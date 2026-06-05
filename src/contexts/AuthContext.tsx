@@ -1,6 +1,5 @@
-"use client";
-
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface User {
   id: string;
@@ -29,31 +28,32 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(true);
 
-  const refreshUser = useCallback(async () => {
-    try {
+  // Use React Query for session management
+  const { data: sessionData, isLoading: isSessionLoading, refetch: refetchSession } = useQuery({
+    queryKey: ["auth-session"],
+    queryFn: async () => {
       const res = await fetch("/api/auth/me", {
         credentials: "include",
         cache: "no-store",
       });
-      if (res.ok) {
-        const data = await res.json();
-        setUser(data.user || null);
-      } else {
-        setUser(null);
-      }
-    } catch {
-      setUser(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      if (!res.ok) throw new Error("No active session");
+      const data = await res.json();
+      return data.user as User | null;
+    },
+    retry: false,
+    staleTime: 1000 * 60 * 5, // Session data is considered fresh for 5 mins
+  });
 
-  useEffect(() => {
-    refreshUser();
-  }, [refreshUser]);
+  // Sync React Query state with local state if needed, 
+  // though we can mostly rely on sessionData
+  const currentUser = sessionData || user;
+
+  const refreshUser = useCallback(async () => {
+    await refetchSession();
+  }, [refetchSession]);
 
   async function login(emailOrUsername: string, password: string) {
     try {
@@ -70,6 +70,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: data.error };
       }
 
+      // Invalidate and refetch session
+      queryClient.invalidateQueries({ queryKey: ["auth-session"] });
       setUser(data.user);
       return { success: true };
     } catch {
@@ -92,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: data.error };
       }
 
+      queryClient.invalidateQueries({ queryKey: ["auth-session"] });
       setUser(data.user);
       return { success: true };
     } catch {
@@ -109,10 +112,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // ignore
     }
     setUser(null);
+    queryClient.setQueryData(["auth-session"], null);
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, refreshUser }}>
+    <AuthContext.Provider value={{ 
+      user: currentUser, 
+      loading: isSessionLoading, 
+      login, 
+      register, 
+      logout, 
+      refreshUser 
+    }}>
       {children}
     </AuthContext.Provider>
   );

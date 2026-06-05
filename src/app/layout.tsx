@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
-import { LayoutWrapper } from "@/components/LayoutWrapper";
+import { QueryProvider } from "@/components/QueryProvider";
 
 export const viewport: Viewport = {
   themeColor: "#a855f7",
@@ -38,11 +38,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
       </head>
       <body className="bg-dark-900 text-white antialiased font-gaming min-h-screen">
-        <AuthProvider>
-          <LanguageProvider>
-            <LayoutWrapper>{children}</LayoutWrapper>
-          </LanguageProvider>
-        </AuthProvider>
+        <QueryProvider>
+          <AuthProvider>
+            <LanguageProvider>
+              <LayoutWrapper>{children}</LayoutWrapper>
+            </LanguageProvider>
+          </AuthProvider>
+        </QueryProvider>
       </body>
     </html>
   );

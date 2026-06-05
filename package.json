@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@tanstack/react-query": "^5.101.0",
     "@types/uuid": "^10.0.0",
     "argon2": "^0.44.0",
     "bcryptjs": "^3.0.3",
