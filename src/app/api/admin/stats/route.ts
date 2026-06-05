@@ -4,8 +4,9 @@ import { users, players, tournaments, matches, disputes, chatMessages, judgments
 import { count, eq } from "drizzle-orm";
 import { validateAdmin } from "@/lib/auth";
 
-
 export const dynamic = "force-dynamic";
+
+
 export async function GET(request: NextRequest) {
   try {
     const { error, status } = await validateAdmin(request);

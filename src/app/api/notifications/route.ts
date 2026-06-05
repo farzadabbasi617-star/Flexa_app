@@ -4,8 +4,9 @@ import { notifications } from "@/db/schema";
 import { eq, desc, count } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 
-
 export const dynamic = "force-dynamic";
+
+
 export async function GET(request: NextRequest) {
   try {
     const searchParams = request.nextUrl.searchParams;

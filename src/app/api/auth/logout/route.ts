@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { deleteSession } from "@/lib/auth";
 
-
 export const dynamic = "force-dynamic";
+
+
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;

@@ -3,8 +3,9 @@ import { db } from "@/db";
 import { siteImages } from "@/db/schema";
 import { eq, and, asc } from "drizzle-orm";
 
-
 export const dynamic = "force-dynamic";
+
+
 export async function GET(request: NextRequest) {
   try {
     const category = request.nextUrl.searchParams.get("category");

@@ -4,8 +4,9 @@ import { achievements, userAchievements } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 
-
 export const dynamic = "force-dynamic";
+
+
 // Default achievements
 const DEFAULT_ACHIEVEMENTS = [
   { name: "First Win", nameFA: "اولین برد", description: "Win your first match", descriptionFA: "اولین مسابقه خود را ببرید", icon: "🏆", category: "wins", requirement: 1, points: 10 },

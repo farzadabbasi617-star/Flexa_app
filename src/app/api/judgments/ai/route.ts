@@ -4,8 +4,9 @@ import { judgments, matches, players, matchEvidence } from "@/db/schema";
 import { eq, count } from "drizzle-orm";
 import { analyzeMatch } from "@/lib/ai-engine";
 
-
 export const dynamic = "force-dynamic";
+
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();

@@ -3,8 +3,9 @@ import { db } from "@/db";
 import { tournaments, registrations } from "@/db/schema";
 import { desc, eq, count, sql } from "drizzle-orm";
 
-
 export const dynamic = "force-dynamic";
+
+
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const game = searchParams.get("game");

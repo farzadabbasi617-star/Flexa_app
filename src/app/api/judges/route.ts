@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { judges } from "@/db/schema";
 
-
 export const dynamic = "force-dynamic";
+
+
 export async function GET() {
   try {
     const allJudges = await db.select().from(judges);

@@ -4,8 +4,9 @@ import { teams, teamMembers, users } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 
-
 export const dynamic = "force-dynamic";
+
+
 export async function GET() {
   try {
     const allTeams = await db

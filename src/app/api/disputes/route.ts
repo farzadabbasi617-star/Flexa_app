@@ -4,8 +4,9 @@ import { disputes, matches } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 
-
 export const dynamic = "force-dynamic";
+
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;
