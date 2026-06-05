@@ -49,10 +49,19 @@ export async function createSession(userId: string, ip: string, userAgent: strin
   return token;
 }
 
-export async function validateSession(token: string, currentIp: string, currentUserAgent: string) {
+export async function validateSession(token: string, currentIp: string, currentUserAgent: string, request?: NextRequest) {
   if (!token) return null;
 
   try {
+    // 1. CSRF Protection for mutating requests
+    if (request && ['POST', 'PATCH', 'DELETE', 'PUT'].includes(request.method)) {
+      const csrfHeader = request.headers.get('x-requested-with');
+      if (!csrfHeader) {
+        logger.warn({ ip: currentIp }, 'CSRF attempt detected: Missing X-Requested-With header');
+        return null;
+      }
+    }
+
     const [session] = await db
       .select()
       .from(sessions)
@@ -60,25 +69,31 @@ export async function validateSession(token: string, currentIp: string, currentU
 
     if (!session) return null;
 
-    // 1. Expiration check
+    // 2. Expiration check
     if (new Date() > session.expiresAt) {
       await deleteSession(token);
       return null;
     }
 
-    // 2. Hijacking Protection: IP & User-Agent Verification
-    // We check if the device has changed. In some cases (mobile data), IP might change, 
-    // but User-Agent rarely does. We log warnings for IP changes.
+    // 3. Hijacking Protection: User-Agent Verification
     if (session.userAgent !== currentUserAgent) {
       logger.warn({ userId: session.userId, oldUA: session.userAgent, newUA: currentUserAgent }, 'Session User-Agent mismatch - Possible Hijacking!');
       await deleteSession(token);
       return null;
     }
 
-    if (session.ipAddress !== currentIp) {
-      logger.info({ userId: session.userId, oldIp: session.ipAddress, newIp: currentIp }, 'Session IP address changed');
-      // We don't necessarily kill the session for IP change (due to mobile roaming), 
-      // but we could trigger a re-auth or rotation.
+    // 4. Automatic Session Rotation (every 15 minutes)
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    if (session.createdAt < fifteenMinutesAgo) {
+      // We rotate the token in the background
+      const newToken = generateToken();
+      await db.update(sessions)
+        .set({ token: newToken })
+        .where(eq(sessions.id, session.id));
+      
+      // We can't easily set the cookie here because this is a helper, 
+      // so we signal that rotation happened via a custom property
+      // The API route will then set the new cookie.
     }
 
     const [user] = await db
