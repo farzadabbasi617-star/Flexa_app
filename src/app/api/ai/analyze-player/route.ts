@@ -3,16 +3,40 @@ import { analyzePlayer } from "@/lib/ai-engine";
 import { db } from "@/db";
 import { players, matches } from "@/db/schema";
 import { eq, or, desc } from "drizzle-orm";
+import { AIAnalyzePlayerSchema } from "@/lib/validations";
+import { rateLimit } from "@/lib/rate-limit";
+import { aiCache } from "@/lib/ai-cache";
+import logger from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   try {
-    const playerId = request.nextUrl.searchParams.get("playerId");
-
-    if (!playerId) {
-      return NextResponse.json({ error: "Player ID required" }, { status: 400 });
+    const ip = request.ip || 'unknown';
+    
+    // 1. Rate Limiting (Tight limit for AI)
+    const rateLimitResult = await rateLimit(ip, 5, 60 * 1000); 
+    if (!rateLimitResult.success) {
+      return NextResponse.json({ error: "Too many AI requests. Please try again later." }, { status: 429 });
     }
 
-    // Get player
+    const playerId = request.nextUrl.searchParams.get("playerId");
+    
+    // 2. Zod Validation
+    const validation = AIAnalyzePlayerSchema.safeParse({ playerId });
+    if (!validation.success) {
+      return NextResponse.json({ error: "Invalid Player ID" }, { status: 400 });
+    }
+
+    // 3. Caching
+    const cacheKey = `analyze_player_${playerId}`;
+    const cachedAnalysis = aiCache.get(cacheKey);
+    if (cachedAnalysis) {
+      return NextResponse.json({ 
+        player: { id: playerId }, 
+        analysis: cachedAnalysis, 
+        cached: true 
+      });
+    }
+
     const [player] = await db
       .select()
       .from(players)
@@ -22,7 +46,6 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Player not found" }, { status: 404 });
     }
 
-    // Get recent matches
     const recentMatches = await db
       .select()
       .from(matches)
@@ -35,7 +58,6 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(matches.createdAt))
       .limit(10);
 
-    // Format recent matches for analysis
     const formattedMatches = recentMatches
       .filter(m => m.winnerId)
       .map(m => ({
@@ -52,6 +74,9 @@ export async function GET(request: NextRequest) {
       formattedMatches
     );
 
+    // Save to cache (1 hour TTL)
+    aiCache.set(cacheKey, analysis, 3600);
+
     return NextResponse.json({
       player: {
         id: player.id,
@@ -61,8 +86,10 @@ export async function GET(request: NextRequest) {
         losses: player.losses,
       },
       analysis,
+      cached: false
     });
-  } catch {
+  } catch (err) {
+    logger.error({ err }, 'AI Player Analysis failed');
     return NextResponse.json({ error: "Analysis failed" }, { status: 500 });
   }
 }

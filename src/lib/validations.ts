@@ -16,13 +16,15 @@ export const LoginSchema = z.object({
   password: z.string().min(1, 'رمز عبور الزامی است'),
 });
 
-export const TournamentCreateSchema = z.object({
-  name: z.string().min(3, 'نام تورنومنت باید حداقل ۳ کاراکتر باشد'),
-  game: z.enum(['Clash Royale', 'Call of Duty', 'Fortnite']),
-  maxPlayers: z.number().int().positive(),
-  startDate: z.string().datetime(),
+export const AIAnalyzePlayerSchema = z.object({
+  playerId: z.string().uuid('ID بازیکن معتبر نیست'),
+  stats: z.record(z.any()).optional(),
 });
 
-export type RegisterInput = z.infer<typeof RegisterSchema>;
-export type LoginInput = z.infer<typeof LoginSchema>;
-export type TournamentCreateInput = z.infer<typeof TournamentCreateSchema>;
+export const AIAssistantSchema = z.object({
+  message: z.string().min(1, 'پیام نمی‌تواند خالی باشد').max(1000, 'پیام بیش از حد طولانی است'),
+});
+
+export const AIModerateSchema = z.object({
+  content: z.string().min(1, 'محتوا برای بررسی الزامی است').max(5000),
+});
