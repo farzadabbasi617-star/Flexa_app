@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { moderateMessage } from "@/lib/ai-engine";
 import { AIModerateSchema } from "@/lib/validations";

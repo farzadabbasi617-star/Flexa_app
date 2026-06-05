@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, players, tournaments, matches, disputes, chatMessages, judgments } from "@/db/schema";

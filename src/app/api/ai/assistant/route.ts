@@ -1,3 +1,4 @@
+export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { generateAssistantResponse } from "@/lib/ai-engine";
 import { validateSession } from "@/lib/auth";
