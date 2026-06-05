@@ -1,10 +1,19 @@
 "use client";
 
-import { ReactNode, useEffect, lazy, Suspense } from "react";
+import { ReactNode, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const AIAssistant = lazy(() => import("./AIAssistant"));
-const PWAInstall = lazy(() => import("./PWAInstall"));
+// Dynamic imports with SSR disabled for client-side only components
+const AIAssistant = dynamic(() => import("./AIAssistant"), { 
+  ssr: false,
+  loading: () => null // Avoid flickering by returning null during load
+});
+
+const PWAInstall = dynamic(() => import("./PWAInstall"), { 
+  ssr: false,
+  loading: () => null 
+});
 
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const { dir, lang } = useLanguage();
@@ -17,12 +26,8 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   return (
     <div dir={dir}>
       {children}
-      <Suspense fallback={null}>
-        <AIAssistant />
-      </Suspense>
-      <Suspense fallback={null}>
-        <PWAInstall />
-      </Suspense>
+      <AIAssistant />
+      <PWAInstall />
     </div>
   );
 }
