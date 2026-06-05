@@ -4,9 +4,18 @@ import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 import logger from "@/lib/logger";
 import { NextRequest } from "next/server";
+import { hashPassword as bcryptHash, comparePassword as bcryptCompare } from "@/lib/auth-utils";
 
 export function generateToken(): string {
   return crypto.randomBytes(48).toString("hex");
+}
+
+export async function hashPassword(password: string): Promise<string> {
+  return await bcryptHash(password);
+}
+
+export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+  return await bcryptCompare(password, hash);
 }
 
 export async function validateAdmin(request: NextRequest) {
@@ -14,7 +23,7 @@ export async function validateAdmin(request: NextRequest) {
   const ip = request.ip || 'unknown';
   const ua = request.headers.get('user-agent') || 'unknown';
 
-  const user = await validateSession(token || '', ip, ua);
+  const user = await validateSession(token || '', ip, ua, request);
 
   if (!user) {
     return { user: null, error: "Unauthorized", status: 401 };
@@ -26,11 +35,6 @@ export async function validateAdmin(request: NextRequest) {
   }
 
   return { user, error: null };
-}
-
-export async function createSession(userId: string, ip: string, userAgent: string): Promise<string> {
-// ...
-  return crypto.randomBytes(48).toString("hex");
 }
 
 export async function createSession(userId: string, ip: string, userAgent: string): Promise<string> {
@@ -53,7 +57,6 @@ export async function validateSession(token: string, currentIp: string, currentU
   if (!token) return null;
 
   try {
-    // 1. CSRF Protection for mutating requests
     if (request && ['POST', 'PATCH', 'DELETE', 'PUT'].includes(request.method)) {
       const csrfHeader = request.headers.get('x-requested-with');
       if (!csrfHeader) {
@@ -69,31 +72,23 @@ export async function validateSession(token: string, currentIp: string, currentU
 
     if (!session) return null;
 
-    // 2. Expiration check
     if (new Date() > session.expiresAt) {
       await deleteSession(token);
       return null;
     }
 
-    // 3. Hijacking Protection: User-Agent Verification
     if (session.userAgent !== currentUserAgent) {
       logger.warn({ userId: session.userId, oldUA: session.userAgent, newUA: currentUserAgent }, 'Session User-Agent mismatch - Possible Hijacking!');
       await deleteSession(token);
       return null;
     }
 
-    // 4. Automatic Session Rotation (every 15 minutes)
     const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
     if (session.createdAt < fifteenMinutesAgo) {
-      // We rotate the token in the background
       const newToken = generateToken();
       await db.update(sessions)
         .set({ token: newToken })
         .where(eq(sessions.id, session.id));
-      
-      // We can't easily set the cookie here because this is a helper, 
-      // so we signal that rotation happened via a custom property
-      // The API route will then set the new cookie.
     }
 
     const [user] = await db

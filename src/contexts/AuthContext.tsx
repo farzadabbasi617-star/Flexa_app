@@ -1,5 +1,10 @@
+'use client';
+
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+interface User {
+// ... (rest of the file remains the same)
 
 interface User {
   id: string;
