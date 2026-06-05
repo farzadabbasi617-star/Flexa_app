@@ -1,41 +1,38 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { tournaments, registrations } from "@/db/schema";
-import { desc, eq, count } from "drizzle-orm";
+import { desc, eq, count, sql } from "drizzle-orm";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const game = searchParams.get("game");
 
   try {
-    let results;
-
-    if (game && ["clash_royale", "cod_mobile", "fortnite"].includes(game)) {
-      results = await db
-        .select()
-        .from(tournaments)
-        .where(eq(tournaments.game, game as "clash_royale" | "cod_mobile" | "fortnite"))
-        .orderBy(desc(tournaments.createdAt));
-    } else {
-      results = await db
-        .select()
-        .from(tournaments)
-        .orderBy(desc(tournaments.createdAt));
-    }
-
-    // Add registration count to each tournament
-    const withCounts = await Promise.all(
-      results.map(async (t) => {
-        const [regCount] = await db
-          .select({ value: count() })
-          .from(registrations)
-          .where(eq(registrations.tournamentId, t.id));
-        return { ...t, registeredCount: regCount.value };
+    // Use a single query with LEFT JOIN and GROUP BY to avoid N+1 problem
+    const results = await db
+      .select({
+        tournament: tournaments,
+        registeredCount: count(registrations.id),
       })
-    );
+      .from(tournaments)
+      .leftJoin(registrations, eq(tournaments.id, registrations.tournamentId))
+      .where(
+        game && ["clash_royale", "cod_mobile", "fortnite"].includes(game)
+          ? eq(tournaments.game, game as "clash_royale" | "cod_mobile" | "fortnite")
+          : undefined
+      )
+      .groupBy(tournaments.id)
+      .orderBy(desc(tournaments.createdAt));
 
-    return NextResponse.json(withCounts);
-  } catch {
+    // Format results to match the original API response structure
+    const formattedResults = results.map(({ tournament, registeredCount }) => ({
+      ...tournament,
+      registeredCount,
+    }));
+
+    return NextResponse.json(formattedResults);
+  } catch (err) {
+    console.error("Fetch tournaments error:", err);
     return NextResponse.json({ error: "Failed to fetch tournaments" }, { status: 500 });
   }
 }
