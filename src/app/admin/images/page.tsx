@@ -1,0 +1,330 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import Navbar from "@/components/Navbar";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
+
+interface SiteImage {
+  id: string;
+  slug: string;
+  title: string;
+  url: string;
+  altText: string | null;
+  category: string;
+  sortOrder: number;
+  isActive: boolean;
+}
+
+const CATEGORIES = [
+  { value: "hero", label: { fa: "هیرو / بنر اصلی", en: "Hero / Main Banner" } },
+  { value: "clash_royale", label: { fa: "کلش رویال", en: "Clash Royale" } },
+  { value: "cod_mobile", label: { fa: "کالاف موبایل", en: "COD Mobile" } },
+  { value: "fortnite", label: { fa: "فورتنایت", en: "Fortnite" } },
+  { value: "tournament", label: { fa: "تورنومنت", en: "Tournament" } },
+  { value: "general", label: { fa: "عمومی", en: "General" } },
+];
+
+export default function AdminImagesPage() {
+  const { lang } = useLanguage();
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const [images, setImages] = useState<SiteImage[]>([]);
+  const [loadingImages, setLoadingImages] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    slug: "",
+    title: "",
+    url: "",
+    altText: "",
+    category: "general",
+    sortOrder: 0,
+  });
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== "admin")) router.push("/");
+  }, [loading, user, router]);
+
+  useEffect(() => {
+    fetchImages();
+  }, []);
+
+  async function fetchImages() {
+    setLoadingImages(true);
+    try {
+      const res = await fetch("/api/admin/images");
+      const data = await res.json();
+      setImages(Array.isArray(data) ? data : []);
+    } catch { setImages([]); }
+    setLoadingImages(false);
+  }
+
+  function startEdit(img: SiteImage) {
+    setEditingId(img.id);
+    setForm({
+      slug: img.slug,
+      title: img.title,
+      url: img.url,
+      altText: img.altText || "",
+      category: img.category,
+      sortOrder: img.sortOrder,
+    });
+    setShowForm(true);
+  }
+
+  function startNew() {
+    setEditingId(null);
+    setForm({ slug: "", title: "", url: "", altText: "", category: "general", sortOrder: 0 });
+    setShowForm(true);
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+
+    try {
+      if (editingId) {
+        await fetch("/api/admin/images", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: editingId, ...form }),
+        });
+      } else {
+        await fetch("/api/admin/images", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(form),
+        });
+      }
+      setShowForm(false);
+      setEditingId(null);
+      fetchImages();
+    } catch { /* ignore */ }
+    setSaving(false);
+  }
+
+  async function handleDelete(id: string) {
+    if (!confirm(lang === "fa" ? "آیا مطمئنید؟" : "Are you sure?")) return;
+    try {
+      await fetch("/api/admin/images", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      fetchImages();
+    } catch { /* ignore */ }
+  }
+
+  async function toggleActive(img: SiteImage) {
+    try {
+      await fetch("/api/admin/images", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: img.id, isActive: !img.isActive }),
+      });
+      fetchImages();
+    } catch { /* ignore */ }
+  }
+
+  if (loading || !user || user.role !== "admin") return null;
+
+  return (
+    <div className="min-h-screen bg-dark-900">
+      <Navbar />
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <button onClick={() => router.push("/admin")} className="text-gray-500 hover:text-white">←</button>
+            <h1 className="text-2xl font-bold">
+              🖼️ <span className="neon-text-purple">{lang === "fa" ? "مدیریت تصاویر" : "Image Manager"}</span>
+            </h1>
+          </div>
+          <button onClick={startNew} className="gaming-btn text-sm">
+            + {lang === "fa" ? "تصویر جدید" : "New Image"}
+          </button>
+        </div>
+
+        {/* Helper */}
+        <div className="gaming-card p-4 mb-6 border-neon-blue/30">
+          <p className="text-sm text-gray-400">
+            💡 {lang === "fa"
+              ? "تصاویر را از هاست تصویر (مثل imgbb.com یا imgur.com) آپلود کنید و لینک را اینجا وارد کنید. دسته‌بندی مناسب انتخاب کنید تا تصاویر در جای درست نمایش داده شوند."
+              : "Upload images to an image host (like imgbb.com or imgur.com) and paste the link here. Choose the right category so images show in the correct place."}
+          </p>
+        </div>
+
+        {/* Form */}
+        {showForm && (
+          <div className="gaming-card p-6 mb-6 animate-slide-up">
+            <h3 className="text-lg font-bold mb-4 neon-text-blue">
+              {editingId
+                ? lang === "fa" ? "ویرایش تصویر" : "Edit Image"
+                : lang === "fa" ? "تصویر جدید" : "New Image"}
+            </h3>
+            <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  {lang === "fa" ? "شناسه (انگلیسی)" : "Slug"} *
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="gaming-input text-sm"
+                  placeholder="hero-banner"
+                  value={form.slug}
+                  onChange={(e) => setForm({ ...form, slug: e.target.value.replace(/\s/g, "-").toLowerCase() })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  {lang === "fa" ? "عنوان" : "Title"} *
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="gaming-input text-sm"
+                  placeholder={lang === "fa" ? "بنر صفحه اصلی" : "Homepage banner"}
+                  value={form.title}
+                  onChange={(e) => setForm({ ...form, title: e.target.value })}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs text-gray-500 mb-1">
+                  {lang === "fa" ? "لینک تصویر" : "Image URL"} *
+                </label>
+                <input
+                  type="url"
+                  required
+                  className="gaming-input text-sm"
+                  placeholder="https://i.ibb.co/xxxxx/image.jpg"
+                  value={form.url}
+                  onChange={(e) => setForm({ ...form, url: e.target.value })}
+                />
+              </div>
+              {form.url && (
+                <div className="sm:col-span-2">
+                  <p className="text-xs text-gray-500 mb-1">{lang === "fa" ? "پیش‌نمایش:" : "Preview:"}</p>
+                  <img src={form.url} alt="Preview" className="h-32 rounded-lg object-cover border border-gaming-border" />
+                </div>
+              )}
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  {lang === "fa" ? "متن جایگزین" : "Alt Text"}
+                </label>
+                <input
+                  type="text"
+                  className="gaming-input text-sm"
+                  value={form.altText}
+                  onChange={(e) => setForm({ ...form, altText: e.target.value })}
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  {lang === "fa" ? "دسته‌بندی" : "Category"}
+                </label>
+                <select
+                  className="gaming-select text-sm"
+                  value={form.category}
+                  onChange={(e) => setForm({ ...form, category: e.target.value })}
+                >
+                  {CATEGORIES.map((c) => (
+                    <option key={c.value} value={c.value}>
+                      {lang === "fa" ? c.label.fa : c.label.en}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">
+                  {lang === "fa" ? "ترتیب نمایش" : "Sort Order"}
+                </label>
+                <input
+                  type="number"
+                  className="gaming-input text-sm"
+                  value={form.sortOrder}
+                  onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value) || 0 })}
+                />
+              </div>
+              <div className="sm:col-span-2 flex gap-3">
+                <button type="submit" disabled={saving} className="gaming-btn text-sm disabled:opacity-50">
+                  {saving
+                    ? lang === "fa" ? "در حال ذخیره..." : "Saving..."
+                    : lang === "fa" ? "💾 ذخیره" : "💾 Save"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setShowForm(false); setEditingId(null); }}
+                  className="px-4 py-2 rounded-lg text-gray-500 hover:text-white transition-colors"
+                >
+                  {lang === "fa" ? "انصراف" : "Cancel"}
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Images List */}
+        {loadingImages ? (
+          <div className="text-center py-16">
+            <div className="text-4xl animate-neon-pulse mb-4">🖼️</div>
+            <p className="text-gray-400">{lang === "fa" ? "در حال بارگذاری..." : "Loading..."}</p>
+          </div>
+        ) : images.length === 0 ? (
+          <div className="gaming-card p-12 text-center">
+            <div className="text-5xl mb-4">🖼️</div>
+            <h3 className="text-xl font-bold mb-2">{lang === "fa" ? "هنوز تصویری نیست" : "No images yet"}</h3>
+            <p className="text-gray-400 mb-4">{lang === "fa" ? "اولین تصویر را اضافه کنید" : "Add your first image"}</p>
+            <button onClick={startNew} className="gaming-btn text-sm">
+              + {lang === "fa" ? "تصویر جدید" : "New Image"}
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {images.map((img) => (
+              <div key={img.id} className={`gaming-card overflow-hidden ${!img.isActive ? "opacity-50" : ""}`}>
+                {/* Image Preview */}
+                <div className="h-40 bg-dark-700 relative">
+                  <img src={img.url} alt={img.altText || img.title} className="w-full h-full object-cover" />
+                  <div className="absolute top-2 start-2 flex gap-1">
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-dark-800/80 text-neon-purple font-bold">
+                      {CATEGORIES.find((c) => c.value === img.category)?.label[lang === "fa" ? "fa" : "en"] || img.category}
+                    </span>
+                  </div>
+                  {!img.isActive && (
+                    <div className="absolute top-2 end-2">
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-red-900/80 text-red-400">
+                        {lang === "fa" ? "غیرفعال" : "Inactive"}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {/* Info */}
+                <div className="p-4">
+                  <h3 className="font-bold text-sm mb-1">{img.title}</h3>
+                  <p className="text-xs text-gray-500 font-mono mb-3">{img.slug}</p>
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button onClick={() => startEdit(img)} className="text-xs px-3 py-1.5 rounded-lg bg-dark-600 text-neon-blue hover:bg-dark-500 transition-colors">
+                      ✏️ {lang === "fa" ? "ویرایش" : "Edit"}
+                    </button>
+                    <button onClick={() => toggleActive(img)} className="text-xs px-3 py-1.5 rounded-lg bg-dark-600 text-neon-yellow hover:bg-dark-500 transition-colors">
+                      {img.isActive ? "🔴" : "🟢"} {img.isActive ? (lang === "fa" ? "غیرفعال" : "Disable") : (lang === "fa" ? "فعال" : "Enable")}
+                    </button>
+                    <button onClick={() => handleDelete(img.id)} className="text-xs px-3 py-1.5 rounded-lg bg-dark-600 text-neon-pink hover:bg-dark-500 transition-colors">
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

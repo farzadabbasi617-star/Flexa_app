@@ -1,0 +1,67 @@
+import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/db";
+import { users } from "@/db/schema";
+import { eq, desc } from "drizzle-orm";
+import { validateSession } from "@/lib/auth";
+
+async function requireAdmin(request: NextRequest) {
+  const token = request.cookies.get("session")?.value;
+  if (!token) return null;
+  const user = await validateSession(token);
+  if (!user || user.role !== "admin") return null;
+  return user;
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const allUsers = await db
+      .select({
+        id: users.id,
+        email: users.email,
+        username: users.username,
+        displayName: users.displayName,
+        role: users.role,
+        isVerified: users.isVerified,
+        clashRoyaleId: users.clashRoyaleId,
+        codMobileId: users.codMobileId,
+        fortniteId: users.fortniteId,
+        createdAt: users.createdAt,
+        lastLoginAt: users.lastLoginAt,
+      })
+      .from(users)
+      .orderBy(desc(users.createdAt));
+
+    return NextResponse.json(allUsers);
+  } catch {
+    return NextResponse.json({ error: "Failed" }, { status: 500 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const admin = await requireAdmin(request);
+    if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+    const body = await request.json();
+    const { id, role, isVerified } = body;
+
+    if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
+
+    const updateData: Record<string, unknown> = {};
+    if (role !== undefined) updateData.role = role;
+    if (isVerified !== undefined) updateData.isVerified = isVerified;
+
+    const [updated] = await db
+      .update(users)
+      .set(updateData)
+      .where(eq(users.id, id))
+      .returning({ id: users.id, role: users.role, isVerified: users.isVerified });
+
+    return NextResponse.json(updated);
+  } catch {
+    return NextResponse.json({ error: "Failed" }, { status: 500 });
+  }
+}

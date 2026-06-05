@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+@theme {
+  --color-neon-blue: #00d4ff;
+  --color-neon-purple: #a855f7;
+  --color-neon-pink: #ff006e;
+  --color-neon-green: #39ff14;
+  --color-neon-orange: #ff6b00;
+  --color-neon-yellow: #ffe600;
+  --color-dark-900: #0a0a0f;
+  --color-dark-800: #12121a;
+  --color-dark-700: #1a1a2e;
+  --color-dark-600: #252540;
+  --color-dark-500: #2d2d4a;
+  --color-gaming-card: #16162a;
+  --color-gaming-border: #2a2a50;
+  --font-family-gaming: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-neon-purple) var(--color-dark-800);
+  }
+
+  *::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: var(--color-dark-800);
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--color-neon-purple);
+    border-radius: 3px;
+  }
+}
+
+@keyframes neon-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes glow {
+  0%, 100% { box-shadow: 0 0 5px var(--color-neon-blue), 0 0 10px var(--color-neon-blue); }
+  50% { box-shadow: 0 0 10px var(--color-neon-blue), 0 0 20px var(--color-neon-blue), 0 0 30px var(--color-neon-blue); }
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-neon-pulse {
+  animation: neon-pulse 2s ease-in-out infinite;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.5s ease-out;
+}
+
+.animate-glow {
+  animation: glow 2s ease-in-out infinite;
+}
+
+.animate-gradient {
+  background-size: 200% 200%;
+  animation: gradient-shift 3s ease infinite;
+}
+
+.gaming-card {
+  background: linear-gradient(135deg, var(--color-gaming-card), var(--color-dark-700));
+  border: 1px solid var(--color-gaming-border);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.gaming-card:hover {
+  border-color: var(--color-neon-purple);
+  box-shadow: 0 0 15px rgba(168, 85, 247, 0.2);
+  transform: translateY(-2px);
+}
+
+.neon-text-blue {
+  color: var(--color-neon-blue);
+  text-shadow: 0 0 7px var(--color-neon-blue), 0 0 10px var(--color-neon-blue);
+}
+
+.neon-text-purple {
+  color: var(--color-neon-purple);
+  text-shadow: 0 0 7px var(--color-neon-purple), 0 0 10px var(--color-neon-purple);
+}
+
+.neon-text-pink {
+  color: var(--color-neon-pink);
+  text-shadow: 0 0 7px var(--color-neon-pink), 0 0 10px var(--color-neon-pink);
+}
+
+.neon-border {
+  border: 1px solid var(--color-neon-blue);
+  box-shadow: 0 0 5px var(--color-neon-blue), inset 0 0 5px rgba(0, 212, 255, 0.1);
+}
+
+.gaming-btn {
+  background: linear-gradient(135deg, var(--color-neon-purple), var(--color-neon-blue));
+  color: white;
+  padding: 10px 24px;
+  border-radius: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.gaming-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(168, 85, 247, 0.4);
+}
+
+.gaming-btn:active {
+  transform: translateY(0);
+}
+
+.gaming-btn-danger {
+  background: linear-gradient(135deg, var(--color-neon-pink), #ff4444);
+}
+
+.gaming-btn-success {
+  background: linear-gradient(135deg, var(--color-neon-green), #00cc66);
+}
+
+.gaming-input {
+  background: var(--color-dark-700);
+  border: 1px solid var(--color-gaming-border);
+  border-radius: 8px;
+  color: white;
+  padding: 10px 16px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+  width: 100%;
+  outline: none;
+}
+
+.gaming-input:focus {
+  border-color: var(--color-neon-blue);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.2);
+}
+
+.gaming-select {
+  background: var(--color-dark-700);
+  border: 1px solid var(--color-gaming-border);
+  border-radius: 8px;
+  color: white;
+  padding: 10px 16px;
+  font-size: 14px;
+  transition: border-color 0.3s ease;
+  width: 100%;
+  outline: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+.gaming-select:focus {
+  border-color: var(--color-neon-blue);
+}
+
+.bracket-line {
+  border-color: var(--color-gaming-border);
+}
