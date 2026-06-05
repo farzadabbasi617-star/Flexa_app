@@ -4,18 +4,18 @@ import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 import logger from "@/lib/logger";
 import { NextRequest } from "next/server";
-import { hashPassword as bcryptHash, comparePassword as bcryptCompare } from "@/lib/auth-utils";
+import { hashPassword as argonHash, comparePassword as argonCompare } from "@/lib/auth-utils";
 
 export function generateToken(): string {
   return crypto.randomBytes(48).toString("hex");
 }
 
 export async function hashPassword(password: string): Promise<string> {
-  return await bcryptHash(password);
+  return await argonHash(password);
 }
 
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return await bcryptCompare(password, hash);
+  return await argonCompare(hash, password);
 }
 
 export async function validateAdmin(request: NextRequest) {
@@ -40,7 +40,7 @@ export async function validateAdmin(request: NextRequest) {
 export async function createSession(userId: string, ip: string, userAgent: string): Promise<string> {
   const token = generateToken();
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 30); // 30 days
+  expiresAt.setDate(expiresAt.getDate() + 30);
 
   await db.insert(sessions).values({
     userId,

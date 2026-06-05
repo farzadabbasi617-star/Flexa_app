@@ -4,9 +4,6 @@ import { createContext, useContext, useState, useCallback, ReactNode } from "rea
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface User {
-// ... (rest of the file remains the same)
-
-interface User {
   id: string;
   email: string;
   username: string;
@@ -36,7 +33,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [user, setUser] = useState<User | null>(null);
 
-  // Use React Query for session management
   const { data: sessionData, isLoading: isSessionLoading, refetch: refetchSession } = useQuery({
     queryKey: ["auth-session"],
     queryFn: async () => {
@@ -49,11 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return data.user as User | null;
     },
     retry: false,
-    staleTime: 1000 * 60 * 5, // Session data is considered fresh for 5 mins
+    staleTime: 1000 * 60 * 5,
   });
 
-  // Sync React Query state with local state if needed, 
-  // though we can mostly rely on sessionData
   const currentUser = sessionData || user;
 
   const refreshUser = useCallback(async () => {
@@ -75,7 +69,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: data.error };
       }
 
-      // Invalidate and refetch session
       queryClient.invalidateQueries({ queryKey: ["auth-session"] });
       setUser(data.user);
       return { success: true };
