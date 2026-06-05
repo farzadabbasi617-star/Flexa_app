@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, players, tournaments, matches, disputes, chatMessages, judgments } from "@/db/schema";
 import { count, eq } from "drizzle-orm";
-import { validateSession } from "@/lib/auth";
+import { validateAdmin } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.cookies.get("session")?.value;
-    if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    const user = await validateSession(token);
-    if (!user || user.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const { error, status } = await validateAdmin(request);
+    if (error) return NextResponse.json({ error }, { status });
 
     const [uCount] = await db.select({ v: count() }).from(users);
     const [pCount] = await db.select({ v: count() }).from(players);

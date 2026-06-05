@@ -2,20 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
-import { validateSession } from "@/lib/auth";
-
-async function requireAdmin(request: NextRequest) {
-  const token = request.cookies.get("session")?.value;
-  if (!token) return null;
-  const user = await validateSession(token);
-  if (!user || user.role !== "admin") return null;
-  return user;
-}
+import { validateAdmin } from "@/lib/auth";
 
 export async function GET(request: NextRequest) {
   try {
-    const admin = await requireAdmin(request);
-    if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { error, status } = await validateAdmin(request);
+    if (error) return NextResponse.json({ error }, { status });
 
     const allUsers = await db
       .select({
@@ -42,8 +34,8 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const admin = await requireAdmin(request);
-    if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { error, status } = await validateAdmin(request);
+    if (error) return NextResponse.json({ error }, { status });
 
     const body = await request.json();
     const { id, role, isVerified } = body;

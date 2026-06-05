@@ -8,9 +8,12 @@ import { validateSession } from "@/lib/auth";
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;
+    const ip = request.ip || 'unknown';
+    const ua = request.headers.get('user-agent') || 'unknown';
+
     if (!token) return NextResponse.json({ error: "Login first" }, { status: 401 });
 
-    const user = await validateSession(token);
+    const user = await validateSession(token, ip, ua);
     if (!user) return NextResponse.json({ error: "Invalid session" }, { status: 401 });
 
     // Check if any admin already exists

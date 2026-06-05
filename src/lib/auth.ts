@@ -3,8 +3,33 @@ import { users, sessions } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 import logger from "@/lib/logger";
+import { NextRequest } from "next/server";
 
 export function generateToken(): string {
+  return crypto.randomBytes(48).toString("hex");
+}
+
+export async function validateAdmin(request: NextRequest) {
+  const token = request.cookies.get("session")?.value;
+  const ip = request.ip || 'unknown';
+  const ua = request.headers.get('user-agent') || 'unknown';
+
+  const user = await validateSession(token || '', ip, ua);
+
+  if (!user) {
+    return { user: null, error: "Unauthorized", status: 401 };
+  }
+
+  if (user.role !== 'admin' && user.role !== 'super_admin') {
+    logger.warn({ userId: user.id, role: user.role }, 'Unauthorized admin access attempt');
+    return { user: null, error: "Forbidden: Admin access required", status: 403 };
+  }
+
+  return { user, error: null };
+}
+
+export async function createSession(userId: string, ip: string, userAgent: string): Promise<string> {
+// ...
   return crypto.randomBytes(48).toString("hex");
 }
 

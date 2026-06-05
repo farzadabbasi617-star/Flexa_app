@@ -2,18 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { siteSettings } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { validateSession } from "@/lib/auth";
+import { validateAdmin } from "@/lib/auth";
 
-async function requireAdmin(request: NextRequest) {
-  const token = request.cookies.get("session")?.value;
-  if (!token) return null;
-  const user = await validateSession(token);
-  if (!user || user.role !== "admin") return null;
-  return user;
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { error, status } = await validateAdmin(request);
+    if (error) return NextResponse.json({ error }, { status });
+
     const settings = await db.select().from(siteSettings);
     const result: Record<string, string> = {};
     for (const s of settings) {
@@ -21,14 +16,14 @@ export async function GET() {
     }
     return NextResponse.json(result);
   } catch {
-    return NextResponse.json({});
+    return NextResponse.json({ error: "Failed" }, { status: 500 });
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdmin(request);
-    if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { error, status } = await validateAdmin(request);
+    if (error) return NextResponse.json({ error }, { status });
 
     const body = await request.json();
 

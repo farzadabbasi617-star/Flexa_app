@@ -2,18 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { siteImages } from "@/db/schema";
 import { eq, asc, desc } from "drizzle-orm";
-import { validateSession } from "@/lib/auth";
+import { validateAdmin } from "@/lib/auth";
 
-async function requireAdmin(request: NextRequest) {
-  const token = request.cookies.get("session")?.value;
-  if (!token) return null;
-  const user = await validateSession(token);
-  if (!user || user.role !== "admin") return null;
-  return user;
-}
-
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
+    const { error, status } = await validateAdmin(request);
+    if (error) return NextResponse.json({ error }, { status });
+
     const images = await db
       .select()
       .from(siteImages)
@@ -26,8 +21,8 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const admin = await requireAdmin(request);
-    if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { error, status } = await validateAdmin(request);
+    if (error) return NextResponse.json({ error }, { status });
 
     const body = await request.json();
     const { slug, title, url, altText, category, sortOrder } = body;
@@ -56,8 +51,8 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const admin = await requireAdmin(request);
-    if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { error, status } = await validateAdmin(request);
+    if (error) return NextResponse.json({ error }, { status });
 
     const body = await request.json();
     const { id, ...data } = body;
@@ -78,8 +73,8 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const admin = await requireAdmin(request);
-    if (!admin) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const { error, status } = await validateAdmin(request);
+    if (error) return NextResponse.json({ error }, { status });
 
     const { id } = await request.json();
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
