@@ -1,8 +1,9 @@
-export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { tournaments, players, registrations, judges, users } from "@/db/schema";
 
+
+export const dynamic = "force-dynamic";
 export async function POST() {
   try {
     // 1. Create sample users first (since registrations and players depend on them)

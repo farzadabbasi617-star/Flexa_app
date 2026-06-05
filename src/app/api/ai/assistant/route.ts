@@ -1,4 +1,3 @@
-export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { generateAssistantResponse } from "@/lib/ai-engine";
 import { validateSession } from "@/lib/auth";
@@ -8,6 +7,8 @@ import { aiCache } from "@/lib/ai-cache";
 import logger from "@/lib/logger";
 import crypto from "crypto";
 
+
+export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';

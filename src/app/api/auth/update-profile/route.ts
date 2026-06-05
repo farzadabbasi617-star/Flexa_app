@@ -1,10 +1,11 @@
-export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 
+
+export const dynamic = "force-dynamic";
 export async function PATCH(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;

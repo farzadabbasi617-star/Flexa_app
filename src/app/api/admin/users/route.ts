@@ -1,10 +1,11 @@
-export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { validateAdmin } from "@/lib/auth";
 
+
+export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const { error, status } = await validateAdmin(request);

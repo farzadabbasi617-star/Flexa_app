@@ -1,4 +1,3 @@
-export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, players } from "@/db/schema";
@@ -8,6 +7,8 @@ import { RegisterSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 
+
+export const dynamic = "force-dynamic";
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';

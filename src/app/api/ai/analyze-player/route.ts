@@ -1,4 +1,3 @@
-export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { analyzePlayer } from "@/lib/ai-engine";
 import { db } from "@/db";
@@ -9,6 +8,8 @@ import { rateLimit } from "@/lib/rate-limit";
 import { aiCache } from "@/lib/ai-cache";
 import logger from "@/lib/logger";
 
+
+export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';

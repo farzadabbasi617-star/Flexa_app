@@ -1,9 +1,10 @@
-export const dynamic = "force-dynamic";
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { matches, players } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
+
+export const dynamic = "force-dynamic";
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
