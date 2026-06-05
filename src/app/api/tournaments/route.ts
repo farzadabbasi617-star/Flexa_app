@@ -6,9 +6,22 @@ import { desc, eq, count, sql } from "drizzle-orm";
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const game = searchParams.get("game");
+  const page = parseInt(searchParams.get("page") || "1");
+  const limit = parseInt(searchParams.get("limit") || "10");
+  const offset = (page - 1) * limit;
 
   try {
-    // Use a single query with LEFT JOIN and GROUP BY to avoid N+1 problem
+    // 1. Get total count for pagination
+    const [totalResult] = await db
+      .select({ value: count() })
+      .from(tournaments)
+      .where(
+        game && ["clash_royale", "cod_mobile", "fortnite"].includes(game)
+          ? eq(tournaments.game, game as "clash_royale" | "cod_mobile" | "fortnite")
+          : undefined
+      );
+
+    // 2. Get paginated results with JOIN to avoid N+1
     const results = await db
       .select({
         tournament: tournaments,
@@ -22,15 +35,24 @@ export async function GET(request: NextRequest) {
           : undefined
       )
       .groupBy(tournaments.id)
-      .orderBy(desc(tournaments.createdAt));
+      .orderBy(desc(tournaments.createdAt))
+      .limit(limit)
+      .offset(offset);
 
-    // Format results to match the original API response structure
     const formattedResults = results.map(({ tournament, registeredCount }) => ({
       ...tournament,
       registeredCount,
     }));
 
-    return NextResponse.json(formattedResults);
+    return NextResponse.json({
+      data: formattedResults,
+      pagination: {
+        total: totalResult.value,
+        page,
+        limit,
+        totalPages: Math.ceil(totalResult.value / limit),
+      },
+    });
   } catch (err) {
     console.error("Fetch tournaments error:", err);
     return NextResponse.json({ error: "Failed to fetch tournaments" }, { status: 500 });

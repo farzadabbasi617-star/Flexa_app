@@ -1,15 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { players } from "@/db/schema";
-import { desc } from "drizzle-orm";
+import { desc, count } from "drizzle-orm";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams;
+  const page = parseInt(searchParams.get("page") || "1");
+  const limit = parseInt(searchParams.get("limit") || "20");
+  const offset = (page - 1) * limit;
+
   try {
-    const allPlayers = await db
+    const [totalResult] = await db
+      .select({ value: count() })
+      .from(players);
+
+    const paginatedPlayers = await db
       .select()
       .from(players)
-      .orderBy(desc(players.rating));
-    return NextResponse.json(allPlayers);
+      .orderBy(desc(players.rating))
+      .limit(limit)
+      .offset(offset);
+
+    return NextResponse.json({
+      data: paginatedPlayers,
+      pagination: {
+        total: totalResult.value,
+        page,
+        limit,
+        totalPages: Math.ceil(totalResult.value / limit),
+      },
+    });
   } catch {
     return NextResponse.json({ error: "Failed to fetch players" }, { status: 500 });
   }

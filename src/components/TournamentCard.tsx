@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, memo } from "react";
 import Link from "next/link";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -78,7 +78,7 @@ function useCountdown(targetDate: string | null) {
   return { timeLeft, isExpired };
 }
 
-export default function TournamentCard({ tournament }: { tournament: Tournament }) {
+const TournamentCard = ({ tournament }: { tournament: Tournament }) => {
   const { lang } = useLanguage();
   const [showRules, setShowRules] = useState(false);
   const { timeLeft, isExpired } = useCountdown(tournament.startDate);
@@ -99,11 +99,8 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
   return (
     <>
       <div className="gaming-card overflow-hidden group relative">
-        {/* Top gradient bar */}
         <div className={`h-1.5 bg-gradient-to-r ${game.gradient}`} />
-
         <div className="p-5">
-          {/* Row 1: Game badge + Status + Countdown */}
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gradient-to-r ${game.gradient} text-white text-xs font-bold`}>
@@ -119,14 +116,12 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
             </div>
           </div>
 
-          {/* Row 2: Tournament Name */}
           <Link href={`/tournaments/${tournament.id}`} className="block">
             <h3 className="text-lg font-bold mb-1 group-hover:text-neon-blue transition-colors leading-tight">
               {tournament.name}
             </h3>
           </Link>
 
-          {/* Row 3: Game Mode + Map */}
           {(tournament.gameMode || tournament.mapName) && (
             <div className="flex items-center gap-2 mb-3 text-xs text-gray-500">
               {tournament.gameMode && <span>🎮 {tournament.gameMode}</span>}
@@ -134,7 +129,6 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
             </div>
           )}
 
-          {/* Row 4: Countdown Timer */}
           {tournament.status === "registration" && timeLeft && (
             <div className="bg-dark-700 rounded-lg p-3 mb-3 flex items-center justify-between">
               <span className="text-xs text-gray-400">{L("⏳ تا شروع:", "⏳ Starts in:")}</span>
@@ -147,7 +141,6 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
             </div>
           )}
 
-          {/* Row 5: Player Progress Bar */}
           <div className="mb-3">
             <div className="flex items-center justify-between text-xs mb-1.5">
               <span className="text-gray-400">
@@ -179,7 +172,6 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
             </div>
           </div>
 
-          {/* Row 6: Entry Fee + Prize */}
           <div className="grid grid-cols-2 gap-2 mb-3">
             <div className="bg-dark-700 rounded-lg p-2.5 text-center">
               <div className="text-xs text-gray-500 mb-0.5">{L("💳 ورودی", "💳 Entry")}</div>
@@ -195,7 +187,6 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
             </div>
           </div>
 
-          {/* Row 7: Prize Distribution */}
           {(tournament.prize1st || tournament.prize2nd || tournament.prize3rd) && (
             <div className="bg-dark-700/50 rounded-lg p-3 mb-3">
               <div className="text-xs text-gray-500 mb-2">{L("🎁 تقسیم جوایز:", "🎁 Prize Split:")}</div>
@@ -228,7 +219,6 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
             </div>
           )}
 
-          {/* Row 8: Actions */}
           <div className="flex gap-2">
             <Link href={`/tournaments/${tournament.id}`} className={`flex-1 text-center py-2.5 rounded-lg text-sm font-bold transition-all ${
               tournament.status === "registration" && !isFull
@@ -254,11 +244,9 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
         </div>
       </div>
 
-      {/* Rules Modal */}
       {showRules && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={() => setShowRules(false)}>
           <div className="gaming-card p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto animate-slide-up" onClick={(e) => e.stopPropagation()}>
-            {/* Header */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
                 <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded bg-gradient-to-r ${game.gradient} text-white text-xs font-bold`}>
@@ -269,7 +257,6 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
               <button onClick={() => setShowRules(false)} className="text-gray-500 hover:text-white text-xl">✕</button>
             </div>
 
-            {/* Tournament Info */}
             <div className="grid grid-cols-2 gap-3 mb-4">
               <div className="bg-dark-700 rounded-lg p-3 text-center">
                 <div className="text-xs text-gray-500">{L("فرمت", "Format")}</div>
@@ -293,7 +280,6 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
               </div>
             </div>
 
-            {/* Description */}
             {tournament.description && (
               <div className="mb-4">
                 <h4 className="font-bold text-neon-blue text-sm mb-2">{L("📝 توضیحات", "📝 Description")}</h4>
@@ -301,7 +287,6 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
               </div>
             )}
 
-            {/* Rules */}
             {tournament.rules && (
               <div className="mb-4">
                 <h4 className="font-bold text-neon-purple text-sm mb-2">{L("📜 قوانین", "📜 Rules")}</h4>
@@ -311,7 +296,6 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
               </div>
             )}
 
-            {/* Prize Details */}
             {(tournament.prize1st || tournament.prizePool) && (
               <div>
                 <h4 className="font-bold text-neon-yellow text-sm mb-2">{L("🏆 جوایز", "🏆 Prizes")}</h4>
@@ -344,7 +328,6 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
               </div>
             )}
 
-            {/* Close button */}
             <button onClick={() => setShowRules(false)} className="gaming-btn w-full mt-6 py-3">
               {L("بستن", "Close")}
             </button>
@@ -354,3 +337,5 @@ export default function TournamentCard({ tournament }: { tournament: Tournament 
     </>
   );
 }
+
+export default memo(TournamentCard);
