@@ -1,10 +1,27 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { tournaments, players, registrations, judges } from "@/db/schema";
+import { tournaments, players, registrations, judges, users } from "@/db/schema";
 
 export async function POST() {
   try {
-    // Create sample judges
+    // 1. Create sample users first (since registrations and players depend on them)
+    const userNames = [
+      "ShadowStrike", "BlazeFury", "FrostByte", "ThunderKing", "VortexGamer", 
+      "NeonAssassin", "CyberWolf", "PhantomAce", "StormRider", "IronClaw", 
+      "DarkMatter", "PixelKnight", "ZeroGravity", "EliteSniper", "GhostReaper", "MegaBlast"
+    ];
+
+    const sampleUsers = await db
+      .insert(users)
+      .values(userNames.map(name => ({
+        username: name.toLowerCase().replace(/\s+/g, ''),
+        email: `${name.toLowerCase()}@example.com`,
+        passwordHash: "hashed_password_here",
+        displayName: name,
+      })))
+      .returning();
+
+    // 2. Create sample judges
     const sampleJudges = await db
       .insert(judges)
       .values([
@@ -14,30 +31,30 @@ export async function POST() {
       ])
       .returning();
 
-    // Create sample players
+    // 3. Create sample players linked to users
     const samplePlayers = await db
       .insert(players)
       .values([
-        { username: "ShadowStrike", displayName: "Shadow Strike", rating: 1450, wins: 28, losses: 12 },
-        { username: "BlazeFury", displayName: "Blaze Fury", rating: 1380, wins: 22, losses: 15 },
-        { username: "FrostByte", displayName: "Frost Byte", rating: 1520, wins: 35, losses: 8 },
-        { username: "ThunderKing", displayName: "Thunder King", rating: 1290, wins: 18, losses: 20 },
-        { username: "VortexGamer", displayName: "Vortex Gamer", rating: 1410, wins: 25, losses: 14 },
-        { username: "NeonAssassin", displayName: "Neon Assassin", rating: 1350, wins: 20, losses: 16 },
-        { username: "CyberWolf", displayName: "Cyber Wolf", rating: 1480, wins: 30, losses: 10 },
-        { username: "PhantomAce", displayName: "Phantom Ace", rating: 1200, wins: 14, losses: 22 },
-        { username: "StormRider", displayName: "Storm Rider", rating: 1550, wins: 38, losses: 6 },
-        { username: "IronClaw", displayName: "Iron Claw", rating: 1320, wins: 19, losses: 18 },
-        { username: "DarkMatter", displayName: "Dark Matter", rating: 1440, wins: 27, losses: 13 },
-        { username: "PixelKnight", displayName: "Pixel Knight", rating: 1260, wins: 16, losses: 21 },
-        { username: "ZeroGravity", displayName: "Zero Gravity", rating: 1390, wins: 23, losses: 15 },
-        { username: "EliteSniper", displayName: "Elite Sniper", rating: 1500, wins: 32, losses: 9 },
-        { username: "GhostReaper", displayName: "Ghost Reaper", rating: 1340, wins: 21, losses: 17 },
-        { username: "MegaBlast", displayName: "Mega Blast", rating: 1180, wins: 12, losses: 24 },
+        { username: "ShadowStrike", displayName: "Shadow Strike", rating: 1450, wins: 28, losses: 12, visibleUserId: sampleUsers[0].id },
+        { username: "BlazeFury", displayName: "Blaze Fury", rating: 1380, wins: 22, losses: 15, visibleUserId: sampleUsers[1].id },
+        { username: "FrostByte", displayName: "Frost Byte", rating: 1520, wins: 35, losses: 8, visibleUserId: sampleUsers[2].id },
+        { username: "ThunderKing", displayName: "Thunder King", rating: 1290, wins: 18, losses: 20, visibleUserId: sampleUsers[3].id },
+        { username: "VortexGamer", displayName: "Vortex Gamer", rating: 1410, wins: 25, losses: 14, visibleUserId: sampleUsers[4].id },
+        { username: "NeonAssassin", displayName: "Neon Assassin", rating: 1350, wins: 20, losses: 16, visibleUserId: sampleUsers[5].id },
+        { username: "CyberWolf", displayName: "Cyber Wolf", rating: 1480, wins: 30, losses: 10, visibleUserId: sampleUsers[6].id },
+        { username: "PhantomAce", displayName: "Phantom Ace", rating: 1200, wins: 14, losses: 22, visibleUserId: sampleUsers[7].id },
+        { username: "StormRider", displayName: "Storm Rider", rating: 1550, wins: 38, losses: 6, visibleUserId: sampleUsers[8].id },
+        { username: "IronClaw", displayName: "Iron Claw", rating: 1320, wins: 19, losses: 18, visibleUserId: sampleUsers[9].id },
+        { username: "DarkMatter", displayName: "Dark Matter", rating: 1440, wins: 27, losses: 13, visibleUserId: sampleUsers[10].id },
+        { username: "PixelKnight", displayName: "Pixel Knight", rating: 1260, wins: 16, losses: 21, visibleUserId: sampleUsers[11].id },
+        { username: "ZeroGravity", displayName: "Zero Gravity", rating: 1390, wins: 23, losses: 15, visibleUserId: sampleUsers[12].id },
+        { username: "EliteSniper", displayName: "Elite Sniper", rating: 1500, wins: 32, losses: 9, visibleUserId: sampleUsers[13].id },
+        { username: "GhostReaper", displayName: "Ghost Reaper", rating: 1340, wins: 21, losses: 17, visibleUserId: sampleUsers[14].id },
+        { username: "MegaBlast", displayName: "Mega Blast", rating: 1180, wins: 12, losses: 24, visibleUserId: sampleUsers[15].id },
       ])
       .returning();
 
-    // Create sample tournaments
+    // 4. Create sample tournaments
     const sampleTournaments = await db
       .insert(tournaments)
       .values([
@@ -100,13 +117,14 @@ export async function POST() {
       ])
       .returning();
 
-    // Register some players to tournaments
+    // 5. Register some players to tournaments
     const regsData = [];
     // Register first 8 players to Clash Royale
     for (let i = 0; i < 8; i++) {
       regsData.push({
         tournamentId: sampleTournaments[0].id,
         playerId: samplePlayers[i].id,
+        visibleUserId: sampleUsers[i].id,
       });
     }
     // Register next 8 to COD Mobile
@@ -114,6 +132,7 @@ export async function POST() {
       regsData.push({
         tournamentId: sampleTournaments[1].id,
         playerId: samplePlayers[i + 4].id,
+        visibleUserId: sampleUsers[i + 4].id,
       });
     }
     // Register 8 to Fortnite
@@ -121,6 +140,7 @@ export async function POST() {
       regsData.push({
         tournamentId: sampleTournaments[2].id,
         playerId: samplePlayers[i + 8].id,
+        visibleUserId: sampleUsers[i + 8].id,
       });
     }
 

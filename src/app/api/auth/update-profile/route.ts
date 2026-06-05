@@ -7,11 +7,14 @@ import { validateSession } from "@/lib/auth";
 export async function PATCH(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    const ua = request.headers.get('user-agent') || 'unknown';
+
     if (!token) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const user = await validateSession(token);
+    const user = await validateSession(token, ip, ua, request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

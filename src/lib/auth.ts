@@ -20,7 +20,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 
 export async function validateAdmin(request: NextRequest) {
   const token = request.cookies.get("session")?.value;
-  const ip = request.ip || 'unknown';
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
   const ua = request.headers.get('user-agent') || 'unknown';
 
   const user = await validateSession(token || '', ip, ua, request);

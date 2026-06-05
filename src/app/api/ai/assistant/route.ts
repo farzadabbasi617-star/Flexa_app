@@ -9,7 +9,7 @@ import crypto from "crypto";
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.ip || 'unknown';
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
     
     // 1. Rate Limiting
     const rateLimitResult = await rateLimit(ip, 10, 60 * 1000);
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json({ 
         error: "Invalid query", 
-        details: validation.error.errors 
+        details: validation.error.issues 
       }, { status: 400 });
     }
 
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     let userName: string | undefined;
     const token = request.cookies.get("session")?.value;
     if (token) {
-      const user = await validateSession(token, ip, request.headers.get('user-agent') || 'unknown');
+      const user = await validateSession(token, ip, request.headers.get('user-agent') || 'unknown', request);
       userName = user?.displayName;
     }
 

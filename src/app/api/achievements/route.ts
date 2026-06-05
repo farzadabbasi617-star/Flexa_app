@@ -21,10 +21,12 @@ const DEFAULT_ACHIEVEMENTS = [
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    const ua = request.headers.get('user-agent') || 'unknown';
     let userId: string | null = null;
 
     if (token) {
-      const user = await validateSession(token);
+      const user = await validateSession(token, ip, ua, request);
       userId = user?.id || null;
     }
 

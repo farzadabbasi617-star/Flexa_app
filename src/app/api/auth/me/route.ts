@@ -4,12 +4,14 @@ import { validateSession } from "@/lib/auth";
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+    const ua = request.headers.get('user-agent') || 'unknown';
 
     if (!token) {
       return NextResponse.json({ user: null });
     }
 
-    const user = await validateSession(token);
+    const user = await validateSession(token, ip, ua, request);
 
     if (!user) {
       const response = NextResponse.json({ user: null });

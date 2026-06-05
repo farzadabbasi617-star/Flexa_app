@@ -10,7 +10,7 @@ import logger from "@/lib/logger";
 
 export async function GET(request: NextRequest) {
   try {
-    const ip = request.ip || 'unknown';
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
     
     // 1. Rate Limiting (Tight limit for AI)
     const rateLimitResult = await rateLimit(ip, 5, 60 * 1000); 
@@ -18,13 +18,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Too many AI requests. Please try again later." }, { status: 429 });
     }
 
-    const playerId = request.nextUrl.searchParams.get("playerId");
+    const playerIdParam = request.nextUrl.searchParams.get("playerId");
     
     // 2. Zod Validation
-    const validation = AIAnalyzePlayerSchema.safeParse({ playerId });
+    const validation = AIAnalyzePlayerSchema.safeParse({ playerId: playerIdParam });
     if (!validation.success) {
       return NextResponse.json({ error: "Invalid Player ID" }, { status: 400 });
     }
+
+    const playerId = validation.data.playerId;
 
     // 3. Caching
     const cacheKey = `analyze_player_${playerId}`;

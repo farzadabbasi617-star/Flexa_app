@@ -16,9 +16,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const ip = request.ip || 'unknown';
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
     const ua = request.headers.get('user-agent') || 'unknown';
-    const user = await validateSession(token, ip, ua);
+    const user = await validateSession(token, ip, ua, request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -77,9 +77,9 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const ip = request.ip || 'unknown';
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
     const ua = request.headers.get('user-agent') || 'unknown';
-    const user = await validateSession(token, ip, ua);
+    const user = await validateSession(token, ip, ua, request);
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

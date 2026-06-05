@@ -18,7 +18,7 @@ export const LoginSchema = z.object({
 
 export const AIAnalyzePlayerSchema = z.object({
   playerId: z.string().uuid('ID بازیکن معتبر نیست'),
-  stats: z.record(z.any()).optional(),
+  stats: z.any().optional(),
 });
 
 export const AIAssistantSchema = z.object({

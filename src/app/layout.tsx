@@ -4,6 +4,7 @@ import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { QueryProvider } from "@/components/QueryProvider";
+import { LayoutWrapper } from "@/components/LayoutWrapper";
 
 export const viewport: Viewport = {
   themeColor: "#a855f7",

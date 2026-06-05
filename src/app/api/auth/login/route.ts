@@ -9,7 +9,7 @@ import logger from "@/lib/logger";
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.ip || 'unknown';
+    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
     const userAgent = request.headers.get('user-agent') || 'unknown';
     
     const rateLimitResult = await rateLimit(ip, 5, 60 * 1000);
@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json({ 
         error: "Validation failed", 
-        details: validation.error.errors 
+        details: validation.error.issues 
       }, { status: 400 });
     }
 
