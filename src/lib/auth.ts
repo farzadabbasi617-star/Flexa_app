@@ -1,22 +1,14 @@
 import { db } from "@/db";
 import { users, sessions } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
-import { hashPassword as bcryptHash, comparePassword as bcryptCompare } from "@/lib/auth-utils";
-
-export async function hashPassword(password: string): Promise<string> {
-  return await bcryptHash(password);
-}
-
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
-  return await bcryptCompare(password, hash);
-}
+import logger from "@/lib/logger";
 
 export function generateToken(): string {
   return crypto.randomBytes(48).toString("hex");
 }
 
-export async function createSession(userId: string): Promise<string> {
+export async function createSession(userId: string, ip: string, userAgent: string): Promise<string> {
   const token = generateToken();
   const expiresAt = new Date();
   expiresAt.setDate(expiresAt.getDate() + 30); // 30 days
@@ -25,12 +17,14 @@ export async function createSession(userId: string): Promise<string> {
     userId,
     token,
     expiresAt,
+    ipAddress: ip,
+    userAgent: userAgent,
   });
 
   return token;
 }
 
-export async function validateSession(token: string) {
+export async function validateSession(token: string, currentIp: string, currentUserAgent: string) {
   if (!token) return null;
 
   try {
@@ -41,9 +35,25 @@ export async function validateSession(token: string) {
 
     if (!session) return null;
 
+    // 1. Expiration check
     if (new Date() > session.expiresAt) {
-      await db.delete(sessions).where(eq(sessions.id, session.id));
+      await deleteSession(token);
       return null;
+    }
+
+    // 2. Hijacking Protection: IP & User-Agent Verification
+    // We check if the device has changed. In some cases (mobile data), IP might change, 
+    // but User-Agent rarely does. We log warnings for IP changes.
+    if (session.userAgent !== currentUserAgent) {
+      logger.warn({ userId: session.userId, oldUA: session.userAgent, newUA: currentUserAgent }, 'Session User-Agent mismatch - Possible Hijacking!');
+      await deleteSession(token);
+      return null;
+    }
+
+    if (session.ipAddress !== currentIp) {
+      logger.info({ userId: session.userId, oldIp: session.ipAddress, newIp: currentIp }, 'Session IP address changed');
+      // We don't necessarily kill the session for IP change (due to mobile roaming), 
+      // but we could trigger a re-auth or rotation.
     }
 
     const [user] = await db
@@ -52,7 +62,34 @@ export async function validateSession(token: string) {
       .where(eq(users.id, session.userId));
 
     return user || null;
-  } catch {
+  } catch (error) {
+    logger.error({ error }, 'Session validation error');
+    return null;
+  }
+}
+
+export async function rotateSession(oldToken: string, currentIp: string, currentUserAgent: string): Promise<string | null> {
+  try {
+    const [session] = await db
+      .select()
+      .from(sessions)
+      .where(eq(sessions.token, oldToken));
+
+    if (!session) return null;
+
+    const newToken = generateToken();
+    
+    await db.update(sessions)
+      .set({ 
+        token: newToken,
+        ipAddress: currentIp,
+        userAgent: currentUserAgent 
+      })
+      .where(eq(sessions.id, session.id));
+
+    return newToken;
+  } catch (error) {
+    logger.error({ error }, 'Session rotation failed');
     return null;
   }
 }
@@ -61,7 +98,7 @@ export async function deleteSession(token: string) {
   if (!token) return;
   try {
     await db.delete(sessions).where(eq(sessions.token, token));
-  } catch {
-    // ignore
+  } catch (error) {
+    logger.error({ error }, 'Session deletion error');
   }
 }

@@ -10,6 +10,8 @@ import logger from "@/lib/logger";
 export async function POST(request: NextRequest) {
   try {
     const ip = request.ip || 'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+    
     const rateLimitResult = await rateLimit(ip, 5, 60 * 1000);
     if (!rateLimitResult.success) {
       return NextResponse.json({ error: "Too many login attempts. Please try again later." }, { status: 429 });
@@ -45,7 +47,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
     }
 
-    const isValid = await verifyPassword(password, user.passwordHash);
+    // Note: verifyPassword now expects (hash, password) per argon2 convention
+    const isValid = await verifyPassword(user.passwordHash, password);
     if (!isValid) {
       logger.warn({ userId: user.id }, 'Login attempt failed: Wrong password');
       return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
@@ -53,7 +56,7 @@ export async function POST(request: NextRequest) {
 
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
 
-    const token = await createSession(user.id);
+    const token = await createSession(user.id, ip, userAgent);
 
     const response = NextResponse.json({
       user: {

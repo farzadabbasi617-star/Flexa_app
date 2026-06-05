@@ -67,6 +67,8 @@ export const sessions = pgTable("sessions", {
   token: varchar("token", { length: 255 }).notNull().unique(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: varchar("user_agent", { length: 500 }),
 });
 
 // Notifications table

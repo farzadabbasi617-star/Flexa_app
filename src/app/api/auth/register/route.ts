@@ -10,6 +10,8 @@ import logger from "@/lib/logger";
 export async function POST(request: NextRequest) {
   try {
     const ip = request.ip || 'unknown';
+    const userAgent = request.headers.get('user-agent') || 'unknown';
+    
     const rateLimitResult = await rateLimit(ip, 10, 60 * 1000);
     if (!rateLimitResult.success) {
       return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
@@ -55,7 +57,7 @@ export async function POST(request: NextRequest) {
       email: user.email,
     });
 
-    const token = await createSession(user.id);
+    const token = await createSession(user.id, ip, userAgent);
 
     const response = NextResponse.json({
       user: {
