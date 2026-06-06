@@ -230,10 +230,14 @@ export default function HomePage() {
                 </Link>
               ))}
             </div>
-            <p className="text-gray-600 text-xs font-medium">© 2026 Flexa Gaming. All rights reserved.</p>
+            <div className="flex flex-col items-end gap-1">
+              <p className="text-gray-600 text-xs font-medium">© 2026 Flexa Gaming. All rights reserved.</p>
+              <span className="text-[10px] text-neon-purple/50 font-mono">v1.0.5 - Debug Mode</span>
+            </div>
           </div>
         </div>
       </footer>
+
     </div>
   );
 }
