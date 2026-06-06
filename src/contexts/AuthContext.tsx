@@ -89,14 +89,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
 
       if (!res.ok) {
-        return { success: false, error: data.error };
+        // Return the exact error from the server for debugging
+        return { success: false, error: data.error || "Server error" };
       }
 
       queryClient.invalidateQueries({ queryKey: ["auth-session"] });
       setUser(data.user);
       return { success: true };
-    } catch {
-      return { success: false, error: "Registration failed" };
+    } catch (err: any) {
+      return { success: false, error: `Network error: ${err.message}` };
     }
   }
 
