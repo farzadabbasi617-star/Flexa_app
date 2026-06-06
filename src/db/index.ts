@@ -3,9 +3,8 @@ import { Pool } from "pg";
 
 const databaseUrl = process.env.DATABASE_URL;
 
-// Prevent build-time crashes when DATABASE_URL is missing
-if (!databaseUrl && process.env.NODE_ENV !== "production") {
-  console.warn("WARNING: DATABASE_URL is not defined. Database connections will fail.");
+if (!databaseUrl) {
+  console.error("CRITICAL ERROR: DATABASE_URL is missing in environment variables!");
 }
 
 const globalForDb = globalThis as typeof globalThis & {
@@ -15,7 +14,13 @@ const globalForDb = globalThis as typeof globalThis & {
 export const pool =
   globalForDb.__arenaNextJsPostgresqlPool ??
   new Pool({
-    connectionString: databaseUrl || "postgresql://localhost:5432/dummy",
+    connectionString: databaseUrl,
+    ssl: {
+      rejectUnauthorized: false, // این خط میان‌بر اصلی است: اجازه می‌دهد حتی با گواهینامه‌های خود-امضا شده وصل شود
+    },
+    max: 10,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
   });
 
 if (process.env.NODE_ENV !== "production") {
