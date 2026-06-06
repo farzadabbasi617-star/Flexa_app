@@ -9,7 +9,6 @@ import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
@@ -31,66 +30,76 @@ export async function POST(request: NextRequest) {
 
     const { email, username, password, displayName } = validation.data;
 
-    const [existingEmail] = await db.select().from(users).where(eq(users.email, email));
-    if (existingEmail) {
-      return NextResponse.json({ error: "Email already registered" }, { status: 400 });
-    }
+    // Use a transaction to ensure both user and player are created together
+    return await db.transaction(async (tx) => {
+      const [existingEmail] = await tx.select().from(users).where(eq(users.email, email));
+      if (existingEmail) {
+        return NextResponse.json({ error: "Email already registered" }, { status: 400 });
+      }
 
-    const [existingUsername] = await db.select().from(users).where(eq(users.username, username));
-    if (existingUsername) {
-      return NextResponse.json({ error: "Username already taken" }, { status: 400 });
-    }
+      const [existingUsername] = await tx.select().from(users).where(eq(users.username, username));
+      if (existingUsername) {
+        return NextResponse.json({ error: "Username already taken" }, { status: 400 });
+      }
 
-    const hashedPassword = await hashPassword(password);
+      const hashedPassword = await hashPassword(password);
 
-    const [user] = await db
-      .insert(users)
-      .values({
-        email,
-        username,
-        passwordHash: hashedPassword,
-        displayName,
-      })
-      .returning();
+      const [user] = await tx
+        .insert(users)
+        .values({
+          email,
+          username,
+          passwordHash: hashedPassword,
+          displayName,
+        })
+        .returning();
 
-    await db.insert(players).values({
-      visibleUserId: user.id,
-      username: user.username,
-      displayName: user.displayName,
-      email: user.email,
-    });
+      if (!user) {
+        throw new Error("Failed to create user record");
+      }
 
-    const token = await createSession(user.id, ip, userAgent);
-
-    const response = NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email,
+      await tx.insert(players).values({
+        visibleUserId: user.id,
         username: user.username,
         displayName: user.displayName,
-        role: user.role,
-        avatarUrl: user.avatarUrl,
-        clashRoyaleId: user.clashRoyaleId,
-        clashRoyaleUsername: user.clashRoyaleUsername,
-        codMobileId: user.codMobileId,
-        codMobileUsername: user.codMobileUsername,
-        fortniteId: user.fortniteId,
-        fortniteUsername: user.fortniteUsername,
-      },
-    });
+        email: user.email,
+      });
 
-    response.cookies.set("session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30,
-      path: "/",
-    });
+      const token = await createSession(user.id, ip, userAgent);
 
-    logger.info({ userId: user.id, email }, 'User registered successfully');
-    return response;
-  } catch (err) {
+      const response = NextResponse.json({
+        user: {
+          id: user.id,
+          email: user.email,
+          username: user.username,
+          displayName: user.displayName,
+          role: user.role,
+          avatarUrl: user.avatarUrl,
+          clashRoyaleId: user.clashRoyaleId,
+          clashRoyaleUsername: user.clashRoyaleUsername,
+          codMobileId: user.codMobileId,
+          codMobileUsername: user.codMobileUsername,
+          fortniteId: user.fortniteId,
+          fortniteUsername: user.fortniteUsername,
+        },
+      });
+
+      response.cookies.set("session", token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",
+        maxAge: 60 * 60 * 24 * 30,
+        path: "/",
+      });
+
+      logger.info({ userId: user.id, email }, 'User registered successfully');
+      return response;
+    });
+  } catch (err: any) {
     logger.error({ err }, 'Registration error');
-    return NextResponse.json({ error: "Registration failed" }, { status: 500 });
+    // Return the actual error message if available, otherwise a generic one
+    return NextResponse.json({ 
+      error: err.message || "Registration failed due to a server error" 
+    }, { status: 500 });
   }
 }
