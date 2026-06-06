@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const { email, username, password, fullName } = validation.data;
+    const { email, username, password, displayName } = validation.data;
 
     const [existingEmail] = await db.select().from(users).where(eq(users.email, email));
     if (existingEmail) {
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         email,
         username,
         passwordHash: hashedPassword,
-        displayName: fullName,
+        displayName,
       })
       .returning();
 
