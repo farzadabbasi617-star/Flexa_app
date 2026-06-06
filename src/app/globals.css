@@ -7,13 +7,14 @@
   --color-neon-green: #39ff14;
   --color-neon-orange: #ff6b00;
   --color-neon-yellow: #ffe600;
-  --color-dark-900: #0a0a0f;
-  --color-dark-800: #12121a;
-  --color-dark-700: #1a1a2e;
-  --color-dark-600: #252540;
-  --color-dark-500: #2d2d4a;
-  --color-gaming-card: #16162a;
-  --color-gaming-border: #2a2a50;
+  --color-dark-950: #050510;
+  --color-dark-900: #0a0a1a;
+  --color-dark-800: #12122b;
+  --color-dark-700: #1a1a3a;
+  --color-dark-600: #252550;
+  --color-dark-500: #2d2d6a;
+  --color-gaming-card: #12122b;
+  --color-gaming-border: #2a2a5a;
   --font-family-gaming: 'Segoe UI', system-ui, -apple-system, sans-serif;
 }
 
