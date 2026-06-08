@@ -22,12 +22,22 @@ export async function PATCH(
     const body = await request.json();
     const { player1Score, player2Score, winnerId, status } = body;
 
+    // Read the current match first so we can tell whether this request is the
+    // transition that *completes* the match. This makes result-application
+    // idempotent: rating/stats and bracket advancement run exactly once, even
+    // if the endpoint is called again (or AI judging already completed it).
+    const [before] = await db.select().from(matches).where(eq(matches.id, id));
+    if (!before) {
+      return NextResponse.json({ error: "Match not found" }, { status: 404 });
+    }
+    const wasCompleted = before.status === "completed";
+
     const updateData: Record<string, unknown> = {};
     if (player1Score !== undefined) updateData.player1Score = player1Score;
     if (player2Score !== undefined) updateData.player2Score = player2Score;
     if (winnerId !== undefined) updateData.winnerId = winnerId;
     if (status !== undefined) updateData.status = status;
-    if (status === "completed") updateData.completedAt = new Date();
+    if (status === "completed" && !wasCompleted) updateData.completedAt = new Date();
 
     const [updated] = await db
       .update(matches)
@@ -39,8 +49,8 @@ export async function PATCH(
       return NextResponse.json({ error: "Match not found" }, { status: 404 });
     }
 
-    // If match completed, advance winner to next round
-    if (status === "completed" && winnerId) {
+    // Only apply side-effects on the first transition into "completed".
+    if (status === "completed" && !wasCompleted && winnerId) {
       const match = updated;
       const nextRound = match.round + 1;
       const nextMatchNumber = Math.ceil(match.matchNumber / 2);

@@ -105,7 +105,9 @@ export async function POST(request: NextRequest) {
           ? match.player2Id
           : null;
 
-      if (winnerId) {
+      // Guard against double-counting: only apply the result if the match
+      // hasn't already been completed (e.g. by a manual PATCH or a prior call).
+      if (winnerId && match.status !== "completed") {
         await db
           .update(matches)
           .set({ winnerId, status: "completed", completedAt: new Date() })
