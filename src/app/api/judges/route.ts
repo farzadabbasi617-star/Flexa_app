@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { judges } from "@/db/schema";
+import { requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -15,6 +16,11 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  // Only admins may add judges.
+  const auth = await requireRole(request, ["admin", "super_admin"]);
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
   try {
     const body = await request.json();
     const { name, email, role } = body;

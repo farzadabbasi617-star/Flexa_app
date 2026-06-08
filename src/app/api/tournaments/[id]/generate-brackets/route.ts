@@ -2,14 +2,20 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { tournaments, registrations, matches, players } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 
 export async function POST(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Only admins may (re)generate brackets — this deletes existing matches.
+  const auth = await requireRole(request, ["admin", "super_admin"]);
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
   const { id } = await params;
   try {
     // Get tournament

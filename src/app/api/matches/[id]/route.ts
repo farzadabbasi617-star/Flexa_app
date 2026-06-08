@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { matches, players } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
+import { requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,12 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Recording scores / results and adjusting ratings is privileged — only
+  // admins, super_admins or judges may do it.
+  const auth = await requireRole(request, ["admin", "super_admin", "judge", "moderator"]);
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
   const { id } = await params;
   try {
     const body = await request.json();

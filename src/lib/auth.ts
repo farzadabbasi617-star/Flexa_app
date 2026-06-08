@@ -37,6 +37,38 @@ export async function validateAdmin(request: NextRequest) {
   return { user, error: null };
 }
 
+/**
+ * Require an authenticated user (any role). Returns { user } on success or
+ * { user: null, error, status } to short-circuit the route.
+ */
+export async function requireUser(request: NextRequest) {
+  const token = request.cookies.get("session")?.value;
+  const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
+  const ua = request.headers.get('user-agent') || 'unknown';
+
+  const user = await validateSession(token || '', ip, ua, request);
+  if (!user) {
+    return { user: null, error: "Unauthorized", status: 401 };
+  }
+  return { user, error: null, status: 200 };
+}
+
+/**
+ * Require an authenticated user whose role is in `allowed`.
+ * Example: requireRole(request, ["admin", "super_admin", "judge"]).
+ */
+export async function requireRole(request: NextRequest, allowed: string[]) {
+  const { user, error, status } = await requireUser(request);
+  if (!user) {
+    return { user: null, error, status };
+  }
+  if (!allowed.includes(user.role)) {
+    logger.warn({ userId: user.id, role: user.role, allowed }, 'Forbidden: insufficient role');
+    return { user: null, error: "Forbidden: insufficient permissions", status: 403 };
+  }
+  return { user, error: null, status: 200 };
+}
+
 export async function createSession(userId: string, ip: string, userAgent: string): Promise<string> {
   const token = generateToken();
   const expiresAt = new Date();

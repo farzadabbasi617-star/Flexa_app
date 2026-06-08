@@ -3,11 +3,18 @@ import { db } from "@/db";
 import { judgments, matches, players, matchEvidence } from "@/db/schema";
 import { eq, count } from "drizzle-orm";
 import { analyzeMatch } from "@/lib/ai-engine";
+import { requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 
 export async function POST(request: NextRequest) {
+  // AI judging triggers an (expensive) AI call and writes a verdict — restrict
+  // to judges/admins.
+  const auth = await requireRole(request, ["admin", "super_admin", "judge", "moderator"]);
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
   try {
     const body = await request.json();
     const { matchId } = body;
