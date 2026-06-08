@@ -9,3 +9,7 @@ dist/
 build/
 .DS_Store
 *.log
+
+# TypeScript incremental build cache
+*.tsbuildinfo
+tsconfig.tsbuildinfo

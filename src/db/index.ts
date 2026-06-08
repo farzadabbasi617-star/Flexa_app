@@ -4,27 +4,39 @@ import { Pool } from "pg";
 const databaseUrl = process.env.DATABASE_URL;
 
 if (!databaseUrl) {
-  console.error("CRITICAL ERROR: DATABASE_URL is missing in environment variables!");
+  console.error(
+    "CRITICAL ERROR: DATABASE_URL is missing in environment variables!"
+  );
 }
 
+/**
+ * SSL configuration.
+ *
+ * Neon (and most managed Postgres) present certificates signed by a real CA,
+ * so certificate verification SHOULD stay on. Disabling it (rejectUnauthorized
+ * = false) opens the connection to man-in-the-middle attacks.
+ *
+ * If a specific host genuinely needs a relaxed check, opt out explicitly by
+ * setting DB_SSL_NO_VERIFY="true" — but treat that as a last resort.
+ */
+const noVerify = process.env.DB_SSL_NO_VERIFY === "true";
+
 const globalForDb = globalThis as typeof globalThis & {
-  __arenaNextJsPostgresqlPool?: Pool;
+  __flexaPool?: Pool;
 };
 
 export const pool =
-  globalForDb.__arenaNextJsPostgresqlPool ??
+  globalForDb.__flexaPool ??
   new Pool({
     connectionString: databaseUrl,
-    ssl: {
-      rejectUnauthorized: false, // این خط میان‌بر اصلی است: اجازه می‌دهد حتی با گواهینامه‌های خود-امضا شده وصل شود
-    },
+    ssl: { rejectUnauthorized: !noVerify },
     max: 10,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 5000,
   });
 
 if (process.env.NODE_ENV !== "production") {
-  globalForDb.__arenaNextJsPostgresqlPool = pool;
+  globalForDb.__flexaPool = pool;
 }
 
 export const db = drizzle(pool);
