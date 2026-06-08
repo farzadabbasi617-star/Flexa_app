@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
 import { eq, desc, count } from "drizzle-orm";
-import { validateSession } from "@/lib/auth";
+import { validateSession, requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -54,6 +54,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  // Creating notifications targets an arbitrary userId, so it must be an
+  // admin-only action (otherwise anyone could spam/phish any user).
+  const auth = await requireRole(request, ["admin", "super_admin"]);
+  if (!auth.user) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
   try {
     const body = await request.json();
     const { userId, type, title, message, link } = body;

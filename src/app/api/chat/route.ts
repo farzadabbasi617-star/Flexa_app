@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { chatMessages, users } from "@/db/schema";
 import { eq, or, and, desc } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -110,22 +111,33 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Throttle chat to curb spam/flooding (per user, 20 msgs / 30s).
+    const limit = await rateLimit(`chat:${user.id}`, 20, 30 * 1000);
+    if (!limit.success) {
+      return NextResponse.json(
+        { error: "You're sending messages too fast. Please slow down." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { receiverId, tournamentId, matchId, message } = body;
 
     if (!message || message.trim() === "") {
       return NextResponse.json({ error: "Message is required" }, { status: 400 });
     }
+    if (message.length > 2000) {
+      return NextResponse.json({ error: "Message is too long" }, { status: 400 });
+    }
 
     // AI Moderation
     const { moderateMessage } = await import("@/lib/ai-engine");
     const moderation = moderateMessage(message.trim());
-    
+
     if (!moderation.isAllowed) {
       return NextResponse.json({
         error: "Message blocked by AI moderation",
         reason: moderation.suggestion,
-        toxicityScore: moderation.toxicityScore,
       }, { status: 400 });
     }
 
