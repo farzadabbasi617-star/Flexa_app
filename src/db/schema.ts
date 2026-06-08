@@ -305,3 +305,14 @@ export const disputes = pgTable("disputes", {
 }, (table) => ({
   matchIdIdx: index("disputes_match_id_idx").on(table.matchId),
 }));
+
+// Rate limits — shared across instances (in-memory Maps don't work on
+// multi-instance / serverless hosting). One row per (bucket) key counts hits
+// within the current window.
+export const rateLimits = pgTable("rate_limits", {
+  key: varchar("key", { length: 191 }).primaryKey(),
+  count: integer("count").notNull().default(0),
+  resetAt: timestamp("reset_at").notNull(),
+}, (table) => ({
+  resetAtIdx: index("rate_limits_reset_at_idx").on(table.resetAt),
+}));
