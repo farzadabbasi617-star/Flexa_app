@@ -37,12 +37,20 @@ export interface AIAnalytics {
 
 // AI Configuration
 const AI_CONFIG = {
+  /*
+   * Weights for the CONFIDENCE score (how sure we are the verdict is correct).
+   * Every factor here must genuinely increase certainty about the result:
+   *  - scoreClarity:    a bigger score gap => the winner is clearer.
+   *  - ratingAlignment: the result matching ELO expectation => more believable.
+   *  - evidenceQuality: submitted evidence => more trustworthy.
+   * (Match "closeness" and player win-rate similarity describe how *exciting*
+   *  or *balanced* a match is — not how *certain* the outcome is — so they are
+   *  reported as informational factors but excluded from the confidence sum.)
+   */
   judgingWeights: {
-    scoreDifferential: 0.35,
-    ratingHistory: 0.20,
-    consistencyScore: 0.15,
-    evidenceQuality: 0.15,
-    fairnessIndex: 0.15,
+    scoreClarity: 0.5,
+    ratingAlignment: 0.3,
+    evidenceQuality: 0.2,
   },
   moderationThresholds: {
     toxicity: 0.7,
@@ -84,54 +92,42 @@ export function analyzeMatch(
   hasEvidence: boolean = false
 ): AIJudgmentResult {
   const factors: AIFactor[] = [];
-  let totalScore = 0;
+  let confidenceScore = 0; // weighted sum of certainty factors (0..1)
 
-  // 1. Score Differential Analysis
   const scoreDiff = player1Score - player2Score;
-  const normalizedScoreDiff = Math.min(Math.abs(scoreDiff) / 10, 1);
-  const scoreWeight = AI_CONFIG.judgingWeights.scoreDifferential;
-  
-  factors.push({
-    name: "Score Differential",
-    nameFA: "اختلاف امتیاز",
-    score: normalizedScoreDiff * 100,
-    weight: scoreWeight,
-    description: `Player ${scoreDiff > 0 ? "1" : "2"} leads by ${Math.abs(scoreDiff)} points`,
-  });
-  totalScore += normalizedScoreDiff * scoreWeight;
+  const absDiff = Math.abs(scoreDiff);
 
-  // 2. Rating History Analysis
+  // 1. Score Clarity — a larger gap makes the winner clearer (more certain).
+  const scoreClarity = Math.min(absDiff / 10, 1);
+  factors.push({
+    name: "Score Clarity",
+    nameFA: "وضوح نتیجه",
+    score: scoreClarity * 100,
+    weight: AI_CONFIG.judgingWeights.scoreClarity,
+    description:
+      scoreDiff === 0
+        ? "Scores are tied"
+        : `Player ${scoreDiff > 0 ? "1" : "2"} leads by ${absDiff} points`,
+  });
+  confidenceScore += scoreClarity * AI_CONFIG.judgingWeights.scoreClarity;
+
+  // 2. Rating Alignment — does the result match ELO expectation?
   const ratingDiff = player1Rating - player2Rating;
   const expectedOutcome = 1 / (1 + Math.pow(10, -ratingDiff / 400)); // ELO formula
   const actualOutcome = scoreDiff > 0 ? 1 : scoreDiff < 0 ? 0 : 0.5;
   const ratingAlignment = 1 - Math.abs(expectedOutcome - actualOutcome);
-  
+
   factors.push({
     name: "Rating Alignment",
     nameFA: "تطابق رتبه‌بندی",
     score: ratingAlignment * 100,
-    weight: AI_CONFIG.judgingWeights.ratingHistory,
+    weight: AI_CONFIG.judgingWeights.ratingAlignment,
     description: `Result ${ratingAlignment > 0.5 ? "aligns" : "differs"} from expected based on ratings`,
   });
-  totalScore += ratingAlignment * AI_CONFIG.judgingWeights.ratingHistory;
+  confidenceScore += ratingAlignment * AI_CONFIG.judgingWeights.ratingAlignment;
 
-  // 3. Consistency Score
-  const p1WinRate = player1History.wins / (player1History.wins + player1History.losses || 1);
-  const p2WinRate = player2History.wins / (player2History.wins + player2History.losses || 1);
-  const consistencyScore = Math.abs(p1WinRate - p2WinRate);
-  
-  factors.push({
-    name: "Consistency Analysis",
-    nameFA: "تحلیل ثبات",
-    score: (1 - consistencyScore) * 100,
-    weight: AI_CONFIG.judgingWeights.consistencyScore,
-    description: `Players have ${consistencyScore < 0.3 ? "similar" : "different"} performance history`,
-  });
-  totalScore += (1 - consistencyScore) * AI_CONFIG.judgingWeights.consistencyScore;
-
-  // 4. Evidence Quality
-  const evidenceScore = hasEvidence ? 0.9 : 0.5;
-  
+  // 3. Evidence Quality — submitted evidence makes the result more trustworthy.
+  const evidenceScore = hasEvidence ? 1 : 0.5;
   factors.push({
     name: "Evidence Quality",
     nameFA: "کیفیت مدارک",
@@ -139,29 +135,41 @@ export function analyzeMatch(
     weight: AI_CONFIG.judgingWeights.evidenceQuality,
     description: hasEvidence ? "Evidence submitted" : "No evidence provided",
   });
-  totalScore += evidenceScore * AI_CONFIG.judgingWeights.evidenceQuality;
+  confidenceScore += evidenceScore * AI_CONFIG.judgingWeights.evidenceQuality;
 
-  // 5. Fairness Index
-  const matchBalance = 1 - Math.min(Math.abs(scoreDiff) / 20, 1);
-  
+  // --- Informational factors (NOT part of confidence) ---
+
+  // Match closeness: how balanced/exciting the game was (weight 0 = info only).
+  const matchBalance = 1 - Math.min(absDiff / 20, 1);
   factors.push({
-    name: "Fairness Index",
-    nameFA: "شاخص عدالت",
+    name: "Match Closeness",
+    nameFA: "نزدیکی نتیجه",
     score: matchBalance * 100,
-    weight: AI_CONFIG.judgingWeights.fairnessIndex,
+    weight: 0,
     description: matchBalance > 0.5 ? "Close match" : "One-sided match",
   });
-  totalScore += matchBalance * AI_CONFIG.judgingWeights.fairnessIndex;
 
-  // Calculate suspicion level
+  // Player history similarity (info only).
+  const p1WinRate = player1History.wins / (player1History.wins + player1History.losses || 1);
+  const p2WinRate = player2History.wins / (player2History.wins + player2History.losses || 1);
+  const historyGap = Math.abs(p1WinRate - p2WinRate);
+  factors.push({
+    name: "History Similarity",
+    nameFA: "شباهت سابقه",
+    score: (1 - historyGap) * 100,
+    weight: 0,
+    description: `Players have ${historyGap < 0.3 ? "similar" : "different"} performance history`,
+  });
+
+  // Calculate suspicion level — flags results that look manipulated.
   let suspicionLevel = 0;
-  if (Math.abs(scoreDiff) > 15) suspicionLevel += 0.2; // Unusually high score diff
+  if (absDiff > 15) suspicionLevel += 0.2; // Unusually high score diff
   if (ratingAlignment < 0.3) suspicionLevel += 0.3; // Result doesn't match ratings
-  if (!hasEvidence && Math.abs(scoreDiff) > 10) suspicionLevel += 0.2;
+  if (!hasEvidence && absDiff > 10) suspicionLevel += 0.2;
   suspicionLevel = Math.min(suspicionLevel, 1);
 
-  // Calculate confidence
-  const confidence = Math.round(totalScore * 100);
+  // Confidence: weighted certainty (0..100).
+  const confidence = Math.round(confidenceScore * 100);
 
   // Determine verdict
   let verdict: AIJudgmentResult["verdict"];
@@ -173,13 +181,18 @@ export function analyzeMatch(
     reasoning = "High suspicion detected. Match requires human review.";
     recommendations.push("Request video evidence from both players");
     recommendations.push("Check for previous disputes involving these players");
-  } else if (confidence < 50) {
-    verdict = "rematch";
-    reasoning = "Low confidence in result. Recommend rematch for fairness.";
-    recommendations.push("Schedule rematch with stricter monitoring");
   } else if (scoreDiff === 0) {
+    // A tie is a clear, decidable outcome — handle it before the ambiguity check.
     verdict = "draw";
     reasoning = "Scores are equal. Match ends in a draw.";
+    if (!hasEvidence) recommendations.push("Ask both players to confirm the tie");
+  } else if (absDiff === 1 && !hasEvidence && suspicionLevel >= AI_CONFIG.suspicionThresholds.medium) {
+    // Only call for a rematch when the result is genuinely ambiguous: a razor-thin
+    // margin, no evidence, AND some suspicion — not merely a low numeric score.
+    verdict = "rematch";
+    reasoning = "Razor-thin result with no evidence and some irregularities. Recommend rematch for fairness.";
+    recommendations.push("Schedule rematch with stricter monitoring");
+    recommendations.push("Ask both players to submit screenshots");
   } else if (scoreDiff > 0) {
     verdict = "player1_wins";
     reasoning = `Player 1 wins with score ${player1Score}-${player2Score}. `;
