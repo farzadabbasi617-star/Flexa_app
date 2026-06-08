@@ -89,15 +89,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
 
       if (!res.ok) {
-        // Return the exact error from the server for debugging
-        return { success: false, error: data.error || "Server error" };
+        return { success: false, error: data.error || "ثبت‌نام با خطا مواجه شد" };
       }
 
       queryClient.invalidateQueries({ queryKey: ["auth-session"] });
       setUser(data.user);
       return { success: true };
-    } catch (err: any) {
-      return { success: false, error: `Network error: ${err.message}` };
+    } catch {
+      return { success: false, error: "خطای ارتباط با سرور. اتصال اینترنت را بررسی کنید." };
     }
   }
 

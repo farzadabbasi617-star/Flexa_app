@@ -1,81 +1,75 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, players } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { eq, or } from "drizzle-orm";
 import { hashPassword, createSession } from "@/lib/auth";
 import { RegisterSchema } from "@/lib/validations";
+import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const userAgent = request.headers.get('user-agent') || 'unknown';
-    
-    // 1. Input Validation
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
+    const userAgent = request.headers.get("user-agent") || "unknown";
+
+    // 1. Rate limit — protect against signup spam / abuse.
+    const limit = await rateLimit(`register:${ip}`, 5, 60 * 60 * 1000); // 5 / hour / IP
+    if (!limit.success) {
+      return NextResponse.json(
+        { error: "تعداد تلاش‌ها بیش از حد مجاز است. لطفاً بعداً دوباره امتحان کنید." },
+        { status: 429 }
+      );
+    }
+
+    // 2. Input validation.
     const body = await request.json();
     const validation = RegisterSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ 
-        error: "Validation failed: " + validation.error.issues[0].message 
-      }, { status: 400 });
+      return NextResponse.json(
+        { error: validation.error.issues[0].message },
+        { status: 400 }
+      );
     }
 
     const { email, username, password, displayName } = validation.data;
 
-    // 2. DB Connection Check & Existing User Check
-    try {
-      const [existingEmail] = await db.select().from(users).where(eq(users.email, email));
-      if (existingEmail) return NextResponse.json({ error: "ایمیل قبلاً ثبت شده است" }, { status: 400 });
+    // 3. Uniqueness check (single query for both email & username).
+    const existing = await db
+      .select({ id: users.id, email: users.email, username: users.username })
+      .from(users)
+      .where(or(eq(users.email, email), eq(users.username, username)));
 
-      const [existingUsername] = await db.select().from(users).where(eq(users.username, username));
-      if (existingUsername) return NextResponse.json({ error: "نام کاربری قبلاً انتخاب شده است" }, { status: 400 });
-    } catch (e: any) {
-      return NextResponse.json({ error: `Database connection error: ${e.message}` }, { status: 500 });
+    if (existing.some((u) => u.email === email)) {
+      return NextResponse.json({ error: "ایمیل قبلاً ثبت شده است" }, { status: 409 });
+    }
+    if (existing.some((u) => u.username === username)) {
+      return NextResponse.json({ error: "نام کاربری قبلاً انتخاب شده است" }, { status: 409 });
     }
 
-    // 3. Password Hashing
-    let hashedPassword;
-    try {
-      hashedPassword = await hashPassword(password);
-    } catch (e: any) {
-      return NextResponse.json({ error: `Encryption error: ${e.message}` }, { status: 500 });
-    }
+    // 4. Hash password.
+    const hashedPassword = await hashPassword(password);
 
-    // 4. User Creation
-    let user;
-    try {
-      const result = await db.insert(users).values({
-        email,
-        username,
-        passwordHash: hashedPassword,
-        displayName,
-      }).returning();
-      user = result[0];
-    } catch (e: any) {
-      return NextResponse.json({ error: `User table error: ${e.message}` }, { status: 500 });
-    }
+    // 5. Create user + player profile atomically.
+    const user = await db.transaction(async (tx) => {
+      const [created] = await tx
+        .insert(users)
+        .values({ email, username, passwordHash: hashedPassword, displayName })
+        .returning();
 
-    // 5. Player Profile Creation
-    try {
-      await db.insert(players).values({
-        visibleUserId: user.id,
-        username: user.username,
-        displayName: user.displayName,
-        email: user.email,
+      await tx.insert(players).values({
+        visibleUserId: created.id,
+        username: created.username,
+        displayName: created.displayName,
+        email: created.email,
       });
-    } catch (e: any) {
-      return NextResponse.json({ error: `Player profile error: ${e.message}` }, { status: 500 });
-    }
 
-    // 6. Session Creation
-    let token;
-    try {
-      token = await createSession(user.id, ip, userAgent);
-    } catch (e: any) {
-      return NextResponse.json({ error: `Session error: ${e.message}` }, { status: 500 });
-    }
+      return created;
+    });
+
+    // 6. Create session.
+    const token = await createSession(user.id, ip, userAgent);
 
     const response = NextResponse.json({
       user: {
@@ -95,11 +89,14 @@ export async function POST(request: NextRequest) {
       path: "/",
     });
 
+    logger.info({ userId: user.id }, "User registered successfully");
     return response;
-
-  } catch (err: any) {
-    return NextResponse.json({ 
-      error: `Critical Server Error: ${err.message || "Unknown error"}` 
-    }, { status: 500 });
+  } catch (err) {
+    // Log full detail server-side for debugging, but never leak it to the client.
+    logger.error({ err }, "Registration error");
+    return NextResponse.json(
+      { error: "ثبت‌نام با خطا مواجه شد. لطفاً بعداً دوباره امتحان کنید." },
+      { status: 500 }
+    );
   }
 }

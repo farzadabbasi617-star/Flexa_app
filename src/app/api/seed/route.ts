@@ -1,11 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { tournaments, players, registrations, judges, users } from "@/db/schema";
+import { validateAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 
-export async function POST() {
+export async function POST(request: NextRequest) {
+  // Seeding writes demo data straight into the database, so it must never be
+  // open to the public. Require an authenticated admin.
+  const { user, error, status } = await validateAdmin(request);
+  if (!user) {
+    return NextResponse.json({ error: error || "Unauthorized" }, { status: status || 401 });
+  }
   try {
     // 1. Create sample users first (since registrations and players depend on them)
     const userNames = [
