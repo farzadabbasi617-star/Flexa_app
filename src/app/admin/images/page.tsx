@@ -1,5 +1,9 @@
 "use client";
 
+/* Admin image manager previews arbitrary remote URLs, so a plain <img> is
+ * intentional here (next/image domain allow-listing isn't a fit). */
+/* eslint-disable @next/next/no-img-element */
+
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";

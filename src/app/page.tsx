@@ -1,5 +1,12 @@
 "use client";
 
+/*
+ * These images come from admin-managed, arbitrary remote URLs (hero / game /
+ * tournament banners stored in the DB), so next/image's domain allow-listing
+ * isn't a good fit here. Using a plain <img> on purpose.
+ */
+/* eslint-disable @next/next/no-img-element */
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
