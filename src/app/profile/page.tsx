@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -27,13 +27,7 @@ export default function ProfilePage() {
     }
   }, [loading, user, router]);
 
-  useEffect(() => {
-    if (user) {
-      fetchStats();
-    }
-  }, [user]);
-
-  async function fetchStats() {
+  const fetchStats = useCallback(async () => {
     try {
       const res = await fetch("/api/players");
       const players = await res.json();
@@ -55,7 +49,13 @@ export default function ProfilePage() {
     } catch {
       // handle error
     }
-  }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) {
+      fetchStats();
+    }
+  }, [user, fetchStats]);
 
   if (loading) {
     return (

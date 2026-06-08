@@ -1,10 +1,102 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+
+/*
+ * Input controls live at module scope (not inside the page component).
+ * Defining them inside would recreate the component type on every render,
+ * which makes React unmount/remount each field — causing inputs to lose
+ * focus after a single keystroke. They receive value/onChange as props.
+ */
+
+function ColorInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          className="w-10 h-10 rounded-lg border border-gaming-border cursor-pointer bg-transparent"
+          value={value || "#ffffff"}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <input
+          type="text"
+          className="gaming-input text-sm flex-1 font-mono"
+          value={value || ""}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TextInput({ label, value, onChange, placeholder, dir }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; dir?: string }) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      <input
+        type="text"
+        dir={dir}
+        className="gaming-input text-sm"
+        placeholder={placeholder}
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+function NumberInput({ label, value, onChange, min, max, suffix }: { label: string; value: string; onChange: (v: string) => void; min?: number; max?: number; suffix?: string }) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-500 mb-1">{label} {suffix && <span className="text-gray-600">({suffix})</span>}</label>
+      <input
+        type="number"
+        min={min}
+        max={max}
+        className="gaming-input text-sm"
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
+
+function ToggleInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  const isOn = value === "true";
+  return (
+    <div className="flex items-center justify-between">
+      <label className="text-sm text-gray-300">{label}</label>
+      <button
+        type="button"
+        onClick={() => onChange(isOn ? "false" : "true")}
+        className={`w-12 h-6 rounded-full relative transition-colors ${isOn ? "bg-neon-green/30" : "bg-dark-600"}`}
+      >
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full transition-all ${isOn ? "end-0.5 bg-neon-green" : "start-0.5 bg-gray-500"}`} />
+      </button>
+    </div>
+  );
+}
+
+function EmojiInput({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <label className="block text-xs text-gray-500 mb-1">{label}</label>
+      <input
+        type="text"
+        className="gaming-input text-sm text-center text-2xl"
+        maxLength={2}
+        value={value || ""}
+        onChange={(e) => onChange(e.target.value)}
+      />
+    </div>
+  );
+}
 
 export default function AdminCustomizePage() {
   const { lang } = useLanguage();
@@ -65,15 +157,7 @@ export default function AdminCustomizePage() {
     announcement_color: "#ff006e",
   });
 
-  useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) router.push("/");
-  }, [loading, user, router]);
-
-  useEffect(() => {
-    if (user?.role === "admin") fetchSettings();
-  }, [user]);
-
-  async function fetchSettings() {
+  const fetchSettings = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/settings");
       const data = await res.json();
@@ -81,7 +165,21 @@ export default function AdminCustomizePage() {
         setSettings((prev) => ({ ...prev, ...data }));
       }
     } catch { /* ignore */ }
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== "admin")) router.push("/");
+  }, [loading, user, router]);
+
+  useEffect(() => {
+    if (user?.role === "admin") fetchSettings();
+  }, [user, fetchSettings]);
+
+  // Update a single setting key by name.
+  const setSetting = useCallback(
+    (key: string, value: string) => setSettings((prev) => ({ ...prev, [key]: value })),
+    []
+  );
 
   async function handleSave() {
     setSaving(true);
@@ -113,91 +211,6 @@ export default function AdminCustomizePage() {
     { key: "footer", icon: "📎", label: L("فوتر", "Footer") },
     { key: "announce", icon: "📢", label: L("اطلاعیه", "Announcement") },
   ];
-
-  function ColorInput({ label, settingKey }: { label: string; settingKey: string }) {
-    return (
-      <div>
-        <label className="block text-xs text-gray-500 mb-1">{label}</label>
-        <div className="flex items-center gap-2">
-          <input
-            type="color"
-            className="w-10 h-10 rounded-lg border border-gaming-border cursor-pointer bg-transparent"
-            value={settings[settingKey as keyof typeof settings] || "#ffffff"}
-            onChange={(e) => setSettings({ ...settings, [settingKey]: e.target.value })}
-          />
-          <input
-            type="text"
-            className="gaming-input text-sm flex-1 font-mono"
-            value={settings[settingKey as keyof typeof settings] || ""}
-            onChange={(e) => setSettings({ ...settings, [settingKey]: e.target.value })}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  function TextInput({ label, settingKey, placeholder, dir }: { label: string; settingKey: string; placeholder?: string; dir?: string }) {
-    return (
-      <div>
-        <label className="block text-xs text-gray-500 mb-1">{label}</label>
-        <input
-          type="text"
-          dir={dir}
-          className="gaming-input text-sm"
-          placeholder={placeholder}
-          value={settings[settingKey as keyof typeof settings] || ""}
-          onChange={(e) => setSettings({ ...settings, [settingKey]: e.target.value })}
-        />
-      </div>
-    );
-  }
-
-  function NumberInput({ label, settingKey, min, max, suffix }: { label: string; settingKey: string; min?: number; max?: number; suffix?: string }) {
-    return (
-      <div>
-        <label className="block text-xs text-gray-500 mb-1">{label} {suffix && <span className="text-gray-600">({suffix})</span>}</label>
-        <input
-          type="number"
-          min={min}
-          max={max}
-          className="gaming-input text-sm"
-          value={settings[settingKey as keyof typeof settings] || ""}
-          onChange={(e) => setSettings({ ...settings, [settingKey]: e.target.value })}
-        />
-      </div>
-    );
-  }
-
-  function ToggleInput({ label, settingKey }: { label: string; settingKey: string }) {
-    const isOn = settings[settingKey as keyof typeof settings] === "true";
-    return (
-      <div className="flex items-center justify-between">
-        <label className="text-sm text-gray-300">{label}</label>
-        <button
-          type="button"
-          onClick={() => setSettings({ ...settings, [settingKey]: isOn ? "false" : "true" })}
-          className={`w-12 h-6 rounded-full relative transition-colors ${isOn ? "bg-neon-green/30" : "bg-dark-600"}`}
-        >
-          <span className={`absolute top-0.5 w-5 h-5 rounded-full transition-all ${isOn ? "end-0.5 bg-neon-green" : "start-0.5 bg-gray-500"}`} />
-        </button>
-      </div>
-    );
-  }
-
-  function EmojiInput({ label, settingKey }: { label: string; settingKey: string }) {
-    return (
-      <div>
-        <label className="block text-xs text-gray-500 mb-1">{label}</label>
-        <input
-          type="text"
-          className="gaming-input text-sm text-center text-2xl"
-          maxLength={2}
-          value={settings[settingKey as keyof typeof settings] || ""}
-          onChange={(e) => setSettings({ ...settings, [settingKey]: e.target.value })}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-dark-900">
@@ -251,11 +264,11 @@ export default function AdminCustomizePage() {
               <div className="gaming-card p-6 animate-slide-up">
                 <h2 className="text-lg font-bold mb-6 neon-text-blue">🎨 {L("رنگ‌ها و تم", "Colors & Theme")}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <ColorInput label={L("رنگ اصلی (بنفش)", "Primary Color")} settingKey="primary_color" />
-                  <ColorInput label={L("رنگ دوم (آبی)", "Secondary Color")} settingKey="secondary_color" />
-                  <ColorInput label={L("رنگ تأکید (صورتی)", "Accent Color")} settingKey="accent_color" />
-                  <ColorInput label={L("رنگ پس‌زمینه", "Background Color")} settingKey="bg_color" />
-                  <ColorInput label={L("رنگ کارت‌ها", "Card Color")} settingKey="card_color" />
+                  <ColorInput label={L("رنگ اصلی (بنفش)", "Primary Color")} value={settings.primary_color ?? ""} onChange={(v) => setSetting("primary_color", v)} />
+                  <ColorInput label={L("رنگ دوم (آبی)", "Secondary Color")} value={settings.secondary_color ?? ""} onChange={(v) => setSetting("secondary_color", v)} />
+                  <ColorInput label={L("رنگ تأکید (صورتی)", "Accent Color")} value={settings.accent_color ?? ""} onChange={(v) => setSetting("accent_color", v)} />
+                  <ColorInput label={L("رنگ پس‌زمینه", "Background Color")} value={settings.bg_color ?? ""} onChange={(v) => setSetting("bg_color", v)} />
+                  <ColorInput label={L("رنگ کارت‌ها", "Card Color")} value={settings.card_color ?? ""} onChange={(v) => setSetting("card_color", v)} />
                 </div>
                 <div className="mt-6 p-4 bg-dark-700 rounded-lg">
                   <p className="text-xs text-gray-500">💡 {L("پیش‌نمایش رنگ‌ها:", "Color Preview:")}</p>
@@ -273,9 +286,9 @@ export default function AdminCustomizePage() {
               <div className="gaming-card p-6 animate-slide-up">
                 <h2 className="text-lg font-bold mb-6 neon-text-blue">⚡ {L("لوگو و برند", "Logo & Brand")}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <EmojiInput label={L("آیکون لوگو", "Logo Icon")} settingKey="logo_icon" />
-                  <TextInput label={L("متن لوگو", "Logo Text")} settingKey="logo_text" />
-                  <NumberInput label={L("اندازه فونت لوگو", "Logo Font Size")} settingKey="logo_font_size" min={16} max={48} suffix="px" />
+                  <EmojiInput label={L("آیکون لوگو", "Logo Icon")} value={settings.logo_icon ?? ""} onChange={(v) => setSetting("logo_icon", v)} />
+                  <TextInput label={L("متن لوگو", "Logo Text")} value={settings.logo_text ?? ""} onChange={(v) => setSetting("logo_text", v)} />
+                  <NumberInput label={L("اندازه فونت لوگو", "Logo Font Size")} value={settings.logo_font_size ?? ""} onChange={(v) => setSetting("logo_font_size", v)} min={16} max={48} suffix="px" />
                 </div>
                 <div className="mt-6 p-4 bg-dark-700 rounded-lg flex items-center gap-3">
                   <span style={{ fontSize: `${settings.logo_font_size}px` }}>{settings.logo_icon}</span>
@@ -291,14 +304,14 @@ export default function AdminCustomizePage() {
               <div className="gaming-card p-6 animate-slide-up">
                 <h2 className="text-lg font-bold mb-6 neon-text-blue">🖼️ {L("هیرو و بنر اصلی", "Hero & Banner")}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <TextInput label={L("عنوان فارسی خط ۱", "Title FA Line 1")} settingKey="hero_title_fa" dir="rtl" />
-                  <TextInput label={L("عنوان انگلیسی خط ۱", "Title EN Line 1")} settingKey="hero_title_en" dir="ltr" />
-                  <TextInput label={L("عنوان فارسی خط ۲", "Title FA Line 2")} settingKey="hero_subtitle_fa" dir="rtl" />
-                  <TextInput label={L("عنوان انگلیسی خط ۲", "Title EN Line 2")} settingKey="hero_subtitle_en" dir="ltr" />
+                  <TextInput label={L("عنوان فارسی خط ۱", "Title FA Line 1")} value={settings.hero_title_fa ?? ""} onChange={(v) => setSetting("hero_title_fa", v)} dir="rtl" />
+                  <TextInput label={L("عنوان انگلیسی خط ۱", "Title EN Line 1")} value={settings.hero_title_en ?? ""} onChange={(v) => setSetting("hero_title_en", v)} dir="ltr" />
+                  <TextInput label={L("عنوان فارسی خط ۲", "Title FA Line 2")} value={settings.hero_subtitle_fa ?? ""} onChange={(v) => setSetting("hero_subtitle_fa", v)} dir="rtl" />
+                  <TextInput label={L("عنوان انگلیسی خط ۲", "Title EN Line 2")} value={settings.hero_subtitle_en ?? ""} onChange={(v) => setSetting("hero_subtitle_en", v)} dir="ltr" />
                   <div className="sm:col-span-2">
-                    <TextInput label={L("لینک تصویر بکگراند هیرو", "Hero Background Image URL")} settingKey="hero_image_url" placeholder="https://i.ibb.co/..." />
+                    <TextInput label={L("لینک تصویر بکگراند هیرو", "Hero Background Image URL")} value={settings.hero_image_url ?? ""} onChange={(v) => setSetting("hero_image_url", v)} placeholder="https://i.ibb.co/..." />
                   </div>
-                  <NumberInput label={L("شفافیت تصویر", "Image Overlay Opacity")} settingKey="hero_overlay_opacity" min={0} max={100} suffix="%" />
+                  <NumberInput label={L("شفافیت تصویر", "Image Overlay Opacity")} value={settings.hero_overlay_opacity ?? ""} onChange={(v) => setSetting("hero_overlay_opacity", v)} min={0} max={100} suffix="%" />
                 </div>
               </div>
             )}
@@ -309,18 +322,18 @@ export default function AdminCustomizePage() {
                 <h2 className="text-lg font-bold mb-6 neon-text-blue">😀 {L("آیکون‌ها", "Icons")}</h2>
                 <h3 className="text-sm font-bold text-gray-400 mb-3">{L("آیکون‌های منو", "Navigation Icons")}</h3>
                 <div className="grid grid-cols-3 sm:grid-cols-6 gap-4 mb-8">
-                  <EmojiInput label={L("خانه", "Home")} settingKey="nav_home_icon" />
-                  <EmojiInput label={L("تورنومنت", "Tournament")} settingKey="nav_tournament_icon" />
-                  <EmojiInput label={L("رتبه‌بندی", "Leaderboard")} settingKey="nav_leaderboard_icon" />
-                  <EmojiInput label={L("داوری", "Judging")} settingKey="nav_judging_icon" />
-                  <EmojiInput label={L("تیم‌ها", "Teams")} settingKey="nav_teams_icon" />
-                  <EmojiInput label={L("دستاوردها", "Achievements")} settingKey="nav_achievements_icon" />
+                  <EmojiInput label={L("خانه", "Home")} value={settings.nav_home_icon ?? ""} onChange={(v) => setSetting("nav_home_icon", v)} />
+                  <EmojiInput label={L("تورنومنت", "Tournament")} value={settings.nav_tournament_icon ?? ""} onChange={(v) => setSetting("nav_tournament_icon", v)} />
+                  <EmojiInput label={L("رتبه‌بندی", "Leaderboard")} value={settings.nav_leaderboard_icon ?? ""} onChange={(v) => setSetting("nav_leaderboard_icon", v)} />
+                  <EmojiInput label={L("داوری", "Judging")} value={settings.nav_judging_icon ?? ""} onChange={(v) => setSetting("nav_judging_icon", v)} />
+                  <EmojiInput label={L("تیم‌ها", "Teams")} value={settings.nav_teams_icon ?? ""} onChange={(v) => setSetting("nav_teams_icon", v)} />
+                  <EmojiInput label={L("دستاوردها", "Achievements")} value={settings.nav_achievements_icon ?? ""} onChange={(v) => setSetting("nav_achievements_icon", v)} />
                 </div>
                 <h3 className="text-sm font-bold text-gray-400 mb-3">{L("آیکون‌های بازی‌ها", "Game Icons")}</h3>
                 <div className="grid grid-cols-3 gap-4">
-                  <EmojiInput label={L("کلش رویال", "Clash Royale")} settingKey="game_clash_icon" />
-                  <EmojiInput label={L("کالاف موبایل", "COD Mobile")} settingKey="game_cod_icon" />
-                  <EmojiInput label={L("فورتنایت", "Fortnite")} settingKey="game_fortnite_icon" />
+                  <EmojiInput label={L("کلش رویال", "Clash Royale")} value={settings.game_clash_icon ?? ""} onChange={(v) => setSetting("game_clash_icon", v)} />
+                  <EmojiInput label={L("کالاف موبایل", "COD Mobile")} value={settings.game_cod_icon ?? ""} onChange={(v) => setSetting("game_cod_icon", v)} />
+                  <EmojiInput label={L("فورتنایت", "Fortnite")} value={settings.game_fortnite_icon ?? ""} onChange={(v) => setSetting("game_fortnite_icon", v)} />
                 </div>
               </div>
             )}
@@ -340,7 +353,7 @@ export default function AdminCustomizePage() {
                       <option value="Vazirmatn, sans-serif">Vazirmatn (فارسی)</option>
                     </select>
                   </div>
-                  <NumberInput label={L("اندازه فونت پایه", "Base Font Size")} settingKey="font_size_base" min={12} max={20} suffix="px" />
+                  <NumberInput label={L("اندازه فونت پایه", "Base Font Size")} value={settings.font_size_base ?? ""} onChange={(v) => setSetting("font_size_base", v)} min={12} max={20} suffix="px" />
                 </div>
               </div>
             )}
@@ -350,9 +363,9 @@ export default function AdminCustomizePage() {
               <div className="gaming-card p-6 animate-slide-up">
                 <h2 className="text-lg font-bold mb-6 neon-text-blue">📐 {L("چینش و لایه‌بندی", "Layout")}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <NumberInput label={L("حداکثر عرض سایت", "Max Width")} settingKey="max_width" min={960} max={1920} suffix="px" />
-                  <NumberInput label={L("گردی گوشه کارت‌ها", "Card Border Radius")} settingKey="card_radius" min={0} max={30} suffix="px" />
-                  <ToggleInput label={L("نمایش حاشیه کارت‌ها", "Show Card Border")} settingKey="card_border" />
+                  <NumberInput label={L("حداکثر عرض سایت", "Max Width")} value={settings.max_width ?? ""} onChange={(v) => setSetting("max_width", v)} min={960} max={1920} suffix="px" />
+                  <NumberInput label={L("گردی گوشه کارت‌ها", "Card Border Radius")} value={settings.card_radius ?? ""} onChange={(v) => setSetting("card_radius", v)} min={0} max={30} suffix="px" />
+                  <ToggleInput label={L("نمایش حاشیه کارت‌ها", "Show Card Border")} value={settings.card_border ?? ""} onChange={(v) => setSetting("card_border", v)} />
                 </div>
               </div>
             )}
@@ -362,9 +375,9 @@ export default function AdminCustomizePage() {
               <div className="gaming-card p-6 animate-slide-up">
                 <h2 className="text-lg font-bold mb-6 neon-text-blue">🏆 {L("لیست برندگان", "Winners List")}</h2>
                 <div className="space-y-6">
-                  <ToggleInput label={L("نمایش بخش برندگان در صفحه اصلی", "Show Winners on Homepage")} settingKey="winners_display" />
-                  <TextInput label={L("عنوان فارسی", "Title FA")} settingKey="winners_title_fa" dir="rtl" />
-                  <TextInput label={L("عنوان انگلیسی", "Title EN")} settingKey="winners_title_en" dir="ltr" />
+                  <ToggleInput label={L("نمایش بخش برندگان در صفحه اصلی", "Show Winners on Homepage")} value={settings.winners_display ?? ""} onChange={(v) => setSetting("winners_display", v)} />
+                  <TextInput label={L("عنوان فارسی", "Title FA")} value={settings.winners_title_fa ?? ""} onChange={(v) => setSetting("winners_title_fa", v)} dir="rtl" />
+                  <TextInput label={L("عنوان انگلیسی", "Title EN")} value={settings.winners_title_en ?? ""} onChange={(v) => setSetting("winners_title_en", v)} dir="ltr" />
                 </div>
               </div>
             )}
@@ -374,9 +387,9 @@ export default function AdminCustomizePage() {
               <div className="gaming-card p-6 animate-slide-up">
                 <h2 className="text-lg font-bold mb-6 neon-text-blue">📎 {L("فوتر", "Footer")}</h2>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <TextInput label={L("متن فوتر (فارسی)", "Footer Text (FA)")} settingKey="footer_text_fa" dir="rtl" />
-                  <TextInput label={L("متن فوتر (انگلیسی)", "Footer Text (EN)")} settingKey="footer_text_en" dir="ltr" />
-                  <ToggleInput label={L("نمایش لینک شبکه‌های اجتماعی", "Show Social Links")} settingKey="footer_show_social" />
+                  <TextInput label={L("متن فوتر (فارسی)", "Footer Text (FA)")} value={settings.footer_text_fa ?? ""} onChange={(v) => setSetting("footer_text_fa", v)} dir="rtl" />
+                  <TextInput label={L("متن فوتر (انگلیسی)", "Footer Text (EN)")} value={settings.footer_text_en ?? ""} onChange={(v) => setSetting("footer_text_en", v)} dir="ltr" />
+                  <ToggleInput label={L("نمایش لینک شبکه‌های اجتماعی", "Show Social Links")} value={settings.footer_show_social ?? ""} onChange={(v) => setSetting("footer_show_social", v)} />
                 </div>
               </div>
             )}
@@ -386,10 +399,10 @@ export default function AdminCustomizePage() {
               <div className="gaming-card p-6 animate-slide-up">
                 <h2 className="text-lg font-bold mb-6 neon-text-blue">📢 {L("نوار اطلاعیه", "Announcement Bar")}</h2>
                 <div className="space-y-6">
-                  <ToggleInput label={L("فعال کردن نوار اطلاعیه", "Enable Announcement Bar")} settingKey="announcement_active" />
-                  <TextInput label={L("متن اطلاعیه (فارسی)", "Announcement (FA)")} settingKey="announcement_text_fa" dir="rtl" placeholder={L("مثال: تورنومنت جدید شروع شد!", "")} />
-                  <TextInput label={L("متن اطلاعیه (انگلیسی)", "Announcement (EN)")} settingKey="announcement_text_en" dir="ltr" placeholder="e.g., New tournament starting!" />
-                  <ColorInput label={L("رنگ نوار اطلاعیه", "Announcement Bar Color")} settingKey="announcement_color" />
+                  <ToggleInput label={L("فعال کردن نوار اطلاعیه", "Enable Announcement Bar")} value={settings.announcement_active ?? ""} onChange={(v) => setSetting("announcement_active", v)} />
+                  <TextInput label={L("متن اطلاعیه (فارسی)", "Announcement (FA)")} value={settings.announcement_text_fa ?? ""} onChange={(v) => setSetting("announcement_text_fa", v)} dir="rtl" placeholder={L("مثال: تورنومنت جدید شروع شد!", "")} />
+                  <TextInput label={L("متن اطلاعیه (انگلیسی)", "Announcement (EN)")} value={settings.announcement_text_en ?? ""} onChange={(v) => setSetting("announcement_text_en", v)} dir="ltr" placeholder="e.g., New tournament starting!" />
+                  <ColorInput label={L("رنگ نوار اطلاعیه", "Announcement Bar Color")} value={settings.announcement_color ?? ""} onChange={(v) => setSetting("announcement_color", v)} />
                 </div>
                 {settings.announcement_active === "true" && settings.announcement_text_fa && (
                   <div className="mt-4 rounded-lg p-3 text-center text-sm text-white font-medium" style={{ backgroundColor: settings.announcement_color }}>

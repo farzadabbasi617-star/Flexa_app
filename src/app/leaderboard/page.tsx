@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -19,11 +19,7 @@ export default function LeaderboardPage() {
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState<"rating" | "wins" | "winrate">("rating");
 
-  useEffect(() => {
-    fetchPlayers();
-  }, []);
-
-  async function fetchPlayers() {
+  const fetchPlayers = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/players");
@@ -33,7 +29,11 @@ export default function LeaderboardPage() {
       setPlayers([]);
     }
     setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    fetchPlayers();
+  }, [fetchPlayers]);
 
   function getWinRate(wins: number, losses: number) {
     const total = wins + losses;

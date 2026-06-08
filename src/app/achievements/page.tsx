@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
@@ -30,11 +30,7 @@ export default function AchievementsPage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>("all");
 
-  useEffect(() => {
-    fetchAchievements();
-  }, []);
-
-  async function fetchAchievements() {
+  const fetchAchievements = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch("/api/achievements");
@@ -44,7 +40,11 @@ export default function AchievementsPage() {
       setAchievements([]);
     }
     setLoading(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    fetchAchievements();
+  }, [fetchAchievements]);
 
   const categories = ["all", "wins", "tournaments", "rating", "special"];
   const filteredAchievements =

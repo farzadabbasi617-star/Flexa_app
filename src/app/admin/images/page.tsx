@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -44,15 +44,7 @@ export default function AdminImagesPage() {
     sortOrder: 0,
   });
 
-  useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) router.push("/");
-  }, [loading, user, router]);
-
-  useEffect(() => {
-    fetchImages();
-  }, []);
-
-  async function fetchImages() {
+  const fetchImages = useCallback(async () => {
     setLoadingImages(true);
     try {
       const res = await fetch("/api/admin/images");
@@ -60,7 +52,15 @@ export default function AdminImagesPage() {
       setImages(Array.isArray(data) ? data : []);
     } catch { setImages([]); }
     setLoadingImages(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (!loading && (!user || user.role !== "admin")) router.push("/");
+  }, [loading, user, router]);
+
+  useEffect(() => {
+    fetchImages();
+  }, [fetchImages]);
 
   function startEdit(img: SiteImage) {
     setEditingId(img.id);

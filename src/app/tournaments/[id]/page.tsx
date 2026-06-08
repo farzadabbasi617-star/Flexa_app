@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -76,12 +76,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [registering, setRegistering] = useState(false);
 
-  useEffect(() => {
-    fetchTournament();
-    fetchPlayers();
-  }, [id]);
-
-  async function fetchTournament() {
+  const fetchTournament = useCallback(async () => {
     setLoading(true);
     try {
       const res = await fetch(`/api/tournaments/${id}`);
@@ -91,9 +86,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       // handle error
     }
     setLoading(false);
-  }
+  }, [id]);
 
-  async function fetchPlayers() {
+  const fetchPlayers = useCallback(async () => {
     try {
       const res = await fetch("/api/players");
       const data = await res.json();
@@ -101,7 +96,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     } catch {
       // handle error
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    fetchTournament();
+    fetchPlayers();
+  }, [fetchTournament, fetchPlayers]);
 
   async function registerPlayer() {
     if (!selectedPlayer) return;

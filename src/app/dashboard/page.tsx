@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -41,11 +41,7 @@ export default function DashboardPage() {
     }
   }, [loading, user, router]);
 
-  useEffect(() => {
-    if (user) fetchDashboard();
-  }, [user]);
-
-  async function fetchDashboard() {
+  const fetchDashboard = useCallback(async () => {
     try {
       const [pRes, nRes] = await Promise.all([
         fetch("/api/players"),
@@ -74,7 +70,11 @@ export default function DashboardPage() {
     } catch {
       // ignore
     }
-  }
+  }, [user]);
+
+  useEffect(() => {
+    if (user) fetchDashboard();
+  }, [user, fetchDashboard]);
 
   if (loading || !user) {
     return (

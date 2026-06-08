@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -38,13 +38,7 @@ export default function NotificationsPage() {
     }
   }, [loading, user, router]);
 
-  useEffect(() => {
-    if (user) {
-      fetchNotifications();
-    }
-  }, [user]);
-
-  async function fetchNotifications() {
+  const fetchNotifications = useCallback(async () => {
     setLoadingNotifs(true);
     try {
       const res = await fetch("/api/notifications");
@@ -54,7 +48,13 @@ export default function NotificationsPage() {
       setNotifications([]);
     }
     setLoadingNotifs(false);
-  }
+  }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchNotifications();
+    }
+  }, [user, fetchNotifications]);
 
   async function markAllRead() {
     try {

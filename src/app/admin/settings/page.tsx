@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -32,21 +32,21 @@ export default function AdminSettingsPage() {
     announcement_en: "",
   });
 
+  const fetchSettings = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/settings");
+      const data = await res.json();
+      setSettings((prev) => ({ ...prev, ...data }));
+    } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     if (!loading && (!user || user.role !== "admin")) router.push("/");
   }, [loading, user, router]);
 
   useEffect(() => {
     if (user?.role === "admin") fetchSettings();
-  }, [user]);
-
-  async function fetchSettings() {
-    try {
-      const res = await fetch("/api/admin/settings");
-      const data = await res.json();
-      setSettings((prev) => ({ ...prev, ...data }));
-    } catch { /* ignore */ }
-  }
+  }, [user, fetchSettings]);
 
   async function handleSave() {
     setSaving(true);

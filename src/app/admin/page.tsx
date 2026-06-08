@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -28,21 +28,21 @@ export default function AdminPage() {
 
   const L = (fa: string, en: string) => lang === "fa" ? fa : en;
 
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/stats");
+      if (res.ok) setStats(await res.json());
+    } catch { /* ignore */ }
+    setLoadingStats(false);
+  }, []);
+
   useEffect(() => {
     if (!loading && (!user || user.role !== "admin")) router.push("/");
   }, [loading, user, router]);
 
   useEffect(() => {
     if (user?.role === "admin") fetchStats();
-  }, [user]);
-
-  async function fetchStats() {
-    try {
-      const res = await fetch("/api/admin/stats");
-      if (res.ok) setStats(await res.json());
-    } catch { /* ignore */ }
-    setLoadingStats(false);
-  }
+  }, [user, fetchStats]);
 
   if (loading || !user || user.role !== "admin") {
     return (

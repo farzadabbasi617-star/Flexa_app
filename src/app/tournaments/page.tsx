@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
@@ -39,9 +39,7 @@ function TournamentsContent() {
 
   const L = (fa: string, en: string) => lang === "fa" ? fa : en;
 
-  useEffect(() => { fetchTournaments(); }, [activeFilter]);
-
-  async function fetchTournaments() {
+  const fetchTournaments = useCallback(async () => {
     setLoading(true);
     try {
       const url = activeFilter !== "all" ? `/api/tournaments?game=${activeFilter}` : "/api/tournaments";
@@ -50,7 +48,9 @@ function TournamentsContent() {
       setTournaments(Array.isArray(data) ? data : []);
     } catch { setTournaments([]); }
     setLoading(false);
-  }
+  }, [activeFilter]);
+
+  useEffect(() => { fetchTournaments(); }, [fetchTournaments]);
 
   const games = [
     { id: "clash_royale", name: L("کلش رویال", "Clash Royale"), icon: "⚔️" },
