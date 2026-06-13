@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ورود به فلکسا</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@900&family=Rajdhani:wght@600&family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --neon: #bc00ff; --glass: rgba(255, 255, 255, 0.03); }
+        body { background: #050508; color: #fff; font-family: 'Vazirmatn', sans-serif; overflow: hidden; }
+        .glass { background: var(--glass); backdrop-filter: blur(25px); border: 1px solid rgba(255,255,255,0.08); }
+        .input-auth { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); border-radius: 20px; padding: 16px 20px; width: 100%; outline: none; transition: 0.3s; text-align: center; font-family: 'Rajdhani', sans-serif; font-size: 1.1rem; }
+        .input-auth:focus { border-color: var(--neon); box-shadow: 0 0 15px rgba(188, 0, 255, 0.2); }
+        .btn-auth { background: linear-gradient(135deg, #bc00ff 0%, #7000ff 100%); padding: 16px; border-radius: 20px; font-weight: 900; width: 100%; shadow: 0 10px 20px rgba(188, 0, 255, 0.3); }
+    </style>
+</head>
+<body class="max-w-[480px] mx-auto min-h-screen flex flex-col justify-center px-8 relative">
+
+    <div class="fixed inset-0 z-[-1]">
+        <div class="absolute top-[10%] left-[-20%] w-64 h-64 bg-purple-600/20 blur-[100px] rounded-full"></div>
+        <div class="absolute bottom-[10%] right-[-20%] w-64 h-64 bg-blue-600/10 blur-[100px] rounded-full"></div>
+    </div>
+
+    <!-- لوگو -->
+    <div class="text-center mb-12">
+        <h1 class="text-5xl font-black italic tracking-tighter" style="font-family: 'Orbitron';">FLEXA</h1>
+        <p class="text-[10px] font-bold text-purple-400 tracking-[0.4em] uppercase mt-2">Elite Gaming Hub</p>
+    </div>
+
+    <!-- فرم ورود/ثبت‌نام -->
+    <div class="glass p-8 rounded-[40px] border-white/10 shadow-2xl relative overflow-hidden">
+        <h2 class="text-xl font-black mb-8 text-center">ورود یا ثبت‌نام</h2>
+        
+        <div id="step-identifier" class="space-y-6">
+            <p class="text-xs text-gray-400 text-center leading-relaxed">
+                شماره موبایل یا ایمیل خود را برای دریافت کد تایید وارد کنید
+            </p>
+            <input type="text" placeholder="09xxxxxxxxx or email@site.com" class="input-auth">
+            <button onclick="nextStep()" class="btn-auth uppercase tracking-widest text-sm">ارسال کد تایید</button>
+        </div>
+
+        <div id="step-otp" class="hidden space-y-6">
+            <p class="text-xs text-gray-400 text-center leading-relaxed">
+                کد ۶ رقمی ارسال شده را وارد کنید
+            </p>
+            <div class="flex gap-2 justify-center" dir="ltr">
+                <input type="text" maxlength="1" class="w-12 h-14 glass border-white/10 rounded-xl text-center font-black text-xl outline-none focus:border-purple-500">
+                <input type="text" maxlength="1" class="w-12 h-14 glass border-white/10 rounded-xl text-center font-black text-xl outline-none focus:border-purple-500">
+                <input type="text" maxlength="1" class="w-12 h-14 glass border-white/10 rounded-xl text-center font-black text-xl outline-none focus:border-purple-500">
+                <input type="text" maxlength="1" class="w-12 h-14 glass border-white/10 rounded-xl text-center font-black text-xl outline-none focus:border-purple-500">
+                <input type="text" maxlength="1" class="w-12 h-14 glass border-white/10 rounded-xl text-center font-black text-xl outline-none focus:border-purple-500">
+                <input type="text" maxlength="1" class="w-12 h-14 glass border-white/10 rounded-xl text-center font-black text-xl outline-none focus:border-purple-500">
+            </div>
+            <button class="btn-auth uppercase tracking-widest text-sm">تایید و ورود</button>
+            <p class="text-[10px] text-center text-gray-500">کد را دریافت نکردید؟ <span class="text-purple-400 cursor-pointer">ارسال مجدد (۵۹ ثانیه)</span></p>
+        </div>
+    </div>
+
+    <p class="text-[9px] text-center text-gray-600 mt-10 leading-relaxed px-10 uppercase tracking-widest">
+        By continuing, you agree to Flexa <span class="text-white">Terms of Service</span> and <span class="text-white">Privacy Policy</span>
+    </p>
+
+    <script>
+        function nextStep() {
+            document.getElementById('step-identifier').classList.add('hidden');
+            document.getElementById('step-otp').classList.remove('hidden');
+            document.getElementById('step-otp').classList.add('animate-fadeIn');
+        }
+    </script>
+</body>
+</html>

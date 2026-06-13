@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flexa - The Masterpiece</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@800;900&family=Rajdhani:wght@600;700&family=Vazirmatn:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        :root { --neon: #bc00ff; --glass: rgba(255, 255, 255, 0.03); --border: rgba(255, 255, 255, 0.1); }
+        body { background: #040406; color: #fff; font-family: 'Vazirmatn', sans-serif; margin: 0; overflow: hidden; }
+        .en { font-family: 'Orbitron', sans-serif; }
+        .num { font-family: 'Rajdhani', sans-serif; font-weight: 700; }
+        
+        /* --- LUXURY GLASS SYSTEM --- */
+        .glass-panel {
+            background: rgba(20, 20, 25, 0.7); backdrop-filter: blur(25px);
+            border: 1px solid var(--border); border-top: 1px solid rgba(255,255,255,0.2);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
+        }
+        
+        /* --- BACKGROUND PARTICLES --- */
+        .bg-scene { position: fixed; inset: 0; z-index: -1; background: radial-gradient(circle at 50% 0%, #1a0033 0%, #040406 70%); }
+        .leaf { position: absolute; background: var(--neon); filter: blur(10px); border-radius: 50%; opacity: 0.2; animation: float 15s infinite linear; }
+        @keyframes float { 0% { transform: translate(0,0) rotate(0deg); } 100% { transform: translate(100px, -150px) rotate(360deg); } }
+
+        /* --- PAGE TRANSITIONS --- */
+        .page { display: none; height: 100vh; overflow-y: auto; padding-bottom: 150px; animation: fadeInUp 0.5s cubic-bezier(0.23, 1, 0.32, 1) forwards; }
+        .active-page { display: block; }
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* --- KILHOUSE CARD LUXURY --- */
+        .tournament-card { border-radius: 45px; overflow: hidden; position: relative; }
+        .prize-box { background: linear-gradient(90deg, rgba(255,215,0,0.15) 0%, transparent 100%); border: 1px solid rgba(255,215,0,0.3); }
+        .btn-view { background: linear-gradient(135deg, #bc00ff 0%, #6a00ff 100%); shadow: 0 10px 20px rgba(188, 0, 255, 0.4); }
+        
+        /* --- NAVIGATION --- */
+        .nav-active { color: var(--neon); text-shadow: 0 0 15px var(--neon); }
+        .nav-indicator { position: absolute; top: -12px; width: 40px; height: 4px; background: var(--neon); border-radius: 10px; box-shadow: 0 0 20px var(--neon); }
+    </style>
+</head>
+<body class="max-w-[480px] mx-auto border-x border-white/5">
+
+    <div class="bg-scene">
+        <div class="leaf" style="width:50px; height:50px; top:20%; left:10%;"></div>
+        <div class="leaf" style="width:80px; height:80px; top:60%; right:5%; animation-delay: -5s;"></div>
+    </div>
+
+    <!-- 1. ARENA (KILHOUSE STYLE WITH EXTREME DEPTH) -->
+    <div id="arena" class="page active-page">
+        <header class="px-8 pt-12 pb-8 flex justify-between items-center">
+            <div>
+                <h1 class="text-4xl en font-black italic tracking-tighter drop-shadow-2xl">ARENA</h1>
+                <p class="text-[9px] font-bold text-purple-400 tracking-[0.4em] uppercase opacity-60">Battlegrounds</p>
+            </div>
+            <div class="glass-panel px-4 py-2.5 rounded-2xl flex items-center gap-2 border-white/10">
+                <span class="num text-sm font-black">2,450,000</span>
+                <div class="bg-purple-600 w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-bold">+</div>
+            </div>
+        </header>
+
+        <div class="px-4 space-y-8">
+            <!-- Tournament Card: iso-Double-579 -->
+            <div class="glass-panel tournament-card">
+                <div class="relative h-48">
+                    <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800" class="w-full h-full object-cover opacity-70">
+                    <div class="absolute inset-0 bg-gradient-to-t from-[#111115] via-transparent to-transparent"></div>
+                    <div class="absolute bottom-5 right-6">
+                        <h3 class="text-2xl en font-black italic text-white drop-shadow-lg">iso-Double-579</h3>
+                    </div>
+                    <div class="absolute top-5 right-5 bg-black/60 backdrop-blur-xl px-4 py-1.5 rounded-full border border-white/10">
+                        <span class="text-[10px] font-black tracking-widest text-white">0 نفر باقی مانده</span>
+                    </div>
+                </div>
+                <div class="p-8 pt-2 space-y-5">
+                    <div class="prize-box p-5 rounded-[25px] flex justify-between items-center">
+                        <p class="text-xs font-black text-yellow-500">3,104,000 تومان جایزه نقدی برای 30 نفر</p>
+                        <span class="text-2xl drop-shadow-[0_0_10px_gold]">🏆</span>
+                    </div>
+                    <div class="bg-white/5 p-4 rounded-[22px] flex items-center justify-center gap-3 border border-white/5">
+                        <span class="text-xs font-bold text-gray-400">امروز ساعت <span class="num text-white">15:00</span></span>
+                        <span class="opacity-30">📅</span>
+                    </div>
+                    <div class="flex items-center justify-between pt-2">
+                        <div class="text-right">
+                            <span class="text-xl num font-black tracking-tighter">43,000</span>
+                            <span class="text-[10px] font-bold text-gray-500 mr-1">تومان</span>
+                        </div>
+                        <button class="btn-view px-10 py-4 rounded-[22px] font-black text-xs flex items-center gap-3 shadow-2xl">
+                            مشاهده <span class="text-[10px]">❮</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. RANKINGS (ULTIMATE GLASS) -->
+    <div id="rankings" class="page">
+        <header class="px-8 pt-12 pb-8">
+            <h1 class="text-6xl en font-black italic tracking-tighter opacity-90 drop-shadow-2xl">RANKINGS</h1>
+        </header>
+        <div class="px-4 space-y-4">
+            <div class="glass-panel p-6 rounded-[40px] flex items-center gap-5 border-yellow-500/30">
+                <div class="w-10 text-center text-3xl drop-shadow-[0_0_15px_gold]">🥇</div>
+                <div class="w-14 h-14 rounded-full border-2 border-yellow-500 p-1 bg-black/20">
+                    <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Kiwan" class="rounded-full">
+                </div>
+                <div class="flex-1">
+                    <h4 class="text-lg en font-black tracking-tighter">KiwanFX</h4>
+                    <p class="text-[9px] text-yellow-500 font-bold tracking-[0.2em]">ELITE HUNTER</p>
+                </div>
+                <div class="text-right num"><p class="text-base font-black">125,750</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. PROFILE (HERO CARD WITH WALLET) -->
+    <div id="profile" class="page">
+        <header class="px-6 pt-12 text-center">
+            <div class="relative inline-block mb-6">
+                <div class="p-1 rounded-full bg-gradient-to-tr from-[#bc00ff] to-[#00d2ff] shadow-[0_0_40px_rgba(188,0,255,0.4)]">
+                    <div class="w-32 h-32 rounded-full border-4 border-[#050508] overflow-hidden bg-gray-900">
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=Kiwan" class="w-full h-full">
+                    </div>
+                </div>
+                <div class="absolute -bottom-1 -right-1 bg-purple-600 border-4 border-[#050508] w-10 h-10 rounded-full flex items-center justify-center text-xs font-black num">42</div>
+            </div>
+            <h2 class="text-4xl en font-black tracking-tighter mb-2">KiwanFX <span class="text-purple-500">👑</span></h2>
+            <p class="text-[10px] font-black text-gray-500 tracking-[0.3em] uppercase italic">شکارچی خبره • PRO GAMER</p>
+        </header>
+
+        <!-- LUXURY WALLET INSIDE PROFILE -->
+        <div class="px-4 my-10">
+            <div class="glass-panel p-8 rounded-[45px] border-purple-500/20 bg-gradient-to-br from-[#1a0033] to-[#0a0a0c]">
+                <p class="text-[10px] font-black text-purple-300 uppercase tracking-widest mb-2 opacity-60">موجودی کیف پول</p>
+                <div class="flex items-baseline gap-3 mb-8">
+                    <span class="text-5xl num font-black tracking-tighter">2,450,000</span>
+                    <span class="text-xs font-bold text-purple-400 uppercase">Toman</span>
+                </div>
+                <div class="flex gap-3">
+                    <button class="flex-[1.5] btn-view py-4 rounded-[22px] font-black text-[10px] tracking-widest">شارژ مستقیم</button>
+                    <button class="flex-1 glass-panel py-4 rounded-[22px] font-black text-[10px] tracking-widest text-gray-400">برداشت</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BOTTOM NAVIGATION (THE FINAL GLOSS) -->
+    <nav class="fixed bottom-0 max-w-[480px] w-full p-6 z-50">
+        <div class="glass-panel rounded-[40px] py-8 flex justify-around items-center border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.8)]">
+            <div class="nav-btn active-nav relative flex flex-col items-center gap-1.5 cursor-pointer transition-all" onclick="nav('arena', this)">
+                <div class="nav-indicator"></div><div class="text-3xl">🔥</div><span class="text-[9px] font-black">آرنا</span>
+            </div>
+            <div class="nav-btn relative flex flex-col items-center gap-1.5 cursor-pointer opacity-30 transition-all" onclick="nav('rankings', this)">
+                <div class="nav-indicator hidden"></div><div class="text-3xl">👑</div><span class="text-[9px] font-black">رتبه‌ها</span>
+            </div>
+            <div class="nav-btn relative flex flex-col items-center gap-1.5 cursor-pointer opacity-30 transition-all" onclick="nav('profile', this)">
+                <div class="nav-indicator hidden"></div><div class="text-3xl">🚀</div><span class="text-[9px] font-black">پروفایل</span>
+            </div>
+        </div>
+    </nav>
+
+    <script>
+        function nav(id, el) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active-page'));
+            document.getElementById(id).classList.add('active-page');
+            document.querySelectorAll('.nav-btn').forEach(n => { n.classList.remove('active-nav'); n.classList.add('opacity-30'); n.querySelector('.nav-indicator').classList.add('hidden'); });
+            el.classList.add('active-nav'); el.classList.remove('opacity-30'); el.querySelector('.nav-indicator').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
