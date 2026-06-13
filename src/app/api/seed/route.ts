@@ -23,11 +23,13 @@ export async function POST(request: NextRequest) {
 
     const sampleUsers = await db
       .insert(users)
-      .values(userNames.map(name => ({
+      .values(userNames.map((name, i) => ({
         username: name.toLowerCase().replace(/\s+/g, ''),
         email: `${name.toLowerCase()}@example.com`,
         passwordHash: "hashed_password_here",
         displayName: name,
+        phoneNumber: `09${Math.floor(100000000 + Math.random() * 900000000)}`, // فیلد اجباری موبایل
+        flexaId: `FLX-SEED-${i + 1}`, // فیلد اجباری شناسه فلکسا
       })))
       .returning();
 
