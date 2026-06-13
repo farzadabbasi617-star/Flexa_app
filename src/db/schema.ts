@@ -19,7 +19,7 @@ export const verificationStatusEnum = pgEnum("verification_status", [
   "unlinked", "pending", "verified", "rejected"
 ]);
 
-// --- Core Identity (KilHouse - Mobile Centric) ---
+// --- Core Identity (Flexa - Mobile Centric) ---
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   phoneNumber: varchar("phone_number", { length: 20 }).notNull().unique(),
