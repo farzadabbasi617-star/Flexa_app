@@ -19,11 +19,11 @@ export const verificationStatusEnum = pgEnum("verification_status", [
   "unlinked", "pending", "verified", "rejected"
 ]);
 
-// --- Core Identity (Mobile Centric) ---
+// --- Core Identity (KilHouse - Mobile Centric) ---
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
-  phoneNumber: varchar("phone_number", { length: 20 }).notNull().unique(), // MANDATORY
-  phoneVerifiedAt: timestamp("phone_verified_at"), // MUST BE SET TO ACCESS APP
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull().unique(),
+  phoneVerifiedAt: timestamp("phone_verified_at"),
   username: varchar("username", { length: 100 }).unique(),
   email: varchar("email", { length: 255 }).unique(), 
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
@@ -33,6 +33,11 @@ export const users = pgTable("users", {
   avatarUrl: varchar("avatar_url", { length: 500 }),
   role: userRoleEnum("role").notNull().default("player"),
   isVerified: boolean("is_verified").notNull().default(false),
+  
+  // XP & Leveling System
+  xp: integer("xp").default(0).notNull(), // Cumulative experience
+  level: integer("level").default(1).notNull(), // Current level
+  rankPoints: integer("rank_points").default(1000).notNull(), // Elo Rating for Rankings
   
   // Strike System for Chat
   chatStrikes: integer("chat_strikes").default(0),
@@ -50,18 +55,17 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
 });
 
-// Verification OTPs
+// (Verification, Tournament, Wallet, Chat, Support tables follow...)
+
 export const verificationTokens = pgTable("verification_tokens", {
   id: uuid("id").defaultRandom().primaryKey(),
-  identifier: varchar("identifier", { length: 255 }).notNull(), // Phone number
-  token: varchar("token", { length: 255 }).notNull().unique(), // 6-digit OTP
+  identifier: varchar("identifier", { length: 255 }).notNull(),
+  token: varchar("token", { length: 255 }).notNull().unique(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
   identifierIdx: index("verif_phone_idx").on(table.identifier),
 }));
-
-// (Tournament, Wallet, and other tables follow...)
 
 export const siteSettings = pgTable("site_settings", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -137,14 +141,14 @@ export const transactions = pgTable("transactions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   walletIdIdx: index("transactions_wallet_id_idx").on(table.walletId),
+  referenceIdx: index("transactions_reference_id_idx").on(table.referenceId),
 }));
 
-// --- Support System ---
 export const tickets = pgTable("tickets", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id),
   subject: varchar("subject", { length: 255 }).notNull(),
-  status: varchar("status", { length: 20 }).default("open"), // open, pending, closed
+  status: varchar("status", { length: 20 }).default("open"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -156,7 +160,6 @@ export const ticketMessages = pgTable("ticket_messages", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
-// --- Ephemeral Global Chat ---
 export const globalChat = pgTable("global_chat", {
   id: uuid("id").defaultRandom().primaryKey(),
   senderId: uuid("sender_id").notNull().references(() => users.id),
