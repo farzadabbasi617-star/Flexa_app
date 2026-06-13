@@ -82,6 +82,37 @@ const SPAM_PATTERNS = [
  * AI Judging System
  * Analyzes match data and provides verdict
  */
+export async function analyzeMatchWithAI(player1Score: number, player2Score: number, player1Rating: number, player2Rating: number, player1History: { wins: number; losses: number }, player2History: { wins: number; losses: number }, hasEvidence: boolean = false): Promise<AIJudgmentResult> {
+  const prompt = `Analyze this match result and provide a verdict:\n    Game: Mobile Gaming Tournament\n    Player 1: Score ${player1Score}, Rating ${player1Rating}, History ${player1History.wins}W/${player1History.losses}L\n    Player 2: Score ${player2Score}, Rating ${player2Rating}, History ${player2History.wins}W/${player2History.losses}L\n    Evidence Provided: ${hasEvidence ? "Yes" : "No"}\n\n    Please return a JSON object with:\n    {\n      "verdict": "player1_wins" | "player2_wins" | "draw" | "rematch" | "needs_review",\n      "confidence": number (0-100),\n      "reasoning": "Detailed explanation in Persian",\n      "suspicionLevel": number (0-100),\n      "recommendations": ["string"]\n    }`;
+
+  const systemPrompt = `You are the Flexa AI Head Judge. Your task is to analyze match scores and player data to ensure fair play.\n    Look for:\n    - Anomalies: High scores with low ratings.\n    - Consistency: Does the result match the players skill levels?\n    - Evidence: How much does the presence (or absence) of evidence affect certainty?\n    Respond ONLY with valid JSON.`;
+
+  const response = await askOpenRouter(prompt, systemPrompt);
+
+  if (!response) {
+    return analyzeMatch(player1Score, player2Score, player1Rating, player2Rating, player1History, player2History, hasEvidence);
+  }
+
+  try {
+    const jsonStr = response.includes("```json") 
+      ? response.split("```json")[1].split("```")[0].trim()
+      : response.trim();
+    
+    const parsed = JSON.parse(jsonStr);
+    
+    return {
+      ...parsed,
+      factors: analyzeMatch(player1Score, player2Score, player1Rating, player2Rating, player1History, player2History, hasEvidence).factors
+    };
+  } catch (e) {
+    return analyzeMatch(player1Score, player2Score, player1Rating, player2Rating, player1History, player2History, hasEvidence);
+  }
+}
+
+/**
+ * AI Judging System (Static Logic)
+ * Analyzes match data and provides verdict
+ */
 export function analyzeMatch(
   player1Score: number,
   player2Score: number,
