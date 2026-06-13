@@ -34,6 +34,10 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull().default("player"),
   isVerified: boolean("is_verified").notNull().default(false),
   
+  // Strike System for Chat
+  chatStrikes: integer("chat_strikes").default(0),
+  chatBanUntil: timestamp("chat_ban_until"),
+  
   // Game IDs
   clashRoyaleId: varchar("clash_royale_id", { length: 100 }),
   clashRoyaleStatus: verificationStatusEnum("cr_status").default("unlinked"),
@@ -133,4 +137,31 @@ export const transactions = pgTable("transactions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   walletIdIdx: index("transactions_wallet_id_idx").on(table.walletId),
+}));
+
+// --- Support System ---
+export const tickets = pgTable("tickets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  subject: varchar("subject", { length: 255 }).notNull(),
+  status: varchar("status", { length: 20 }).default("open"), // open, pending, closed
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const ticketMessages = pgTable("ticket_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ticketId: uuid("ticket_id").notNull().references(() => tickets.id),
+  senderId: uuid("sender_id").notNull().references(() => users.id),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// --- Ephemeral Global Chat ---
+export const globalChat = pgTable("global_chat", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  senderId: uuid("sender_id").notNull().references(() => users.id),
+  message: text("message").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  createdIdx: index("chat_created_idx").on(table.createdAt),
 }));
