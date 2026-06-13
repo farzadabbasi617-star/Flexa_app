@@ -4,29 +4,20 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
-import TournamentCard from "@/components/TournamentCard";
+import TournamentCardLuxury from "@/components/TournamentCardLuxury";
 import { useLanguage } from "@/contexts/LanguageContext";
 
 interface Tournament {
   id: string;
   name: string;
-  game: "clash_royale" | "cod_mobile" | "fortnite";
-  format: string;
-  status: string;
-  description: string | null;
+  game: string;
   maxPlayers: number;
-  prizePool: string | null;
-  entryFee: string | null;
-  gameMode: string | null;
-  mapName: string | null;
-  serverSlots: number | null;
-  prize1st: string | null;
-  prize2nd: string | null;
-  prize3rd: string | null;
-  prize4to10: string | null;
-  rules: string | null;
-  startDate: string | null;
   registeredCount: number;
+  prizePool: string | null;
+  winnersCount?: number;
+  entryFee: string | null;
+  startDate: string | null;
+  bannerUrl?: string | null;
 }
 
 function TournamentsContent() {
@@ -89,7 +80,7 @@ function TournamentsContent() {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {tournaments.map((t) => (
-            <TournamentCard key={t.id} tournament={t} />
+            <TournamentCardLuxury key={t.id} t={t} />
           ))}
         </div>
       )}

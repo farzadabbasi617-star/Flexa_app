@@ -168,6 +168,8 @@ export const tournaments = pgTable("tournaments", {
   description: text("description"),
   maxPlayers: integer("max_players").notNull().default(16),
   prizePool: varchar("prize_pool", { length: 100 }),
+  winnersCount: integer("winners_count").default(1), // جدید: جایزه برای چند نفر
+  categoryLabel: varchar("category_label", { length: 100 }), // جدید: صد نفره، کیلی و...
   entryFee: varchar("entry_fee", { length: 100 }).default("رایگان"),
   gameMode: varchar("game_mode", { length: 100 }),
   mapName: varchar("map_name", { length: 100 }),

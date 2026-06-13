@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const {
       name, game, format, description, maxPlayers, prizePool, rules, startDate,
-      entryFee, gameMode, mapName, serverSlots, prize1st, prize2nd, prize3rd, prize4to10,
+      entryFee, gameMode, mapName, serverSlots, winnersCount, categoryLabel
     } = body;
 
     if (!name || !game) {
@@ -89,14 +89,12 @@ export async function POST(request: NextRequest) {
         description: description || null,
         maxPlayers: maxPlayers || 16,
         prizePool: prizePool || null,
+        winnersCount: winnersCount || 1,
+        categoryLabel: categoryLabel || null,
         entryFee: entryFee || "رایگان",
         gameMode: gameMode || null,
         mapName: mapName || null,
         serverSlots: serverSlots || maxPlayers || 16,
-        prize1st: prize1st || null,
-        prize2nd: prize2nd || null,
-        prize3rd: prize3rd || null,
-        prize4to10: prize4to10 || null,
         rules: rules || null,
         startDate: startDate ? new Date(startDate) : null,
       })
