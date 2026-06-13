@@ -342,9 +342,48 @@ export function analyzePlayer(
   };
 }
 
+import { askOpenRouter } from './openrouter';
+
 /**
- * AI Chat Assistant Responses
- * Generates helpful responses to user questions
+ * Real AI Chat Assistant Response using OpenRouter
+ */
+export async function generateRealAssistantResponse(
+  query: string,
+  context: { lang: "en" | "fa"; userName?: string }
+): Promise<{ response: string; suggestions: string[] }> {
+  const isFA = context.lang === "fa";
+  const name = context.userName || (isFA ? "کاربر" : "User");
+  
+  const systemPrompt = isFA 
+    ? `شما "فلکسا" (Flexa) هستید، یک دستیار هوشمند برای پلتفرم برگزاری تورنمنت بازی‌های موبایل (کلش رویال، کالاف دیوتی موبایل و فورتنایت). 
+       نام کاربر: ${name}.
+       وظیفه شما راهنمایی کاربران در مورد قوانین، نحوه ثبت‌نام، جوایز و سیستم داوری است.
+       پاسخ‌ها را صمیمی، کوتاه و به زبان فارسی بنویسید.`
+    : `You are "Flexa", an AI assistant for a mobile gaming tournament platform (Clash Royale, COD Mobile, Fortnite).
+       User name: ${name}.
+       Your job is to guide users about rules, registration, prizes, and judging.
+       Keep responses friendly, brief, and in English.`;
+
+  const response = await askOpenRouter(query, systemPrompt);
+
+  if (!response) {
+    // Fallback to the static version if OpenRouter fails
+    return generateAssistantResponse(query, context);
+  }
+
+  // Generate some dynamic suggestions based on the response or query
+  const suggestions = isFA 
+    ? ["قوانین تورنومنت", "نحوه ثبت امتیاز", "تورنومنت‌های فعال"]
+    : ["Tournament Rules", "How to report score", "Active Tournaments"];
+
+  return {
+    response,
+    suggestions
+  };
+}
+
+/**
+ * AI Chat Assistant Responses (Static Fallback)
  */
 export function generateAssistantResponse(
   query: string,

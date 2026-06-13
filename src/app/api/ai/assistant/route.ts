@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateAssistantResponse } from "@/lib/ai-engine";
+import { generateRealAssistantResponse } from "@/lib/ai-engine";
 import { validateSession } from "@/lib/auth";
 import { AIAssistantSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
@@ -8,7 +8,6 @@ import logger from "@/lib/logger";
 import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
-
 
 export async function POST(request: NextRequest) {
   try {
@@ -48,7 +47,8 @@ export async function POST(request: NextRequest) {
       userName = user?.displayName;
     }
 
-    const result = generateAssistantResponse(query, {
+    // Call the real AI assistant
+    const result = await generateRealAssistantResponse(query, {
       lang,
       userName,
     });
