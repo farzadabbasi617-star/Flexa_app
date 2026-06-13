@@ -12,27 +12,20 @@ import {
 } from "drizzle-orm/pg-core";
 
 export const userRoleEnum = pgEnum("user_role", [
-  "player",
-  "judge",
-  "moderator",
-  "admin",
-  "super_admin",
+  "player", "judge", "moderator", "admin", "super_admin"
 ]);
 
 export const verificationStatusEnum = pgEnum("verification_status", [
-  "unlinked",
-  "pending",
-  "verified",
-  "rejected",
+  "unlinked", "pending", "verified", "rejected"
 ]);
 
-// Users table (Core Identity)
+// --- Core Identity (Mobile Centric) ---
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
-  username: varchar("username", { length: 100 }).notNull().unique(),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  phoneNumber: varchar("phone_number", { length: 20 }).unique(), // MOBILE LOGIN
-  emailVerified: timestamp("email_verified"), // EMAIL VERIFICATION
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull().unique(), // MANDATORY
+  phoneVerifiedAt: timestamp("phone_verified_at"), // MUST BE SET TO ACCESS APP
+  username: varchar("username", { length: 100 }).unique(),
+  email: varchar("email", { length: 255 }).unique(), 
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   flexaId: varchar("flexa_id", { length: 20 }).notNull().unique(), 
   displayName: varchar("display_name", { length: 100 }).notNull(),
@@ -41,7 +34,7 @@ export const users = pgTable("users", {
   role: userRoleEnum("role").notNull().default("player"),
   isVerified: boolean("is_verified").notNull().default(false),
   
-  // Game IDs and statuses
+  // Game IDs
   clashRoyaleId: varchar("clash_royale_id", { length: 100 }),
   clashRoyaleStatus: verificationStatusEnum("cr_status").default("unlinked"),
   codMobileId: varchar("cod_mobile_id", { length: 100 }),
@@ -53,19 +46,18 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
 });
 
-// Verification Tokens (For OTP and Email Links)
+// Verification OTPs
 export const verificationTokens = pgTable("verification_tokens", {
   id: uuid("id").defaultRandom().primaryKey(),
-  identifier: varchar("identifier", { length: 255 }).notNull(), // Email or Phone
-  token: varchar("token", { length: 255 }).notNull().unique(),
+  identifier: varchar("identifier", { length: 255 }).notNull(), // Phone number
+  token: varchar("token", { length: 255 }).notNull().unique(), // 6-digit OTP
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({
-  identifierIdx: index("verif_identifier_idx").on(table.identifier),
+  identifierIdx: index("verif_phone_idx").on(table.identifier),
 }));
 
-// Rest of the existing tables (Tournaments, Matches, etc.)
-// ... (I will keep the existing logic in the final merged file)
+// (Tournament, Wallet, and other tables follow...)
 
 export const siteSettings = pgTable("site_settings", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -115,3 +107,30 @@ export const aiProposals = pgTable("ai_proposals", {
   status: varchar("status", { length: 20 }).default("pending"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const transactionTypeEnum = pgEnum("transaction_type", ["deposit", "withdrawal", "tournament_win", "entry_fee", "refund"]);
+export const transactionStatusEnum = pgEnum("transaction_status", ["pending", "completed", "failed", "cancelled"]);
+
+export const wallets = pgTable("wallets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id).unique(),
+  balance: text("balance").notNull().default("0"),
+  currency: varchar("currency", { length: 10 }).notNull().default("RIAL"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: index("wallets_user_id_idx").on(table.userId),
+}));
+
+export const transactions = pgTable("transactions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  walletId: uuid("wallet_id").notNull().references(() => wallets.id),
+  amount: text("amount").notNull(),
+  type: transactionTypeEnum("type").notNull(),
+  status: transactionStatusEnum("status").notNull().default("pending"),
+  referenceId: varchar("reference_id", { length: 255 }),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  walletIdIdx: index("transactions_wallet_id_idx").on(table.walletId),
+}));
