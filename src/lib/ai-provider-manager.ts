@@ -21,9 +21,12 @@ export async function fetchAIResponse(prompt: string, systemPrompt: string) {
         const data = await response.json();
         const content = data.choices[0]?.message?.content;
         if (content) return { content, provider: "openrouter" };
+      } else {
+        const err = await response.json();
+        console.error("OpenRouter API Error:", err);
       }
     } catch (e) {
-      console.error("OpenRouter failed, trying Groq...");
+      console.error("OpenRouter Connection Error:", e);
     }
   }
 
@@ -37,7 +40,7 @@ export async function fetchAIResponse(prompt: string, systemPrompt: string) {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          "model": "llama-3.1-70b-versatile",
+          "model": "llama-3.3-70b-versatile",
           "messages": [{ "role": "system", "content": systemPrompt }, { "role": "user", "content": prompt }],
         })
       });
@@ -45,9 +48,12 @@ export async function fetchAIResponse(prompt: string, systemPrompt: string) {
         const data = await response.json();
         const content = data.choices[0]?.message?.content;
         if (content) return { content, provider: "groq" };
+      } else {
+        const err = await response.json();
+        console.error("Groq API Error:", err);
       }
     } catch (e) {
-      console.error("Groq failed too.");
+      console.error("Groq Connection Error:", e);
     }
   }
 
