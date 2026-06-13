@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
       .values([
         {
           name: "جام قهرمانان کلش رویال",
-          game: "clash_royale",
+          game: "clash_royale" as const,
           format: "single_elimination",
           status: "registration",
           description: "بزرگترین تورنومنت کلش رویال! با بهترین بازیکنان رقابت کن و جایزه ببر.",
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         },
         {
           name: "لیگ حرفه‌ای کالاف موبایل",
-          game: "cod_mobile",
+          game: "cod_mobile" as const,
           format: "single_elimination",
           status: "registration",
           description: "مسابقات حرفه‌ای COD Mobile - مهارت خودت رو نشون بده!",
@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
         },
         {
           name: "تورنومنت فورتنایت بتل رویال",
-          game: "fortnite",
+          game: "fortnite" as const,
           format: "single_elimination",
           status: "registration",
           description: "بتل رویال فورتنایت - بساز، بجنگ، ببر! 🏗️",
