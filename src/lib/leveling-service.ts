@@ -13,10 +13,9 @@ export const LevelingService = {
     const [user] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
     if (!user) throw new Error("User not found");
 
-    const newXP = (user.xp || 0) + xpAmount;
+    const newXP = (user.xp ?? 0) + xpAmount;
     
     // Formula: Level = Floor(sqrt(XP / 100)) + 1
-    // e.g. 100 XP = Lvl 2, 400 XP = Lvl 3, 900 XP = Lvl 4
     const newLevel = Math.floor(Math.sqrt(newXP / 100)) + 1;
 
     await tx.update(users)
@@ -37,7 +36,7 @@ export const LevelingService = {
     const [user] = await tx.select().from(users).where(eq(users.id, userId)).for("update");
     if (!user) throw new Error("User not found");
 
-    const newPoints = Math.max(0, (user.rankPoints || 1000) + pointsChange);
+    const newPoints = Math.max(0, (user.rankPoints ?? 1000) + pointsChange);
 
     await tx.update(users)
       .set({ rankPoints: newPoints })

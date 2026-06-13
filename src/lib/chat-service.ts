@@ -17,7 +17,8 @@ export const ChatService = {
     // 2. AI Moderation
     const moderation = moderateMessage(message);
     if (!moderation.isAllowed) {
-      const newStrikes = (user.chatStrikes || 0) + 1;
+      const currentStrikes = user.chatStrikes ?? 0;
+      const newStrikes = currentStrikes + 1;
       
       if (newStrikes >= 3) {
         // 3rd strike: Ban for 10 minutes
@@ -36,7 +37,7 @@ export const ChatService = {
     }
 
     // 3. Reset strikes on clean message (optional, for fairness)
-    if (user.chatStrikes > 0) {
+    if ((user.chatStrikes ?? 0) > 0) {
       await db.update(users).set({ chatStrikes: 0 }).where(eq(users.id, senderId));
     }
 

@@ -84,7 +84,7 @@ export const users = pgTable("users", {
   xp: integer("xp").default(0).notNull(),
   level: integer("level").default(1).notNull(),
   rankPoints: integer("rank_points").default(1000).notNull(),
-  chatStrikes: integer("chat_strikes").default(0),
+  chatStrikes: integer("chat_strikes").default(0).notNull(),
   chatBanUntil: timestamp("chat_ban_until"),
   clashRoyaleId: varchar("clash_royale_id", { length: 100 }),
   clashRoyaleUsername: varchar("clash_royale_username", { length: 100 }),
