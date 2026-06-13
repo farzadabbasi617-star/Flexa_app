@@ -20,7 +20,7 @@ export async function askOpenRouter(prompt: string, systemPrompt: string = "You 
         "X-Title": "Flexa App", // Optional, for OpenRouter analytics
       },
       body: JSON.stringify({
-        "model": "google/gemini-flash-1.5-exp:free",
+        "model": "google/gemini-2.0-flash-exp:free",
         "messages": [
           { "role": "system", "content": systemPrompt },
           { "role": "user", "content": prompt }
