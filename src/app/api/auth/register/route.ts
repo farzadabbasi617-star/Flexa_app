@@ -33,19 +33,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, username, password, displayName } = validation.data;
+    const { email, username, password, displayName, phoneNumber } = validation.data;
 
-    // 3. Uniqueness check (single query for both email & username).
+    // 3. Uniqueness check (single query for email, username & phone).
     const existing = await db
-      .select({ id: users.id, email: users.email, username: users.username })
+      .select({ id: users.id, email: users.email, username: users.username, phoneNumber: users.phoneNumber })
       .from(users)
-      .where(or(eq(users.email, email), eq(users.username, username)));
+      .where(or(
+        email ? eq(users.email, email) : undefined, 
+        eq(users.username, username),
+        eq(users.phoneNumber, phoneNumber)
+      ));
 
-    if (existing.some((u) => u.email === email)) {
+    if (email && existing.some((u) => u.email === email)) {
       return NextResponse.json({ error: "ایمیل قبلاً ثبت شده است" }, { status: 409 });
     }
     if (existing.some((u) => u.username === username)) {
       return NextResponse.json({ error: "نام کاربری قبلاً انتخاب شده است" }, { status: 409 });
+    }
+    if (existing.some((u) => u.phoneNumber === phoneNumber)) {
+      return NextResponse.json({ error: "شماره موبایل قبلاً ثبت شده است" }, { status: 409 });
     }
 
     // 4. Hash password.
@@ -53,14 +60,24 @@ export async function POST(request: NextRequest) {
 
     // 5. Create user + player profile atomically.
     const user = await db.transaction(async (tx) => {
+      // Generate a unique Flexa ID
+      const flexaId = `FLX-${Math.floor(1000 + Math.random() * 9000)}`;
+
       const [created] = await tx
         .insert(users)
-        .values({ email, username, passwordHash: hashedPassword, displayName })
+        .values({ 
+          phoneNumber, 
+          flexaId, 
+          username, 
+          passwordHash: hashedPassword, 
+          displayName, 
+          email: email || null 
+        })
         .returning();
 
       await tx.insert(players).values({
         visibleUserId: created.id,
-        username: created.username,
+        username: created.username!,
         displayName: created.displayName,
         email: created.email,
       });

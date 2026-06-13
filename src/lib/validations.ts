@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 export const RegisterSchema = z.object({
   username: z.string().min(3, 'نام کاربری باید حداقل ۳ کاراکتر باشد').max(20),
-  email: z.string().email('ایمیل وارد شده معتبر نیست'),
+  phoneNumber: z.string().regex(/^09\d{9}$/, 'شماره موبایل معتبر نیست (مثال: 09123456789)'),
+  email: z.string().email('ایمیل وارد شده معتبر نیست').optional(),
   password: z.string().min(6, 'رمز عبور باید حداقل ۶ کاراکتر باشد'),
   displayName: z.string().min(2, 'نام کامل الزامی است'),
 });
