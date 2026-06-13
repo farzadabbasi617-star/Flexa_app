@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateRealAssistantResponse } from "@/lib/ai-engine";
+import { generateRealAssistantResponse } from "@/lib/ai-service";
 import { validateSession } from "@/lib/auth";
 import { AIAssistantSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
