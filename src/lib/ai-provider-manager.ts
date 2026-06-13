@@ -1,9 +1,18 @@
-/**
- * AI Provider Manager with Auto-Switch (Failover) logic
- */
+import { aiCache } from './ai-cache';
 
+/**
+ * AI Provider Manager with Caching and Auto-Switch
+ */
 export async function fetchAIResponse(prompt: string, systemPrompt: string) {
-  // 1. Try OpenRouter (Primary)
+  // 1. Check Cache First (Speed Boost)
+  const cacheKey = `ai_${prompt}_${systemPrompt}`;
+  const cached = aiCache.get(cacheKey);
+  if (cached) return { content: cached, provider: "cache" };
+
+  // 2. Try OpenRouter (Primary)
+  // ... existing logic ...
+  // (After getting result, cache it)
+  // aiCache.set(cacheKey, content, 3600); 
   if (process.env.OPENROUTER_API_KEY) {
     try {
       const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {

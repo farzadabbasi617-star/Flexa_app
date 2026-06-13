@@ -53,7 +53,11 @@ export const users = pgTable("users", {
   
   createdAt: timestamp("created_at").defaultNow().notNull(),
   lastLoginAt: timestamp("last_login_at"),
-});
+}, (table) => ({
+  phoneIdx: index("users_phone_idx").on(table.phoneNumber),
+  rankIdx: index("users_rank_points_idx").on(table.rankPoints), // سرعت فوق‌العاده در لیدربورد
+  flexaIdIdx: index("users_flexa_id_idx").on(table.flexaId),
+}));
 
 // (Verification, Tournament, Wallet, Chat, Support tables follow...)
 
