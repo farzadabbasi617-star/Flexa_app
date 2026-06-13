@@ -316,3 +316,16 @@ export const rateLimits = pgTable("rate_limits", {
 }, (table) => ({
   resetAtIdx: index("rate_limits_reset_at_idx").on(table.resetAt),
 }));
+import { pgTable, uuid, varchar, text, timestamp, integer } from "drizzle-orm/pg-core";
+import { users } from "./schema";
+
+export const aiProposals = pgTable("ai_proposals", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  type: varchar("type", { length: 50 }).notNull(),
+  targetId: uuid("target_id").notNull(),
+  suggestedAction: text("suggested_action").notNull(),
+  confidence: integer("confidence").notNull(),
+  reasoning: text("reasoning"),
+  status: varchar("status", { length: 20 }).default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
