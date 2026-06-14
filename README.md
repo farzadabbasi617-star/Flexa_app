@@ -1,91 +1,113 @@
-# Flexa ⚡
+# Flexa ⚡️ | پلتفرم هوشمند مسابقات گیمینگ
 
-پلتفرم برگزاری تورنمنت بازی‌های موبایل — **کلش رویال، کالاف موبایل و فورتنایت** — با داوری کمک‌گرفته از هوش مصنوعی.
-
-A tournament platform for mobile games (Clash Royale, COD Mobile, Fortnite) with AI-assisted judging.
+**فلکسا (Flexa)** یک وب‌اپلیکیشن پیشرفته (PWA) برای برگزاری و مدیریت تورنمنت‌های بازی‌های موبایلی (کالاف دیوتی موبایل، فورتنایت و کلش رویال) است که با تمرکز بر **داوری هوشمند** و **تجربه کاربری لوکس** طراحی شده است.
 
 ---
 
-## 🧱 Tech stack
-- **Next.js 16** (App Router) + **React 19** + **TypeScript**
-- **PostgreSQL** (Neon) via **Drizzle ORM**
-- **Tailwind CSS 4**
-- **Vitest** for unit tests
-- Auth: session cookies + **Argon2** password hashing
+## 💎 ویژگی‌های کلیدی (Core Features)
+
+### ۱. هوش مصنوعی و داوری (AI Engine)
+*   **داوری خودکار (AI Judging)**: تحلیل نتایج مسابقات توسط مدل‌های **Gemini 2.0** و **Llama 3.3** برای تشخیص پیروزی‌های غیرمنتظره (Upsets) و تقلب.
+*   **سیستم سوئیچ خودکار (Failover)**: اتصال دوگانه به **OpenRouter** و **Groq**؛ در صورت قطع شدن یک سرویس، سیستم در کمتر از ۱ ثانیه روی مدل پشتیبان سوئیچ می‌کند.
+*   **ناظر هوشمند چت**: بررسی بلادرنگ پیام‌ها و جلوگیری از محتوای نامناسب.
+
+### ۲. سیستم مالی و کیف پول (Secure Wallet)
+*   **معاملات اتمیک**: استفاده از تراکنش‌های دیتابیس برای جلوگیری از خطاهای مالی.
+*   **دقت بانکی**: ذخیره‌سازی مبالغ به **ریال (BigInt)** در دیتابیس و نمایش به **تومان** در اپلیکیشن.
+*   **امنیت تراکنش**: پیاده‌سازی **Row-Level Locking** برای جلوگیری از حملات Race Condition در هنگام واریز و برداشت.
+*   **درگاه پرداخت**: آماده‌سازی زیرساخت برای اتصال به درگاه‌های ریالی.
+
+### ۳. پیشرفت و گیمیفیکیشن (Leveling System)
+*   **سیستم XP/Level**: محاسبه سطح کاربر بر اساس فعالیت و بردها با فرمول ریاضی دقیق:  
+    `Level = Floor(sqrt(XP / 100)) + 1`
+*   **رتبه‌بندی Elo**: سیستم امتیازدهی رتبه‌بندی (RP) برای ایجاد لیدربورد عادلانه و رقابتی.
+
+### ۴. احراز هویت و امنیت (Security)
+*   **ورود اجباری با موبایل**: سیستم تایید شماره موبایل (OTP) از طریق **FarazSMS**.
+*   **شناسه فلکسا (Flexa ID)**: تولید شناسه منحصر‌به‌فرد برای هر کاربر (مثلاً `FLX-1234`) جهت ردیابی در مسابقات.
+*   **هشینگ پیشرفته**: استفاده از الگوریتم **Argon2** برای محافظت از رمزهای عبور.
+
+### ۵. تعامل و پشتیبانی
+*   **چت جهانی موقت (Ephemeral Chat)**: نگهداری فقط ۵۰ پیام آخر برای بهینه‌سازی دیتابیس و حفظ حریم خصوصی.
+*   **سیستم اخطار (Strikes)**: بن خودکار ۱۰ دقیقه‌ای کاربر پس از ۳ بار نقض قوانین چت.
+*   **تیکتینگ لوکس**: سیستم پشتیبانی مستقیم داخلی با وضعیت‌های داینامیک.
 
 ---
 
-## 🚀 Getting started
+## 🛠 پشته تکنولوژی (Tech Stack)
 
-```bash
-# 1. Install dependencies
-npm install
-
-# 2. Configure environment
-cp .env.example .env
-#   then edit .env and set DATABASE_URL to your Postgres connection string
-
-# 3. Apply the database schema
-#    (first time: push the full schema)
-npm run db:push
-#    plus any manual migrations under drizzle/manual/, e.g.:
-psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
-
-# 4. Run the dev server
-npm run dev          # http://localhost:3000
-```
-
-> First admin: register a normal account, then call `POST /api/admin/setup`
-> while logged in — it promotes you to admin **only if no admin exists yet**.
+*   **Framework**: Next.js 16 (App Router) + React 19
+*   **Language**: TypeScript (Strict Mode)
+*   **Database**: PostgreSQL (Neon.tech) via Drizzle ORM
+*   **Styling**: Tailwind CSS 4 (Luxury Glassmorphism / Dark Theme)
+*   **AI**: OpenRouter (Gemini 2.0) + Groq (Llama 3.3)
+*   **SMS**: FarazSMS API
 
 ---
 
-## 📜 Scripts
+## 📂 ساختار پوشه‌بندی (Project Structure)
 
-| Command | What it does |
-|---------|--------------|
-| `npm run dev` | Start the dev server |
-| `npm run build` | Production build |
-| `npm start` | Run the production server |
-| `npm run lint` | ESLint |
-| `npm run typecheck` | `tsc --noEmit` |
-| `npm test` | Run unit tests (Vitest) |
-| `npm run test:watch` | Tests in watch mode |
-| `npm run db:generate` | Generate a Drizzle migration |
-| `npm run db:push` | Push schema to the database |
-| `npm run db:studio` | Open Drizzle Studio |
-
----
-
-## 📁 Structure
-
-```
+```text
 src/
-├─ app/
-│  ├─ api/            # route handlers (auth, tournaments, matches, judging…)
-│  └─ (pages)/        # UI pages (home, dashboard, admin, tournaments…)
-├─ components/        # shared React components
-├─ contexts/          # Auth & Language providers
-├─ db/                # Drizzle schema + connection
-└─ lib/               # pure logic: ai-engine, brackets, auth, rate-limit…
-drizzle/manual/       # hand-written, idempotent SQL migrations
+├── app/                  # مسیرها و صفحات (Next.js App Router)
+│   ├── api/              # سرویس‌های API (Auth, Wallet, AI, Chat)
+│   ├── (auth)/           # صفحات ورود و ثبت‌نام
+│   ├── leaderboard/      # صفحه رتبه‌بندی قهرمانان
+│   ├── profile/          # مدیریت حساب و تیکتینگ
+│   └── tournaments/      # آرنا مسابقات و لابی‌ها
+├── components/           # کامپوننت‌های UI (Luxury Cards, BottomNav)
+├── db/                   # تنظیمات دیتابیس و اسکیما (Drizzle)
+├── lib/                  # منطق بیزنس (AI Manager, Wallet Service, Leveling)
+└── contexts/             # مدیریت وضعیت‌ها (Theme, Auth, Language)
 ```
 
-The pure logic in `src/lib` (AI judging, bracket generation) is unit-tested in
-`*.test.ts` files next to each module.
+---
+
+## 🚀 راهنمای نصب و اجرا
+
+۱. **کلون کردن پروژه**:
+```bash
+git clone https://github.com/farzadabbasi617-star/Flexa_app.git
+cd Flexa_app
+```
+
+۲. **نصب وابستگی‌ها**:
+```bash
+npm install
+```
+
+۳. **تنظیم متغیرهای محیطی**:  
+یک فایل `.env` بسازید و مقادیر زیر را وارد کنید:
+```env
+DATABASE_URL="your_postgresql_url"
+OPENROUTER_API_KEY="your_key"
+GROQ_API_KEY="your_key"
+FARAZSMS_API_KEY="your_key"
+FARAZSMS_PATTERN_CODE="your_code"
+```
+
+۴. **ساخت جداول دیتابیس**:
+```bash
+npm run db:push
+```
+
+۵. **اجرای نسخه توسعه**:
+```bash
+npm run dev
+```
 
 ---
 
-## 🔐 Security notes
-- **Never commit secrets.** `DATABASE_URL` and other secrets live in `.env`
-  (git-ignored) and in your host's environment — not in source.
-- Passwords are hashed with Argon2; sessions are httpOnly cookies with CSRF and
-  user-agent checks.
-- Privileged API routes are guarded by role (`requireRole` / `requireUser`).
-- Rate limiting is database-backed so it works across multiple instances.
+## 🗺 نقشه راه (Roadmap)
+
+- [x] سیستم داوری هوشمند و سوئیچ خودکار بین مدل‌ها.
+- [x] طراحی رابط کاربری لوکس شیشه‌ای (Luxury Glass UI).
+- [x] تایید اجباری شماره موبایل و تولید Flexa ID.
+- [x] کیف پول اتمیک و سیستم تراکنش‌های ریالی.
+- [x] چت جهانی تحت نظارت AI و سیستم تیکتینگ.
+- [ ] پیاده‌سازی اپلیکیشن اندروید و iOS (PWA/Capacitor).
+- [ ] سیستم پخش زنده (Live Streaming) برای مسابقات فینال.
+- [ ] فروشگاه داخلی برای خرید مستقیم محصولات درون‌بازی (CP, Gems).
 
 ---
-
-## ✅ CI
-Every push / PR to `main` runs **lint → typecheck → test → build** via
-GitHub Actions (`.github/workflows/ci.yml`).
+**ساخته شده با ❤️ برای جامعه گیمینگ ایران.**
