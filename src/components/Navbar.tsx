@@ -9,11 +9,11 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { lang, setLang, t } = useLanguage();
+  const { lang, t } = useLanguage();
   const { user, loading, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
-  const isAdmin = user?.role === "admin";
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
   const navItems = [
     { href: "/", label: t.nav.home, icon: "🏠" },
@@ -67,12 +67,6 @@ export default function Navbar() {
                 </Link>
               );
             })}
-
-            {/* Language */}
-            <div className="flex items-center gap-2 ms-4 border-s border-gaming-border ps-4">
-              <button onClick={() => setLang("en")} className={`px-2 py-1 rounded-md text-xs font-black transition-all ${lang === "en" ? "bg-white text-dark-950" : "text-gray-500 hover:text-white"}`}>EN</button>
-              <button onClick={() => setLang("fa")} className={`px-2 py-1 rounded-md text-xs font-black transition-all ${lang === "fa" ? "bg-white text-dark-950" : "text-gray-500 hover:text-white"}`}>فا</button>
-            </div>
 
             {/* User/Auth */}
             <div className="ms-4 border-s border-gaming-border ps-4">
@@ -166,9 +160,6 @@ export default function Navbar() {
                 </Link>
               );
             })}
-            <button onClick={() => setLang(lang === "en" ? "fa" : "en")} className="text-xs font-black px-2 py-1 rounded-md bg-dark-800 text-white border border-gaming-border">
-              {lang === "en" ? "فا" : "EN"}
-            </button>
             {user ? (
               <Link href="/dashboard" className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${isAdmin ? "bg-gradient-to-br from-neon-pink to-neon-orange" : "bg-gradient-to-br from-neon-purple to-neon-blue"}`}>
                 {isAdmin ? "👑" : user.displayName.charAt(0).toUpperCase()}

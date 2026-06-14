@@ -6,6 +6,9 @@ import { validateAdmin } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+const ROLES = ["player", "judge", "moderator", "admin", "super_admin"] as const;
+
+type Role = (typeof ROLES)[number];
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,6 +18,7 @@ export async function GET(request: NextRequest) {
     const allUsers = await db
       .select({
         id: users.id,
+        phoneNumber: users.phoneNumber,
         email: users.email,
         username: users.username,
         displayName: users.displayName,
@@ -37,8 +41,8 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { error, status } = await validateAdmin(request);
-    if (error) return NextResponse.json({ error }, { status });
+    const { user: currentUser, error, status } = await validateAdmin(request);
+    if (error || !currentUser) return NextResponse.json({ error }, { status });
 
     const body = await request.json();
     const { id, role, isVerified } = body;
@@ -46,8 +50,21 @@ export async function PATCH(request: NextRequest) {
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
     const updateData: Record<string, unknown> = {};
-    if (role !== undefined) updateData.role = role;
-    if (isVerified !== undefined) updateData.isVerified = isVerified;
+
+    if (role !== undefined) {
+      if (!ROLES.includes(role as Role)) {
+        return NextResponse.json({ error: "Invalid role" }, { status: 400 });
+      }
+
+      // Only the main manager can choose admins or change super-admin roles.
+      if ((role === "admin" || role === "super_admin") && currentUser.role !== "super_admin") {
+        return NextResponse.json({ error: "Only super admin can assign admin roles" }, { status: 403 });
+      }
+
+      updateData.role = role;
+    }
+
+    if (isVerified !== undefined) updateData.isVerified = Boolean(isVerified);
 
     const [updated] = await db
       .update(users)

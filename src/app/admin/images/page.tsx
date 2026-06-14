@@ -59,7 +59,7 @@ export default function AdminImagesPage() {
   }, []);
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) router.push("/");
+    if (!loading && (!user || (user.role !== "admin" && user.role !== "super_admin"))) router.push("/");
   }, [loading, user, router]);
 
   useEffect(() => {
@@ -133,7 +133,7 @@ export default function AdminImagesPage() {
     } catch { /* ignore */ }
   }
 
-  if (loading || !user || user.role !== "admin") return null;
+  if (loading || !user || (user.role !== "admin" && user.role !== "super_admin")) return null;
 
   return (
     <div className="min-h-screen bg-dark-900">

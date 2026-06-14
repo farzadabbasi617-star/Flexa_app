@@ -41,7 +41,7 @@ export default function AIAdminPage() {
   } | null>(null);
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) {
+    if (!loading && (!user || (user.role !== "admin" && user.role !== "super_admin"))) {
       // Allow for demo purposes, but show warning
     }
   }, [loading, user, router]);

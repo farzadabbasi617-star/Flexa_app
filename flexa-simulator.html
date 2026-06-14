@@ -863,10 +863,37 @@
       setNavOpen(!bottomNav?.classList.contains('open'));
     });
 
-    aiFloat?.addEventListener('click', () => {
-      aiFloat.classList.toggle('open');
-      aiPreview?.classList.toggle('open');
-      aiFloat.textContent = aiFloat.classList.contains('open') ? '✕' : '🤖';
+    let aiDrag = { active: false, moved: false, sx: 0, sy: 0, ix: 0, iy: 0 };
+
+    function clamp(value, min, max) { return Math.min(Math.max(value, min), max); }
+
+    aiFloat?.addEventListener('pointerdown', (event) => {
+      const rect = aiFloat.getBoundingClientRect();
+      aiDrag = { active: true, moved: false, sx: event.clientX, sy: event.clientY, ix: rect.left, iy: rect.top };
+      aiFloat.setPointerCapture(event.pointerId);
+    });
+
+    aiFloat?.addEventListener('pointermove', (event) => {
+      if (!aiDrag.active) return;
+      const dx = event.clientX - aiDrag.sx;
+      const dy = event.clientY - aiDrag.sy;
+      if (Math.abs(dx) > 4 || Math.abs(dy) > 4) aiDrag.moved = true;
+      const x = clamp(aiDrag.ix + dx, 12, window.innerWidth - 68);
+      const y = clamp(aiDrag.iy + dy, 76, window.innerHeight - 68);
+      aiFloat.style.left = `${x}px`;
+      aiFloat.style.top = `${y}px`;
+      aiFloat.style.right = 'auto';
+      aiFloat.style.bottom = 'auto';
+    });
+
+    aiFloat?.addEventListener('pointerup', () => {
+      if (!aiDrag.active) return;
+      aiDrag.active = false;
+      if (!aiDrag.moved) {
+        aiFloat.classList.toggle('open');
+        aiPreview?.classList.toggle('open');
+        aiFloat.textContent = aiFloat.classList.contains('open') ? '✕' : '🤖';
+      }
     });
   </script>
 </body>

@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import TournamentCardLuxury from "@/components/TournamentCardLuxury";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Tournament {
   id: string;
@@ -20,28 +21,32 @@ interface Tournament {
   bannerUrl?: string | null;
 }
 
-function TournamentsContent() {
-  const { t, lang } = useLanguage();
+function TournamentsContent({ canCreate }: { canCreate: boolean }) {
+  const { lang } = useLanguage();
   const searchParams = useSearchParams();
   const gameFilter = searchParams.get("game");
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeFilter, setActiveFilter] = useState(gameFilter || "all");
 
-  const L = (fa: string, en: string) => lang === "fa" ? fa : en;
+  const L = (fa: string, en: string) => (lang === "fa" ? fa : en);
 
   const fetchTournaments = useCallback(async () => {
     setLoading(true);
     try {
       const url = activeFilter !== "all" ? `/api/tournaments?game=${activeFilter}` : "/api/tournaments";
-      const res = await fetch(url);
+      const res = await fetch(url, { cache: "no-store" });
       const data = await res.json();
-      setTournaments(Array.isArray(data) ? data : []);
-    } catch { setTournaments([]); }
+      setTournaments(Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : []);
+    } catch {
+      setTournaments([]);
+    }
     setLoading(false);
   }, [activeFilter]);
 
-  useEffect(() => { fetchTournaments(); }, [fetchTournaments]);
+  useEffect(() => {
+    fetchTournaments();
+  }, [fetchTournaments]);
 
   const games = [
     { id: "clash_royale", name: L("کلش رویال", "Clash Royale"), icon: "⚔️" },
@@ -51,21 +56,32 @@ function TournamentsContent() {
 
   return (
     <>
-      {/* Filters */}
       <div className="flex flex-wrap gap-2 mb-6">
-        <button onClick={() => setActiveFilter("all")}
-          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeFilter === "all" ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/50" : "bg-dark-700 text-gray-400 border border-gaming-border hover:border-neon-purple/30"}`}>
+        <button
+          onClick={() => setActiveFilter("all")}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+            activeFilter === "all"
+              ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/50"
+              : "bg-dark-700 text-gray-400 border border-gaming-border hover:border-neon-purple/30"
+          }`}
+        >
           🎮 {L("همه", "All")}
         </button>
         {games.map((g) => (
-          <button key={g.id} onClick={() => setActiveFilter(g.id)}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${activeFilter === g.id ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/50" : "bg-dark-700 text-gray-400 border border-gaming-border hover:border-neon-purple/30"}`}>
+          <button
+            key={g.id}
+            onClick={() => setActiveFilter(g.id)}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+              activeFilter === g.id
+                ? "bg-neon-purple/20 text-neon-purple border border-neon-purple/50"
+                : "bg-dark-700 text-gray-400 border border-gaming-border hover:border-neon-purple/30"
+            }`}
+          >
             {g.icon} {g.name}
           </button>
         ))}
       </div>
 
-      {/* Grid */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="text-4xl animate-neon-pulse">🎮</div>
@@ -74,8 +90,16 @@ function TournamentsContent() {
         <div className="text-center py-20">
           <div className="text-6xl mb-4">🏟️</div>
           <h3 className="text-xl font-bold mb-2">{L("هنوز تورنومنتی نیست", "No Tournaments Yet")}</h3>
-          <p className="text-gray-400 mb-6">{L("اولین تورنومنت رو بساز!", "Create the first tournament!")}</p>
-          <Link href="/tournaments/create" className="gaming-btn">{L("ساخت تورنومنت", "Create Tournament")}</Link>
+          <p className="text-gray-400 mb-6">
+            {canCreate
+              ? L("اولین تورنومنت رو بساز!", "Create the first tournament!")
+              : L("به‌زودی تورنومنت‌های جدید توسط مدیرها ساخته می‌شود.", "Admins will create tournaments soon.")}
+          </p>
+          {canCreate && (
+            <Link href="/tournaments/create" className="gaming-btn">
+              {L("ساخت تورنومنت", "Create Tournament")}
+            </Link>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -89,8 +113,10 @@ function TournamentsContent() {
 }
 
 export default function TournamentsPage() {
-  const { t, lang } = useLanguage();
-  const L = (fa: string, en: string) => lang === "fa" ? fa : en;
+  const { lang } = useLanguage();
+  const { user } = useAuth();
+  const L = (fa: string, en: string) => (lang === "fa" ? fa : en);
+  const canCreate = user?.role === "admin" || user?.role === "super_admin";
 
   return (
     <div className="min-h-screen bg-dark-900">
@@ -101,14 +127,18 @@ export default function TournamentsPage() {
             <h1 className="text-2xl sm:text-3xl font-bold">
               🏆 <span className="neon-text-purple">{L("تورنومنت‌ها", "Tournaments")}</span>
             </h1>
-            <p className="text-gray-400 mt-1 text-sm">{L("مرور و پیوستن به تورنومنت‌های فعال", "Browse and join active tournaments")}</p>
+            <p className="text-gray-400 mt-1 text-sm">
+              {L("مرور و پیوستن به تورنومنت‌های فعال", "Browse and join active tournaments")}
+            </p>
           </div>
-          <Link href="/tournaments/create" className="gaming-btn text-sm">
-            + {L("تورنومنت جدید", "New Tournament")}
-          </Link>
+          {canCreate && (
+            <Link href="/tournaments/create" className="gaming-btn text-sm">
+              + {L("تورنومنت جدید", "New Tournament")}
+            </Link>
+          )}
         </div>
         <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="text-4xl animate-neon-pulse">🎮</div></div>}>
-          <TournamentsContent />
+          <TournamentsContent canCreate={Boolean(canCreate)} />
         </Suspense>
       </div>
     </div>

@@ -37,14 +37,14 @@ export default function AdminPage() {
   }, []);
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) router.push("/");
+    if (!loading && (!user || (user.role !== "admin" && user.role !== "super_admin"))) router.push("/");
   }, [loading, user, router]);
 
   useEffect(() => {
-    if (user?.role === "admin") fetchStats();
+    if ((user?.role === "admin" || user?.role === "super_admin")) fetchStats();
   }, [user, fetchStats]);
 
-  if (loading || !user || user.role !== "admin") {
+  if (loading || !user || (user.role !== "admin" && user.role !== "super_admin")) {
     return (
       <div className="min-h-screen bg-dark-900">
         <Navbar />

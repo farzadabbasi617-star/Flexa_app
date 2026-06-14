@@ -1,70 +1,122 @@
-import { aiCache } from './ai-cache';
+import { aiCache } from "./ai-cache";
+import logger from "@/lib/logger";
+
+type AIProvider = "openrouter" | "groq";
+
+export interface AIProviderResult {
+  content: string;
+  provider: AIProvider | "cache";
+  cachedProvider?: AIProvider;
+}
+
+const PROVIDERS: Array<{
+  id: AIProvider;
+  url: string;
+  apiKeyEnv: "OPENROUTER_API_KEY" | "GROQ_API_KEY";
+  modelEnv: "OPENROUTER_MODEL" | "GROQ_MODEL";
+  defaultModel: string;
+}> = [
+  {
+    id: "openrouter",
+    url: "https://openrouter.ai/api/v1/chat/completions",
+    apiKeyEnv: "OPENROUTER_API_KEY",
+    modelEnv: "OPENROUTER_MODEL",
+    defaultModel: "google/gemini-2.0-flash-exp:free",
+  },
+  {
+    id: "groq",
+    url: "https://api.groq.com/openai/v1/chat/completions",
+    apiKeyEnv: "GROQ_API_KEY",
+    modelEnv: "GROQ_MODEL",
+    defaultModel: "llama-3.3-70b-versatile",
+  },
+];
+
+function timeoutSignal(ms: number) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), ms);
+  return { signal: controller.signal, cancel: () => clearTimeout(timeout) };
+}
+
+async function callProvider(
+  provider: (typeof PROVIDERS)[number],
+  prompt: string,
+  systemPrompt: string
+): Promise<AIProviderResult | null> {
+  const apiKey = process.env[provider.apiKeyEnv];
+  if (!apiKey) return null;
+
+  const model = process.env[provider.modelEnv] || provider.defaultModel;
+  const { signal, cancel } = timeoutSignal(18_000);
+
+  try {
+    const response = await fetch(provider.url, {
+      method: "POST",
+      signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        ...(provider.id === "openrouter"
+          ? {
+              "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://flexa-app.com",
+              "X-Title": "Flexa App",
+            }
+          : {}),
+      },
+      body: JSON.stringify({
+        model,
+        temperature: 0.55,
+        max_tokens: 800,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text().catch(() => "");
+      logger.warn(
+        { provider: provider.id, status: response.status, body: errorText.slice(0, 500) },
+        "AI provider returned an error"
+      );
+      return null;
+    }
+
+    const data = await response.json();
+    const content = data?.choices?.[0]?.message?.content;
+
+    if (typeof content === "string" && content.trim()) {
+      return { content: content.trim(), provider: provider.id };
+    }
+
+    logger.warn({ provider: provider.id }, "AI provider returned an empty response");
+    return null;
+  } catch (err) {
+    logger.warn({ provider: provider.id, err }, "AI provider connection failed");
+    return null;
+  } finally {
+    cancel();
+  }
+}
 
 /**
- * AI Provider Manager with Caching and Auto-Switch
+ * Multi-provider AI call with OpenRouter as primary and Groq as failover.
  */
-export async function fetchAIResponse(prompt: string, systemPrompt: string) {
-  // 1. Check Cache First (Speed Boost)
-  const cacheKey = `ai_${prompt}_${systemPrompt}`;
-  const cached = aiCache.get(cacheKey);
-  if (cached) return { content: cached, provider: "cache" };
+export async function fetchAIResponse(prompt: string, systemPrompt: string): Promise<AIProviderResult | null> {
+  const cacheKey = `ai_${Buffer.from(`${systemPrompt}\n${prompt}`).toString("base64url")}`;
+  const cached = aiCache.get(cacheKey) as { content: string; provider: AIProvider } | null;
+  if (cached?.content) {
+    return { content: cached.content, provider: "cache", cachedProvider: cached.provider };
+  }
 
-  // 2. Try OpenRouter (Primary)
-  // ... existing logic ...
-  // (After getting result, cache it)
-  // aiCache.set(cacheKey, content, 3600); 
-  if (process.env.OPENROUTER_API_KEY) {
-    try {
-      const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          "model": "google/gemini-2.0-flash-exp:free",
-          "messages": [{ "role": "system", "content": systemPrompt }, { "role": "user", "content": prompt }],
-        })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.choices[0]?.message?.content;
-        if (content) return { content, provider: "openrouter" };
-      } else {
-        const err = await response.json();
-        console.error("OpenRouter API Error:", err);
-      }
-    } catch (e) {
-      console.error("OpenRouter Connection Error:", e);
+  for (const provider of PROVIDERS) {
+    const result = await callProvider(provider, prompt, systemPrompt);
+    if (result) {
+      aiCache.set(cacheKey, { content: result.content, provider: result.provider }, 3600);
+      return result;
     }
   }
 
-  // 2. Try Groq (Secondary/Failover)
-  if (process.env.GROQ_API_KEY) {
-    try {
-      const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          "model": "llama-3.3-70b-versatile",
-          "messages": [{ "role": "system", "content": systemPrompt }, { "role": "user", "content": prompt }],
-        })
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const content = data.choices[0]?.message?.content;
-        if (content) return { content, provider: "groq" };
-      } else {
-        const err = await response.json();
-        console.error("Groq API Error:", err);
-      }
-    } catch (e) {
-      console.error("Groq Connection Error:", e);
-    }
-  }
-
-  return null; // Both failed
+  return null;
 }

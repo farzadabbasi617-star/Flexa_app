@@ -11,30 +11,29 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    
-    // 1. Rate Limiting
-    const rateLimitResult = await rateLimit(ip, 10, 60 * 1000);
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
+
+    const rateLimitResult = await rateLimit(`ai-assistant:${ip}`, 10, 60 * 1000);
     if (!rateLimitResult.success) {
-      return NextResponse.json({ error: "AI Assistant rate limit exceeded. Please slow down." }, { status: 429 });
+      return NextResponse.json({ error: "محدودیت درخواست دستیار هوشمند. لطفاً کمی آرام‌تر." }, { status: 429 });
     }
 
     const body = await request.json();
-    
-    // 2. Zod Validation
-    const validation = AIAssistantSchema.safeParse({ message: body.query });
+    const validation = AIAssistantSchema.safeParse({ message: body.query ?? body.message });
     if (!validation.success) {
-      return NextResponse.json({ 
-        error: "Invalid query", 
-        details: validation.error.issues 
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "پیام معتبر نیست",
+          details: validation.error.issues,
+        },
+        { status: 400 }
+      );
     }
 
-    const query = body.query;
-    const lang = (body.lang || "en") as "en" | "fa";
+    const query = validation.data.message;
+    const lang = "fa" as const;
 
-    // 3. Caching (Hash the query for key)
-    const queryHash = crypto.createHash('sha256').update(`${lang}:${query}`).digest('hex');
+    const queryHash = crypto.createHash("sha256").update(`${lang}:${query}`).digest("hex");
     const cachedResponse = aiCache.get(`assistant_${queryHash}`);
     if (cachedResponse) {
       return NextResponse.json({ ...cachedResponse, cached: true });
@@ -43,22 +42,20 @@ export async function POST(request: NextRequest) {
     let userName: string | undefined;
     const token = request.cookies.get("session")?.value;
     if (token) {
-      const user = await validateSession(token, ip, request.headers.get('user-agent') || 'unknown', request);
+      const user = await validateSession(token, ip, request.headers.get("user-agent") || "unknown", request);
       userName = user?.displayName;
     }
 
-    // Call the real AI assistant
     const result = await generateRealAssistantResponse(query, {
       lang,
       userName,
     });
 
-    // Cache for 30 minutes
     aiCache.set(`assistant_${queryHash}`, result, 1800);
 
     return NextResponse.json({ ...result, cached: false });
   } catch (err) {
-    logger.error({ err }, 'AI Assistant error');
-    return NextResponse.json({ error: "AI assistant error" }, { status: 500 });
+    logger.error({ err }, "AI Assistant error");
+    return NextResponse.json({ error: "خطا در دستیار هوشمند" }, { status: 500 });
   }
 }

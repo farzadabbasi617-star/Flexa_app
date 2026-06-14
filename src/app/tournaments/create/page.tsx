@@ -2,14 +2,18 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function CreateTournamentPage() {
   const router = useRouter();
   const { lang } = useLanguage();
+  const { user, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(false);
-  const L = (fa: string, en: string) => lang === "fa" ? fa : en;
+  const [error, setError] = useState("");
+  const L = (fa: string, en: string) => (lang === "fa" ? fa : en);
 
   const [form, setForm] = useState({
     name: "",
@@ -30,21 +34,41 @@ export default function CreateTournamentPage() {
     startDate: "",
   });
 
+  const canCreateTournament = user?.role === "admin" || user?.role === "super_admin";
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError("");
+
+    if (!canCreateTournament) {
+      setError("فقط مدیر و ادمین‌های منتخب مدیر می‌توانند تورنومنت بسازند.");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch("/api/tournaments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
         body: JSON.stringify({ ...form, startDate: form.startDate || null }),
       });
-      if (res.ok) {
-        const t = await res.json();
-        router.push(`/tournaments/${t.id}`);
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "ساخت تورنومنت با خطا مواجه شد.");
+        return;
       }
-    } catch { /* ignore */ }
-    setLoading(false);
+
+      router.push(`/tournaments/${data.id}`);
+      router.refresh();
+    } catch {
+      setError("خطای ارتباط با سرور. لطفاً دوباره تلاش کن.");
+    } finally {
+      setLoading(false);
+    }
   }
 
   const games = [
@@ -59,27 +83,95 @@ export default function CreateTournamentPage() {
     { id: "round_robin", icon: "🔁", name: L("دوره‌ای", "Round Robin") },
   ];
 
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-dark-900">
+        <Navbar />
+        <div className="flex items-center justify-center py-32">
+          <div className="text-4xl animate-neon-pulse">⚡</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-dark-900">
+        <Navbar />
+        <div className="max-w-md mx-auto px-4 py-20 text-center">
+          <div className="gaming-card p-8">
+            <div className="text-5xl mb-4">🔐</div>
+            <h1 className="text-xl font-black mb-3">اول وارد حساب شو</h1>
+            <p className="text-gray-400 text-sm leading-7 mb-6">برای دسترسی به بخش مدیریت تورنومنت باید وارد حساب شوی.</p>
+            <Link href="/login" className="gaming-btn w-full">ورود</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!canCreateTournament) {
+    return (
+      <div className="min-h-screen bg-dark-900">
+        <Navbar />
+        <div className="max-w-md mx-auto px-4 py-20 text-center">
+          <div className="gaming-card p-8">
+            <div className="text-5xl mb-4">🚫</div>
+            <h1 className="text-xl font-black mb-3 neon-text-pink">دسترسی محدود</h1>
+            <p className="text-gray-400 text-sm leading-7 mb-6">
+              ساخت تورنومنت فقط برای مدیر اصلی و ادمین‌هایی که مدیر انتخاب می‌کند فعال است.
+            </p>
+            <Link href="/tournaments" className="gaming-btn w-full">بازگشت به تورنومنت‌ها</Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-dark-900">
       <Navbar />
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8">
-        <h1 className="text-2xl font-bold mb-1">🏆 <span className="neon-text-purple">{L("ساخت تورنومنت", "Create Tournament")}</span></h1>
-        <p className="text-gray-400 text-sm mb-8">{L("فیلدهای ستاره‌دار الزامی هستند", "Fields marked with * are required")}</p>
+        <h1 className="text-2xl font-bold mb-1">
+          🏆 <span className="neon-text-purple">{L("ساخت تورنومنت", "Create Tournament")}</span>
+        </h1>
+        <p className="text-gray-400 text-sm mb-8">
+          {L("فقط مدیر و ادمین‌های منتخب اجازه ساخت تورنومنت دارند", "Only admins may create tournaments")}
+        </p>
+
+        {error && (
+          <div className="bg-red-900/30 border border-red-500/50 text-red-300 px-4 py-3 rounded-xl mb-6 text-sm leading-6">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Name */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">{L("نام تورنومنت", "Tournament Name")} *</label>
-            <input type="text" required className="gaming-input" placeholder={L("مثال: جام قهرمانان", "e.g., Champions Cup")} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input
+              type="text"
+              required
+              className="gaming-input"
+              placeholder={L("مثال: جام قهرمانان", "e.g., Champions Cup")}
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
+            />
           </div>
 
-          {/* Game */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-3">{L("بازی", "Game")} *</label>
             <div className="grid grid-cols-3 gap-3">
               {games.map((g) => (
-                <button key={g.id} type="button" onClick={() => setForm({ ...form, game: g.id })}
-                  className={`p-4 rounded-xl border text-center transition-all ${form.game === g.id ? "border-neon-purple bg-neon-purple/10" : "border-gaming-border bg-dark-700 hover:border-neon-purple/30"}`}>
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => setForm({ ...form, game: g.id })}
+                  className={`p-4 rounded-xl border text-center transition-all ${
+                    form.game === g.id
+                      ? "border-neon-purple bg-neon-purple/10"
+                      : "border-gaming-border bg-dark-700 hover:border-neon-purple/30"
+                  }`}
+                >
                   <div className="text-3xl mb-2">{g.icon}</div>
                   <div className="text-xs font-bold">{g.name}</div>
                 </button>
@@ -87,40 +179,59 @@ export default function CreateTournamentPage() {
             </div>
           </div>
 
-          {/* Format + Mode */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">{L("فرمت", "Format")}</label>
               <select className="gaming-select" value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value })}>
-                {formats.map((f) => (<option key={f.id} value={f.id}>{f.icon} {f.name}</option>))}
+                {formats.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.icon} {f.name}
+                  </option>
+                ))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">{L("مود بازی", "Game Mode")}</label>
-              <input type="text" className="gaming-input" placeholder={L("مثال: Search & Destroy", "e.g., Search & Destroy")} value={form.gameMode} onChange={(e) => setForm({ ...form, gameMode: e.target.value })} />
+              <input
+                type="text"
+                className="gaming-input"
+                placeholder={L("مثال: Search & Destroy", "e.g., Search & Destroy")}
+                value={form.gameMode}
+                onChange={(e) => setForm({ ...form, gameMode: e.target.value })}
+              />
             </div>
           </div>
 
-          {/* Map + Server */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">{L("مپ", "Map")}</label>
-              <input type="text" className="gaming-input" placeholder={L("مثال: Nuketown", "")} value={form.mapName} onChange={(e) => setForm({ ...form, mapName: e.target.value })} />
+              <input
+                type="text"
+                className="gaming-input"
+                placeholder={L("مثال: Nuketown", "")}
+                value={form.mapName}
+                onChange={(e) => setForm({ ...form, mapName: e.target.value })}
+              />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">{L("ظرفیت سرور", "Server Slots")}</label>
               <select className="gaming-select" value={form.serverSlots} onChange={(e) => setForm({ ...form, serverSlots: parseInt(e.target.value) })}>
-                {[4, 8, 16, 32, 64, 100].map((n) => (<option key={n} value={n}>{n} {L("نفر", "players")}</option>))}
+                {[4, 8, 16, 32, 64, 100].map((n) => (
+                  <option key={n} value={n}>
+                    {n} {L("نفر", "players")}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
 
-          {/* Max Players + Start Date */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-300 mb-2">{L("حداکثر بازیکنان", "Max Players")}</label>
               <select className="gaming-select" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: parseInt(e.target.value) })}>
-                {[4, 8, 16, 32, 64].map((n) => (<option key={n} value={n}>{n}</option>))}
+                {[4, 8, 16, 32, 64].map((n) => (
+                  <option key={n} value={n}>{n}</option>
+                ))}
               </select>
             </div>
             <div>
@@ -129,13 +240,17 @@ export default function CreateTournamentPage() {
             </div>
           </div>
 
-          {/* Entry Fee */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">{L("💳 مبلغ ورودی", "💳 Entry Fee")}</label>
-            <input type="text" className="gaming-input" placeholder={L("مثال: رایگان / ۵۰ هزار تومان", "e.g., Free / $5")} value={form.entryFee} onChange={(e) => setForm({ ...form, entryFee: e.target.value })} />
+            <input
+              type="text"
+              className="gaming-input"
+              placeholder={L("مثال: رایگان / ۵۰ هزار تومان", "e.g., Free / $5")}
+              value={form.entryFee}
+              onChange={(e) => setForm({ ...form, entryFee: e.target.value })}
+            />
           </div>
 
-          {/* Prizes */}
           <div className="gaming-card p-5">
             <h3 className="font-bold text-neon-yellow mb-4">🏆 {L("جوایز", "Prizes")}</h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -162,19 +277,16 @@ export default function CreateTournamentPage() {
             </div>
           </div>
 
-          {/* Description */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">{L("توضیحات", "Description")}</label>
             <textarea className="gaming-input min-h-[80px] resize-y" placeholder={L("توضیح تورنومنت...", "Tournament description...")} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
 
-          {/* Rules */}
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">{L("📜 قوانین", "📜 Rules")}</label>
             <textarea className="gaming-input min-h-[100px] resize-y" placeholder={L("قوانین و مقررات تورنومنت...", "Tournament rules...")} value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })} />
           </div>
 
-          {/* Submit */}
           <div className="flex gap-4">
             <button type="submit" disabled={loading} className="gaming-btn flex-1 py-3 disabled:opacity-50">
               {loading ? L("⏳ در حال ساخت...", "⏳ Creating...") : L("🏆 ساخت تورنومنت", "🏆 Create Tournament")}

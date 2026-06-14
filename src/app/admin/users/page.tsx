@@ -8,8 +8,9 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface UserRow {
   id: string;
-  email: string;
-  username: string;
+  phoneNumber: string;
+  email: string | null;
+  username: string | null;
   displayName: string;
   role: string;
   isVerified: boolean;
@@ -27,60 +28,64 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [search, setSearch] = useState("");
+  const [error, setError] = useState("");
+
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+  const isSuperAdmin = user?.role === "super_admin";
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) router.push("/");
-  }, [loading, user, router]);
+    if (!loading && (!user || !isAdmin)) router.push("/");
+  }, [loading, user, isAdmin, router]);
 
   useEffect(() => {
-    if (user?.role === "admin") fetchUsers();
-  }, [user]);
+    if (isAdmin) fetchUsers();
+  }, [isAdmin]);
 
   async function fetchUsers() {
     setLoadingUsers(true);
+    setError("");
     try {
-      const res = await fetch("/api/admin/users");
+      const res = await fetch("/api/admin/users", { cache: "no-store" });
       const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
       setUsers(Array.isArray(data) ? data : []);
-    } catch { setUsers([]); }
+    } catch {
+      setError("لیست کاربران بارگذاری نشد.");
+      setUsers([]);
+    }
     setLoadingUsers(false);
   }
 
-  async function changeRole(id: string, role: string) {
+  async function patchUser(id: string, payload: Record<string, unknown>) {
+    setError("");
     try {
-      await fetch("/api/admin/users", {
+      const res = await fetch("/api/admin/users", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, role }),
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        body: JSON.stringify({ id, ...payload }),
       });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed");
       fetchUsers();
-    } catch { /* ignore */ }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تغییرات ذخیره نشد.");
+    }
   }
 
-  async function toggleVerified(id: string, current: boolean) {
-    try {
-      await fetch("/api/admin/users", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, isVerified: !current }),
-      });
-      fetchUsers();
-    } catch { /* ignore */ }
-  }
+  const filtered = users.filter((u) => {
+    const q = search.toLowerCase();
+    return (
+      (u.username || "").toLowerCase().includes(q) ||
+      (u.displayName || "").toLowerCase().includes(q) ||
+      (u.email || "").toLowerCase().includes(q) ||
+      (u.phoneNumber || "").toLowerCase().includes(q)
+    );
+  });
 
-  const filtered = users.filter((u) =>
-    u.username.toLowerCase().includes(search.toLowerCase()) ||
-    u.displayName.toLowerCase().includes(search.toLowerCase()) ||
-    u.email.toLowerCase().includes(search.toLowerCase())
-  );
-
-  if (loading || !user || user.role !== "admin") return null;
-
-  const ROLE_BADGES: Record<string, { color: string; label: string }> = {
-    admin: { color: "bg-neon-pink/20 text-neon-pink", label: lang === "fa" ? "ادمین" : "Admin" },
-    judge: { color: "bg-neon-blue/20 text-neon-blue", label: lang === "fa" ? "داور" : "Judge" },
-    user: { color: "bg-dark-600 text-gray-400", label: lang === "fa" ? "کاربر" : "User" },
-  };
+  if (loading || !user || !isAdmin) return null;
 
   return (
     <div className="min-h-screen bg-dark-900">
@@ -97,18 +102,18 @@ export default function AdminUsersPage() {
           </div>
         </div>
 
-        {/* Search */}
+        {error && <div className="bg-red-900/30 border border-red-500/40 text-red-300 rounded-xl p-3 mb-5 text-sm">{error}</div>}
+
         <div className="mb-6">
           <input
             type="text"
             className="gaming-input"
-            placeholder={lang === "fa" ? "🔍 جستجوی نام، ایمیل..." : "🔍 Search name, email..."}
+            placeholder="🔍 جستجوی نام، موبایل، ایمیل..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
 
-        {/* Users Table */}
         {loadingUsers ? (
           <div className="text-center py-16">
             <div className="text-4xl animate-neon-pulse mb-4">👥</div>
@@ -116,11 +121,10 @@ export default function AdminUsersPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map((u) => {
-              const badge = ROLE_BADGES[u.role] || ROLE_BADGES.user;
+              const canEditAdminRole = isSuperAdmin || (u.role !== "admin" && u.role !== "super_admin");
               return (
                 <div key={u.id} className="gaming-card p-4">
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    {/* Avatar + Info */}
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="w-10 h-10 rounded-full bg-gradient-to-br from-neon-purple to-neon-blue flex items-center justify-center text-sm font-bold flex-shrink-0">
                         {u.displayName.charAt(0).toUpperCase()}
@@ -130,40 +134,38 @@ export default function AdminUsersPage() {
                           <span className="font-bold text-sm">{u.displayName}</span>
                           {u.isVerified && <span className="text-neon-green text-xs">✓</span>}
                         </div>
-                        <div className="text-xs text-gray-500 truncate">@{u.username} · {u.email}</div>
+                        <div className="text-xs text-gray-500 truncate" dir="ltr">
+                          @{u.username || "-"} · {u.phoneNumber} · {u.email || "no email"}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Game IDs */}
                     <div className="flex gap-2 flex-shrink-0">
                       <span className={`text-xs px-1.5 py-0.5 rounded ${u.clashRoyaleId ? "text-neon-blue" : "text-gray-600"}`}>⚔️</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${u.codMobileId ? "text-neon-orange" : "text-gray-600"}`}>🎯</span>
                       <span className={`text-xs px-1.5 py-0.5 rounded ${u.fortniteId ? "text-neon-purple" : "text-gray-600"}`}>🏗️</span>
                     </div>
 
-                    {/* Role */}
                     <select
-                      className="bg-dark-700 border border-gaming-border rounded-lg px-3 py-1.5 text-xs text-white flex-shrink-0"
+                      className="bg-dark-700 border border-gaming-border rounded-lg px-3 py-1.5 text-xs text-white flex-shrink-0 disabled:opacity-50"
                       value={u.role}
-                      onChange={(e) => changeRole(u.id, e.target.value)}
+                      disabled={!canEditAdminRole}
+                      onChange={(e) => patchUser(u.id, { role: e.target.value })}
                     >
-                      <option value="user">{lang === "fa" ? "👤 کاربر" : "👤 User"}</option>
-                      <option value="judge">{lang === "fa" ? "⚖️ داور" : "⚖️ Judge"}</option>
-                      <option value="admin">{lang === "fa" ? "👑 ادمین" : "👑 Admin"}</option>
+                      <option value="player">👤 بازیکن</option>
+                      <option value="judge">⚖️ داور</option>
+                      <option value="moderator">🛡️ ناظر</option>
+                      {isSuperAdmin && <option value="admin">👑 ادمین</option>}
+                      {isSuperAdmin && <option value="super_admin">💎 مدیر اصلی</option>}
                     </select>
 
-                    {/* Verify */}
                     <button
-                      onClick={() => toggleVerified(u.id, u.isVerified)}
+                      onClick={() => patchUser(u.id, { isVerified: !u.isVerified })}
                       className={`text-xs px-3 py-1.5 rounded-lg flex-shrink-0 ${
-                        u.isVerified
-                          ? "bg-neon-green/20 text-neon-green"
-                          : "bg-dark-600 text-gray-500"
+                        u.isVerified ? "bg-neon-green/20 text-neon-green" : "bg-dark-600 text-gray-500"
                       }`}
                     >
-                      {u.isVerified
-                        ? lang === "fa" ? "✓ تأیید شده" : "✓ Verified"
-                        : lang === "fa" ? "تأیید نشده" : "Unverified"}
+                      {u.isVerified ? "✓ تأیید شده" : "تأیید نشده"}
                     </button>
                   </div>
                 </div>

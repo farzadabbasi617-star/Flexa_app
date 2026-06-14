@@ -1,5 +1,12 @@
-import { fetchAIResponse } from './ai-provider-manager';
-import { analyzeMatch, generateAssistantResponse, AIJudgmentResult } from './ai-engine';
+import { fetchAIResponse } from "./ai-provider-manager";
+import { analyzeMatch, generateAssistantResponse, AIJudgmentResult } from "./ai-engine";
+
+export interface AssistantAIResponse {
+  response: string;
+  suggestions: string[];
+  provider: "openrouter" | "groq" | "cache" | "local";
+  cachedProvider?: "openrouter" | "groq";
+}
 
 /**
  * Real AI Chat Assistant Response using Multi-Provider Auto-Switch
@@ -7,27 +14,34 @@ import { analyzeMatch, generateAssistantResponse, AIJudgmentResult } from './ai-
 export async function generateRealAssistantResponse(
   query: string,
   context: { lang: "en" | "fa"; userName?: string }
-): Promise<{ response: string; suggestions: string[] }> {
+): Promise<AssistantAIResponse> {
   const isFA = context.lang === "fa";
   const name = context.userName || (isFA ? "کاربر" : "User");
-  
-  const systemPrompt = isFA 
-    ? `شما "فلکسا" (Flexa) هستید، یک دستیار هوشمند برای پلتفرم برگزاری تورنمنت بازی‌های موبایل. نام کاربر: ${name}. پاسخ‌ها را صمیمی و کوتاه به زبان فارسی بنویسید.`
+
+  const systemPrompt = isFA
+    ? `شما «فلکسا» هستید؛ دستیار هوشمند پلتفرم تورنمنت گیمینگ Flexa. نام کاربر: ${name}. فقط فارسی، کوتاه، کاربردی و صمیمی پاسخ بده. اگر سؤال مربوط به تورنمنت، ثبت‌نام، داوری، کیف پول یا پروفایل بود دقیق راهنمایی کن.`
     : `You are "Flexa", an AI assistant for a mobile gaming tournament platform. User name: ${name}. Keep responses friendly and brief in English.`;
 
   const aiResult = await fetchAIResponse(query, systemPrompt);
 
-  if (!aiResult) {
-    return generateAssistantResponse(query, context);
-  }
-
-  const suggestions = isFA 
+  const suggestions = isFA
     ? ["قوانین تورنومنت", "نحوه ثبت امتیاز", "تورنومنت‌های فعال"]
     : ["Tournament Rules", "How to report score", "Active Tournaments"];
 
+  if (!aiResult) {
+    const fallback = generateAssistantResponse(query, context);
+    return {
+      response: fallback.response,
+      suggestions: fallback.suggestions,
+      provider: "local",
+    };
+  }
+
   return {
     response: aiResult.content,
-    suggestions
+    suggestions,
+    provider: aiResult.provider,
+    cachedProvider: aiResult.cachedProvider,
   };
 }
 
@@ -58,7 +72,7 @@ export async function analyzeMatchWithAI(
       "recommendations": ["string"]
     }`;
 
-  const systemPrompt = `You are the Flexa AI Head Judge. Analyze scores for fair play. Respond ONLY with valid JSON.`;
+  const systemPrompt = "You are the Flexa AI Head Judge. Analyze scores for fair play. Respond ONLY with valid JSON.";
 
   const aiResult = await fetchAIResponse(prompt, systemPrompt);
 
@@ -67,17 +81,17 @@ export async function analyzeMatchWithAI(
   }
 
   try {
-    const jsonStr = aiResult.content.includes("```json") 
+    const jsonStr = aiResult.content.includes("```json")
       ? aiResult.content.split("```json")[1].split("```")[0].trim()
       : aiResult.content.trim();
-    
+
     const parsed = JSON.parse(jsonStr);
-    
+
     return {
       ...parsed,
-      factors: analyzeMatch(player1Score, player2Score, player1Rating, player2Rating, player1History, player2History, hasEvidence).factors
+      factors: analyzeMatch(player1Score, player2Score, player1Rating, player2Rating, player1History, player2History, hasEvidence).factors,
     };
-  } catch (e) {
+  } catch {
     return analyzeMatch(player1Score, player2Score, player1Rating, player2Rating, player1History, player2History, hasEvidence);
   }
 }

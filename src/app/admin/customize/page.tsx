@@ -168,11 +168,11 @@ export default function AdminCustomizePage() {
   }, []);
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) router.push("/");
+    if (!loading && (!user || (user.role !== "admin" && user.role !== "super_admin"))) router.push("/");
   }, [loading, user, router]);
 
   useEffect(() => {
-    if (user?.role === "admin") fetchSettings();
+    if ((user?.role === "admin" || user?.role === "super_admin")) fetchSettings();
   }, [user, fetchSettings]);
 
   // Update a single setting key by name.
@@ -196,7 +196,7 @@ export default function AdminCustomizePage() {
     setSaving(false);
   }
 
-  if (loading || !user || user.role !== "admin") return null;
+  if (loading || !user || (user.role !== "admin" && user.role !== "super_admin")) return null;
 
   const L = (fa: string, en: string) => lang === "fa" ? fa : en;
 

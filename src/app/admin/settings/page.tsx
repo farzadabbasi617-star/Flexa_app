@@ -41,11 +41,11 @@ export default function AdminSettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (!loading && (!user || user.role !== "admin")) router.push("/");
+    if (!loading && (!user || (user.role !== "admin" && user.role !== "super_admin"))) router.push("/");
   }, [loading, user, router]);
 
   useEffect(() => {
-    if (user?.role === "admin") fetchSettings();
+    if ((user?.role === "admin" || user?.role === "super_admin")) fetchSettings();
   }, [user, fetchSettings]);
 
   async function handleSave() {
@@ -63,7 +63,7 @@ export default function AdminSettingsPage() {
     setSaving(false);
   }
 
-  if (loading || !user || user.role !== "admin") return null;
+  if (loading || !user || (user.role !== "admin" && user.role !== "super_admin")) return null;
 
   const sections = [
     {
