@@ -47,9 +47,9 @@ export default function LeaderboardPage() {
         </header>
 
         {/* TABS (Static for now) */}
-        <div class="bg-[#111115] p-1 rounded-2xl border border-white/5 flex gap-1 mb-8">
-            <button class="flex-1 py-3 rounded-xl bg-white/5 text-xs font-black tracking-wider border border-white/5">GLOBAL</button>
-            <button class="flex-1 py-3 rounded-xl text-gray-500 text-xs font-black tracking-wider">FRIENDS</button>
+        <div className="bg-[#111115] p-1 rounded-2xl border border-white/5 flex gap-1 mb-8">
+            <button className="flex-1 py-3 rounded-xl bg-white/5 text-xs font-black tracking-wider border border-white/5">GLOBAL</button>
+            <button className="flex-1 py-3 rounded-xl text-gray-500 text-xs font-black tracking-wider">FRIENDS</button>
         </div>
 
         {loading ? (
