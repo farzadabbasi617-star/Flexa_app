@@ -9,7 +9,7 @@
 - **Build Command**
 
 ```bash
-npm ci && npm run build
+npm ci --include=dev && npm run build
 ```
 
 - **Start Command**

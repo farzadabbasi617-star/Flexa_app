@@ -223,9 +223,17 @@ export default function AIAssistant() {
           className="fixed bottom-[104px] w-[calc(100vw-2rem)] max-w-[400px] h-[520px] max-h-[calc(100vh-130px)] bg-dark-800 rounded-2xl shadow-2xl border border-gaming-border z-[75] flex flex-col overflow-hidden animate-slide-up"
           style={chatOnLeft ? { left: 16 } : { right: 16 }}
         >
-          <div className="bg-gradient-to-r from-neon-purple to-neon-blue p-4 flex items-center gap-3">
+          <div className="bg-gradient-to-r from-neon-purple to-neon-blue p-4 flex items-center gap-3 relative">
+            <button
+              type="button"
+              onClick={() => setIsOpen(false)}
+              className="absolute top-3 left-3 w-7 h-7 rounded-full bg-red-500 text-white text-xs font-black shadow-[0_0_18px_rgba(239,68,68,0.55)] border border-white/20 flex items-center justify-center active:scale-90 transition-transform"
+              aria-label="بستن دستیار هوشمند"
+            >
+              ✕
+            </button>
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">🤖</div>
-            <div>
+            <div className="pe-8">
               <h3 className="font-bold text-white">دستیار هوشمند</h3>
               <p className="text-xs text-white/80">{lastProvider}</p>
             </div>
