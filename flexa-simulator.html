@@ -417,6 +417,39 @@
     .ai-title { margin: 0 0 4px; font-size: 14px; font-weight: 900; }
     .ai-text { margin: 0; font-size: 10px; color: rgba(255,255,255,.38); line-height: 1.8; }
 
+    .nav-handle {
+      position: absolute;
+      z-index: 24;
+      left: 50%;
+      bottom: 12px;
+      width: 92px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.1);
+      background: rgba(20,20,25,.9);
+      backdrop-filter: blur(28px);
+      box-shadow: 0 0 28px rgba(188,0,255,.28);
+      transform: translateX(-50%);
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      transition: .3s ease;
+    }
+
+    .nav-handle.open {
+      width: 54px;
+      height: 28px;
+      transform: translateX(-50%) translateY(-122px);
+    }
+
+    .nav-handle span {
+      width: 36px;
+      height: 4px;
+      border-radius: 99px;
+      background: #c084fc;
+      box-shadow: 0 0 14px #bc00ff;
+    }
+
     .bottom-nav {
       position: absolute;
       z-index: 20;
@@ -432,6 +465,14 @@
       border: 1px solid rgba(255,255,255,.1);
       backdrop-filter: blur(28px);
       box-shadow: 0 -20px 60px rgba(0,0,0,.82);
+      transform: translateY(125%);
+      opacity: 0;
+      transition: .3s ease;
+    }
+
+    .bottom-nav.open {
+      transform: translateY(0);
+      opacity: 1;
     }
 
     .nav-item {
@@ -463,6 +504,50 @@
       box-shadow: 0 0 18px #bc00ff;
     }
     .nav-item.active .ico { filter: drop-shadow(0 0 12px #bc00ff); }
+
+    .ai-float {
+      position: absolute;
+      z-index: 25;
+      right: 20px;
+      bottom: 92px;
+      width: 56px;
+      height: 56px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 999px;
+      background: linear-gradient(135deg, var(--purple), var(--cyan));
+      color: #fff;
+      font-size: 27px;
+      display: grid;
+      place-items: center;
+      box-shadow: 0 18px 45px rgba(0,0,0,.45), 0 0 24px rgba(0,210,255,.25);
+      cursor: pointer;
+      transition: .22s ease;
+    }
+
+    .ai-float.open {
+      transform: rotate(45deg);
+      background: rgba(20,20,25,.92);
+    }
+
+    .ai-preview {
+      position: absolute;
+      z-index: 25;
+      right: 16px;
+      left: 16px;
+      bottom: 164px;
+      min-height: 150px;
+      border-radius: 28px;
+      padding: 18px;
+      display: none;
+      background: rgba(20,20,25,.92);
+      border: 1px solid rgba(255,255,255,.1);
+      backdrop-filter: blur(28px);
+      box-shadow: 0 24px 70px rgba(0,0,0,.5);
+    }
+
+    .ai-preview.open { display: block; animation: fadeUp .22s ease both; }
+    .ai-preview h3 { margin: 0 0 8px; font-size: 15px; }
+    .ai-preview p { margin: 0; color: rgba(255,255,255,.55); font-size: 12px; line-height: 1.9; }
 
     .form-card, .profile-card, .tournament-card {
       border-radius: 36px;
@@ -717,6 +802,13 @@
           </section>
         </div>
 
+        <button class="ai-float" id="aiFloat" aria-label="دستیار هوشمند">🤖</button>
+        <div class="ai-preview" id="aiPreview">
+          <h3>دستیار هوشمند Flexa</h3>
+          <p>این دکمه حالا شناور است و بالاتر از نشانگر منوی پایین قرار می‌گیرد تا مزاحم تب‌ها و محتوای صفحه نباشد.</p>
+        </div>
+
+        <button class="nav-handle" id="navHandle" aria-label="باز کردن منوی پایین"><span></span></button>
         <nav class="bottom-nav" id="bottomNav">
           <button class="nav-item active" data-screen="home"><span class="ico">🔥</span><span>آرنا</span></button>
           <button class="nav-item" data-screen="tournaments"><span class="ico">👑</span><span>رتبه‌ها</span></button>
@@ -743,17 +835,38 @@
     const navItems = [...document.querySelectorAll('.nav-item')];
     const sideButtons = [...document.querySelectorAll('.screen-button')];
     const scrollBox = document.querySelector('.app-scroll');
+    const bottomNav = document.getElementById('bottomNav');
+    const navHandle = document.getElementById('navHandle');
+    const aiFloat = document.getElementById('aiFloat');
+    const aiPreview = document.getElementById('aiPreview');
+
+    function setNavOpen(open) {
+      bottomNav?.classList.toggle('open', open);
+      navHandle?.classList.toggle('open', open);
+      navHandle?.setAttribute('aria-label', open ? 'بستن منوی پایین' : 'باز کردن منوی پایین');
+    }
 
     function showScreen(name) {
       screens.forEach(screen => screen.classList.toggle('active', screen.id === `screen-${name}`));
       buttons.forEach(button => button.classList.toggle('active', button.dataset.screen === name));
       navItems.forEach(button => button.classList.toggle('active', button.dataset.screen === name));
       sideButtons.forEach(button => button.classList.toggle('active', button.dataset.screen === name));
+      setNavOpen(false);
       if (scrollBox) scrollBox.scrollTop = 0;
     }
 
     buttons.forEach(button => {
       button.addEventListener('click', () => showScreen(button.dataset.screen));
+    });
+
+    navHandle?.addEventListener('click', () => {
+      setNavOpen(!bottomNav?.classList.contains('open'));
+    });
+
+    aiFloat?.addEventListener('click', () => {
+      aiFloat.classList.toggle('open');
+      aiPreview?.classList.toggle('open');
+      aiFloat.textContent = aiFloat.classList.contains('open') ? '✕' : '🤖';
     });
   </script>
 </body>

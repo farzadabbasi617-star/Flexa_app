@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { normalizeLoginIdentifier, normalizePhoneNumber } from "@/lib/phone";
 
 const optionalEmail = z.preprocess(
   (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
@@ -11,18 +12,22 @@ export const RegisterSchema = z.object({
     .trim()
     .min(3, "نام کاربری باید حداقل ۳ کاراکتر باشد")
     .max(20, "نام کاربری نباید بیشتر از ۲۰ کاراکتر باشد")
-    .regex(/^[a-zA-Z0-9_.]+$/, "نام کاربری فقط می‌تواند شامل حروف انگلیسی، عدد، نقطه و آندرلاین باشد"),
-  phoneNumber: z
-    .string()
-    .trim()
-    .regex(/^09\d{9}$/, "شماره موبایل معتبر نیست (مثال: 09123456789)"),
+    .regex(/^[\p{L}\p{N}_.-]+$/u, "نام کاربری فقط می‌تواند شامل حروف، عدد، نقطه، خط تیره و آندرلاین باشد"),
+  phoneNumber: z.preprocess(
+    (value) => (typeof value === "string" ? normalizePhoneNumber(value) : value),
+    z.string().regex(/^09\d{9}$/, "شماره موبایل معتبر نیست (مثال: 09123456789)")
+  ),
   email: optionalEmail,
   password: z.string().min(6, "رمز عبور باید حداقل ۶ کاراکتر باشد"),
   displayName: z.string().trim().min(2, "نام نمایشی الزامی است").max(100),
 });
 
 export const LoginSchema = z.object({
-  identifier: z.string().trim().min(1, "شماره موبایل، ایمیل یا نام کاربری الزامی است"),
+  identifier: z
+    .string()
+    .trim()
+    .min(1, "شماره موبایل، ایمیل یا نام کاربری الزامی است")
+    .transform(normalizeLoginIdentifier),
   password: z.string().min(1, "رمز عبور الزامی است"),
 });
 

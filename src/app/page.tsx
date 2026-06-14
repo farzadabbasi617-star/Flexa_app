@@ -41,7 +41,7 @@ export default function LuxuryHomePage() {
         <div className="absolute inset-0 opacity-[.055] bg-[linear-gradient(rgba(255,255,255,.9)_1px,_transparent_1px),linear-gradient(90deg,rgba(255,255,255,.9)_1px,_transparent_1px)] bg-[size:42px_42px]" />
       </div>
 
-      <div className="relative z-10 max-w-[480px] mx-auto px-6 pb-44">
+      <div className="relative z-10 max-w-[480px] mx-auto px-6 pb-28">
         {/* Header - same mobile structure as the reference: brand on right, wallet on left */}
         <header className="pt-12 pb-8 flex justify-between items-center">
           <div className="text-right">

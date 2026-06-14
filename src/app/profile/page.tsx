@@ -15,7 +15,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-[#050508] text-white relative overflow-x-hidden">
-      <div className="relative z-10 max-w-[480px] mx-auto px-6 pb-44">
+      <div className="relative z-10 max-w-[480px] mx-auto px-6 pb-28">
         <header className="pt-12 pb-8 text-center">
             <div className="relative inline-block mb-6">
                 <div className="p-1 rounded-full bg-gradient-to-tr from-[#bc00ff] to-[#00d2ff] shadow-[0_0_30px_rgba(188,0,255,0.4)]">

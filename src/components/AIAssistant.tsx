@@ -92,18 +92,19 @@ export default function AIAssistant() {
       {/* Floating Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className={`fixed bottom-6 end-6 w-14 h-14 rounded-full shadow-lg z-50 flex items-center justify-center text-2xl transition-all ${
+        className={`fixed bottom-[92px] end-5 w-14 h-14 rounded-full shadow-[0_18px_45px_rgba(0,0,0,0.45)] z-[70] flex items-center justify-center text-2xl transition-all active:scale-95 border border-white/10 ${
           isOpen
             ? "bg-dark-700 rotate-45"
             : "bg-gradient-to-br from-neon-purple to-neon-blue animate-glow"
         }`}
+        aria-label={isOpen ? "بستن دستیار هوشمند" : "باز کردن دستیار هوشمند"}
       >
         {isOpen ? "✕" : "🤖"}
       </button>
 
       {/* Chat Window */}
       {isOpen && (
-        <div className="fixed bottom-24 end-6 w-[350px] sm:w-[400px] h-[500px] bg-dark-800 rounded-2xl shadow-2xl border border-gaming-border z-50 flex flex-col overflow-hidden animate-slide-up">
+        <div className="fixed bottom-[164px] end-4 w-[calc(100vw-2rem)] max-w-[400px] h-[520px] max-h-[calc(100vh-190px)] bg-dark-800 rounded-2xl shadow-2xl border border-gaming-border z-[70] flex flex-col overflow-hidden animate-slide-up">
           {/* Header */}
           <div className="bg-gradient-to-r from-neon-purple to-neon-blue p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center text-xl">

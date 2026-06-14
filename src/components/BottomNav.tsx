@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,10 +13,33 @@ const navItems = [
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const [isOpen, setIsOpen] = useState(false);
+
+  useEffect(() => {
+    setIsOpen(false);
+  }, [pathname]);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto p-6 z-50 pointer-events-none">
-      <div className="glass-bottom rounded-[45px] py-7 px-2 flex justify-around items-center border border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.82)] pointer-events-auto">
+    <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto px-6 pb-4 z-50 pointer-events-none">
+      {/* Small handle: keeps the menu out of the way until the user needs it. */}
+      <button
+        type="button"
+        onClick={() => setIsOpen((value) => !value)}
+        className={`absolute left-1/2 -translate-x-1/2 bottom-3 pointer-events-auto rounded-full border border-white/10 bg-[rgba(20,20,25,0.9)] backdrop-blur-2xl shadow-[0_0_28px_rgba(188,0,255,0.28)] transition-all duration-300 active:scale-95 ${
+          isOpen ? "w-14 h-7 -translate-y-[122px]" : "w-24 h-8"
+        }`}
+        aria-label={isOpen ? "بستن منوی پایین" : "باز کردن منوی پایین"}
+        aria-expanded={isOpen}
+      >
+        <span className="mx-auto block w-9 h-1 rounded-full bg-purple-400 shadow-[0_0_14px_#bc00ff]" />
+        {!isOpen && <span className="sr-only">منوی پایین</span>}
+      </button>
+
+      <div
+        className={`glass-bottom rounded-[45px] py-7 px-2 flex justify-around items-center border border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.82)] pointer-events-auto transition-all duration-300 ease-out ${
+          isOpen ? "translate-y-0 opacity-100" : "translate-y-[125%] opacity-0"
+        }`}
+      >
         {navItems.map((item) => {
           const isActive = item.path === "/" ? pathname === "/" : pathname.startsWith(item.path);
           return (

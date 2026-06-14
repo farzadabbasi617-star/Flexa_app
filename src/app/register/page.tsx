@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { normalizePhoneNumber } from "@/lib/phone";
 
 export default function RegisterPage() {
   const { t, lang } = useLanguage();
@@ -26,7 +27,7 @@ export default function RegisterPage() {
     e.preventDefault();
     setError("");
 
-    const phoneNumber = form.phoneNumber.trim();
+    const phoneNumber = normalizePhoneNumber(form.phoneNumber);
 
     if (!/^09\d{9}$/.test(phoneNumber)) {
       setError(lang === "fa" ? "شماره موبایل معتبر نیست. مثال: 09123456789" : "Invalid mobile number. Example: 09123456789");
@@ -104,6 +105,7 @@ export default function RegisterPage() {
                 placeholder="09123456789"
                 value={form.phoneNumber}
                 onChange={(e) => setForm({ ...form, phoneNumber: e.target.value })}
+                onBlur={() => setForm({ ...form, phoneNumber: normalizePhoneNumber(form.phoneNumber) })}
               />
             </div>
 
