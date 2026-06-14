@@ -1,250 +1,63 @@
 "use client";
-
-import { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import Navbar from "@/components/Navbar";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
-
-interface PlayerStats {
-  rating: number;
-  wins: number;
-  losses: number;
-  totalMatches: number;
-  winRate: number;
-}
+import { useEffect, useState } from "react";
+import BottomNav from "@/components/BottomNav";
 
 export default function ProfilePage() {
-  const { t, lang } = useLanguage();
-  const { user, loading } = useAuth();
-  const router = useRouter();
-  const [stats, setStats] = useState<PlayerStats | null>(null);
+  const [balance, setBalance] = useState(0);
+  const [user, setUser] = useState<any>(null);
 
   useEffect(() => {
-    if (!loading && !user) {
-      router.push("/login");
-    }
-  }, [loading, user, router]);
+    fetch("/api/auth/me").then(r => r.json()).then(d => setUser(d.user));
+    fetch("/api/wallet/balance").then(r => r.json()).then(d => setBalance(d.balanceToman || 0));
+  }, []);
 
-  const fetchStats = useCallback(async () => {
-    try {
-      const res = await fetch("/api/players");
-      const players = await res.json();
-      if (Array.isArray(players)) {
-        const myPlayer = players.find(
-          (p: { username: string }) => p.username === user?.username
-        );
-        if (myPlayer) {
-          const total = myPlayer.wins + myPlayer.losses;
-          setStats({
-            rating: myPlayer.rating,
-            wins: myPlayer.wins,
-            losses: myPlayer.losses,
-            totalMatches: total,
-            winRate: total > 0 ? Math.round((myPlayer.wins / total) * 100) : 0,
-          });
-        }
-      }
-    } catch {
-      // handle error
-    }
-  }, [user]);
-
-  useEffect(() => {
-    if (user) {
-      fetchStats();
-    }
-  }, [user, fetchStats]);
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-dark-900">
-        <Navbar />
-        <div className="flex items-center justify-center py-32">
-          <div className="text-4xl animate-neon-pulse">⚡</div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
-
-  const hasAnyGameId = user.clashRoyaleId || user.codMobileId || user.fortniteId;
+  if (!user) return <div className="min-h-screen bg-[#050508] flex items-center justify-center">Loading...</div>;
 
   return (
-    <div className="min-h-screen bg-dark-900">
-      <Navbar />
-
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-        {/* Profile Header */}
-        <div className="gaming-card p-6 sm:p-8 mb-6">
-          <div className="flex flex-col sm:flex-row items-center sm:items-start gap-6">
-            {/* Avatar */}
-            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-neon-purple via-neon-blue to-neon-pink flex items-center justify-center text-4xl font-bold">
-              {user.displayName.charAt(0).toUpperCase()}
+    <div className="min-h-screen bg-[#050508] text-white relative overflow-x-hidden">
+      <div className="relative z-10 max-w-[480px] mx-auto px-6 pb-44">
+        <header className="pt-12 pb-8 text-center">
+            <div className="relative inline-block mb-6">
+                <div className="p-1 rounded-full bg-gradient-to-tr from-[#bc00ff] to-[#00d2ff] shadow-[0_0_30px_rgba(188,0,255,0.4)]">
+                    <div className="w-28 h-28 rounded-full border-4 border-[#050508] overflow-hidden bg-gray-900">
+                        <img src={user.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.username}`} className="w-full h-full object-cover" />
+                    </div>
+                </div>
+                <div className="absolute -bottom-1 -right-1 bg-purple-600 border-4 border-[#050508] w-9 h-9 rounded-full flex items-center justify-center text-[10px] font-black num-en">{user.level || 1}</div>
             </div>
-
-            {/* Info */}
-            <div className="flex-1 text-center sm:text-start">
-              <h1 className="text-2xl sm:text-3xl font-bold">{user.displayName}</h1>
-              <p className="text-gray-400">@{user.username}</p>
-              <p className="text-gray-500 text-sm mt-1">{user.email}</p>
-
-              <div className="flex flex-wrap gap-2 mt-4 justify-center sm:justify-start">
-                <span className="px-3 py-1 rounded-full bg-neon-purple/20 text-neon-purple text-xs font-bold">
-                  {user.role === "admin" ? "👑 Admin" : user.role === "judge" ? "⚖️ Judge" : "🎮 Player"}
-                </span>
-                <span className="px-3 py-1 rounded-full bg-dark-600 text-gray-400 text-xs">
-                  {t.auth.memberSince}: {new Date().toLocaleDateString(lang === "fa" ? "fa-IR" : "en-US")}
-                </span>
-              </div>
+            <h2 className="text-3xl font-black mb-1 uppercase" style={{ fontFamily: 'Orbitron' }}>{user.username}</h2>
+            <div className="inline-flex items-center gap-2 bg-white/5 px-4 py-1.5 rounded-full border border-white/5 mb-6">
+                <span className="text-[9px] font-bold text-gray-500 uppercase">Flexa ID:</span>
+                <span className="text-xs font-black text-purple-400" style={{ fontFamily: 'Orbitron' }}>{user.flexaId || 'N/A'}</span>
             </div>
-
-            {/* Actions */}
-            <div className="flex gap-2">
-              <Link href="/profile/edit" className="gaming-btn text-sm">
-                ✏️ {t.auth.editProfile}
-              </Link>
+        </header>
+        <div className="mb-10">
+            <div className="glass-panel p-8 rounded-[45px] border-purple-500/20 bg-gradient-to-br from-[#1a0033] to-[#0a0a0c]">
+                <p className="text-[10px] font-black text-purple-300 uppercase mb-2 opacity-60">موجودی کیف پول</p>
+                <div className="flex items-baseline gap-3 mb-8">
+                    <span className="text-5xl font-black" style={{ fontFamily: 'Rajdhani' }}>{balance.toLocaleString()}</span>
+                    <span className="text-xs font-bold text-purple-400 uppercase">Toman</span>
+                </div>
+                <div className="flex gap-3">
+                    <button className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 py-4 rounded-[22px] font-black text-[10px] shadow-xl">شارژ حساب</button>
+                    <button className="flex-1 glass-panel py-4 rounded-[22px] font-black text-[10px] text-gray-400">برداشت وجه</button>
+                </div>
             </div>
-          </div>
         </div>
-
-        {/* Game IDs Warning */}
-        {!hasAnyGameId && (
-          <div className="bg-neon-orange/10 border border-neon-orange/50 rounded-lg p-4 mb-6 flex items-center gap-4">
-            <span className="text-2xl">⚠️</span>
-            <div className="flex-1">
-              <p className="font-bold text-neon-orange">
-                {lang === "fa" ? "آیدی بازی‌ها وارد نشده!" : "Game IDs not set!"}
-              </p>
-              <p className="text-sm text-gray-400">
-                {t.auth.gameIdsDesc}
-              </p>
+        <div className="mb-10 space-y-4">
+            <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mr-2">تیکت‌های پشتیبانی</h3>
+            <div className="glass-panel p-5 rounded-[30px] flex items-center justify-between border-white/5">
+                <div className="text-right">
+                    <h4 className="text-xs font-black">خطا در ثبت آیدی فورتنایت</h4>
+                    <p className="text-[8px] text-gray-500 uppercase">#TK-9021 • 2026.06.14</p>
+                </div>
+                <span className="bg-orange-500/10 text-orange-500 px-3 py-1 rounded-lg text-[8px] font-black uppercase">Pending</span>
             </div>
-            <Link href="/profile/edit" className="gaming-btn text-sm bg-gradient-to-r from-neon-orange to-neon-pink">
-              {lang === "fa" ? "وارد کردن" : "Add Now"}
-            </Link>
-          </div>
-        )}
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-          {[
-            { label: t.playersPage.rating, value: stats?.rating || 1000, icon: "⭐", color: "text-neon-blue" },
-            { label: t.leaderboardPage.wins, value: stats?.wins || 0, icon: "🏆", color: "text-neon-green" },
-            { label: t.auth.totalMatches, value: stats?.totalMatches || 0, icon: "⚔️", color: "text-neon-purple" },
-            { label: t.auth.winRate, value: `${stats?.winRate || 0}%`, icon: "📈", color: "text-neon-orange" },
-          ].map((stat) => (
-            <div key={stat.label} className="gaming-card p-4 text-center">
-              <div className="text-2xl mb-1">{stat.icon}</div>
-              <div className={`text-xl sm:text-2xl font-bold ${stat.color}`}>{stat.value}</div>
-              <div className="text-xs text-gray-500 mt-1">{stat.label}</div>
-            </div>
-          ))}
         </div>
-
-        {/* Game IDs Display */}
-        <div className="gaming-card p-6 mb-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-bold neon-text-purple">{t.auth.gameIds}</h3>
-            <Link href="/profile/edit" className="text-sm text-neon-blue hover:underline">
-              {t.auth.editProfile} →
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            {/* Clash Royale */}
-            <div className={`p-4 rounded-lg ${user.clashRoyaleId ? "bg-neon-blue/10 border border-neon-blue/30" : "bg-dark-700"}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">⚔️</span>
-                <span className="font-bold text-sm">{t.games.clash_royale}</span>
-              </div>
-              {user.clashRoyaleId ? (
-                <>
-                  <p className="text-neon-blue font-mono text-sm">{user.clashRoyaleId}</p>
-                  <p className="text-gray-400 text-xs mt-1">{user.clashRoyaleUsername}</p>
-                </>
-              ) : (
-                <p className="text-gray-500 text-sm">{lang === "fa" ? "وارد نشده" : "Not set"}</p>
-              )}
-            </div>
-
-            {/* COD Mobile */}
-            <div className={`p-4 rounded-lg ${user.codMobileId ? "bg-neon-orange/10 border border-neon-orange/30" : "bg-dark-700"}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">🎯</span>
-                <span className="font-bold text-sm">{t.games.cod_mobile}</span>
-              </div>
-              {user.codMobileId ? (
-                <>
-                  <p className="text-neon-orange font-mono text-sm">{user.codMobileId}</p>
-                  <p className="text-gray-400 text-xs mt-1">{user.codMobileUsername}</p>
-                </>
-              ) : (
-                <p className="text-gray-500 text-sm">{lang === "fa" ? "وارد نشده" : "Not set"}</p>
-              )}
-            </div>
-
-            {/* Fortnite */}
-            <div className={`p-4 rounded-lg ${user.fortniteId ? "bg-neon-purple/10 border border-neon-purple/30" : "bg-dark-700"}`}>
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl">🏗️</span>
-                <span className="font-bold text-sm">{t.games.fortnite}</span>
-              </div>
-              {user.fortniteId ? (
-                <>
-                  <p className="text-neon-purple font-mono text-sm">{user.fortniteId}</p>
-                  <p className="text-gray-400 text-xs mt-1">{user.fortniteUsername}</p>
-                </>
-              ) : (
-                <p className="text-gray-500 text-sm">{lang === "fa" ? "وارد نشده" : "Not set"}</p>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Links */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Link href="/profile/tournaments" className="gaming-card p-5 flex items-center gap-4 group">
-            <div className="text-3xl">🏆</div>
-            <div>
-              <h3 className="font-bold group-hover:text-neon-blue transition-colors">
-                {t.auth.myTournaments}
-              </h3>
-              <p className="text-sm text-gray-500">
-                {lang === "fa" ? "مدیریت تورنومنت‌ها" : "Manage tournaments"}
-              </p>
-            </div>
-          </Link>
-
-          <Link href="/notifications" className="gaming-card p-5 flex items-center gap-4 group">
-            <div className="text-3xl">🔔</div>
-            <div>
-              <h3 className="font-bold group-hover:text-neon-blue transition-colors">
-                {t.notif.title}
-              </h3>
-              <p className="text-sm text-gray-500">
-                {lang === "fa" ? "اعلان‌های شما" : "Your notifications"}
-              </p>
-            </div>
-          </Link>
-
-          <Link href="/chat" className="gaming-card p-5 flex items-center gap-4 group">
-            <div className="text-3xl">💬</div>
-            <div>
-              <h3 className="font-bold group-hover:text-neon-blue transition-colors">
-                {t.chat.title}
-              </h3>
-              <p className="text-sm text-gray-500">
-                {lang === "fa" ? "پیام‌های شما" : "Your messages"}
-              </p>
-            </div>
-          </Link>
-        </div>
+        <button className="w-full glass-panel py-5 rounded-[30px] text-red-400 text-sm font-black border-red-500/10">خروج از حساب کاربری</button>
       </div>
+      <BottomNav />
+      <style jsx global>{` .glass-panel { background: rgba(20, 20, 25, 0.75); backdrop-filter: blur(25px); } .num-en { font-family: 'Rajdhani', sans-serif; } `}</style>
     </div>
   );
 }
