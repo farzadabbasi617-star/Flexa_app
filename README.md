@@ -82,6 +82,7 @@ npm install
 DATABASE_URL="your_postgresql_url"
 OPENROUTER_API_KEY="your_key"
 GROQ_API_KEY="your_key"
+# فعلاً اختیاری است؛ ورود با رمز عبور کار می‌کند و OTP بعداً فعال می‌شود
 FARAZSMS_API_KEY="your_key"
 FARAZSMS_PATTERN_CODE="your_code"
 ```

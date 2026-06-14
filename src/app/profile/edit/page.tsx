@@ -47,7 +47,10 @@ export default function EditProfilePage() {
     try {
       const res = await fetch("/api/auth/update-profile", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
         body: JSON.stringify(form),
       });
 

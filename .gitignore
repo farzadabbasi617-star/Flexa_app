@@ -17,3 +17,8 @@ tsconfig.tsbuildinfo
 # Test artifacts
 coverage/
 .vitest/
+
+# Local/user uploads and accidental screenshots
+uploads/
+*.local.jpg
+*.local.png

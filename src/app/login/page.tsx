@@ -8,10 +8,10 @@ import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 
 export default function LoginPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
   const { login } = useAuth();
   const router = useRouter();
-  const [form, setForm] = useState({ emailOrUsername: "", password: "" });
+  const [form, setForm] = useState({ identifier: "", password: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -20,12 +20,12 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const result = await login(form.emailOrUsername, form.password);
+    const result = await login(form.identifier.trim(), form.password);
 
     if (result.success) {
       router.push("/");
     } else {
-      setError(result.error || "Login failed");
+      setError(result.error || (lang === "fa" ? "ورود ناموفق بود" : "Login failed"));
     }
     setLoading(false);
   }
@@ -43,6 +43,12 @@ export default function LoginPage() {
             <p className="text-gray-400 mt-1">{t.auth.loginSubtitle}</p>
           </div>
 
+          <div className="bg-neon-blue/10 border border-neon-blue/30 text-neon-blue px-4 py-3 rounded-xl mb-6 text-xs leading-6">
+            {lang === "fa"
+              ? "تا وقتی پنل پیامک تهیه نشده، ورود با رمز عبور فعال است. بعداً OTP را روی همین شماره موبایل اضافه می‌کنیم."
+              : "Until the SMS panel is ready, password login is enabled. OTP can be added later on the same mobile number."}
+          </div>
+
           {/* Error */}
           {error && (
             <div className="bg-red-900/30 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg mb-6 text-sm">
@@ -54,15 +60,15 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm text-gray-400 mb-2">
-                {t.auth.emailOrUsername}
+                {lang === "fa" ? "شماره موبایل، ایمیل یا نام کاربری" : "Mobile, email or username"}
               </label>
               <input
                 type="text"
                 required
                 className="gaming-input"
-                placeholder={t.auth.emailOrUsername}
-                value={form.emailOrUsername}
-                onChange={(e) => setForm({ ...form, emailOrUsername: e.target.value })}
+                placeholder={lang === "fa" ? "مثلاً 09123456789 یا ShadowGamer" : "09123456789 or ShadowGamer"}
+                value={form.identifier}
+                onChange={(e) => setForm({ ...form, identifier: e.target.value })}
               />
             </div>
 

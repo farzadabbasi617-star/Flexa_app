@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: flexa-app
+    env: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: FARAZSMS_API_KEY
+        sync: false
+      - key: FARAZSMS_PATTERN_CODE
+        sync: false
+      - key: FARAZSMS_SENDER
+        sync: false

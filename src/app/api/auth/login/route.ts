@@ -9,28 +9,33 @@ import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-
 export async function POST(request: NextRequest) {
   try {
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const userAgent = request.headers.get('user-agent') || 'unknown';
-    
-    const rateLimitResult = await rateLimit(ip, 5, 60 * 1000);
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
+    const userAgent = request.headers.get("user-agent") || "unknown";
+
+    const rateLimitResult = await rateLimit(`login:${ip}`, 5, 60 * 1000);
     if (!rateLimitResult.success) {
-      return NextResponse.json({ error: "Too many login attempts. Please try again later." }, { status: 429 });
+      return NextResponse.json(
+        { error: "تعداد تلاش‌های ورود زیاد است. لطفاً کمی بعد دوباره امتحان کنید." },
+        { status: 429 }
+      );
     }
 
     const body = await request.json();
     const validation = LoginSchema.safeParse({
-      identifier: body.emailOrUsername,
-      password: body.password
+      identifier: body.emailOrUsername ?? body.identifier,
+      password: body.password,
     });
 
     if (!validation.success) {
-      return NextResponse.json({ 
-        error: "Validation failed", 
-        details: validation.error.issues 
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: validation.error.issues[0]?.message || "اطلاعات ورود معتبر نیست",
+          details: validation.error.issues,
+        },
+        { status: 400 }
+      );
     }
 
     const { identifier, password } = validation.data;
@@ -41,20 +46,20 @@ export async function POST(request: NextRequest) {
       .where(
         or(
           eq(users.email, identifier),
-          eq(users.username, identifier)
+          eq(users.username, identifier),
+          eq(users.phoneNumber, identifier)
         )
       );
 
     if (!user) {
-      logger.warn({ identifier }, 'Login attempt failed: User not found');
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      logger.warn({ identifier }, "Login attempt failed: User not found");
+      return NextResponse.json({ error: "شماره موبایل/نام کاربری یا رمز عبور اشتباه است" }, { status: 401 });
     }
 
-    // Note: verifyPassword now expects (hash, password) per argon2 convention
     const isValid = await verifyPassword(user.passwordHash, password);
     if (!isValid) {
-      logger.warn({ userId: user.id }, 'Login attempt failed: Wrong password');
-      return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+      logger.warn({ userId: user.id }, "Login attempt failed: Wrong password");
+      return NextResponse.json({ error: "شماره موبایل/نام کاربری یا رمز عبور اشتباه است" }, { status: 401 });
     }
 
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
@@ -65,10 +70,16 @@ export async function POST(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
+        phoneNumber: user.phoneNumber,
+        phoneVerifiedAt: user.phoneVerifiedAt,
         username: user.username,
         displayName: user.displayName,
+        flexaId: user.flexaId,
         role: user.role,
         avatarUrl: user.avatarUrl,
+        isVerified: user.isVerified,
+        level: user.level,
+        rankPoints: user.rankPoints,
         clashRoyaleId: user.clashRoyaleId,
         clashRoyaleUsername: user.clashRoyaleUsername,
         codMobileId: user.codMobileId,
@@ -86,10 +97,10 @@ export async function POST(request: NextRequest) {
       path: "/",
     });
 
-    logger.info({ userId: user.id }, 'User logged in successfully');
+    logger.info({ userId: user.id, authMode: "password_without_sms" }, "User logged in successfully");
     return response;
   } catch (err) {
-    logger.error({ err }, 'Login error');
-    return NextResponse.json({ error: "Login failed" }, { status: 500 });
+    logger.error({ err }, "Login error");
+    return NextResponse.json({ error: "ورود با خطا مواجه شد" }, { status: 500 });
   }
 }

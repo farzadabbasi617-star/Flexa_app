@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { users, sessions } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import crypto from "crypto";
 import logger from "@/lib/logger";
 import { NextRequest } from "next/server";
@@ -14,7 +14,7 @@ export async function hashPassword(password: string): Promise<string> {
   return await argonHash(password);
 }
 
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+export async function verifyPassword(hash: string, password: string): Promise<boolean> {
   return await argonCompare(hash, password);
 }
 
@@ -115,13 +115,11 @@ export async function validateSession(token: string, currentIp: string, currentU
       return null;
     }
 
-    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
-    if (session.createdAt < fifteenMinutesAgo) {
-      const newToken = generateToken();
-      await db.update(sessions)
-        .set({ token: newToken })
-        .where(eq(sessions.id, session.id));
-    }
+    // Do not rotate the session token here: route handlers that call
+    // validateSession do not have access to the response object to write the
+    // new cookie back to the browser. Rotating here would invalidate the
+    // user's cookie after a few minutes and make the next request look logged
+    // out. Use rotateSession from a handler that can also set the cookie.
 
     const [user] = await db
       .select()

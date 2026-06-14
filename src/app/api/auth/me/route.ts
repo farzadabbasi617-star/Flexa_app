@@ -3,12 +3,11 @@ import { validateSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
-
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;
-    const ip = request.headers.get('x-forwarded-for')?.split(',')[0] || 'unknown';
-    const ua = request.headers.get('user-agent') || 'unknown';
+    const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
+    const ua = request.headers.get("user-agent") || "unknown";
 
     if (!token) {
       return NextResponse.json({ user: null });
@@ -26,10 +25,16 @@ export async function GET(request: NextRequest) {
       user: {
         id: user.id,
         email: user.email,
+        phoneNumber: user.phoneNumber,
+        phoneVerifiedAt: user.phoneVerifiedAt,
         username: user.username,
         displayName: user.displayName,
+        flexaId: user.flexaId,
         role: user.role,
         avatarUrl: user.avatarUrl,
+        isVerified: user.isVerified,
+        level: user.level,
+        rankPoints: user.rankPoints,
         clashRoyaleId: user.clashRoyaleId,
         clashRoyaleUsername: user.clashRoyaleUsername,
         codMobileId: user.codMobileId,

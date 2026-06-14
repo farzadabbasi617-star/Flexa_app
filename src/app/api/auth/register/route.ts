@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { db } from "@/db";
-import { users, players } from "@/db/schema";
+import { players, users, wallets } from "@/db/schema";
 import { eq, or } from "drizzle-orm";
 import { hashPassword, createSession } from "@/lib/auth";
 import { RegisterSchema } from "@/lib/validations";
@@ -9,10 +10,28 @@ import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
+async function generateUniqueFlexaId() {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const candidate = `FLX-${crypto.randomInt(1000, 10000)}`;
+    const [existing] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(eq(users.flexaId, candidate))
+      .limit(1);
+
+    if (!existing) return candidate;
+  }
+
+  return `FLX-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
     const userAgent = request.headers.get("user-agent") || "unknown";
+
+    // SMS/OTP is intentionally not required yet. We store the mobile number now
+    // and can verify it later when the SMS provider is purchased and enabled.
 
     // 1. Rate limit — protect against signup spam / abuse.
     const limit = await rateLimit(`register:${ip}`, 5, 60 * 60 * 1000); // 5 / hour / IP
@@ -35,15 +54,15 @@ export async function POST(request: NextRequest) {
 
     const { email, username, password, displayName, phoneNumber } = validation.data;
 
-    // 3. Uniqueness check (single query for email, username & phone).
+    // 3. Uniqueness check.
     const existing = await db
       .select({ id: users.id, email: users.email, username: users.username, phoneNumber: users.phoneNumber })
       .from(users)
-      .where(or(
-        email ? eq(users.email, email) : undefined, 
-        eq(users.username, username),
-        eq(users.phoneNumber, phoneNumber)
-      ));
+      .where(
+        email
+          ? or(eq(users.email, email), eq(users.username, username), eq(users.phoneNumber, phoneNumber))
+          : or(eq(users.username, username), eq(users.phoneNumber, phoneNumber))
+      );
 
     if (email && existing.some((u) => u.email === email)) {
       return NextResponse.json({ error: "ایمیل قبلاً ثبت شده است" }, { status: 409 });
@@ -57,21 +76,22 @@ export async function POST(request: NextRequest) {
 
     // 4. Hash password.
     const hashedPassword = await hashPassword(password);
+    const flexaId = await generateUniqueFlexaId();
 
-    // 5. Create user + player profile atomically.
+    // 5. Create user + player profile + empty wallet atomically.
     const user = await db.transaction(async (tx) => {
-      // Generate a unique Flexa ID
-      const flexaId = `FLX-${Math.floor(1000 + Math.random() * 9000)}`;
-
       const [created] = await tx
         .insert(users)
-        .values({ 
-          phoneNumber, 
-          flexaId, 
-          username, 
-          passwordHash: hashedPassword, 
-          displayName, 
-          email: email || null 
+        .values({
+          phoneNumber,
+          flexaId,
+          username,
+          passwordHash: hashedPassword,
+          displayName,
+          email: email || null,
+          // The number is saved but not verified until SMS/OTP is enabled.
+          phoneVerifiedAt: null,
+          isVerified: false,
         })
         .returning();
 
@@ -82,21 +102,43 @@ export async function POST(request: NextRequest) {
         email: created.email,
       });
 
+      await tx.insert(wallets).values({
+        userId: created.id,
+        balance: "0",
+        currency: "RIAL",
+      });
+
       return created;
     });
 
     // 6. Create session.
     const token = await createSession(user.id, ip, userAgent);
 
-    const response = NextResponse.json({
-      user: {
-        id: user.id,
-        email: user.email,
-        username: user.username,
-        displayName: user.displayName,
-        role: user.role,
+    const response = NextResponse.json(
+      {
+        user: {
+          id: user.id,
+          email: user.email,
+          phoneNumber: user.phoneNumber,
+          phoneVerifiedAt: user.phoneVerifiedAt,
+          username: user.username,
+          displayName: user.displayName,
+          flexaId: user.flexaId,
+          role: user.role,
+          avatarUrl: user.avatarUrl,
+          isVerified: user.isVerified,
+          level: user.level,
+          rankPoints: user.rankPoints,
+          clashRoyaleId: user.clashRoyaleId,
+          clashRoyaleUsername: user.clashRoyaleUsername,
+          codMobileId: user.codMobileId,
+          codMobileUsername: user.codMobileUsername,
+          fortniteId: user.fortniteId,
+          fortniteUsername: user.fortniteUsername,
+        },
       },
-    });
+      { status: 201 }
+    );
 
     response.cookies.set("session", token, {
       httpOnly: true,
@@ -106,7 +148,7 @@ export async function POST(request: NextRequest) {
       path: "/",
     });
 
-    logger.info({ userId: user.id }, "User registered successfully");
+    logger.info({ userId: user.id, authMode: "password_without_sms" }, "User registered successfully");
     return response;
   } catch (err) {
     // Log full detail server-side for debugging, but never leak it to the client.
