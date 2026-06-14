@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Navbar from "@/components/Navbar";
+import BottomNav from "@/components/BottomNav";
 
 const GAMES = [
   { id: "cod_mobile", name: "COD MOBILE", icon: "🎯", color: "#ff8c00", img: "https://images.unsplash.com/photo-1542751371-adc38448a05e?q=80&w=800" },
@@ -19,7 +19,7 @@ export default function LuxuryHomePage() {
         <div className="leaf-anim w-32 h-32 bg-purple-600/10 blur-3xl rounded-full absolute top-20 left-10 animate-pulse"></div>
       </div>
 
-      <div className="relative z-10 max-w-[480px] mx-auto px-6 pb-32">
+      <div className="relative z-10 max-w-[480px] mx-auto px-6 pb-44">
         {/* Header */}
         <header className="pt-12 pb-8 flex justify-between items-center">
             <div>
@@ -77,27 +77,7 @@ export default function LuxuryHomePage() {
         </section>
       </div>
 
-      {/* Bottom Nav */}
-      <nav className="fixed bottom-0 max-w-[480px] w-full p-6 z-50">
-          <div className="glass-panel rounded-[40px] py-8 flex justify-around items-center border-white/10 shadow-[0_-20px_50px_rgba(0,0,0,0.8)]">
-              <div className="flex flex-col items-center gap-1.5 text-purple-400">
-                  <div className="text-2xl drop-shadow-[0_0_10px_#bc00ff]">🔥</div>
-                  <span className="text-[8px] font-black uppercase">آرنا</span>
-              </div>
-              <div className="flex flex-col items-center gap-1.5 opacity-30 cursor-pointer">
-                  <div className="text-2xl">👑</div>
-                  <span className="text-[9px] font-black uppercase">رتبه‌ها</span>
-              </div>
-              <div className="flex flex-col items-center gap-1.5 opacity-30 cursor-pointer">
-                  <div className="text-2xl">💬</div>
-                  <span className="text-[9px] font-black uppercase">چت</span>
-              </div>
-              <div className="flex flex-col items-center gap-1.5 opacity-30 cursor-pointer">
-                  <div className="text-2xl">🚀</div>
-                  <span className="text-[9px] font-black uppercase">پروفایل</span>
-              </div>
-          </div>
-      </nav>
+      <BottomNav />
 
       <style jsx global>{`
         @font-face {
