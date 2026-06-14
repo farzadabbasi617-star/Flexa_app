@@ -151,10 +151,13 @@ export async function POST(request: NextRequest) {
     logger.info({ userId: user.id, authMode: "password_without_sms" }, "User registered successfully");
     return response;
   } catch (err) {
-    // Log full detail server-side for debugging, but never leak it to the client.
+    // Log full detail server-side for debugging, but never leak secrets to the client.
     logger.error({ err }, "Registration error");
     return NextResponse.json(
-      { error: "ثبت‌نام با خطا مواجه شد. لطفاً بعداً دوباره امتحان کنید." },
+      {
+        error:
+          "ثبت‌نام با خطا مواجه شد. اگر /api/health وضعیت دیتابیس را false نشان می‌دهد، DATABASE_URL در Render درست تنظیم نشده است.",
+      },
       { status: 500 }
     );
   }

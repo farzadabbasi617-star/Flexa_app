@@ -1,5 +1,6 @@
 import "dotenv/config";
 import { defineConfig } from "drizzle-kit";
+import { isLikelyPostgresUrl, normalizeDatabaseUrl } from "./src/lib/database-url";
 
 /**
  * Drizzle Kit configuration.
@@ -8,11 +9,11 @@ import { defineConfig } from "drizzle-kit";
  * environment variable (see .env.example). Never hard-code credentials in
  * this file — it is committed to git.
  */
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
 
-if (!databaseUrl) {
+if (!databaseUrl || !isLikelyPostgresUrl(databaseUrl)) {
   throw new Error(
-    "DATABASE_URL is not set. Copy .env.example to .env and fill in your database connection string."
+    "DATABASE_URL is not set or is not a valid PostgreSQL URL. It must start with postgresql://"
   );
 }
 

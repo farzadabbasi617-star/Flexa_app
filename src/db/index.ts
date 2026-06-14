@@ -1,12 +1,13 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
+import { isLikelyPostgresUrl, normalizeDatabaseUrl } from "@/lib/database-url";
 
-const databaseUrl = process.env.DATABASE_URL;
+const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
 
 if (!databaseUrl) {
-  console.error(
-    "CRITICAL ERROR: DATABASE_URL is missing in environment variables!"
-  );
+  console.error("CRITICAL ERROR: DATABASE_URL is missing in environment variables!");
+} else if (!isLikelyPostgresUrl(databaseUrl)) {
+  console.error("CRITICAL ERROR: DATABASE_URL must start with postgresql://");
 }
 
 /**
