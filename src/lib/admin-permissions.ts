@@ -15,9 +15,13 @@ export const ADMIN_PERMISSIONS = [
   "messages",
   "media",
   "wallets",
+  "finance",
+  "notifications",
+  "support",
   "audit",
   "ai",
   "settings",
+  "uploads",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -31,10 +35,14 @@ export const PERMISSION_LABELS: Record<AdminPermission, string> = {
   disputes: "اعتراضات",
   messages: "پیام‌ها",
   media: "تصاویر و ظاهر",
-  wallets: "کیف پول و مالی",
+  wallets: "کیف پول کاربران",
+  finance: "گزارش مالی",
+  notifications: "اعلان‌ها",
+  support: "پشتیبانی و تیکت‌ها",
   audit: "لاگ فعالیت مدیران",
   ai: "هوش مصنوعی",
   settings: "تنظیمات سایت",
+  uploads: "آپلود فایل",
 };
 
 export function isKnownPermission(value: string): value is AdminPermission {

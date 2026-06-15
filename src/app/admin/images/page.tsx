@@ -88,20 +88,29 @@ export default function AdminImagesPage() {
     setShowForm(true);
   }
 
-  function handleFileUpload(file: File | null) {
+  async function handleFileUpload(file: File | null) {
     setUploadError("");
     if (!file) return;
     if (!file.type.startsWith("image/")) {
       setUploadError("فقط فایل تصویر مجاز است.");
       return;
     }
-    if (file.size > 1.2 * 1024 * 1024) {
-      setUploadError("حجم تصویر برای ذخیره مستقیم باید کمتر از ۱.۲ مگابایت باشد. برای تصاویر بزرگ از لینک هاست تصویر استفاده کن.");
-      return;
+
+    try {
+      const uploadForm = new FormData();
+      uploadForm.append("file", file);
+      uploadForm.append("folder", "flexa-admin");
+      const res = await fetch("/api/admin/upload", {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: uploadForm,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "آپلود انجام نشد");
+      setForm((prev) => ({ ...prev, url: data.url }));
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "آپلود انجام نشد");
     }
-    const reader = new FileReader();
-    reader.onload = () => setForm((prev) => ({ ...prev, url: String(reader.result || "") }));
-    reader.readAsDataURL(file);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -235,7 +244,7 @@ export default function AdminImagesPage() {
                     onChange={(e) => handleFileUpload(e.target.files?.[0] || null)}
                     className="text-xs text-gray-400 file:me-3 file:px-4 file:py-2 file:rounded-xl file:border-0 file:bg-purple-600 file:text-white file:font-bold"
                   />
-                  <span className="text-[11px] text-gray-500">آپلود مستقیم برای آیکون/تصویرهای سبک؛ تصاویر بزرگ بهتر است URL باشند.</span>
+                  <span className="text-[11px] text-gray-500">اگر Cloudinary تنظیم باشد تصویر واقعی آپلود می‌شود؛ در غیر این صورت تصاویر سبک مستقیم در دیتابیس ذخیره می‌شوند.</span>
                 </div>
                 {uploadError && <p className="text-red-400 text-xs mt-2">{uploadError}</p>}
               </div>

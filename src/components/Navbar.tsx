@@ -138,7 +138,16 @@ export default function Navbar() {
                               <span>🚨</span> اعتراضات
                             </Link>
                             <Link href="/admin/wallets" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
-                              <span>💳</span> کیف پول و مالی
+                              <span>💳</span> کیف پول کاربران
+                            </Link>
+                            <Link href="/admin/finance" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                              <span>📈</span> گزارش مالی
+                            </Link>
+                            <Link href="/admin/notifications" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                              <span>🔔</span> اعلان‌ها
+                            </Link>
+                            <Link href="/admin/support" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                              <span>🎧</span> پشتیبانی
                             </Link>
                             <Link href="/admin/audit" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                               <span>🧾</span> لاگ مدیران

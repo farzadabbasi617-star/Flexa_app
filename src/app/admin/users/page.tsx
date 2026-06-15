@@ -16,9 +16,13 @@ const PERMISSIONS = [
   { key: "messages", label: "پیام‌ها" },
   { key: "media", label: "رسانه/ظاهر" },
   { key: "wallets", label: "کیف پول" },
+  { key: "finance", label: "گزارش مالی" },
+  { key: "notifications", label: "اعلان‌ها" },
+  { key: "support", label: "پشتیبانی" },
   { key: "audit", label: "لاگ‌ها" },
   { key: "ai", label: "هوش مصنوعی" },
   { key: "settings", label: "تنظیمات" },
+  { key: "uploads", label: "آپلود فایل" },
 ];
 
 interface UserRow {

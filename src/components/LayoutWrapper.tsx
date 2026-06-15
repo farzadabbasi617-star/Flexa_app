@@ -15,6 +15,11 @@ const PWAInstall = dynamic(() => import("./PWAInstall"), {
   loading: () => null 
 });
 
+const ThemeRuntime = dynamic(() => import("./ThemeRuntime"), {
+  ssr: false,
+  loading: () => null,
+});
+
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const { dir, lang } = useLanguage();
 
@@ -25,6 +30,7 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
 
   return (
     <div dir={dir}>
+      <ThemeRuntime />
       {children}
       <AIAssistant />
       <PWAInstall />

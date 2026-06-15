@@ -228,7 +228,10 @@ export default function AdminPage() {
               { href: "/admin/matches", icon: "⚔️", title: "مدیریت مسابقات", desc: "ثبت نتیجه، برنده، وضعیت، زمان‌بندی و حذف مسابقه" },
               { href: "/admin/judgments", icon: "⚖️", title: "مدیریت داوری‌ها", desc: "ثبت و بررسی داوری دستی و هوش مصنوعی" },
               { href: "/admin/disputes", icon: "🚨", title: "مرکز اعتراضات", desc: "پاسخ رسمی، حل‌وفصل، رد یا حذف اعتراضات" },
-              { href: "/admin/wallets", icon: "💳", title: "کیف پول و مالی", desc: "مشاهده موجودی کاربران و اصلاح دستی با لاگ مدیریتی" },
+              { href: "/admin/wallets", icon: "💳", title: "کیف پول کاربران", desc: "مشاهده موجودی کاربران و اصلاح دستی با لاگ مدیریتی" },
+              { href: "/admin/finance", icon: "📈", title: "گزارش مالی", desc: "گزارش تراکنش‌ها، موجودی‌ها، ورودی‌ها، خروجی‌ها و CSV" },
+              { href: "/admin/notifications", icon: "🔔", title: "اعلان سیستمی", desc: "ارسال اعلان به همه کاربران یا کاربر مشخص" },
+              { href: "/admin/support", icon: "🎧", title: "پشتیبانی و تیکت", desc: "مشاهده تیکت‌ها، پاسخ رسمی و تغییر وضعیت" },
               { href: "/admin/audit", icon: "🧾", title: "لاگ فعالیت مدیران", desc: "ردیابی تغییرات حساس، حذف‌ها، ویرایش‌ها و عملیات مالی" },
               { href: "/admin/tournaments", icon: "🧩", title: "کنترل کامل تورنومنت", desc: "ویرایش کامل رویدادها، جوایز، قوانین، وضعیت و بنر" },
             ].map((item) => (
