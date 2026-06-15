@@ -2,8 +2,10 @@
 
 import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Player {
   id: string;
@@ -40,6 +42,11 @@ interface Tournament {
   description: string | null;
   maxPlayers: number;
   prizePool: string | null;
+  bannerUrl?: string | null;
+  startDate?: string | null;
+  entryFee?: string | null;
+  gameMode?: string | null;
+  mapName?: string | null;
   rules: string | null;
   registrations: Registration[];
   matches: Match[];
@@ -68,13 +75,17 @@ const MATCH_STATUS_STYLES = {
 
 export default function TournamentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
+  const router = useRouter();
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [tournament, setTournament] = useState<Tournament | null>(null);
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState<"overview" | "bracket" | "players" | "rules">("overview");
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [registering, setRegistering] = useState(false);
+  const [adminError, setAdminError] = useState("");
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
   const fetchTournament = useCallback(async () => {
     setLoading(true);
@@ -109,7 +120,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     try {
       await fetch("/api/registrations", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ tournamentId: id, playerId: selectedPlayer }),
       });
       await fetchTournament();
@@ -120,9 +131,27 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     setRegistering(false);
   }
 
+  async function deleteTournament() {
+    if (!confirm("تورنومنت و مسابقات/داوری‌های وابسته حذف می‌شوند. ادامه می‌دهی؟")) return;
+    setAdminError("");
+    try {
+      const res = await fetch("/api/admin/tournaments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "حذف تورنومنت انجام نشد");
+      router.push("/tournaments");
+      router.refresh();
+    } catch (err) {
+      setAdminError(err instanceof Error ? err.message : "حذف تورنومنت انجام نشد");
+    }
+  }
+
   async function generateBrackets() {
     try {
-      await fetch(`/api/tournaments/${id}/generate-brackets`, { method: "POST" });
+      await fetch(`/api/tournaments/${id}/generate-brackets`, { method: "POST", headers: { "X-Requested-With": "XMLHttpRequest" } });
       await fetchTournament();
       setTab("bracket");
     } catch {
@@ -139,7 +168,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     try {
       await fetch(`/api/matches/${matchId}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({
           player1Score: p1Score,
           player2Score: p2Score,
@@ -215,8 +244,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* Tournament Header */}
-        <div className="gaming-card p-6 sm:p-8 mb-8">
-          <div className="flex flex-col sm:flex-row items-start gap-6">
+        <div className="gaming-card p-6 sm:p-8 mb-8 overflow-hidden relative">
+          {tournament.bannerUrl && <img src={tournament.bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />}
+          <div className="relative flex flex-col sm:flex-row items-start gap-6">
             <div className="text-6xl">{gameData.icon}</div>
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-3 mb-2">
@@ -249,6 +279,16 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             </div>
 
             <div className="flex flex-col gap-2">
+              {isAdmin && (
+                <>
+                  <Link href="/admin/tournaments" className="gaming-btn text-sm bg-gradient-to-r from-cyan-600 to-blue-600">
+                    ✏️ ویرایش در پنل مدیریت
+                  </Link>
+                  <button onClick={deleteTournament} className="gaming-btn gaming-btn-danger text-sm">
+                    🗑️ حذف تورنومنت
+                  </button>
+                </>
+              )}
               {tournament.status === "registration" && tournament.registrations.length >= 2 && (
                 <button onClick={generateBrackets} className="gaming-btn text-sm">
                   ⚔️ {t.tournamentDetail.generateBrackets}
@@ -257,6 +297,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             </div>
           </div>
         </div>
+
+        {adminError && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-6 text-sm">{adminError}</div>}
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 overflow-x-auto">

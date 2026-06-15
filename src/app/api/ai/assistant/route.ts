@@ -51,7 +51,12 @@ export async function POST(request: NextRequest) {
       userName,
     });
 
-    aiCache.set(`assistant_${queryHash}`, result, 1800);
+    // Only cache real provider responses. If the app temporarily lacks API keys
+    // or a provider is down, caching the local fallback would make the assistant
+    // look "stuck on local" even after the environment is fixed.
+    if (result.provider !== "local") {
+      aiCache.set(`assistant_${queryHash}`, result, 1800);
+    }
 
     return NextResponse.json({ ...result, cached: false });
   } catch (err) {

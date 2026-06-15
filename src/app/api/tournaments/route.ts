@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
     const {
       name, game, format, description, maxPlayers, prizePool, rules, startDate,
       entryFee, gameMode, mapName, serverSlots, winnersCount, categoryLabel,
-      prize1st, prize2nd, prize3rd, prize4to10
+      prize1st, prize2nd, prize3rd, prize4to10, bannerUrl
     } = body;
 
     if (!name || !game) {
@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
         prize2nd: prize2nd || null,
         prize3rd: prize3rd || null,
         prize4to10: prize4to10 || null,
+        bannerUrl: bannerUrl || null,
         rules: rules || null,
         startDate: startDate ? new Date(startDate) : null,
       })

@@ -7,6 +7,7 @@ export interface AIProviderResult {
   content: string;
   provider: AIProvider | "cache";
   cachedProvider?: AIProvider;
+  model?: string;
 }
 
 const PROVIDERS: Array<{
@@ -14,21 +15,25 @@ const PROVIDERS: Array<{
   url: string;
   apiKeyEnv: "OPENROUTER_API_KEY" | "GROQ_API_KEY";
   modelEnv: "OPENROUTER_MODEL" | "GROQ_MODEL";
-  defaultModel: string;
+  defaultModels: string[];
 }> = [
   {
     id: "openrouter",
     url: "https://openrouter.ai/api/v1/chat/completions",
     apiKeyEnv: "OPENROUTER_API_KEY",
     modelEnv: "OPENROUTER_MODEL",
-    defaultModel: "google/gemini-2.0-flash-exp:free",
+    defaultModels: [
+      "google/gemini-2.0-flash-001",
+      "google/gemini-flash-1.5",
+      "meta-llama/llama-3.3-70b-instruct:free",
+    ],
   },
   {
     id: "groq",
     url: "https://api.groq.com/openai/v1/chat/completions",
     apiKeyEnv: "GROQ_API_KEY",
     modelEnv: "GROQ_MODEL",
-    defaultModel: "llama-3.3-70b-versatile",
+    defaultModels: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
   },
 ];
 
@@ -38,15 +43,20 @@ function timeoutSignal(ms: number) {
   return { signal: controller.signal, cancel: () => clearTimeout(timeout) };
 }
 
-async function callProvider(
+function modelsFor(provider: (typeof PROVIDERS)[number]) {
+  const envModel = process.env[provider.modelEnv];
+  return [...new Set([...(envModel ? [envModel] : []), ...provider.defaultModels])];
+}
+
+async function callProviderModel(
   provider: (typeof PROVIDERS)[number],
+  model: string,
   prompt: string,
   systemPrompt: string
 ): Promise<AIProviderResult | null> {
   const apiKey = process.env[provider.apiKeyEnv];
   if (!apiKey) return null;
 
-  const model = process.env[provider.modelEnv] || provider.defaultModel;
   const { signal, cancel } = timeoutSignal(18_000);
 
   try {
@@ -58,7 +68,7 @@ async function callProvider(
         "Content-Type": "application/json",
         ...(provider.id === "openrouter"
           ? {
-              "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://flexa-app.com",
+              "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://flexa-app-1.onrender.com",
               "X-Title": "Flexa App",
             }
           : {}),
@@ -77,7 +87,7 @@ async function callProvider(
     if (!response.ok) {
       const errorText = await response.text().catch(() => "");
       logger.warn(
-        { provider: provider.id, status: response.status, body: errorText.slice(0, 500) },
+        { provider: provider.id, model, status: response.status, body: errorText.slice(0, 500) },
         "AI provider returned an error"
       );
       return null;
@@ -87,17 +97,30 @@ async function callProvider(
     const content = data?.choices?.[0]?.message?.content;
 
     if (typeof content === "string" && content.trim()) {
-      return { content: content.trim(), provider: provider.id };
+      return { content: content.trim(), provider: provider.id, model };
     }
 
-    logger.warn({ provider: provider.id }, "AI provider returned an empty response");
+    logger.warn({ provider: provider.id, model }, "AI provider returned an empty response");
     return null;
   } catch (err) {
-    logger.warn({ provider: provider.id, err }, "AI provider connection failed");
+    logger.warn({ provider: provider.id, model, err }, "AI provider connection failed");
     return null;
   } finally {
     cancel();
   }
+}
+
+async function callProvider(
+  provider: (typeof PROVIDERS)[number],
+  prompt: string,
+  systemPrompt: string
+): Promise<AIProviderResult | null> {
+  if (!process.env[provider.apiKeyEnv]) return null;
+  for (const model of modelsFor(provider)) {
+    const result = await callProviderModel(provider, model, prompt, systemPrompt);
+    if (result) return result;
+  }
+  return null;
 }
 
 /**
@@ -105,15 +128,15 @@ async function callProvider(
  */
 export async function fetchAIResponse(prompt: string, systemPrompt: string): Promise<AIProviderResult | null> {
   const cacheKey = `ai_${Buffer.from(`${systemPrompt}\n${prompt}`).toString("base64url")}`;
-  const cached = aiCache.get(cacheKey) as { content: string; provider: AIProvider } | null;
+  const cached = aiCache.get(cacheKey) as { content: string; provider: AIProvider; model?: string } | null;
   if (cached?.content) {
-    return { content: cached.content, provider: "cache", cachedProvider: cached.provider };
+    return { content: cached.content, provider: "cache", cachedProvider: cached.provider, model: cached.model };
   }
 
   for (const provider of PROVIDERS) {
     const result = await callProvider(provider, prompt, systemPrompt);
     if (result) {
-      aiCache.set(cacheKey, { content: result.content, provider: result.provider }, 3600);
+      aiCache.set(cacheKey, { content: result.content, provider: result.provider, model: result.model }, 3600);
       return result;
     }
   }

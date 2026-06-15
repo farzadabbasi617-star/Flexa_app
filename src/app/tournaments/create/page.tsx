@@ -16,6 +16,15 @@ interface FormatOption {
   hint: string;
 }
 
+interface SiteImage {
+  id: string;
+  slug: string;
+  title: string;
+  url: string;
+  category: string;
+  altText?: string | null;
+}
+
 interface GameConfig {
   id: GameId;
   icon: string;
@@ -108,6 +117,7 @@ interface FormState {
   mapName: string;
   serverSlots: number;
   rules: string;
+  bannerUrl: string;
   startDate: string;
 }
 
@@ -129,6 +139,7 @@ const initialForm: FormState = {
   mapName: initialGame.defaultMap,
   serverSlots: initialGame.defaultServerSlots,
   rules: "",
+  bannerUrl: "",
   startDate: "",
 };
 
@@ -139,6 +150,7 @@ export default function CreateTournamentPage() {
   const [error, setError] = useState("");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState<FormState>(initialForm);
+  const [imageOptions, setImageOptions] = useState<SiteImage[]>([]);
 
   const selectedGame = GAME_CONFIG[form.game];
   const selectedFormat = useMemo(
@@ -150,6 +162,18 @@ export default function CreateTournamentPage() {
   useEffect(() => {
     refreshUser().catch(() => undefined);
   }, [refreshUser]);
+
+  useEffect(() => {
+    Promise.all([
+      fetch("/api/public/images?category=tournament", { cache: "no-store" }).then((res) => res.json()).catch(() => []),
+      fetch(`/api/public/images?category=${form.game}`, { cache: "no-store" }).then((res) => res.json()).catch(() => []),
+    ]).then(([tournamentImages, gameImages]) => {
+      const all = [...(Array.isArray(tournamentImages) ? tournamentImages : []), ...(Array.isArray(gameImages) ? gameImages : [])];
+      const unique = new Map<string, SiteImage>();
+      for (const image of all) unique.set(image.id || image.url, image);
+      setImageOptions(Array.from(unique.values()));
+    });
+  }, [form.game]);
 
   function chooseGame(gameId: GameId) {
     const config = GAME_CONFIG[gameId];
@@ -332,6 +356,37 @@ export default function CreateTournamentPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="gaming-card p-5 border-neon-blue/20">
+            <h3 className="font-black text-neon-blue mb-4">🖼️ تصویر تورنومنت</h3>
+            <input
+              type="text"
+              className="gaming-input mb-4"
+              placeholder="لینک تصویر بنر تورنومنت یا انتخاب از تصاویر زیر"
+              value={form.bannerUrl}
+              onChange={(e) => setForm({ ...form, bannerUrl: e.target.value })}
+            />
+            {imageOptions.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {imageOptions.slice(0, 9).map((image) => (
+                  <button
+                    key={image.id || image.url}
+                    type="button"
+                    onClick={() => setForm({ ...form, bannerUrl: image.url })}
+                    className={`relative h-24 rounded-2xl overflow-hidden border transition-all ${
+                      form.bannerUrl === image.url ? "border-neon-purple ring-2 ring-purple-500/30" : "border-gaming-border"
+                    }`}
+                  >
+                    <img src={image.url} alt={image.altText || image.title} className="w-full h-full object-cover" />
+                    <span className="absolute inset-x-0 bottom-0 bg-black/55 text-[10px] p-1 truncate">{image.title}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-gray-500 leading-6">هنوز تصویری در پنل رسانه ثبت نشده. از /admin/images می‌توانی تصویرهای دسته tournament یا کارت همان بازی اضافه کنی.</p>
+            )}
+            {form.bannerUrl && <img src={form.bannerUrl} alt="پیش‌نمایش" className="mt-4 h-36 w-full object-cover rounded-2xl border border-white/10" />}
           </div>
 
           <div className="gaming-card p-5 border-neon-purple/20">
