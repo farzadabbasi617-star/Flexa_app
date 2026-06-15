@@ -1,0 +1,278 @@
+"use client";
+
+import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import Navbar from "@/components/Navbar";
+import { useAuth } from "@/contexts/AuthContext";
+
+type GameId = "clash_royale" | "cod_mobile" | "fortnite";
+type FormatId = "single_elimination" | "double_elimination" | "round_robin";
+
+type TournamentRow = {
+  id: string;
+  name: string;
+  game: GameId;
+  format: FormatId;
+  status: string;
+  description: string | null;
+  maxPlayers: number;
+  prizePool: string | null;
+  winnersCount: number | null;
+  categoryLabel: string | null;
+  entryFee: string | null;
+  gameMode: string | null;
+  mapName: string | null;
+  serverSlots: number | null;
+  prize1st: string | null;
+  prize2nd: string | null;
+  prize3rd: string | null;
+  prize4to10: string | null;
+  rules: string | null;
+  bannerUrl: string | null;
+  startDate: string | null;
+  registrations: number;
+};
+
+const games = [
+  { id: "clash_royale", name: "کلش رویال", icon: "⚔️" },
+  { id: "cod_mobile", name: "کالاف موبایل", icon: "🎯" },
+  { id: "fortnite", name: "فورتنایت", icon: "🏗️" },
+] as const;
+
+const formats = [
+  { id: "single_elimination", name: "حذفی" },
+  { id: "double_elimination", name: "حذفی دوگانه" },
+  { id: "round_robin", name: "لیگ / گروهی" },
+] as const;
+
+const statuses = [
+  { id: "registration", name: "ثبت‌نام" },
+  { id: "in_progress", name: "در جریان" },
+  { id: "completed", name: "تکمیل‌شده" },
+  { id: "cancelled", name: "لغوشده" },
+] as const;
+
+const emptyForm = {
+  id: "",
+  name: "",
+  game: "clash_royale" as GameId,
+  format: "single_elimination" as FormatId,
+  status: "registration",
+  description: "",
+  maxPlayers: 16,
+  prizePool: "",
+  winnersCount: 1,
+  categoryLabel: "",
+  entryFee: "رایگان",
+  gameMode: "1v1 Best of 3",
+  mapName: "Arena",
+  serverSlots: 16,
+  prize1st: "",
+  prize2nd: "",
+  prize3rd: "",
+  prize4to10: "",
+  rules: "",
+  bannerUrl: "",
+  startDate: "",
+};
+
+function toDateTimeLocal(value: string | null) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
+export default function AdminTournamentsPage() {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+  const [rows, setRows] = useState<TournamentRow[]>([]);
+  const [busy, setBusy] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [query, setQuery] = useState("");
+  const [error, setError] = useState("");
+  const [form, setForm] = useState(emptyForm);
+  const [showForm, setShowForm] = useState(false);
+
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+
+  const load = useCallback(async () => {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/tournaments", { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "بارگذاری نشد");
+      setRows(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "بارگذاری نشد");
+    } finally {
+      setBusy(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!loading && (!user || !isAdmin)) router.push("/");
+  }, [loading, user, isAdmin, router]);
+
+  useEffect(() => {
+    if (isAdmin) load();
+  }, [isAdmin, load]);
+
+  const filtered = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((row) => JSON.stringify(row).toLowerCase().includes(q));
+  }, [query, rows]);
+
+  function edit(row: TournamentRow) {
+    setForm({
+      id: row.id,
+      name: row.name,
+      game: row.game,
+      format: row.format,
+      status: row.status,
+      description: row.description || "",
+      maxPlayers: row.maxPlayers,
+      prizePool: row.prizePool || "",
+      winnersCount: row.winnersCount || 1,
+      categoryLabel: row.categoryLabel || "",
+      entryFee: row.entryFee || "رایگان",
+      gameMode: row.gameMode || "",
+      mapName: row.mapName || "",
+      serverSlots: row.serverSlots || row.maxPlayers || 16,
+      prize1st: row.prize1st || "",
+      prize2nd: row.prize2nd || "",
+      prize3rd: row.prize3rd || "",
+      prize4to10: row.prize4to10 || "",
+      rules: row.rules || "",
+      bannerUrl: row.bannerUrl || "",
+      startDate: toDateTimeLocal(row.startDate),
+    });
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function startNew() {
+    setForm(emptyForm);
+    setShowForm(true);
+  }
+
+  async function save(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/tournaments", {
+        method: form.id ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ ...form, startDate: form.startDate || null }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "ذخیره نشد");
+      setShowForm(false);
+      setForm(emptyForm);
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ذخیره نشد");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function remove(id: string) {
+    if (!confirm("تورنومنت و مسابقات/داوری‌های وابسته حذف می‌شوند. ادامه می‌دهی؟")) return;
+    try {
+      const res = await fetch("/api/admin/tournaments", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ id }),
+      });
+      if (!res.ok) throw new Error("delete failed");
+      load();
+    } catch {
+      alert("حذف انجام نشد");
+    }
+  }
+
+  if (loading || !user || !isAdmin) return null;
+
+  return (
+    <div className="min-h-screen bg-dark-900 text-white">
+      <Navbar />
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+          <div>
+            <button onClick={() => router.push("/admin")} className="text-gray-500 hover:text-white mb-3">← بازگشت</button>
+            <h1 className="text-3xl font-black neon-text-purple">🏆 مدیریت کامل تورنومنت‌ها</h1>
+            <p className="text-gray-500 text-sm mt-2">ایجاد، ویرایش، حذف، وضعیت، جوایز، قوانین و تصویر بنر تورنومنت</p>
+          </div>
+          <button onClick={startNew} className="gaming-btn">+ تورنومنت جدید</button>
+        </div>
+
+        {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-5 text-sm">{error}</div>}
+
+        {showForm && (
+          <form onSubmit={save} className="gaming-card p-5 mb-8 grid grid-cols-1 md:grid-cols-2 gap-4 animate-slide-up">
+            <input className="gaming-input" placeholder="نام تورنومنت" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input className="gaming-input" placeholder="لینک تصویر بنر" value={form.bannerUrl} onChange={(e) => setForm({ ...form, bannerUrl: e.target.value })} />
+            <select className="gaming-select" value={form.game} onChange={(e) => setForm({ ...form, game: e.target.value as GameId })}>{games.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}</select>
+            <select className="gaming-select" value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value as FormatId })}>{formats.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
+            <select className="gaming-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+            <input className="gaming-input" placeholder="زمان شروع" type="datetime-local" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+            <input className="gaming-input" placeholder="مود بازی" value={form.gameMode} onChange={(e) => setForm({ ...form, gameMode: e.target.value })} />
+            <input className="gaming-input" placeholder="مپ" value={form.mapName} onChange={(e) => setForm({ ...form, mapName: e.target.value })} />
+            <input className="gaming-input" type="number" placeholder="حداکثر بازیکن" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: Number(e.target.value) })} />
+            <input className="gaming-input" type="number" placeholder="ظرفیت سرور" value={form.serverSlots} onChange={(e) => setForm({ ...form, serverSlots: Number(e.target.value) })} />
+            <input className="gaming-input" placeholder="ورودی" value={form.entryFee} onChange={(e) => setForm({ ...form, entryFee: e.target.value })} />
+            <input className="gaming-input" placeholder="کل جایزه" value={form.prizePool} onChange={(e) => setForm({ ...form, prizePool: e.target.value })} />
+            <input className="gaming-input" placeholder="نفر اول" value={form.prize1st} onChange={(e) => setForm({ ...form, prize1st: e.target.value })} />
+            <input className="gaming-input" placeholder="نفر دوم" value={form.prize2nd} onChange={(e) => setForm({ ...form, prize2nd: e.target.value })} />
+            <input className="gaming-input" placeholder="نفر سوم" value={form.prize3rd} onChange={(e) => setForm({ ...form, prize3rd: e.target.value })} />
+            <input className="gaming-input" placeholder="نفرات ۴ تا ۱۰" value={form.prize4to10} onChange={(e) => setForm({ ...form, prize4to10: e.target.value })} />
+            <textarea className="gaming-input min-h-24 md:col-span-2" placeholder="توضیحات" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+            <textarea className="gaming-input min-h-28 md:col-span-2" placeholder="قوانین" value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })} />
+            <div className="md:col-span-2 flex gap-3">
+              <button disabled={saving} className="gaming-btn disabled:opacity-50">{saving ? "ذخیره..." : "ذخیره"}</button>
+              <button type="button" onClick={() => setShowForm(false)} className="px-5 py-3 rounded-xl bg-dark-700 text-gray-300">انصراف</button>
+            </div>
+          </form>
+        )}
+
+        <div className="mb-5 flex gap-3">
+          <input className="gaming-input max-w-md" placeholder="جستجو..." value={query} onChange={(e) => setQuery(e.target.value)} />
+          <button onClick={load} className="px-4 py-3 rounded-xl bg-dark-700 text-sm font-bold">🔄</button>
+        </div>
+
+        {busy ? <div className="text-center py-20 text-4xl animate-neon-pulse">🏆</div> : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {filtered.map((row) => (
+              <article key={row.id} className="gaming-card p-5 overflow-hidden relative">
+                {row.bannerUrl && <img src={row.bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-15" />}
+                <div className="relative">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2 className="font-black text-lg text-white">{row.name}</h2>
+                      <p className="text-xs text-gray-500 mt-1">{row.game} • {row.format} • {row.registrations} ثبت‌نام</p>
+                    </div>
+                    <span className="text-xs px-3 py-1 rounded-full bg-purple-500/10 text-purple-300 border border-purple-500/20">{row.status}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-4 text-xs text-gray-400">
+                    <div>ظرفیت: {row.maxPlayers}</div><div>سرور: {row.serverSlots || "—"}</div>
+                    <div>ورودی: {row.entryFee || "—"}</div><div>جایزه: {row.prizePool || "—"}</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2 mt-5">
+                    <Link href={`/tournaments/${row.id}`} className="px-3 py-2 rounded-lg bg-dark-700 text-neon-blue text-xs font-bold">مشاهده</Link>
+                    <button onClick={() => edit(row)} className="px-3 py-2 rounded-lg bg-dark-700 text-neon-green text-xs font-bold">ویرایش</button>
+                    <button onClick={() => remove(row.id)} className="px-3 py-2 rounded-lg bg-red-500/10 text-red-300 text-xs font-bold">حذف</button>
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}

@@ -6,6 +6,7 @@ import { eq, desc, or } from "drizzle-orm";
 import { hashPassword, validateAdmin } from "@/lib/auth";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { TERMS_VERSION } from "@/lib/terms";
+import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 
 export const dynamic = "force-dynamic";
 
@@ -107,6 +108,15 @@ export async function POST(request: NextRequest) {
       return u;
     });
 
+    await logAdminAction({
+      adminId: currentUser.id,
+      action: "create",
+      entityType: "user",
+      entityId: created.id,
+      metadata: { username, role: requestedRole },
+      ipAddress: getClientIp(request.headers),
+    });
+
     return NextResponse.json(publicUserShape(created), { status: 201 });
   } catch {
     return NextResponse.json({ error: "Failed" }, { status: 500 });
@@ -144,6 +154,15 @@ export async function PATCH(request: NextRequest) {
       .set(updateData)
       .where(eq(users.id, id))
       .returning({ id: users.id, role: users.role, isVerified: users.isVerified });
+
+    await logAdminAction({
+      adminId: currentUser.id,
+      action: "update",
+      entityType: "user",
+      entityId: id,
+      metadata: updateData,
+      ipAddress: getClientIp(request.headers),
+    });
 
     return NextResponse.json(updated);
   } catch {
@@ -184,6 +203,15 @@ export async function DELETE(request: NextRequest) {
           chatBanUntil: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000),
         })
         .where(eq(users.id, id));
+    });
+
+    await logAdminAction({
+      adminId: currentUser.id,
+      action: "safe_delete",
+      entityType: "user",
+      entityId: id,
+      metadata: { previousUsername: target.username, previousRole: target.role },
+      ipAddress: getClientIp(request.headers),
     });
 
     return NextResponse.json({ success: true });

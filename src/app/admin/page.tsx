@@ -174,8 +174,9 @@ export default function AdminPage() {
             </div>
             <div className="flex flex-wrap gap-3">
               <Link href="/admin/users" className="gaming-btn text-xs">+ کاربر / نقش‌ها</Link>
-              <Link href="/tournaments/create" className="gaming-btn text-xs">+ تورنومنت</Link>
+              <Link href="/admin/tournaments" className="gaming-btn text-xs">کنترل تورنومنت</Link>
               <Link href="/admin/images" className="gaming-btn text-xs">+ تصویر</Link>
+              <Link href="/admin/wallets" className="gaming-btn text-xs">کیف پول</Link>
             </div>
           </div>
         </section>
@@ -224,6 +225,9 @@ export default function AdminPage() {
               { href: "/admin/images", icon: "🖼️", title: "استودیو رسانه", desc: "تصویر پس‌زمینه، هیرو، کارت بازی‌ها، آیکون‌ها و بنرها" },
               { href: "/admin/customize", icon: "🎨", title: "ظاهر و افکت‌ها", desc: "رنگ، برند، آیکون، فونت، اعلان و عمق بصری" },
               { href: "/admin/ai", icon: "🤖", title: "مرکز هوش مصنوعی", desc: "مدریشن، دستیار، تحلیل و موتور داوری هوشمند" },
+              { href: "/admin/wallets", icon: "💳", title: "کیف پول و مالی", desc: "مشاهده موجودی کاربران و اصلاح دستی با لاگ مدیریتی" },
+              { href: "/admin/audit", icon: "🧾", title: "لاگ فعالیت مدیران", desc: "ردیابی تغییرات حساس، حذف‌ها، ویرایش‌ها و عملیات مالی" },
+              { href: "/admin/tournaments", icon: "🧩", title: "کنترل کامل تورنومنت", desc: "ویرایش کامل رویدادها، جوایز، قوانین، وضعیت و بنر" },
             ].map((item) => (
               <Link key={item.href} href={item.href} className="gaming-card p-6 group hover:border-neon-purple/50 transition-all relative overflow-hidden">
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-neon-purple/10 to-neon-blue/5" />

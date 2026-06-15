@@ -349,6 +349,22 @@ export const aiProposals = pgTable("ai_proposals", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Admin audit logs
+export const adminAuditLogs = pgTable("admin_audit_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  adminId: uuid("admin_id").references(() => users.id),
+  action: varchar("action", { length: 100 }).notNull(),
+  entityType: varchar("entity_type", { length: 100 }).notNull(),
+  entityId: varchar("entity_id", { length: 100 }),
+  metadata: jsonb("metadata"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  adminIdx: index("admin_audit_admin_idx").on(table.adminId),
+  entityIdx: index("admin_audit_entity_idx").on(table.entityType, table.entityId),
+  createdIdx: index("admin_audit_created_idx").on(table.createdAt),
+}));
+
 // Wallets
 export const wallets = pgTable("wallets", {
   id: uuid("id").defaultRandom().primaryKey(),

@@ -41,6 +41,7 @@ export default function AdminImagesPage() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [uploadError, setUploadError] = useState("");
   const [form, setForm] = useState({
     slug: "",
     title: "",
@@ -85,6 +86,22 @@ export default function AdminImagesPage() {
     setEditingId(null);
     setForm({ slug: "", title: "", url: "", altText: "", category: "general", sortOrder: 0 });
     setShowForm(true);
+  }
+
+  function handleFileUpload(file: File | null) {
+    setUploadError("");
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setUploadError("فقط فایل تصویر مجاز است.");
+      return;
+    }
+    if (file.size > 1.2 * 1024 * 1024) {
+      setUploadError("حجم تصویر برای ذخیره مستقیم باید کمتر از ۱.۲ مگابایت باشد. برای تصاویر بزرگ از لینک هاست تصویر استفاده کن.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => setForm((prev) => ({ ...prev, url: String(reader.result || "") }));
+    reader.readAsDataURL(file);
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -204,13 +221,23 @@ export default function AdminImagesPage() {
                   {lang === "fa" ? "لینک تصویر" : "Image URL"} *
                 </label>
                 <input
-                  type="url"
+                  type="text"
                   required
                   className="gaming-input text-sm"
-                  placeholder="https://i.ibb.co/xxxxx/image.jpg"
+                  placeholder="https://i.ibb.co/xxxxx/image.jpg یا انتخاب فایل از پایین"
                   value={form.url}
                   onChange={(e) => setForm({ ...form, url: e.target.value })}
                 />
+                <div className="mt-3 flex flex-col sm:flex-row gap-3 sm:items-center">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleFileUpload(e.target.files?.[0] || null)}
+                    className="text-xs text-gray-400 file:me-3 file:px-4 file:py-2 file:rounded-xl file:border-0 file:bg-purple-600 file:text-white file:font-bold"
+                  />
+                  <span className="text-[11px] text-gray-500">آپلود مستقیم برای آیکون/تصویرهای سبک؛ تصاویر بزرگ بهتر است URL باشند.</span>
+                </div>
+                {uploadError && <p className="text-red-400 text-xs mt-2">{uploadError}</p>}
               </div>
               {form.url && (
                 <div className="sm:col-span-2">
