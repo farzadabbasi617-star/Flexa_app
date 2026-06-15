@@ -131,6 +131,10 @@ export default function ProfilePage() {
             <div className="text-3xl mb-2">📊</div>
             <div className="text-xs font-black">داشبورد</div>
           </Link>
+          <Link href="/support" className="glass-panel p-5 rounded-[28px] border border-white/5 text-center active:scale-95 transition-transform col-span-2">
+            <div className="text-3xl mb-2">🎧</div>
+            <div className="text-xs font-black">پشتیبانی و تیکت‌ها</div>
+          </Link>
           {isAdmin && (
             <Link href="/admin" className="glass-panel p-5 rounded-[28px] border border-fuchsia-500/20 text-center active:scale-95 transition-transform col-span-2">
               <div className="text-3xl mb-2">👑</div>
