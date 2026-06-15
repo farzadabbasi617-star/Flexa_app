@@ -43,7 +43,7 @@ export default function NotificationsPage() {
     try {
       const res = await fetch("/api/notifications");
       const data = await res.json();
-      setNotifications(Array.isArray(data) ? data : []);
+      setNotifications(Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : []);
     } catch {
       setNotifications([]);
     }
@@ -58,7 +58,7 @@ export default function NotificationsPage() {
 
   async function markAllRead() {
     try {
-      await fetch("/api/notifications", { method: "PATCH" });
+      await fetch("/api/notifications", { method: "PATCH", headers: { "X-Requested-With": "XMLHttpRequest" } });
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     } catch {
       // handle error

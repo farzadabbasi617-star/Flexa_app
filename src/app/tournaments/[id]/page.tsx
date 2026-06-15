@@ -629,9 +629,32 @@ function BracketMatch({
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [uploadingEvidence, setUploadingEvidence] = useState(false);
 
   const canSubmit = Boolean((ownedPlayerId || isAdmin) && match.player1Id && match.player2Id && match.status !== "completed");
   const canDispute = Boolean(ownedPlayerId && match.player1Id && match.player2Id && match.status !== "pending");
+
+  async function uploadEvidenceFile(file: File | null) {
+    if (!file) return;
+    setUploadingEvidence(true);
+    setError("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/uploads/evidence", {
+        method: "POST",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "آپلود مدرک انجام نشد");
+      setEvidenceUrl(data.url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "آپلود مدرک انجام نشد");
+    } finally {
+      setUploadingEvidence(false);
+    }
+  }
 
   async function submitResult() {
     setSubmitting(true);
@@ -738,9 +761,20 @@ function BracketMatch({
           </div>
           {!isAdmin && (
             <>
+              <div className="rounded-xl bg-dark-800 border border-white/5 p-3">
+                <label className="block text-[11px] text-gray-400 mb-2">آپلود مدرک نتیجه</label>
+                <input
+                  type="file"
+                  accept="image/*,video/*"
+                  disabled={uploadingEvidence}
+                  onChange={(e) => uploadEvidenceFile(e.target.files?.[0] || null)}
+                  className="text-[11px] text-gray-400 file:me-2 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-purple-600 file:text-white file:font-bold disabled:opacity-50"
+                />
+                {uploadingEvidence && <p className="text-[10px] text-neon-blue mt-2">در حال آپلود...</p>}
+              </div>
               <input
                 className="gaming-input text-xs"
-                placeholder="لینک مدرک نتیجه (اختیاری)"
+                placeholder="یا لینک مستقیم مدرک نتیجه"
                 value={evidenceUrl}
                 onChange={(e) => setEvidenceUrl(e.target.value)}
               />

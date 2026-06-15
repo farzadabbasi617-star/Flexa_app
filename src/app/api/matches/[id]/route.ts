@@ -1,11 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { matches, players } from "@/db/schema";
+import { matches, notifications, players } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+async function notifyMatchParticipants(matchId: string, title: string, message: string, link: string) {
+  const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
+  if (!match) return;
+
+  const playerIds = [match.player1Id, match.player2Id].filter(Boolean) as string[];
+  if (playerIds.length === 0) return;
+
+  const playerRows = await db
+    .select({ ownerId: players.visibleUserId })
+    .from(players)
+    .where(eq(players.id, playerIds[0]));
+
+  if (playerIds.length > 1) {
+    const moreRows = await db
+      .select({ ownerId: players.visibleUserId })
+      .from(players)
+      .where(eq(players.id, playerIds[1]));
+    playerRows.push(...moreRows);
+  }
+
+  const userIds = [...new Set(playerRows.map((p) => p.ownerId).filter(Boolean) as string[])];
+  if (userIds.length === 0) return;
+
+  await db.insert(notifications).values(userIds.map((userId) => ({ userId, type: "match_result", title, message, link })));
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -115,6 +140,20 @@ export async function PATCH(
             .where(eq(players.id, loserId));
         }
       }
+
+      await notifyMatchParticipants(
+        id,
+        "نتیجه مسابقه نهایی شد",
+        `نتیجه مسابقه شما ثبت و نهایی شد.`,
+        `/tournaments/${match.tournamentId}`
+      ).catch(() => undefined);
+    } else if (status === "awaiting_judgment") {
+      await notifyMatchParticipants(
+        id,
+        "مسابقه در انتظار داوری",
+        "نتیجه مسابقه ثبت شد و در انتظار بررسی داور است.",
+        `/tournaments/${updated.tournamentId}`
+      ).catch(() => undefined);
     }
 
     return NextResponse.json(updated);

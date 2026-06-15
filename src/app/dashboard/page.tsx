@@ -47,8 +47,10 @@ export default function DashboardPage() {
         fetch("/api/players"),
         fetch("/api/notifications"),
       ]);
-      const players = await pRes.json();
-      const notifications = await nRes.json();
+      const playersResponse = await pRes.json();
+      const notificationsResponse = await nRes.json();
+      const players = Array.isArray(playersResponse) ? playersResponse : Array.isArray(playersResponse.data) ? playersResponse.data : [];
+      const notifications = Array.isArray(notificationsResponse) ? notificationsResponse : Array.isArray(notificationsResponse.data) ? notificationsResponse.data : [];
 
       let myStats = { rating: 1000, wins: 0, losses: 0 };
       if (Array.isArray(players)) {

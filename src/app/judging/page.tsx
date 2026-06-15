@@ -37,6 +37,17 @@ interface Judgment {
   createdAt: string;
 }
 
+interface Evidence {
+  id: string;
+  uploaderName: string | null;
+  uploaderUsername: string | null;
+  uploaderRole: string | null;
+  fileUrl: string;
+  fileType: string;
+  description: string | null;
+  createdAt: string;
+}
+
 interface Player {
   id: string;
   username: string;
@@ -63,6 +74,7 @@ function JudgingContent() {
   const [selectedMatch, setSelectedMatch] = useState<string>(preSelectedMatch || "");
   const [selectedJudge, setSelectedJudge] = useState("");
   const [judgments, setJudgments] = useState<Judgment[]>([]);
+  const [evidence, setEvidence] = useState<Evidence[]>([]);
   const [verdict, setVerdict] = useState("player1_wins");
   const [reasoning, setReasoning] = useState("");
   const [loading, setLoading] = useState(true);
@@ -77,6 +89,9 @@ function JudgingContent() {
   useEffect(() => {
     if (selectedMatch) {
       fetchJudgments(selectedMatch);
+      fetchEvidence(selectedMatch);
+    } else {
+      setEvidence([]);
     }
   }, [selectedMatch]);
 
@@ -129,6 +144,16 @@ function JudgingContent() {
       setJudgments(Array.isArray(data) ? data : []);
     } catch {
       setJudgments([]);
+    }
+  }
+
+  async function fetchEvidence(matchId: string) {
+    try {
+      const res = await fetch(`/api/matches/${matchId}/evidence`, { cache: "no-store" });
+      const data = await res.json();
+      setEvidence(Array.isArray(data) ? data : []);
+    } catch {
+      setEvidence([]);
     }
   }
 
@@ -333,6 +358,48 @@ function JudgingContent() {
                   />
                 </div>
               </div>
+            </div>
+
+            {/* Evidence */}
+            <div className="gaming-card p-6">
+              <div className="flex items-center justify-between gap-4 mb-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">📸</span>
+                  <h3 className="font-bold text-neon-green">مدارک ثبت‌شده بازیکنان</h3>
+                </div>
+                <span className="text-xs text-gray-500">{evidence.length.toLocaleString("fa-IR")} مدرک</span>
+              </div>
+
+              {evidence.length === 0 ? (
+                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 text-sm text-yellow-200 leading-7">
+                  هنوز مدرکی برای این مسابقه ثبت نشده است. اگر نتیجه توسط بازیکن ارسال شده باشد، لینک یا اسکرین‌شات اینجا نمایش داده می‌شود.
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {evidence.map((item) => {
+                    const isImage = item.fileUrl.startsWith("data:image") || /\.(png|jpg|jpeg|webp|gif)(\?.*)?$/i.test(item.fileUrl);
+                    return (
+                      <div key={item.id} className="bg-dark-700 rounded-2xl border border-white/5 overflow-hidden">
+                        {isImage ? (
+                          <a href={item.fileUrl} target="_blank" rel="noreferrer">
+                            <img src={item.fileUrl} alt={item.description || "مدرک مسابقه"} className="w-full h-40 object-cover" />
+                          </a>
+                        ) : (
+                          <a href={item.fileUrl} target="_blank" rel="noreferrer" className="block p-5 text-neon-blue text-sm font-bold break-all">
+                            🔗 مشاهده لینک مدرک
+                          </a>
+                        )}
+                        <div className="p-4">
+                          <div className="text-xs text-gray-500 mb-2">
+                            {item.uploaderName || item.uploaderUsername || "کاربر"} • {new Date(item.createdAt).toLocaleString("fa-IR")}
+                          </div>
+                          {item.description && <p className="text-sm text-gray-300 leading-6 whitespace-pre-wrap">{item.description}</p>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
 
             {/* Judging Methods */}
