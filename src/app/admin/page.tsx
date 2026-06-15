@@ -230,6 +230,7 @@ export default function AdminPage() {
               { href: "/admin/disputes", icon: "🚨", title: "مرکز اعتراضات", desc: "پاسخ رسمی، حل‌وفصل، رد یا حذف اعتراضات" },
               { href: "/admin/wallets", icon: "💳", title: "کیف پول کاربران", desc: "مشاهده موجودی کاربران و اصلاح دستی با لاگ مدیریتی" },
               { href: "/admin/finance", icon: "📈", title: "گزارش مالی", desc: "گزارش تراکنش‌ها، موجودی‌ها، ورودی‌ها، خروجی‌ها و CSV" },
+              { href: "/admin/prizes", icon: "🏆", title: "پرداخت جایزه", desc: "واریز جایزه تورنومنت به کیف پول برنده‌ها" },
               { href: "/admin/notifications", icon: "🔔", title: "اعلان سیستمی", desc: "ارسال اعلان به همه کاربران یا کاربر مشخص" },
               { href: "/admin/support", icon: "🎧", title: "پشتیبانی و تیکت", desc: "مشاهده تیکت‌ها، پاسخ رسمی و تغییر وضعیت" },
               { href: "/admin/audit", icon: "🧾", title: "لاگ فعالیت مدیران", desc: "ردیابی تغییرات حساس، حذف‌ها، ویرایش‌ها و عملیات مالی" },

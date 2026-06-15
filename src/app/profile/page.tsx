@@ -112,12 +112,12 @@ export default function ProfilePage() {
               <span className="text-xs font-bold text-purple-400 uppercase">Toman</span>
             </div>
             <div className="flex gap-3">
-              <button className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 py-4 rounded-[22px] font-black text-[10px] shadow-xl">
+                    <Link href="/wallet" className="flex-1 bg-gradient-to-r from-purple-600 to-blue-600 py-4 rounded-[22px] font-black text-[10px] shadow-xl text-center">
                 شارژ حساب
-              </button>
-              <button className="flex-1 glass-panel py-4 rounded-[22px] font-black text-[10px] text-gray-400">
-                برداشت وجه
-              </button>
+              </Link>
+              <Link href="/wallet" className="flex-1 glass-panel py-4 rounded-[22px] font-black text-[10px] text-gray-400 text-center">
+                تراکنش‌ها
+              </Link>
             </div>
           </div>
         </div>
