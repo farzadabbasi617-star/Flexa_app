@@ -95,6 +95,8 @@ export const users = pgTable("users", {
   fortniteId: varchar("fortnite_id", { length: 100 }),
   fortniteUsername: varchar("fortnite_username", { length: 100 }),
   fortniteStatus: verificationStatusEnum("fortnite_status").default("unlinked"),
+  termsAcceptedAt: timestamp("terms_accepted_at"),
+  termsVersion: varchar("terms_version", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   lastLoginAt: timestamp("last_login_at"),
 }, (table) => ({

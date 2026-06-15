@@ -33,7 +33,8 @@ interface AuthContextType {
     email: string,
     username: string,
     password: string,
-    displayName: string
+    displayName: string,
+    termsAccepted: boolean
   ) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -101,14 +102,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     username: string,
     password: string,
-    displayName: string
+    displayName: string,
+    termsAccepted: boolean
   ) {
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders },
         credentials: "include",
-        body: JSON.stringify({ phoneNumber, email: email || undefined, username, password, displayName }),
+        body: JSON.stringify({ phoneNumber, email: email || undefined, username, password, displayName, termsAccepted }),
       });
 
       const data = await res.json();

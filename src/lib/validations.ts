@@ -20,6 +20,7 @@ export const RegisterSchema = z.object({
   email: optionalEmail,
   password: z.string().min(6, "رمز عبور باید حداقل ۶ کاراکتر باشد"),
   displayName: z.string().trim().min(2, "نام نمایشی الزامی است").max(100),
+  termsAccepted: z.boolean().refine((value) => value === true, "پذیرش قوانین و مقررات فلکسا الزامی است"),
 });
 
 export const LoginSchema = z.object({

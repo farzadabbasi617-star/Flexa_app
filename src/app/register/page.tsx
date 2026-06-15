@@ -19,6 +19,7 @@ export default function RegisterPage() {
     displayName: "",
     password: "",
     confirmPassword: "",
+    termsAccepted: false,
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -44,6 +45,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!form.termsAccepted) {
+      setError("برای ثبت‌نام، پذیرش قوانین و مقررات فلکسا الزامی است.");
+      return;
+    }
+
     setLoading(true);
 
     const result = await register(
@@ -51,7 +57,8 @@ export default function RegisterPage() {
       form.email.trim(),
       form.username.trim(),
       form.password,
-      form.displayName.trim()
+      form.displayName.trim(),
+      form.termsAccepted
     );
 
     if (result.success) {
@@ -179,9 +186,25 @@ export default function RegisterPage() {
               />
             </div>
 
+            <label className="flex items-start gap-3 bg-dark-800/70 border border-gaming-border rounded-2xl p-4 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="mt-1 h-5 w-5 accent-purple-600"
+                checked={form.termsAccepted}
+                onChange={(e) => setForm({ ...form, termsAccepted: e.target.checked })}
+              />
+              <span className="text-xs text-gray-300 leading-7">
+                با ثبت‌نام تأیید می‌کنم که
+                <Link href="/rules" target="_blank" className="text-neon-blue font-black mx-1 hover:underline">
+                  قوانین، مقررات و شرایط استفاده فلکسا
+                </Link>
+                را کامل مطالعه کرده‌ام و همه بندهای آن، از جمله ماهیت مهارتی مسابقات، هزینه خدمات، شرایط جوایز، داوری، امنیت و پیگیری‌های قانونی را می‌پذیرم.
+              </span>
+            </label>
+
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !form.termsAccepted}
               className="gaming-btn w-full py-3 text-base disabled:opacity-50 mt-6"
             >
               {loading ? t.auth.registering : t.auth.registerButton}

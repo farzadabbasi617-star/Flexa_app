@@ -7,6 +7,7 @@ import { hashPassword, createSession } from "@/lib/auth";
 import { RegisterSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
+import { TERMS_VERSION } from "@/lib/terms";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +93,8 @@ export async function POST(request: NextRequest) {
           // The number is saved but not verified until SMS/OTP is enabled.
           phoneVerifiedAt: null,
           isVerified: false,
+          termsAcceptedAt: new Date(),
+          termsVersion: TERMS_VERSION,
         })
         .returning();
 
