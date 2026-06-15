@@ -187,10 +187,42 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     }
   }
 
+  async function submitPlayerResult(matchId: string, p1Score: number, p2Score: number, evidenceUrl: string, description: string) {
+    const res = await fetch(`/api/matches/${matchId}/submit-result`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+      body: JSON.stringify({ player1Score: p1Score, player2Score: p2Score, evidenceUrl, description }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "ثبت نتیجه انجام نشد");
+    await fetchTournament();
+  }
+
+  async function raiseMatchDispute(matchId: string, raisedById: string, reason: string) {
+    const res = await fetch("/api/disputes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+      body: JSON.stringify({ matchId, raisedById, reason, evidenceUrls: [] }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "ثبت اعتراض انجام نشد");
+    await fetchTournament();
+  }
+
   function getPlayerName(playerId: string | null): string {
     if (!playerId) return t.tournamentDetail.tbd;
     const reg = tournament?.registrations.find((r) => r.player?.id === playerId);
     return reg?.player?.displayName || t.common.unknown;
+  }
+
+  function getOwnedPlayerIdForMatch(match: Match): string | null {
+    if (!user) return null;
+    const candidates = [match.player1Id, match.player2Id].filter(Boolean) as string[];
+    for (const playerId of candidates) {
+      const reg = tournament?.registrations.find((r) => r.player?.id === playerId);
+      if (reg?.player?.visibleUserId === user.id) return playerId;
+    }
+    return null;
   }
 
   if (loading) {
@@ -486,6 +518,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                           match={match}
                           getPlayerName={getPlayerName}
                           onScore={updateMatchScore}
+                          onSubmitResult={submitPlayerResult}
+                          onDispute={raiseMatchDispute}
+                          ownedPlayerId={getOwnedPlayerIdForMatch(match)}
+                          isAdmin={isAdmin}
                           t={t}
                         />
                       ))}
@@ -569,19 +605,74 @@ function BracketMatch({
   match,
   getPlayerName,
   onScore,
+  onSubmitResult,
+  onDispute,
+  ownedPlayerId,
+  isAdmin,
   t,
 }: {
   match: Match;
   getPlayerName: (id: string | null) => string;
   onScore: (matchId: string, p1: number, p2: number) => void;
+  onSubmitResult: (matchId: string, p1: number, p2: number, evidenceUrl: string, description: string) => Promise<void>;
+  onDispute: (matchId: string, raisedById: string, reason: string) => Promise<void>;
+  ownedPlayerId: string | null;
+  isAdmin: boolean;
   t: ReturnType<typeof useLanguage>["t"];
 }) {
   const [editing, setEditing] = useState(false);
+  const [disputing, setDisputing] = useState(false);
   const [p1, setP1] = useState(match.player1Score?.toString() || "0");
   const [p2, setP2] = useState(match.player2Score?.toString() || "0");
+  const [evidenceUrl, setEvidenceUrl] = useState("");
+  const [description, setDescription] = useState("");
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  const canSubmit = Boolean((ownedPlayerId || isAdmin) && match.player1Id && match.player2Id && match.status !== "completed");
+  const canDispute = Boolean(ownedPlayerId && match.player1Id && match.player2Id && match.status !== "pending");
+
+  async function submitResult() {
+    setSubmitting(true);
+    setError("");
+    try {
+      if (isAdmin) {
+        onScore(match.id, parseInt(p1), parseInt(p2));
+      } else {
+        await onSubmitResult(match.id, parseInt(p1), parseInt(p2), evidenceUrl, description);
+      }
+      setEditing(false);
+      setEvidenceUrl("");
+      setDescription("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ثبت نتیجه انجام نشد");
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function submitDispute() {
+    if (!ownedPlayerId || !reason.trim()) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      await onDispute(match.id, ownedPlayerId, reason.trim());
+      setDisputing(false);
+      setReason("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ثبت اعتراض انجام نشد");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
-    <div className="w-60 bg-dark-700 rounded-lg border border-gaming-border overflow-hidden">
+    <div className="w-72 bg-dark-700 rounded-xl border border-gaming-border overflow-hidden shadow-lg">
+      <div className="px-3 py-2 border-b border-gaming-border flex items-center justify-between">
+        <span className="text-[10px] text-gray-500">R{match.round} • M{match.matchNumber}</span>
+        <span className="text-[10px] text-neon-purple">{match.status}</span>
+      </div>
       <div
         className={`flex items-center justify-between px-3 py-2 border-b border-gaming-border ${
           match.winnerId === match.player1Id ? "bg-neon-green/10" : ""
@@ -624,41 +715,82 @@ function BracketMatch({
         </span>
       </div>
 
-      {match.status === "pending" && match.player1Id && match.player2Id && (
-        <div className="border-t border-gaming-border p-2">
-          {editing ? (
-            <div className="flex items-center gap-1">
+      {error && <div className="mx-3 mt-2 bg-red-500/10 border border-red-500/20 rounded-lg p-2 text-[11px] text-red-300 leading-5">{error}</div>}
+
+      {editing && (
+        <div className="border-t border-gaming-border p-3 space-y-3">
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              min="0"
+              className="w-16 bg-dark-800 text-center text-sm rounded px-1 py-2 text-white border border-gaming-border"
+              value={p1}
+              onChange={(e) => setP1(e.target.value)}
+            />
+            <span className="text-gray-500 text-xs">:</span>
+            <input
+              type="number"
+              min="0"
+              className="w-16 bg-dark-800 text-center text-sm rounded px-1 py-2 text-white border border-gaming-border"
+              value={p2}
+              onChange={(e) => setP2(e.target.value)}
+            />
+          </div>
+          {!isAdmin && (
+            <>
               <input
-                type="number"
-                min="0"
-                className="w-12 bg-dark-800 text-center text-sm rounded px-1 py-0.5 text-white border border-gaming-border"
-                value={p1}
-                onChange={(e) => setP1(e.target.value)}
+                className="gaming-input text-xs"
+                placeholder="لینک مدرک نتیجه (اختیاری)"
+                value={evidenceUrl}
+                onChange={(e) => setEvidenceUrl(e.target.value)}
               />
-              <span className="text-gray-500 text-xs">:</span>
-              <input
-                type="number"
-                min="0"
-                className="w-12 bg-dark-800 text-center text-sm rounded px-1 py-0.5 text-white border border-gaming-border"
-                value={p2}
-                onChange={(e) => setP2(e.target.value)}
+              <textarea
+                className="gaming-input text-xs min-h-16"
+                placeholder="توضیح کوتاه برای داور (اختیاری)"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
               />
-              <button
-                onClick={() => {
-                  onScore(match.id, parseInt(p1), parseInt(p2));
-                  setEditing(false);
-                }}
-                className="text-xs bg-neon-green/20 text-neon-green px-2 py-0.5 rounded hover:bg-neon-green/30"
-              >
-                ✓
-              </button>
-            </div>
-          ) : (
+              <p className="text-[10px] text-yellow-300 leading-5">نتیجه بازیکن برای داوری ارسال می‌شود و بعد از تأیید داور نهایی خواهد شد.</p>
+            </>
+          )}
+          <div className="flex gap-2">
             <button
-              onClick={() => setEditing(true)}
-              className="text-xs text-neon-blue hover:underline w-full text-center"
+              onClick={submitResult}
+              disabled={submitting}
+              className="flex-1 text-xs bg-neon-green/20 text-neon-green px-2 py-2 rounded-lg hover:bg-neon-green/30 disabled:opacity-50"
             >
-              {t.tournamentDetail.enterScore}
+              {submitting ? "..." : isAdmin ? "ثبت نهایی" : "ارسال برای داوری"}
+            </button>
+            <button onClick={() => setEditing(false)} className="px-3 text-xs bg-dark-600 text-gray-300 rounded-lg">لغو</button>
+          </div>
+        </div>
+      )}
+
+      {disputing && (
+        <div className="border-t border-gaming-border p-3 space-y-3">
+          <textarea
+            className="gaming-input text-xs min-h-20"
+            placeholder="دلیل اعتراض را دقیق بنویس..."
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+          />
+          <div className="flex gap-2">
+            <button onClick={submitDispute} disabled={submitting || !reason.trim()} className="flex-1 text-xs bg-red-500/20 text-red-300 px-2 py-2 rounded-lg disabled:opacity-50">ثبت اعتراض</button>
+            <button onClick={() => setDisputing(false)} className="px-3 text-xs bg-dark-600 text-gray-300 rounded-lg">لغو</button>
+          </div>
+        </div>
+      )}
+
+      {!editing && !disputing && (canSubmit || canDispute) && (
+        <div className="border-t border-gaming-border p-2 flex gap-2">
+          {canSubmit && (
+            <button onClick={() => setEditing(true)} className="flex-1 text-xs text-neon-blue hover:underline text-center py-1.5">
+              {isAdmin ? t.tournamentDetail.enterScore : "ثبت نتیجه"}
+            </button>
+          )}
+          {canDispute && (
+            <button onClick={() => setDisputing(true)} className="flex-1 text-xs text-red-300 hover:underline text-center py-1.5">
+              اعتراض
             </button>
           )}
         </div>

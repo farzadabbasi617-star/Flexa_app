@@ -93,11 +93,17 @@ function JudgingContent() {
       const playersData = await pRes.json();
 
       setJudges(Array.isArray(judgesData) ? judgesData : []);
-      setPlayers(Array.isArray(playersData) ? playersData : []);
+      setPlayers(Array.isArray(playersData) ? playersData : Array.isArray(playersData.data) ? playersData.data : []);
+
+      const tournaments = Array.isArray(tournamentsData)
+        ? tournamentsData
+        : Array.isArray(tournamentsData.data)
+        ? tournamentsData.data
+        : [];
 
       const allMatches: Match[] = [];
-      if (Array.isArray(tournamentsData)) {
-        for (const trnmt of tournamentsData) {
+      if (Array.isArray(tournaments)) {
+        for (const trnmt of tournaments) {
           try {
             const tRes = await fetch(`/api/tournaments/${trnmt.id}`);
             const tData = await tRes.json();
@@ -142,7 +148,7 @@ function JudgingContent() {
 
       await fetch(`/api/matches/${selectedMatch}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({
           player1Score: parseInt(p1Score),
           player2Score: parseInt(p2Score),
@@ -152,7 +158,7 @@ function JudgingContent() {
 
       await fetch("/api/judgments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({
           matchId: selectedMatch,
           judgeId: selectedJudge || null,
@@ -164,7 +170,7 @@ function JudgingContent() {
 
       await fetch(`/api/matches/${selectedMatch}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ winnerId, status: "completed" }),
       });
     }
@@ -180,7 +186,7 @@ function JudgingContent() {
 
     await fetch(`/api/matches/${selectedMatch}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({
         player1Score: parseInt(p1Score),
         player2Score: parseInt(p2Score),
@@ -191,7 +197,7 @@ function JudgingContent() {
     try {
       const res = await fetch("/api/judgments/ai", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ matchId: selectedMatch }),
       });
       const data = await res.json();
@@ -202,7 +208,7 @@ function JudgingContent() {
           const winnerId = data.verdict === "player1_wins" ? match.player1Id : match.player2Id;
           await fetch(`/api/matches/${selectedMatch}`, {
             method: "PATCH",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
             body: JSON.stringify({ winnerId, status: "completed" }),
           });
         }
