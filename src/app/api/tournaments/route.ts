@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { tournaments, registrations } from "@/db/schema";
-import { desc, eq, count, sql } from "drizzle-orm";
-import { requireRole } from "@/lib/auth";
+import { desc, eq, count } from "drizzle-orm";
+import { requireRole, validateSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -43,9 +43,29 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
+    let registeredTournamentIds = new Set<string>();
+    let registeredPlayerByTournament = new Map<string, string>();
+
+    const token = request.cookies.get("session")?.value;
+    if (token) {
+      const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
+      const ua = request.headers.get("user-agent") || "unknown";
+      const user = await validateSession(token, ip, ua, request);
+      if (user) {
+        const myRegistrations = await db
+          .select({ tournamentId: registrations.tournamentId, playerId: registrations.playerId })
+          .from(registrations)
+          .where(eq(registrations.visibleUserId, user.id));
+        registeredTournamentIds = new Set(myRegistrations.map((reg) => reg.tournamentId));
+        registeredPlayerByTournament = new Map(myRegistrations.map((reg) => [reg.tournamentId, reg.playerId]));
+      }
+    }
+
     const formattedResults = results.map(({ tournament, registeredCount }) => ({
       ...tournament,
       registeredCount,
+      isRegistered: registeredTournamentIds.has(tournament.id),
+      myPlayerId: registeredPlayerByTournament.get(tournament.id) || null,
     }));
 
     return NextResponse.json({

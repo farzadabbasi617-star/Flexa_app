@@ -1,7 +1,8 @@
 "use client";
 
-import React, { memo, useEffect, useState } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 
 interface Tournament {
   id: string;
@@ -14,6 +15,13 @@ interface Tournament {
   entryFee: string | null;
   startDate: string | null;
   bannerUrl?: string | null;
+  isRegistered?: boolean;
+}
+
+interface Props {
+  t: Tournament;
+  walletBalanceToman?: number | null;
+  isLoggedIn?: boolean;
 }
 
 function useCountdown(targetDate: string | null) {
@@ -60,9 +68,25 @@ const GAME_FALLBACK: Record<string, string> = {
   clash_royale: "radial-gradient(circle at 75% 28%, rgba(0,210,255,.38), transparent 22%), linear-gradient(135deg,#080a12,#09283a)",
 };
 
-const TournamentCardLuxury = ({ t }: { t: Tournament }) => {
+const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false }: Props) => {
   const spotsLeft = Math.max(0, t.maxPlayers - (t.registeredCount || 0));
   const { value: countdown, expired } = useCountdown(t.startDate);
+
+  const entryFeeInfo = useMemo(() => {
+    const rial = parseTomanToRial(t.entryFee || "");
+    const toman = rialToTomanNumber(rial);
+    return { rial, toman, isPaid: rial > BigInt(0) };
+  }, [t.entryFee]);
+
+  const insufficientWallet = Boolean(
+    isLoggedIn && !t.isRegistered && entryFeeInfo.isPaid && walletBalanceToman !== null && walletBalanceToman < entryFeeInfo.toman
+  );
+
+  const action = t.isRegistered
+    ? { href: `/tournaments/${t.id}/lobby`, label: "ورود به لابی", tone: "from-green-600 to-emerald-600" }
+    : insufficientWallet
+    ? { href: "/wallet", label: "شارژ کیف پول", tone: "from-orange-600 to-red-600" }
+    : { href: `/tournaments/${t.id}`, label: entryFeeInfo.isPaid ? "ثبت‌نام پولی" : "ثبت‌نام", tone: "from-purple-600 to-blue-600" };
 
   const formatTournamentDate = (dateStr: string | null) => {
     if (!dateStr) return "زمان نامشخص";
@@ -92,9 +116,15 @@ const TournamentCardLuxury = ({ t }: { t: Tournament }) => {
 
         <div className="absolute top-4 right-4 bg-black/45 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-white/10">
           <span className="text-[10px] font-black text-white">
-            {spotsLeft === 0 ? "تکمیل ظرفیت" : `${spotsLeft.toLocaleString("fa-IR")} نفر باقی مانده`}
+            {t.isRegistered ? "ثبت‌نام شده" : spotsLeft === 0 ? "تکمیل ظرفیت" : `${spotsLeft.toLocaleString("fa-IR")} نفر باقی مانده`}
           </span>
         </div>
+
+        {t.isRegistered && (
+          <div className="absolute top-4 left-4 bg-green-500/20 backdrop-blur-md px-3 py-1.5 rounded-2xl border border-green-500/30 text-green-300 text-[10px] font-black">
+            ✅ شما عضو هستید
+          </div>
+        )}
       </div>
 
       <div className="p-6 pt-3 space-y-4">
@@ -119,15 +149,21 @@ const TournamentCardLuxury = ({ t }: { t: Tournament }) => {
               <span className={`text-sm font-black ${expired ? "text-green-400" : "text-purple-300 animate-neon-pulse"}`}>{countdown}</span>
             </div>
           )}
+
+          {insufficientWallet && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-300 rounded-2xl p-3 text-[11px] leading-5">
+              موجودی کیف پول برای ورودی {entryFeeInfo.toman.toLocaleString("fa-IR")} تومان کافی نیست.
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center justify-between pt-2">
-          <div className="text-right">
-            <span className="text-lg font-black num-en">{t.entryFee || "رایگان"}</span>
-            {t.entryFee && t.entryFee !== "رایگان" && <span className="text-[10px] font-bold text-gray-500 mr-1">تومان</span>}
+        <div className="flex items-center justify-between pt-2 gap-3">
+          <div className="text-right min-w-0">
+            <span className="text-lg font-black num-en truncate block">{t.entryFee || "رایگان"}</span>
+            {entryFeeInfo.isPaid && <span className="text-[10px] font-bold text-gray-500 mr-1">ورودی</span>}
           </div>
-          <Link href={`/tournaments/${t.id}`} className="bg-gradient-to-r from-purple-600 to-blue-600 px-8 py-3 rounded-2xl font-black text-sm flex items-center gap-2 shadow-lg shadow-purple-500/20 active:scale-95 transition-all">
-            مشاهده
+          <Link href={action.href} className={`bg-gradient-to-r ${action.tone} px-6 py-3 rounded-2xl font-black text-sm flex items-center gap-2 shadow-lg shadow-purple-500/20 active:scale-95 transition-all whitespace-nowrap`}>
+            {action.label}
             <span className="text-xs">❮</span>
           </Link>
         </div>

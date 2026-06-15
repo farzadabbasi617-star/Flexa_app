@@ -39,7 +39,7 @@ function normalizeMode(tournament: Tournament) {
   return value || DEFAULT_MODE_LABEL[tournament.game] || "سایر مودها";
 }
 
-function TournamentsContent({ canCreate }: { canCreate: boolean }) {
+function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { canCreate: boolean; walletBalanceToman: number | null; isLoggedIn: boolean }) {
   const { lang } = useLanguage();
   const searchParams = useSearchParams();
   const gameFilter = searchParams.get("game");
@@ -166,7 +166,7 @@ function TournamentsContent({ canCreate }: { canCreate: boolean }) {
                       <div className="flex gap-5 overflow-x-auto snap-x pb-4 -mx-1 px-1">
                         {list.map((tournament) => (
                           <div key={tournament.id} className="snap-start shrink-0 w-[310px] sm:w-[340px]">
-                            <TournamentCardLuxury t={tournament} />
+                            <TournamentCardLuxury t={tournament} walletBalanceToman={walletBalanceToman} isLoggedIn={isLoggedIn} />
                           </div>
                         ))}
                       </div>
@@ -185,8 +185,20 @@ function TournamentsContent({ canCreate }: { canCreate: boolean }) {
 export default function TournamentsPage() {
   const { lang } = useLanguage();
   const { user } = useAuth();
+  const [walletBalanceToman, setWalletBalanceToman] = useState<number | null>(null);
   const L = (fa: string, en: string) => (lang === "fa" ? fa : en);
   const canCreate = user?.role === "admin" || user?.role === "super_admin";
+
+  useEffect(() => {
+    if (!user) {
+      setWalletBalanceToman(null);
+      return;
+    }
+    fetch("/api/wallet/balance", { cache: "no-store", credentials: "include" })
+      .then((res) => res.json())
+      .then((data) => setWalletBalanceToman(Number(data.balanceToman || 0)))
+      .catch(() => setWalletBalanceToman(null));
+  }, [user]);
 
   return (
     <div className="min-h-screen bg-dark-900">
@@ -207,8 +219,17 @@ export default function TournamentsPage() {
             </Link>
           )}
         </div>
+        {user && walletBalanceToman !== null && (
+          <div className="gaming-card p-4 mb-6 flex items-center justify-between gap-3 border-neon-blue/20">
+            <div>
+              <div className="text-xs text-gray-500 mb-1">موجودی کیف پول</div>
+              <div className="font-black text-neon-blue">{walletBalanceToman.toLocaleString("fa-IR")} تومان</div>
+            </div>
+            <Link href="/wallet" className="gaming-btn text-xs">شارژ / تراکنش‌ها</Link>
+          </div>
+        )}
         <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="text-4xl animate-neon-pulse">🎮</div></div>}>
-          <TournamentsContent canCreate={Boolean(canCreate)} />
+          <TournamentsContent canCreate={Boolean(canCreate)} walletBalanceToman={walletBalanceToman} isLoggedIn={Boolean(user)} />
         </Suspense>
       </div>
     </div>
