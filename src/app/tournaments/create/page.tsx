@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function CreateTournamentPage() {
   const router = useRouter();
   const { lang } = useLanguage();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refreshUser } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const L = (fa: string, en: string) => (lang === "fa" ? fa : en);
@@ -35,6 +35,12 @@ export default function CreateTournamentPage() {
   });
 
   const canCreateTournament = user?.role === "admin" || user?.role === "super_admin";
+
+  useEffect(() => {
+    // Role changes (e.g. promoting a user to super_admin from DB/admin panel)
+    // should be reflected immediately without forcing the user to clear cache.
+    refreshUser().catch(() => undefined);
+  }, [refreshUser]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -119,9 +125,12 @@ export default function CreateTournamentPage() {
             <div className="text-5xl mb-4">🚫</div>
             <h1 className="text-xl font-black mb-3 neon-text-pink">دسترسی محدود</h1>
             <p className="text-gray-400 text-sm leading-7 mb-6">
-              ساخت تورنومنت فقط برای مدیر اصلی و ادمین‌هایی که مدیر انتخاب می‌کند فعال است.
+              ساخت تورنومنت فقط برای مدیر اصلی و ادمین‌هایی که مدیر انتخاب می‌کند فعال است. اگر همین الان مدیر شدی، یک بار دسترسی را تازه‌سازی کن.
             </p>
-            <Link href="/tournaments" className="gaming-btn w-full">بازگشت به تورنومنت‌ها</Link>
+            <div className="grid gap-3">
+              <button onClick={() => refreshUser()} className="gaming-btn w-full">بررسی مجدد دسترسی</button>
+              <Link href="/tournaments" className="px-5 py-3 rounded-xl bg-dark-700 text-gray-300 text-sm font-bold">بازگشت به تورنومنت‌ها</Link>
+            </div>
           </div>
         </div>
       </div>

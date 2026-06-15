@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
         gameMode: gameMode || null,
         mapName: mapName || null,
         serverSlots: serverSlots || maxPlayers || 16,
+        createdById: auth.user.id,
         prize1st: prize1st || null,
         prize2nd: prize2nd || null,
         prize3rd: prize3rd || null,

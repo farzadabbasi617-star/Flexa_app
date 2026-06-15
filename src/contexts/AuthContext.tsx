@@ -61,7 +61,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return data.user as User | null;
     },
     retry: false,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
+    refetchOnMount: "always",
+    refetchOnWindowFocus: true,
   });
 
   const currentUser = sessionData || user;
