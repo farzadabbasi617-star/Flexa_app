@@ -4,6 +4,7 @@ import { disputes, judgments, matchEvidence, matches, registrations, tournaments
 import { count, desc, eq, inArray } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
+import { refundTournamentEntryFees } from "@/lib/tournament-finance";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -134,13 +135,23 @@ export async function PATCH(request: NextRequest) {
     const values = normalizeTournamentBody(body);
     if (!values.name) return NextResponse.json({ error: "نام تورنومنت الزامی است" }, { status: 400 });
 
-    const [updated] = await db
-      .update(tournaments)
-      .set({ ...values, updatedAt: new Date() })
-      .where(eq(tournaments.id, id))
-      .returning();
+    const [before] = await db.select({ status: tournaments.status }).from(tournaments).where(eq(tournaments.id, id)).limit(1);
 
-    await logAdminAction({
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(tournaments)
+        .set({ ...values, updatedAt: new Date() })
+        .where(eq(tournaments.id, id))
+        .returning();
+
+      if (before?.status !== "cancelled" && values.status === "cancelled") {
+        await refundTournamentEntryFees(tx, id, auth.user.id);
+      }
+
+      return row;
+    });
+
+    await logAdminAction({ 
       adminId: auth.user.id,
       action: "update",
       entityType: "tournament",
@@ -165,6 +176,7 @@ export async function DELETE(request: NextRequest) {
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
     await db.transaction(async (tx) => {
+      await refundTournamentEntryFees(tx, id, auth.user.id);
       const relatedMatches = await tx.select({ id: matches.id }).from(matches).where(eq(matches.tournamentId, id));
       const matchIds = relatedMatches.map((m) => m.id);
       if (matchIds.length > 0) {

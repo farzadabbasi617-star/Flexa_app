@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface Player {
   id: string;
+  visibleUserId?: string | null;
   username: string;
   displayName: string;
   rating: number;
@@ -85,6 +86,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [selectedPlayer, setSelectedPlayer] = useState("");
   const [registering, setRegistering] = useState(false);
   const [adminError, setAdminError] = useState("");
+  const [registrationError, setRegistrationError] = useState("");
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
   const fetchTournament = useCallback(async () => {
@@ -103,7 +105,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     try {
       const res = await fetch("/api/players");
       const data = await res.json();
-      setAllPlayers(Array.isArray(data) ? data : []);
+      setAllPlayers(Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : []);
     } catch {
       // handle error
     }
@@ -117,16 +119,19 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   async function registerPlayer() {
     if (!selectedPlayer) return;
     setRegistering(true);
+    setRegistrationError("");
     try {
-      await fetch("/api/registrations", {
+      const res = await fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ tournamentId: id, playerId: selectedPlayer }),
       });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "ثبت‌نام انجام نشد");
       await fetchTournament();
       setSelectedPlayer("");
-    } catch {
-      // handle error
+    } catch (err) {
+      setRegistrationError(err instanceof Error ? err.message : "ثبت‌نام انجام نشد");
     }
     setRegistering(false);
   }
@@ -222,7 +227,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const statusStyle = STATUS_STYLES[tournament.status];
   const statusLabel = t.statuses[tournament.status];
   const registeredIds = new Set(tournament.registrations.map((r) => r.registration.playerId));
-  const availablePlayers = allPlayers.filter((p) => !registeredIds.has(p.id));
+  const availablePlayers = allPlayers.filter((p) => !registeredIds.has(p.id) && (isAdmin || p.visibleUserId === user?.id));
 
   const roundsMap = new Map<number, Match[]>();
   tournament.matches.forEach((m) => {
@@ -353,6 +358,12 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 <h3 className="text-lg font-bold mb-4 neon-text-purple">
                   {t.tournamentDetail.registerPlayer}
                 </h3>
+                {registrationError && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-4 text-sm leading-6">{registrationError}</div>}
+                {tournament.entryFee && tournament.entryFee !== "رایگان" && (
+                  <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-200 rounded-xl p-3 mb-4 text-xs leading-6">
+                    مبلغ ورودی: {tournament.entryFee}. در صورت ثبت‌نام، مبلغ از کیف پول کسر می‌شود. اگر تورنومنت لغو شود، وجه به کیف پول برمی‌گردد.
+                  </div>
+                )}
                 {availablePlayers.length === 0 ? (
                   <p className="text-gray-400 text-sm">{t.tournamentDetail.noAvailablePlayers}</p>
                 ) : (

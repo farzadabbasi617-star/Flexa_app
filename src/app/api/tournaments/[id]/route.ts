@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { tournaments, registrations, matches, players } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireRole } from "@/lib/auth";
+import { refundTournamentEntryFees } from "@/lib/tournament-finance";
 
 export const dynamic = "force-dynamic";
 
@@ -63,11 +64,21 @@ export async function PATCH(
     const body = await request.json();
     const { status } = body;
 
-    const [updated] = await db
-      .update(tournaments)
-      .set({ status, updatedAt: new Date() })
-      .where(eq(tournaments.id, id))
-      .returning();
+    const [before] = await db.select({ status: tournaments.status }).from(tournaments).where(eq(tournaments.id, id)).limit(1);
+
+    const updated = await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(tournaments)
+        .set({ status, updatedAt: new Date() })
+        .where(eq(tournaments.id, id))
+        .returning();
+
+      if (before?.status !== "cancelled" && status === "cancelled") {
+        await refundTournamentEntryFees(tx, id, auth.user.id);
+      }
+
+      return row;
+    });
 
     return NextResponse.json(updated);
   } catch {
