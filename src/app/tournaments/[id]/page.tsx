@@ -81,6 +81,42 @@ const MATCH_STATUS_STYLES = {
   disputed: { color: "text-neon-pink", bg: "bg-red-900/30" },
 };
 
+function useCountdown(targetDate?: string | null) {
+  const [value, setValue] = useState("");
+  const [expired, setExpired] = useState(false);
+
+  useEffect(() => {
+    if (!targetDate) {
+      setValue("");
+      setExpired(false);
+      return;
+    }
+
+    function update() {
+      const diff = new Date(targetDate!).getTime() - Date.now();
+      if (diff <= 0) {
+        setValue("شروع شده");
+        setExpired(true);
+        return;
+      }
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      if (days > 0) setValue(`${days.toLocaleString("fa-IR")} روز و ${hours.toLocaleString("fa-IR")} ساعت`);
+      else if (hours > 0) setValue(`${hours.toLocaleString("fa-IR")} ساعت و ${minutes.toLocaleString("fa-IR")} دقیقه`);
+      else setValue(`${minutes.toLocaleString("fa-IR")}:${seconds.toString().padStart(2, "0")}`);
+      setExpired(false);
+    }
+
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [targetDate]);
+
+  return { value, expired };
+}
+
 export default function TournamentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
   const router = useRouter();
@@ -96,6 +132,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [registrationError, setRegistrationError] = useState("");
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+  const countdown = useCountdown(tournament?.startDate);
 
   const fetchTournament = useCallback(async () => {
     setLoading(true);
@@ -297,6 +334,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const entryFeeToman = rialToTomanNumber(entryFeeRial);
   const isPaidTournament = entryFeeRial > BigInt(0);
   const hasEnoughWallet = walletBalance !== null && walletBalance >= entryFeeToman;
+  const checkedInCount = tournament.registrations.filter((r) => r.registration.checkedInAt).length;
+  const fillPercent = Math.min((tournament.registrations.length / Math.max(tournament.maxPlayers, 1)) * 100, 100);
+  const completedMatches = tournament.matches.filter((m) => m.status === "completed").length;
+  const awaitingJudgmentCount = tournament.matches.filter((m) => m.status === "awaiting_judgment" || m.status === "disputed").length;
 
   const roundsMap = new Map<number, Match[]>();
   tournament.matches.forEach((m) => {
@@ -353,6 +394,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
             </div>
 
             <div className="flex flex-col gap-2">
+              {(isAdmin || isRegistered) && (
+                <Link href={`/tournaments/${tournament.id}/lobby`} className="gaming-btn text-sm bg-gradient-to-r from-purple-600 to-blue-600">
+                  🎮 ورود به لابی
+                </Link>
+              )}
               {isAdmin && (
                 <>
                   <Link href="/admin/tournaments" className="gaming-btn text-sm bg-gradient-to-r from-cyan-600 to-blue-600">
@@ -368,6 +414,32 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   ⚔️ {t.tournamentDetail.generateBrackets}
                 </button>
               )}
+            </div>
+          </div>
+
+          <div className="relative mt-8 grid grid-cols-2 lg:grid-cols-5 gap-3">
+            <div className="bg-dark-700/80 rounded-2xl p-4 border border-white/5">
+              <div className="text-xs text-gray-500 mb-1">ظرفیت</div>
+              <div className="text-xl font-black text-neon-purple">{tournament.registrations.length.toLocaleString("fa-IR")}/{tournament.maxPlayers.toLocaleString("fa-IR")}</div>
+              <div className="h-2 bg-dark-600 rounded-full overflow-hidden mt-3">
+                <div className="h-full bg-gradient-to-r from-neon-purple to-neon-blue" style={{ width: `${fillPercent}%` }} />
+              </div>
+            </div>
+            <div className="bg-dark-700/80 rounded-2xl p-4 border border-white/5">
+              <div className="text-xs text-gray-500 mb-1">جای خالی</div>
+              <div className="text-xl font-black text-neon-blue">{spotsLeft.toLocaleString("fa-IR")}</div>
+            </div>
+            <div className="bg-dark-700/80 rounded-2xl p-4 border border-white/5">
+              <div className="text-xs text-gray-500 mb-1">تأیید حضور</div>
+              <div className="text-xl font-black text-neon-green">{checkedInCount.toLocaleString("fa-IR")}</div>
+            </div>
+            <div className="bg-dark-700/80 rounded-2xl p-4 border border-white/5">
+              <div className="text-xs text-gray-500 mb-1">در انتظار داوری</div>
+              <div className="text-xl font-black text-neon-orange">{awaitingJudgmentCount.toLocaleString("fa-IR")}</div>
+            </div>
+            <div className="bg-dark-700/80 rounded-2xl p-4 border border-white/5 col-span-2 lg:col-span-1">
+              <div className="text-xs text-gray-500 mb-1">⏳ تا شروع</div>
+              <div className={`text-sm font-black ${countdown.expired ? "text-neon-green" : "text-neon-blue animate-neon-pulse"}`}>{countdown.value || "نامشخص"}</div>
             </div>
           </div>
         </div>
@@ -411,7 +483,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 </div>
                 <div className="bg-dark-700 rounded-lg p-4 text-center">
                   <div className="text-2xl font-bold text-neon-green">
-                    {tournament.matches.filter((m) => m.status === "completed").length}
+                    {completedMatches}
                   </div>
                   <div className="text-xs text-gray-400 mt-1">{t.tournamentDetail.completed}</div>
                 </div>
@@ -647,9 +719,14 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                         @{reg.player?.username} · {t.tournamentDetail.rating}: {reg.player?.rating}
                       </div>
                     </div>
-                    <div className="text-end text-xs">
+                    <div className="text-end text-xs space-y-1">
                       <div className="text-neon-green">{reg.player?.wins}W</div>
                       <div className="text-neon-pink">{reg.player?.losses}L</div>
+                      {reg.registration.checkedInAt ? (
+                        <div className="text-[10px] text-green-300 bg-green-500/10 border border-green-500/20 rounded-full px-2 py-0.5">حاضر</div>
+                      ) : (
+                        <div className="text-[10px] text-gray-500 bg-white/5 rounded-full px-2 py-0.5">حضور نزده</div>
+                      )}
                     </div>
                   </div>
                 ))}
