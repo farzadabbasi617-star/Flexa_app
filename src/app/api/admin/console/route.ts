@@ -14,18 +14,18 @@ import {
 } from "@/db/schema";
 import { count, desc, eq, inArray, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
-import { validateAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-function isAdminError(result: Awaited<ReturnType<typeof validateAdmin>>) {
+function isAdminError(result: { user: unknown; error: string | null | undefined }) {
   return result.error || !result.user;
 }
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await validateAdmin(request);
+    const auth = await requireAdminPermission(request, "overview");
     if (isAdminError(auth)) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const limit = Math.min(Number(request.nextUrl.searchParams.get("limit") || 80), 250);
@@ -200,7 +200,7 @@ export async function GET(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await validateAdmin(request);
+    const auth = await requireAdminPermission(request, "overview");
     if (isAdminError(auth)) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const { resource, id } = await request.json();
@@ -245,7 +245,7 @@ export async function DELETE(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const auth = await validateAdmin(request);
+    const auth = await requireAdminPermission(request, "overview");
     if (isAdminError(auth)) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const { resource, id, data } = await request.json();

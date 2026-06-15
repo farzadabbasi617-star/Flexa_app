@@ -349,6 +349,17 @@ export const aiProposals = pgTable("ai_proposals", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+// Granular admin permissions
+export const adminPermissions = pgTable("admin_permissions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  permission: varchar("permission", { length: 80 }).notNull(),
+  allowed: boolean("allowed").notNull().default(true),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userPermissionIdx: index("admin_permissions_user_permission_idx").on(table.userId, table.permission),
+}));
+
 // Admin audit logs
 export const adminAuditLogs = pgTable("admin_audit_logs", {
   id: uuid("id").defaultRandom().primaryKey(),

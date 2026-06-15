@@ -3,7 +3,8 @@ import crypto from "crypto";
 import { db } from "@/db";
 import { players, sessions, users, wallets } from "@/db/schema";
 import { eq, desc, or } from "drizzle-orm";
-import { hashPassword, validateAdmin } from "@/lib/auth";
+import { hashPassword } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { TERMS_VERSION } from "@/lib/terms";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
@@ -41,7 +42,7 @@ function publicUserShape(u: typeof users.$inferSelect) {
 
 export async function GET(request: NextRequest) {
   try {
-    const { error, status } = await validateAdmin(request);
+    const { error, status } = await requireAdminPermission(request, "users");
     if (error) return NextResponse.json({ error }, { status });
 
     const allUsers = await db.select().from(users).orderBy(desc(users.createdAt));
@@ -53,7 +54,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { user: currentUser, error, status } = await validateAdmin(request);
+    const { user: currentUser, error, status } = await requireAdminPermission(request, "users");
     if (error || !currentUser) return NextResponse.json({ error }, { status });
 
     const body = await request.json();
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { user: currentUser, error, status } = await validateAdmin(request);
+    const { user: currentUser, error, status } = await requireAdminPermission(request, "users");
     if (error || !currentUser) return NextResponse.json({ error }, { status });
 
     const body = await request.json();
@@ -172,7 +173,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { user: currentUser, error, status } = await validateAdmin(request);
+    const { user: currentUser, error, status } = await requireAdminPermission(request, "users");
     if (error || !currentUser) return NextResponse.json({ error }, { status });
 
     const { id } = await request.json();

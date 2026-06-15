@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users, players, tournaments, matches, disputes, globalChat, judgments } from "@/db/schema";
 import { count, eq } from "drizzle-orm";
-import { validateAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 
 export const dynamic = "force-dynamic";
 
 
 export async function GET(request: NextRequest) {
   try {
-    const { error, status } = await validateAdmin(request);
+    const { error, status } = await requireAdminPermission(request, "overview");
     if (error) return NextResponse.json({ error }, { status });
 
     const [uCount] = await db.select({ v: count() }).from(users);

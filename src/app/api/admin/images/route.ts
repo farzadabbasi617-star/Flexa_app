@@ -2,14 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { siteImages } from "@/db/schema";
 import { eq, asc, desc } from "drizzle-orm";
-import { validateAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 
 export const dynamic = "force-dynamic";
 
 
 export async function GET(request: NextRequest) {
   try {
-    const { error, status } = await validateAdmin(request);
+    const { error, status } = await requireAdminPermission(request, "media");
     if (error) return NextResponse.json({ error }, { status });
 
     const images = await db
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { error, status } = await validateAdmin(request);
+    const { error, status } = await requireAdminPermission(request, "media");
     if (error) return NextResponse.json({ error }, { status });
 
     const body = await request.json();
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const { error, status } = await validateAdmin(request);
+    const { error, status } = await requireAdminPermission(request, "media");
     if (error) return NextResponse.json({ error }, { status });
 
     const body = await request.json();
@@ -76,7 +76,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const { error, status } = await validateAdmin(request);
+    const { error, status } = await requireAdminPermission(request, "media");
     if (error) return NextResponse.json({ error }, { status });
 
     const { id } = await request.json();

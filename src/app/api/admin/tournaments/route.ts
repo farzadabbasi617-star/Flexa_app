@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { disputes, judgments, matchEvidence, matches, registrations, tournaments } from "@/db/schema";
 import { count, desc, eq, inArray } from "drizzle-orm";
-import { validateAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import logger from "@/lib/logger";
 
@@ -52,7 +52,7 @@ function normalizeTournamentBody(body: Record<string, unknown>) {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await validateAdmin(request);
+    const auth = await requireAdminPermission(request, "tournaments");
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const limit = Math.min(Number(request.nextUrl.searchParams.get("limit") || 200), 500);
@@ -98,7 +98,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    const auth = await validateAdmin(request);
+    const auth = await requireAdminPermission(request, "tournaments");
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const auth = await validateAdmin(request);
+    const auth = await requireAdminPermission(request, "tournaments");
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
@@ -158,7 +158,7 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const auth = await validateAdmin(request);
+    const auth = await requireAdminPermission(request, "tournaments");
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const { id } = await request.json();

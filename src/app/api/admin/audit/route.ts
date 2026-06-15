@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { adminAuditLogs, users } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
-import { validateAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await validateAdmin(request);
+    const auth = await requireAdminPermission(request, "audit");
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const limit = Math.min(Number(request.nextUrl.searchParams.get("limit") || 150), 500);

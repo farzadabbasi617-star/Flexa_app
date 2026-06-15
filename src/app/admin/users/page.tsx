@@ -6,6 +6,21 @@ import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 
+const PERMISSIONS = [
+  { key: "overview", label: "داشبورد" },
+  { key: "users", label: "کاربران" },
+  { key: "tournaments", label: "تورنومنت‌ها" },
+  { key: "matches", label: "مسابقات" },
+  { key: "judgments", label: "داوری‌ها" },
+  { key: "disputes", label: "اعتراضات" },
+  { key: "messages", label: "پیام‌ها" },
+  { key: "media", label: "رسانه/ظاهر" },
+  { key: "wallets", label: "کیف پول" },
+  { key: "audit", label: "لاگ‌ها" },
+  { key: "ai", label: "هوش مصنوعی" },
+  { key: "settings", label: "تنظیمات" },
+];
+
 interface UserRow {
   id: string;
   phoneNumber: string;
@@ -39,6 +54,9 @@ export default function AdminUsersPage() {
     password: "",
     role: "player",
   });
+  const [permissionTarget, setPermissionTarget] = useState<UserRow | null>(null);
+  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]);
+  const [savingPermissions, setSavingPermissions] = useState(false);
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const isSuperAdmin = user?.role === "super_admin";
@@ -102,6 +120,38 @@ export default function AdminUsersPage() {
       fetchUsers();
     } catch (err) {
       setError(err instanceof Error ? err.message : "حذف انجام نشد");
+    }
+  }
+
+  async function openPermissions(target: UserRow) {
+    setPermissionTarget(target);
+    setError("");
+    try {
+      const res = await fetch(`/api/admin/permissions?userId=${target.id}`, { cache: "no-store" });
+      const data = await res.json();
+      setSelectedPermissions(Array.isArray(data.permissions) ? data.permissions : []);
+    } catch {
+      setSelectedPermissions([]);
+    }
+  }
+
+  async function savePermissions() {
+    if (!permissionTarget) return;
+    setSavingPermissions(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/permissions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ userId: permissionTarget.id, permissions: selectedPermissions }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "ذخیره دسترسی انجام نشد");
+      setPermissionTarget(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ذخیره دسترسی انجام نشد");
+    } finally {
+      setSavingPermissions(false);
     }
   }
 
@@ -171,6 +221,37 @@ export default function AdminUsersPage() {
           </form>
         )}
 
+        {permissionTarget && (
+          <div className="gaming-card p-5 mb-6 animate-slide-up border-neon-purple/30">
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div>
+                <h2 className="font-black text-lg text-neon-purple">سطح دسترسی {permissionTarget.displayName}</h2>
+                <p className="text-xs text-gray-500 mt-1">فقط مدیر اصلی می‌تواند دسترسی ادمین‌ها/داورها/ناظرها را تعیین کند.</p>
+              </div>
+              <button onClick={() => setPermissionTarget(null)} className="text-gray-500 hover:text-white">✕</button>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+              {PERMISSIONS.map((permission) => {
+                const checked = selectedPermissions.includes(permission.key);
+                return (
+                  <label key={permission.key} className={`p-3 rounded-xl border cursor-pointer text-sm ${checked ? "bg-purple-500/15 border-purple-500/40 text-purple-200" : "bg-dark-700 border-gaming-border text-gray-400"}`}>
+                    <input
+                      type="checkbox"
+                      className="me-2 accent-purple-600"
+                      checked={checked}
+                      onChange={(e) => {
+                        setSelectedPermissions((prev) => e.target.checked ? [...prev, permission.key] : prev.filter((p) => p !== permission.key));
+                      }}
+                    />
+                    {permission.label}
+                  </label>
+                );
+              })}
+            </div>
+            <button onClick={savePermissions} disabled={savingPermissions} className="gaming-btn mt-4 text-sm disabled:opacity-50">{savingPermissions ? "ذخیره..." : "ذخیره سطح دسترسی"}</button>
+          </div>
+        )}
+
         <div className="mb-6">
           <input
             type="text"
@@ -234,6 +315,14 @@ export default function AdminUsersPage() {
                     >
                       {u.isVerified ? "✓ تأیید شده" : "تأیید نشده"}
                     </button>
+                    {isSuperAdmin && (u.role === "admin" || u.role === "judge" || u.role === "moderator") && (
+                      <button
+                        onClick={() => openPermissions(u)}
+                        className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20"
+                      >
+                        دسترسی‌ها
+                      </button>
+                    )}
                     <button
                       onClick={() => deleteUser(u.id)}
                       className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0 bg-red-500/10 text-red-300 hover:bg-red-500/20"

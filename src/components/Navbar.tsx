@@ -125,6 +125,24 @@ export default function Navbar() {
                             <Link href="/admin/customize" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                               <span>🎨</span> {lang === "fa" ? "شخصی‌سازی ظاهر" : "Customize UI"}
                             </Link>
+                            <Link href="/admin/tournaments" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                              <span>🏆</span> مدیریت تورنومنت‌ها
+                            </Link>
+                            <Link href="/admin/matches" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                              <span>⚔️</span> مدیریت مسابقات
+                            </Link>
+                            <Link href="/admin/judgments" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                              <span>⚖️</span> مدیریت داوری‌ها
+                            </Link>
+                            <Link href="/admin/disputes" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                              <span>🚨</span> اعتراضات
+                            </Link>
+                            <Link href="/admin/wallets" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                              <span>💳</span> کیف پول و مالی
+                            </Link>
+                            <Link href="/admin/audit" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                              <span>🧾</span> لاگ مدیران
+                            </Link>
                             <Link href="/admin/ai" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                               <span>🤖</span> {lang === "fa" ? "هوش مصنوعی" : "AI"}
                             </Link>

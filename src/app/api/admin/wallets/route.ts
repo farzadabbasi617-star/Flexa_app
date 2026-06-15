@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { transactions, users, wallets } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
-import { validateAdmin } from "@/lib/auth";
+import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 
 export const dynamic = "force-dynamic";
@@ -24,7 +24,7 @@ function tomanToRial(value: unknown) {
 
 export async function GET(request: NextRequest) {
   try {
-    const auth = await validateAdmin(request);
+    const auth = await requireAdminPermission(request, "wallets");
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const rows = await db
@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const auth = await validateAdmin(request);
+    const auth = await requireAdminPermission(request, "wallets");
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
