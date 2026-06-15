@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { matches, notifications, players } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireRole } from "@/lib/auth";
+import { evaluateUserAchievements } from "@/lib/achievement-service";
 
 export const dynamic = "force-dynamic";
 
@@ -139,6 +140,9 @@ export async function PATCH(
             })
             .where(eq(players.id, loserId));
         }
+
+        if (winner?.visibleUserId) await evaluateUserAchievements(winner.visibleUserId).catch(() => undefined);
+        if (loser?.visibleUserId) await evaluateUserAchievements(loser.visibleUserId).catch(() => undefined);
       }
 
       await notifyMatchParticipants(

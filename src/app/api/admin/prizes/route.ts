@@ -5,6 +5,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { bigIntFromText, parseTomanToRial } from "@/lib/money";
+import { evaluateUserAchievements } from "@/lib/achievement-service";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -100,12 +101,14 @@ export async function POST(request: NextRequest) {
           type: "tournament_win",
           status: "completed",
           referenceId: `prize-${tournamentId}-${playerId}-${Date.now()}`,
-          metadata: { tournamentId, tournamentName: tournament.name, playerId, playerName: player.displayName, reason, adminId: auth.user!.id },
+          metadata: { tournamentId, tournamentName: tournament.name, playerId, playerName: player.displayName, userId: player.ownerId, reason, adminId: auth.user!.id },
         })
         .returning();
 
       return { prizeTx, player, tournament };
     });
+
+    if (result.player.ownerId) await evaluateUserAchievements(result.player.ownerId).catch(() => undefined);
 
     await logAdminAction({
       adminId: auth.user.id,

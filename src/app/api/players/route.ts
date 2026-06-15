@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { players } from "@/db/schema";
-import { desc, count } from "drizzle-orm";
+import { players, users } from "@/db/schema";
+import { desc, count, eq } from "drizzle-orm";
 import { requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -19,8 +19,27 @@ export async function GET(request: NextRequest) {
       .from(players);
 
     const paginatedPlayers = await db
-      .select()
+      .select({
+        id: players.id,
+        visibleUserId: players.visibleUserId,
+        username: players.username,
+        displayName: players.displayName,
+        email: players.email,
+        avatarUrl: players.avatarUrl,
+        gameId: players.gameId,
+        rating: players.rating,
+        wins: players.wins,
+        losses: players.losses,
+        createdAt: players.createdAt,
+        flexaId: users.flexaId,
+        xp: users.xp,
+        level: users.level,
+        rankPoints: users.rankPoints,
+        role: users.role,
+        isVerified: users.isVerified,
+      })
       .from(players)
+      .leftJoin(users, eq(players.visibleUserId, users.id))
       .orderBy(desc(players.rating))
       .limit(limit)
       .offset(offset);

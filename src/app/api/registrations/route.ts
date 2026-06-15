@@ -5,6 +5,7 @@ import { and, eq, count, sql } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 import { bigIntFromText, formatTomanFromRial } from "@/lib/money";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
+import { evaluateUserAchievements } from "@/lib/achievement-service";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -121,6 +122,8 @@ export async function POST(request: NextRequest) {
 
       return { registration: reg, entryFeeRial: entryFeeRial.toString(), paymentTransactionId };
     });
+
+    await evaluateUserAchievements(result.registration.visibleUserId).catch(() => undefined);
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {

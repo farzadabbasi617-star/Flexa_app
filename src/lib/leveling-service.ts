@@ -21,8 +21,7 @@ export const LevelingService = {
     await tx.update(users)
       .set({ 
         xp: newXP, 
-        level: newLevel,
-        updatedAt: new Date() 
+        level: newLevel
       })
       .where(eq(users.id, userId));
 

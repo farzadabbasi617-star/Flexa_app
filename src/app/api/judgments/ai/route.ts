@@ -4,6 +4,7 @@ import { judgments, matches, players, matchEvidence } from "@/db/schema";
 import { eq, count } from "drizzle-orm";
 import { analyzeMatch } from "@/lib/ai-engine";
 import { requireRole } from "@/lib/auth";
+import { evaluateUserAchievements } from "@/lib/achievement-service";
 
 export const dynamic = "force-dynamic";
 
@@ -134,11 +135,14 @@ export async function POST(request: NextRequest) {
               rating: Math.max(0, loser.rating - 15),
             }).where(eq(players.id, loserId));
           }
+
+          if (winner?.visibleUserId) await evaluateUserAchievements(winner.visibleUserId).catch(() => undefined);
+          if (loser?.visibleUserId) await evaluateUserAchievements(loser.visibleUserId).catch(() => undefined);
         }
       }
     }
 
-    return NextResponse.json({
+    return NextResponse.json({ 
       judgment,
       aiAnalysis: aiResult,
       autoApplied: aiResult.confidence >= 70 && aiResult.suspicionLevel < 30,

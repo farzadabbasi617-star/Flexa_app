@@ -5,6 +5,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { bigIntFromText } from "@/lib/money";
+import { evaluateUserAchievements } from "@/lib/achievement-service";
 
 export const dynamic = "force-dynamic";
 
@@ -112,7 +113,7 @@ export async function PATCH(request: NextRequest) {
           .set({ status: "failed", updatedAt: new Date(), metadata: sql`coalesce(${transactions.metadata}, '{}'::jsonb) || ${JSON.stringify({ rejectedBy: auth.user!.id, rejectedAt: new Date().toISOString() })}::jsonb` })
           .where(eq(transactions.id, transactionId))
           .returning();
-        return updated;
+        return { transaction: updated, userId: null as string | null };
       }
 
       if (transaction.type !== "deposit") throw new Error("ONLY_DEPOSIT_APPROVAL_SUPPORTED");
@@ -130,19 +131,21 @@ export async function PATCH(request: NextRequest) {
         .set({ status: "completed", updatedAt: new Date(), metadata: sql`coalesce(${transactions.metadata}, '{}'::jsonb) || ${JSON.stringify({ approvedBy: auth.user!.id, approvedAt: new Date().toISOString() })}::jsonb` })
         .where(eq(transactions.id, transactionId))
         .returning();
-      return updated;
+      return { transaction: updated, userId: wallet.userId };
     });
 
-    await logAdminAction({
+    if (result.userId) await evaluateUserAchievements(result.userId).catch(() => undefined);
+
+    await logAdminAction({ 
       adminId: auth.user.id,
       action: action === "approve" ? "approve_deposit" : "reject_deposit",
       entityType: "transaction",
       entityId: transactionId,
-      metadata: { status: result.status, type: result.type, amount: result.amount },
+      metadata: { status: result.transaction.status, type: result.transaction.type, amount: result.transaction.amount },
       ipAddress: getClientIp(request.headers),
     });
 
-    return NextResponse.json({ success: true, transaction: result });
+    return NextResponse.json({ success: true, transaction: result.transaction });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Finance update failed";
     return NextResponse.json({ error: message }, { status: 400 });

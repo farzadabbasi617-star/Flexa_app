@@ -16,6 +16,8 @@ interface Achievement {
   requirement: number;
   points: number;
   unlocked: boolean;
+  progress?: number;
+  progressPercent?: number;
 }
 
 const CATEGORY_LABELS = {
@@ -69,6 +71,11 @@ export default function AchievementsPage() {
             🏅 <span className="neon-text-purple">{t.achievementsPage.title}</span>
           </h1>
           <p className="text-gray-400">{t.achievementsPage.subtitle}</p>
+          {user && (
+            <button onClick={fetchAchievements} className="mt-4 px-4 py-2 rounded-xl bg-dark-700 text-xs font-black text-neon-blue hover:bg-dark-600">
+              🔄 بروزرسانی دستاوردها
+            </button>
+          )}
         </div>
 
         {/* Stats */}
@@ -158,7 +165,19 @@ export default function AchievementsPage() {
                     <p className="text-sm text-gray-400">
                       {lang === "fa" ? achievement.descriptionFA : achievement.description}
                     </p>
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+                        <span>پیشرفت</span>
+                        <span>{(achievement.progress || 0).toLocaleString("fa-IR")} / {achievement.requirement.toLocaleString("fa-IR")}</span>
+                      </div>
+                      <div className="h-1.5 bg-dark-700 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${achievement.unlocked ? "bg-neon-green" : "bg-gradient-to-r from-neon-purple to-neon-blue"}`}
+                          style={{ width: `${achievement.progressPercent || 0}%` }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-3">
                       <span className="text-xs px-2 py-0.5 rounded-full bg-neon-purple/20 text-neon-purple">
                         {achievement.points} {t.achievementsPage.points}
                       </span>
