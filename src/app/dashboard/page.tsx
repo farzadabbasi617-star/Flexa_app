@@ -90,6 +90,7 @@ export default function DashboardPage() {
   }
 
   const hasGameIds = user.clashRoyaleId || user.codMobileId || user.fortniteId;
+  const isAdmin = user.role === "admin" || user.role === "super_admin";
   const total = data.wins + data.losses;
   const winRate = total > 0 ? Math.round((data.wins / total) * 100) : 0;
 
@@ -157,9 +158,10 @@ export default function DashboardPage() {
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-8">
           {[
-            { href: "/tournaments/create", icon: "🏆", label: lang === "fa" ? "ساخت تورنومنت" : "Create Tournament" },
+            ...(isAdmin ? [{ href: "/tournaments/create", icon: "🏆", label: lang === "fa" ? "ساخت تورنومنت" : "Create Tournament" }] : []),
             { href: "/tournaments", icon: "🎮", label: lang === "fa" ? "تورنومنت‌ها" : "Tournaments" },
-            { href: "/judging", icon: "⚖️", label: lang === "fa" ? "داوری" : "Judging" },
+            { href: "/wallet", icon: "💳", label: "کیف پول" },
+            { href: "/support", icon: "🎧", label: "پشتیبانی" },
             { href: "/chat", icon: "💬", label: lang === "fa" ? "چت" : "Chat" },
             { href: "/leaderboard", icon: "📊", label: lang === "fa" ? "رتبه‌بندی" : "Leaderboard" },
             { href: "/teams", icon: "🛡️", label: lang === "fa" ? "تیم‌ها" : "Teams" },

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 
 interface Player {
   id: string;
@@ -30,7 +31,13 @@ interface Match {
 }
 
 interface Registration {
-  registration: { id: string; playerId: string };
+  registration: {
+    id: string;
+    playerId: string;
+    visibleUserId: string;
+    checkedInAt: string | null;
+    registeredAt: string;
+  };
   player: Player | null;
 }
 
@@ -87,6 +94,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [registering, setRegistering] = useState(false);
   const [adminError, setAdminError] = useState("");
   const [registrationError, setRegistrationError] = useState("");
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
   const fetchTournament = useCallback(async () => {
@@ -111,10 +119,28 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     }
   }, []);
 
+  const fetchWalletBalance = useCallback(async () => {
+    if (!user) {
+      setWalletBalance(null);
+      return;
+    }
+    try {
+      const res = await fetch("/api/wallet/balance", { cache: "no-store", credentials: "include" });
+      const data = await res.json();
+      if (res.ok) setWalletBalance(Number(data.balanceToman || 0));
+    } catch {
+      setWalletBalance(null);
+    }
+  }, [user]);
+
   useEffect(() => {
     fetchTournament();
     fetchPlayers();
   }, [fetchTournament, fetchPlayers]);
+
+  useEffect(() => {
+    fetchWalletBalance();
+  }, [fetchWalletBalance]);
 
   async function registerPlayer() {
     if (!selectedPlayer) return;
@@ -129,6 +155,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "ثبت‌نام انجام نشد");
       await fetchTournament();
+      await fetchWalletBalance();
       setSelectedPlayer("");
     } catch (err) {
       setRegistrationError(err instanceof Error ? err.message : "ثبت‌نام انجام نشد");
@@ -259,7 +286,17 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const statusStyle = STATUS_STYLES[tournament.status];
   const statusLabel = t.statuses[tournament.status];
   const registeredIds = new Set(tournament.registrations.map((r) => r.registration.playerId));
+  const myRegistration = user
+    ? tournament.registrations.find((r) => r.registration.visibleUserId === user.id || r.player?.visibleUserId === user.id) || null
+    : null;
+  const isRegistered = Boolean(myRegistration);
   const availablePlayers = allPlayers.filter((p) => !registeredIds.has(p.id) && (isAdmin || p.visibleUserId === user?.id));
+  const spotsLeft = Math.max(0, tournament.maxPlayers - tournament.registrations.length);
+  const entryFee = tournament.entryFee || "رایگان";
+  const entryFeeRial = parseTomanToRial(entryFee);
+  const entryFeeToman = rialToTomanNumber(entryFeeRial);
+  const isPaidTournament = entryFeeRial > BigInt(0);
+  const hasEnoughWallet = walletBalance !== null && walletBalance >= entryFeeToman;
 
   const roundsMap = new Map<number, Match[]>();
   tournament.matches.forEach((m) => {
@@ -385,44 +422,94 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               </div>
             </div>
 
-            {tournament.status === "registration" && (
-              <div className="gaming-card p-6">
-                <h3 className="text-lg font-bold mb-4 neon-text-purple">
-                  {t.tournamentDetail.registerPlayer}
-                </h3>
-                {registrationError && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-4 text-sm leading-6">{registrationError}</div>}
-                {tournament.entryFee && tournament.entryFee !== "رایگان" && (
-                  <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-200 rounded-xl p-3 mb-4 text-xs leading-6">
-                    مبلغ ورودی: {tournament.entryFee}. در صورت ثبت‌نام، مبلغ از کیف پول کسر می‌شود. اگر تورنومنت لغو شود، وجه به کیف پول برمی‌گردد.
+            <div className="gaming-card p-6">
+              <h3 className="text-lg font-bold mb-4 neon-text-purple">
+                وضعیت ثبت‌نام شما
+              </h3>
+
+              {registrationError && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-4 text-sm leading-6">{registrationError}</div>}
+
+              {!user ? (
+                <div className="space-y-4">
+                  <p className="text-gray-400 text-sm leading-7">برای ثبت‌نام در تورنومنت باید وارد حساب شوی.</p>
+                  <Link href="/login" className="gaming-btn w-full text-sm">ورود به حساب</Link>
+                </div>
+              ) : isRegistered ? (
+                <div className="space-y-4">
+                  <div className="bg-green-500/10 border border-green-500/25 text-green-300 rounded-2xl p-4 text-sm leading-7">
+                    ✅ شما با بازیکن <b>{myRegistration?.player?.displayName || "خودتان"}</b> در این تورنومنت ثبت‌نام کرده‌اید.
+                    {myRegistration?.registration.checkedInAt && <div className="mt-2 text-xs">حضور شما در لابی تأیید شده است.</div>}
                   </div>
-                )}
-                {availablePlayers.length === 0 ? (
-                  <p className="text-gray-400 text-sm">{t.tournamentDetail.noAvailablePlayers}</p>
-                ) : (
-                  <div className="flex gap-2">
-                    <select
-                      className="gaming-select flex-1"
-                      value={selectedPlayer}
-                      onChange={(e) => setSelectedPlayer(e.target.value)}
-                    >
-                      <option value="">{t.tournamentDetail.selectPlayer}</option>
-                      {availablePlayers.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.displayName} ({t.tournamentDetail.rating}: {p.rating})
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={registerPlayer}
-                      disabled={!selectedPlayer || registering}
-                      className="gaming-btn disabled:opacity-50 text-sm"
-                    >
-                      {registering ? "..." : t.tournamentDetail.register}
-                    </button>
+                  <Link href={`/tournaments/${tournament.id}/lobby`} className="gaming-btn w-full text-sm">ورود به لابی</Link>
+                </div>
+              ) : tournament.status !== "registration" ? (
+                <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-200 rounded-2xl p-4 text-sm leading-7">
+                  ثبت‌نام این تورنومنت در حال حاضر باز نیست.
+                </div>
+              ) : spotsLeft <= 0 ? (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-300 rounded-2xl p-4 text-sm leading-7">
+                  ظرفیت تورنومنت تکمیل شده است.
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-dark-700 rounded-2xl p-3 text-center">
+                      <div className="text-xs text-gray-500 mb-1">ورودی</div>
+                      <div className={isPaidTournament ? "text-yellow-300 font-black" : "text-green-300 font-black"}>{entryFee}</div>
+                    </div>
+                    <div className="bg-dark-700 rounded-2xl p-3 text-center">
+                      <div className="text-xs text-gray-500 mb-1">موجودی شما</div>
+                      <div className="text-neon-blue font-black">{walletBalance === null ? "—" : `${walletBalance.toLocaleString("fa-IR")} تومان`}</div>
+                    </div>
                   </div>
-                )}
-              </div>
-            )}
+
+                  {isPaidTournament && walletBalance !== null && !hasEnoughWallet && (
+                    <div className="bg-red-500/10 border border-red-500/20 text-red-300 rounded-2xl p-3 text-xs leading-6">
+                      موجودی کیف پول برای ثبت‌نام کافی نیست. مبلغ لازم: {entryFeeToman.toLocaleString("fa-IR")} تومان.
+                    </div>
+                  )}
+
+                  {isPaidTournament && (
+                    <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-200 rounded-2xl p-3 text-xs leading-6">
+                      در صورت ثبت‌نام، ورودی از کیف پول کسر می‌شود. اگر تورنومنت لغو شود، وجه به کیف پول برمی‌گردد.
+                    </div>
+                  )}
+
+                  {availablePlayers.length === 0 ? (
+                    <div className="space-y-3">
+                      <p className="text-gray-400 text-sm">برای ثبت‌نام، ابتدا باید پروفایل بازیکن داشته باشی. اگر ثبت‌نام کرده‌ای ولی بازیکن نمی‌بینی، پروفایل را کامل کن.</p>
+                      <Link href="/profile/edit" className="gaming-btn w-full text-sm">تکمیل پروفایل</Link>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <select
+                        className="gaming-select flex-1"
+                        value={selectedPlayer}
+                        onChange={(e) => setSelectedPlayer(e.target.value)}
+                      >
+                        <option value="">{t.tournamentDetail.selectPlayer}</option>
+                        {availablePlayers.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.displayName} ({t.tournamentDetail.rating}: {p.rating})
+                          </option>
+                        ))}
+                      </select>
+                      {isPaidTournament && walletBalance !== null && !hasEnoughWallet ? (
+                        <Link href="/wallet" className="gaming-btn text-sm bg-gradient-to-r from-orange-600 to-red-600">شارژ کیف پول</Link>
+                      ) : (
+                        <button
+                          onClick={registerPlayer}
+                          disabled={!selectedPlayer || registering}
+                          className="gaming-btn disabled:opacity-50 text-sm"
+                        >
+                          {registering ? "..." : isPaidTournament ? "ثبت‌نام و کسر ورودی" : t.tournamentDetail.register}
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             <div className="gaming-card p-6 lg:col-span-2">
               <h3 className="text-lg font-bold mb-4 neon-text-blue">{t.tournamentDetail.matchResults}</h3>
