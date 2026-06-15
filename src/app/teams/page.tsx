@@ -13,6 +13,7 @@ interface Team {
   logoUrl: string | null;
   description: string | null;
   createdAt: string;
+  memberCount?: number;
 }
 
 export default function TeamsPage() {
@@ -21,7 +22,7 @@ export default function TeamsPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [form, setForm] = useState({ name: "", tag: "", description: "" });
+  const [form, setForm] = useState({ name: "", tag: "", logoUrl: "", description: "" });
   const [creating, setCreating] = useState(false);
 
   useEffect(() => {
@@ -48,12 +49,12 @@ export default function TeamsPage() {
     try {
       const res = await fetch("/api/teams", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify(form),
       });
 
       if (res.ok) {
-        setForm({ name: "", tag: "", description: "" });
+        setForm({ name: "", tag: "", logoUrl: "", description: "" });
         setShowForm(false);
         fetchTeams();
       }
@@ -123,6 +124,16 @@ export default function TeamsPage() {
                 />
               </div>
               <div className="sm:col-span-2">
+                <label className="block text-sm text-gray-400 mb-1">لینک لوگو</label>
+                <input
+                  type="text"
+                  className="gaming-input"
+                  placeholder="https://..."
+                  value={form.logoUrl}
+                  onChange={(e) => setForm({ ...form, logoUrl: e.target.value })}
+                />
+              </div>
+              <div className="sm:col-span-2">
                 <label className="block text-sm text-gray-400 mb-1">
                   {lang === "fa" ? "توضیحات" : "Description"}
                 </label>
@@ -175,14 +186,14 @@ export default function TeamsPage() {
                 className="gaming-card p-5 group"
               >
                 <div className="flex items-center gap-4 mb-3">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-neon-purple to-neon-blue flex items-center justify-center text-xl font-bold">
-                    {team.tag}
+                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-neon-purple to-neon-blue flex items-center justify-center text-xl font-bold overflow-hidden">
+                    {team.logoUrl ? <img src={team.logoUrl} alt={team.name} className="w-full h-full object-cover" /> : team.tag}
                   </div>
                   <div>
                     <h3 className="font-bold group-hover:text-neon-blue transition-colors">
                       {team.name}
                     </h3>
-                    <p className="text-xs text-gray-500">[{team.tag}]</p>
+                    <p className="text-xs text-gray-500">[{team.tag}] • {(team.memberCount || 0).toLocaleString("fa-IR")} عضو</p>
                   </div>
                 </div>
                 {team.description && (
