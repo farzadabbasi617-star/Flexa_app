@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 
@@ -38,7 +39,7 @@ export default function PlayersPage() {
     try {
       const res = await fetch("/api/players");
       const data = await res.json();
-      setPlayers(Array.isArray(data) ? data : []);
+      setPlayers(Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : []);
     } catch {
       setPlayers([]);
     }
@@ -51,7 +52,7 @@ export default function PlayersPage() {
     try {
       await fetch("/api/players", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify(form),
       });
       setForm({ username: "", displayName: "", email: "", gameId: "" });
@@ -182,7 +183,7 @@ export default function PlayersPage() {
                 >
                   <div className="col-span-1 text-lg font-bold">{getRankEmoji(idx)}</div>
                   <div className="col-span-4">
-                    <div className="font-bold text-sm">{player.displayName}</div>
+                    <Link href={`/players/${player.id}`} className="font-bold text-sm hover:text-neon-blue transition-colors">{player.displayName}</Link>
                     <div className="text-xs text-gray-500">@{player.username}</div>
                   </div>
                   <div className="col-span-2 text-center">
