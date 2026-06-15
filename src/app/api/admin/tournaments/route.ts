@@ -47,6 +47,10 @@ function normalizeTournamentBody(body: Record<string, unknown>) {
     prize4to10: body.prize4to10 ? String(body.prize4to10) : null,
     rules: body.rules ? String(body.rules) : null,
     bannerUrl: body.bannerUrl ? String(body.bannerUrl) : null,
+    roomId: body.roomId ? String(body.roomId) : null,
+    roomPassword: body.roomPassword ? String(body.roomPassword) : null,
+    lobbyNotes: body.lobbyNotes ? String(body.lobbyNotes) : null,
+    roomVisibleAt: body.roomVisibleAt ? new Date(String(body.roomVisibleAt)) : null,
     startDate: body.startDate ? new Date(String(body.startDate)) : null,
   };
 }
@@ -79,6 +83,10 @@ export async function GET(request: NextRequest) {
         prize4to10: tournaments.prize4to10,
         rules: tournaments.rules,
         bannerUrl: tournaments.bannerUrl,
+        roomId: tournaments.roomId,
+        roomPassword: tournaments.roomPassword,
+        lobbyNotes: tournaments.lobbyNotes,
+        roomVisibleAt: tournaments.roomVisibleAt,
         startDate: tournaments.startDate,
         createdAt: tournaments.createdAt,
         updatedAt: tournaments.updatedAt,

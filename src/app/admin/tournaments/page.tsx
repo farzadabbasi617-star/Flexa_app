@@ -30,6 +30,10 @@ type TournamentRow = {
   prize4to10: string | null;
   rules: string | null;
   bannerUrl: string | null;
+  roomId: string | null;
+  roomPassword: string | null;
+  lobbyNotes: string | null;
+  roomVisibleAt: string | null;
   startDate: string | null;
   registrations: number;
 };
@@ -74,6 +78,10 @@ const emptyForm = {
   prize4to10: "",
   rules: "",
   bannerUrl: "",
+  roomId: "",
+  roomPassword: "",
+  lobbyNotes: "",
+  roomVisibleAt: "",
   startDate: "",
 };
 
@@ -148,6 +156,10 @@ export default function AdminTournamentsPage() {
       prize4to10: row.prize4to10 || "",
       rules: row.rules || "",
       bannerUrl: row.bannerUrl || "",
+      roomId: row.roomId || "",
+      roomPassword: row.roomPassword || "",
+      lobbyNotes: row.lobbyNotes || "",
+      roomVisibleAt: toDateTimeLocal(row.roomVisibleAt),
       startDate: toDateTimeLocal(row.startDate),
     });
     setShowForm(true);
@@ -167,7 +179,7 @@ export default function AdminTournamentsPage() {
       const res = await fetch("/api/admin/tournaments", {
         method: form.id ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-        body: JSON.stringify({ ...form, startDate: form.startDate || null }),
+        body: JSON.stringify({ ...form, startDate: form.startDate || null, roomVisibleAt: form.roomVisibleAt || null }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "ذخیره نشد");
@@ -231,6 +243,16 @@ export default function AdminTournamentsPage() {
             <input className="gaming-input" placeholder="نفر دوم" value={form.prize2nd} onChange={(e) => setForm({ ...form, prize2nd: e.target.value })} />
             <input className="gaming-input" placeholder="نفر سوم" value={form.prize3rd} onChange={(e) => setForm({ ...form, prize3rd: e.target.value })} />
             <input className="gaming-input" placeholder="نفرات ۴ تا ۱۰" value={form.prize4to10} onChange={(e) => setForm({ ...form, prize4to10: e.target.value })} />
+            <div className="md:col-span-2 gaming-card p-4 bg-dark-800/60 border-neon-blue/20">
+              <h3 className="font-black text-neon-blue mb-3">🎮 اطلاعات لابی / روم بازی</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input className="gaming-input" placeholder="Room ID / Lobby ID" value={form.roomId} onChange={(e) => setForm({ ...form, roomId: e.target.value })} />
+                <input className="gaming-input" placeholder="Password" value={form.roomPassword} onChange={(e) => setForm({ ...form, roomPassword: e.target.value })} />
+                <input className="gaming-input" type="datetime-local" title="زمان نمایش اطلاعات روم" value={form.roomVisibleAt} onChange={(e) => setForm({ ...form, roomVisibleAt: e.target.value })} />
+                <textarea className="gaming-input min-h-20 md:col-span-3" placeholder="توضیحات و قوانین اختصاصی لابی" value={form.lobbyNotes} onChange={(e) => setForm({ ...form, lobbyNotes: e.target.value })} />
+              </div>
+              <p className="text-[11px] text-gray-500 mt-3 leading-6">اگر زمان نمایش را خالی بگذاری، اطلاعات روم ۳۰ دقیقه قبل از شروع برای شرکت‌کنندگان نمایش داده می‌شود. ادمین‌ها همیشه می‌بینند.</p>
+            </div>
             <textarea className="gaming-input min-h-24 md:col-span-2" placeholder="توضیحات" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             <textarea className="gaming-input min-h-28 md:col-span-2" placeholder="قوانین" value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })} />
             <div className="md:col-span-2 flex gap-3">

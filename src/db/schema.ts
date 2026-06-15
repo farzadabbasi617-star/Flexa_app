@@ -198,6 +198,10 @@ export const tournaments = pgTable("tournaments", {
   prize4to10: varchar("prize_4to10", { length: 100 }),
   rules: text("rules"),
   bannerUrl: varchar("banner_url", { length: 500 }),
+  roomId: varchar("room_id", { length: 100 }),
+  roomPassword: varchar("room_password", { length: 100 }),
+  lobbyNotes: text("lobby_notes"),
+  roomVisibleAt: timestamp("room_visible_at"),
   createdById: uuid("created_by_id").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -228,6 +232,7 @@ export const registrations = pgTable("registrations", {
   playerId: uuid("player_id").notNull().references(() => players.id),
   visibleUserId: uuid("user_id").notNull().references(() => users.id),
   seed: integer("seed"),
+  checkedInAt: timestamp("checked_in_at"),
   registeredAt: timestamp("registered_at").defaultNow().notNull(),
 }, (table) => ({
   tournamentIdx: index("registrations_tournament_id_idx").on(table.tournamentId),
