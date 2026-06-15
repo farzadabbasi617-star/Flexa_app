@@ -54,7 +54,7 @@ export default function AdminSettingsPage() {
     try {
       await fetch("/api/admin/settings", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify(settings),
       });
       setSaved(true);

@@ -1,7 +1,16 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+
+interface SiteImage {
+  slug: string;
+  title: string;
+  url: string;
+  category: string;
+  altText?: string | null;
+}
 
 const GAMES = [
   {
@@ -31,10 +40,35 @@ const GAMES = [
 ];
 
 export default function LuxuryHomePage() {
+  const [images, setImages] = useState<SiteImage[]>([]);
+
+  useEffect(() => {
+    fetch("/api/public/images", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => setImages(Array.isArray(data) ? data : []))
+      .catch(() => setImages([]));
+  }, []);
+
+  const imageMap = useMemo(() => {
+    const byCategory: Record<string, SiteImage> = {};
+    const bySlug: Record<string, SiteImage> = {};
+    for (const image of images) {
+      bySlug[image.slug] = image;
+      if (!byCategory[image.category]) byCategory[image.category] = image;
+    }
+    return { byCategory, bySlug };
+  }, [images]);
+
+  const heroImage = imageMap.bySlug["home-hero"] || imageMap.byCategory.hero;
+  const appBackground = imageMap.bySlug["app-background"] || imageMap.byCategory.background;
+
   return (
     <main className="min-h-screen bg-[#050508] text-white relative overflow-x-hidden selection:bg-purple-500/30">
       {/* Ambient background */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+        {appBackground && (
+          <img src={appBackground.url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-25 scale-105" />
+        )}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,_rgba(92,0,160,.65)_0%,_rgba(32,0,56,.55)_30%,_transparent_70%)]" />
         <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-purple-700/20 blur-[80px] animate-pulse" />
         <div className="absolute top-72 -right-28 w-64 h-64 rounded-full bg-cyan-500/10 blur-[85px]" />
@@ -67,6 +101,7 @@ export default function LuxuryHomePage() {
           <Link href="/tournaments" className="block active:scale-[.99] transition-transform">
             <div className="glass-panel rounded-[42px] overflow-hidden relative h-56 border border-purple-400/20 shadow-[0_28px_80px_rgba(0,0,0,.55)]">
               <div className="absolute inset-0 hero-art" />
+              {heroImage && <img src={heroImage.url} alt={heroImage.altText || heroImage.title} className="absolute inset-0 w-full h-full object-cover opacity-45 scale-105" />}
               <div className="absolute inset-0 bg-gradient-to-t from-[#050508] via-[#050508]/25 to-transparent" />
               <div className="absolute top-5 left-5 w-9 h-9 rounded-full border border-white/10 bg-white/5 backdrop-blur-xl" />
               <div className="absolute -top-6 -right-10 w-40 h-40 rounded-full bg-purple-500/15 blur-3xl" />
@@ -98,10 +133,13 @@ export default function LuxuryHomePage() {
           </div>
 
           <div className="grid grid-cols-1 gap-6">
-            {GAMES.map((game) => (
+            {GAMES.map((game) => {
+              const gameImage = imageMap.bySlug[`game-card-${game.id}`] || imageMap.byCategory[game.id];
+              return (
               <Link key={game.id} href={`/tournaments?game=${game.id}`} className="block group active:scale-[.98] transition-transform">
-                <article className="game-card glass-panel rounded-[36px] overflow-hidden relative h-40 border border-white/5 transition-all group-hover:border-purple-400/30">
+                <article className="game-card glass-panel fx-card rounded-[36px] overflow-hidden relative h-40 border border-white/5 transition-all group-hover:border-purple-400/30">
                   <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110" style={{ background: game.bg }} />
+                  {gameImage && <img src={gameImage.url} alt={gameImage.altText || gameImage.title} className="absolute inset-0 w-full h-full object-cover opacity-50 transition-transform duration-700 group-hover:scale-110" />}
                   <div className="absolute inset-0 bg-gradient-to-l from-black/85 via-black/40 to-black/5" />
                   <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-black/70 to-transparent" />
                   <div className="absolute top-5 left-6 text-[10px] font-black text-white/30 en-font tracking-[0.24em]">
@@ -121,7 +159,8 @@ export default function LuxuryHomePage() {
                   </div>
                 </article>
               </Link>
-            ))}
+              );
+            })}
           </div>
         </section>
 

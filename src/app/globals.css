@@ -228,3 +228,49 @@
 .bracket-line {
   border-color: var(--color-gaming-border);
 }
+
+/* Luxury depth / motion layer */
+@keyframes float-slow {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(0, -8px, 0) rotate(2deg); }
+}
+
+@keyframes aurora-shift {
+  0% { filter: hue-rotate(0deg); transform: translateX(0); }
+  50% { filter: hue-rotate(22deg); transform: translateX(12px); }
+  100% { filter: hue-rotate(0deg); transform: translateX(0); }
+}
+
+@keyframes soft-shimmer {
+  0% { transform: translateX(-130%) skewX(-18deg); opacity: 0; }
+  25% { opacity: .35; }
+  100% { transform: translateX(130%) skewX(-18deg); opacity: 0; }
+}
+
+.animate-float-slow { animation: float-slow 4.8s ease-in-out infinite; }
+.animate-aurora { animation: aurora-shift 8s ease-in-out infinite; }
+
+.fx-card {
+  transform-style: preserve-3d;
+  box-shadow:
+    0 28px 80px rgba(0, 0, 0, .42),
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 -1px 0 rgba(255,255,255,.03);
+}
+
+.fx-card::after {
+  content: "";
+  position: absolute;
+  inset: -20% -45%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent);
+  pointer-events: none;
+  animation: soft-shimmer 5.5s ease-in-out infinite;
+}
+
+.depth-orb {
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(42px);
+  opacity: .22;
+  pointer-events: none;
+}

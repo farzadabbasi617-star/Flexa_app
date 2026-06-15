@@ -1,8 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+
+interface SiteImage {
+  slug: string;
+  url: string;
+  category: string;
+  altText?: string | null;
+}
 
 const navItems = [
   { id: "arena", label: "آرنا", icon: "🔥", path: "/" },
@@ -14,14 +21,27 @@ const navItems = [
 export default function BottomNav() {
   const pathname = usePathname();
   const [isOpen, setIsOpen] = useState(false);
+  const [icons, setIcons] = useState<SiteImage[]>([]);
 
   useEffect(() => {
     setIsOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    fetch("/api/public/images?category=icon", { cache: "no-store" })
+      .then((res) => res.json())
+      .then((data) => setIcons(Array.isArray(data) ? data : []))
+      .catch(() => setIcons([]));
+  }, []);
+
+  const iconMap = useMemo(() => {
+    const map: Record<string, SiteImage> = {};
+    for (const image of icons) map[image.slug] = image;
+    return map;
+  }, [icons]);
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto px-6 pb-4 z-50 pointer-events-none">
-      {/* Small handle: keeps the menu out of the way until the user needs it. */}
       <button
         type="button"
         onClick={() => setIsOpen((value) => !value)}
@@ -42,6 +62,7 @@ export default function BottomNav() {
       >
         {navItems.map((item) => {
           const isActive = item.path === "/" ? pathname === "/" : pathname.startsWith(item.path);
+          const imageIcon = iconMap[`icon-${item.id}`];
           return (
             <Link
               key={item.id}
@@ -52,7 +73,15 @@ export default function BottomNav() {
               aria-current={isActive ? "page" : undefined}
             >
               {isActive && <div className="absolute -top-10 w-[35px] h-1 bg-purple-500 shadow-[0_0_18px_#bc00ff] rounded-full" />}
-              <div className={`text-3xl ${isActive ? "drop-shadow-[0_0_14px_#bc00ff]" : ""}`}>{item.icon}</div>
+              {imageIcon ? (
+                <img
+                  src={imageIcon.url}
+                  alt={imageIcon.altText || item.label}
+                  className={`w-9 h-9 rounded-2xl object-cover ${isActive ? "drop-shadow-[0_0_14px_#bc00ff]" : "opacity-70"}`}
+                />
+              ) : (
+                <div className={`text-3xl ${isActive ? "drop-shadow-[0_0_14px_#bc00ff]" : ""}`}>{item.icon}</div>
+              )}
               <span className="text-[9px] font-black uppercase">{item.label}</span>
             </Link>
           );

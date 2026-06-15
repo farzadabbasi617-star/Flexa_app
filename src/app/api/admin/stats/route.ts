@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users, players, tournaments, matches, disputes, chatMessages, judgments } from "@/db/schema";
+import { users, players, tournaments, matches, disputes, globalChat, judgments } from "@/db/schema";
 import { count, eq } from "drizzle-orm";
 import { validateAdmin } from "@/lib/auth";
 
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const [tCount] = await db.select({ v: count() }).from(tournaments);
     const [mCount] = await db.select({ v: count() }).from(matches);
     const [dCount] = await db.select({ v: count() }).from(disputes);
-    const [cCount] = await db.select({ v: count() }).from(chatMessages);
+    const [cCount] = await db.select({ v: count() }).from(globalChat);
     const [jCount] = await db.select({ v: count() }).from(judgments);
     const [aiCount] = await db.select({ v: count() }).from(judgments).where(eq(judgments.isAiJudgment, true));
     const [completedCount] = await db.select({ v: count() }).from(matches).where(eq(matches.status, "completed"));

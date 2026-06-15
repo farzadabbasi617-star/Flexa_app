@@ -23,9 +23,11 @@ interface SiteImage {
 
 const CATEGORIES = [
   { value: "hero", label: { fa: "هیرو / بنر اصلی", en: "Hero / Main Banner" } },
-  { value: "clash_royale", label: { fa: "کلش رویال", en: "Clash Royale" } },
-  { value: "cod_mobile", label: { fa: "کالاف موبایل", en: "COD Mobile" } },
-  { value: "fortnite", label: { fa: "فورتنایت", en: "Fortnite" } },
+  { value: "background", label: { fa: "پس‌زمینه اپ", en: "App Background" } },
+  { value: "icon", label: { fa: "آیکون‌ها", en: "Icons" } },
+  { value: "clash_royale", label: { fa: "کارت بازی کلش رویال", en: "Clash Royale Card" } },
+  { value: "cod_mobile", label: { fa: "کارت بازی کالاف موبایل", en: "COD Mobile Card" } },
+  { value: "fortnite", label: { fa: "کارت بازی فورتنایت", en: "Fortnite Card" } },
   { value: "tournament", label: { fa: "تورنومنت", en: "Tournament" } },
   { value: "general", label: { fa: "عمومی", en: "General" } },
 ];
@@ -93,13 +95,13 @@ export default function AdminImagesPage() {
       if (editingId) {
         await fetch("/api/admin/images", {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
           body: JSON.stringify({ id: editingId, ...form }),
         });
       } else {
         await fetch("/api/admin/images", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
           body: JSON.stringify(form),
         });
       }
@@ -115,7 +117,7 @@ export default function AdminImagesPage() {
     try {
       await fetch("/api/admin/images", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ id }),
       });
       fetchImages();
@@ -126,7 +128,7 @@ export default function AdminImagesPage() {
     try {
       await fetch("/api/admin/images", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ id: img.id, isActive: !img.isActive }),
       });
       fetchImages();
@@ -157,8 +159,8 @@ export default function AdminImagesPage() {
         <div className="gaming-card p-4 mb-6 border-neon-blue/30">
           <p className="text-sm text-gray-400">
             💡 {lang === "fa"
-              ? "تصاویر را از هاست تصویر (مثل imgbb.com یا imgur.com) آپلود کنید و لینک را اینجا وارد کنید. دسته‌بندی مناسب انتخاب کنید تا تصاویر در جای درست نمایش داده شوند."
-              : "Upload images to an image host (like imgbb.com or imgur.com) and paste the link here. Choose the right category so images show in the correct place."}
+              ? "برای کنترل کامل ظاهر، تصویر را آپلود و لینک مستقیم را وارد کنید. دسته‌بندی hero برای بنر اصلی، background برای پس‌زمینه، icon برای آیکون‌ها و دسته هر بازی برای تصویر کارت همان بازی استفاده می‌شود. اسلاگ‌های پیشنهادی: home-hero، app-background، icon-home، icon-chat، icon-profile."
+              : "Upload images and paste direct URLs. Use hero for main banner, background for app background, icon for icons, and each game category for game-card images."}
           </p>
         </div>
 

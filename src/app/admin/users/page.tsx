@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -29,6 +29,16 @@ export default function AdminUsersPage() {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
+  const [showCreate, setShowCreate] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [newUser, setNewUser] = useState({
+    phoneNumber: "",
+    email: "",
+    username: "",
+    displayName: "",
+    password: "",
+    role: "player",
+  });
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const isSuperAdmin = user?.role === "super_admin";
@@ -54,6 +64,45 @@ export default function AdminUsersPage() {
       setUsers([]);
     }
     setLoadingUsers(false);
+  }
+
+  async function createUser(e: FormEvent) {
+    e.preventDefault();
+    setCreating(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify(newUser),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "ساخت کاربر انجام نشد");
+      setNewUser({ phoneNumber: "", email: "", username: "", displayName: "", password: "", role: "player" });
+      setShowCreate(false);
+      fetchUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ساخت کاربر انجام نشد");
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  async function deleteUser(id: string) {
+    if (!confirm("حساب کاربر به‌صورت امن حذف/ناشناس می‌شود. ادامه می‌دهی؟")) return;
+    setError("");
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "حذف انجام نشد");
+      fetchUsers();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "حذف انجام نشد");
+    }
   }
 
   async function patchUser(id: string, payload: Record<string, unknown>) {
@@ -100,9 +149,27 @@ export default function AdminUsersPage() {
             </h1>
             <span className="text-sm text-gray-500">({users.length})</span>
           </div>
+          <button onClick={() => setShowCreate((v) => !v)} className="gaming-btn text-sm">+ کاربر جدید</button>
         </div>
 
         {error && <div className="bg-red-900/30 border border-red-500/40 text-red-300 rounded-xl p-3 mb-5 text-sm">{error}</div>}
+
+        {showCreate && (
+          <form onSubmit={createUser} className="gaming-card p-5 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-slide-up">
+            <input className="gaming-input text-sm" placeholder="شماره موبایل" value={newUser.phoneNumber} onChange={(e) => setNewUser({ ...newUser, phoneNumber: e.target.value })} />
+            <input className="gaming-input text-sm" placeholder="ایمیل اختیاری" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+            <input className="gaming-input text-sm" placeholder="نام کاربری" value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} />
+            <input className="gaming-input text-sm" placeholder="نام نمایشی" value={newUser.displayName} onChange={(e) => setNewUser({ ...newUser, displayName: e.target.value })} />
+            <input className="gaming-input text-sm" placeholder="رمز اولیه" type="password" value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
+            <select className="gaming-select text-sm" value={newUser.role} onChange={(e) => setNewUser({ ...newUser, role: e.target.value })}>
+              <option value="player">بازیکن</option>
+              <option value="judge">داور</option>
+              <option value="moderator">ناظر</option>
+              {isSuperAdmin && <option value="admin">ادمین</option>}
+            </select>
+            <button disabled={creating} className="gaming-btn text-sm disabled:opacity-50 sm:col-span-2 lg:col-span-3">{creating ? "در حال ساخت..." : "ساخت کاربر"}</button>
+          </form>
+        )}
 
         <div className="mb-6">
           <input
@@ -166,6 +233,12 @@ export default function AdminUsersPage() {
                       }`}
                     >
                       {u.isVerified ? "✓ تأیید شده" : "تأیید نشده"}
+                    </button>
+                    <button
+                      onClick={() => deleteUser(u.id)}
+                      className="text-xs px-3 py-1.5 rounded-lg flex-shrink-0 bg-red-500/10 text-red-300 hover:bg-red-500/20"
+                    >
+                      حذف امن
                     </button>
                   </div>
                 </div>
