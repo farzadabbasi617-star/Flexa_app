@@ -10,6 +10,28 @@ export interface AIProviderResult {
   model?: string;
 }
 
+export function normalizeAIEnvValue(value: string | undefined) {
+  if (!value) return "";
+  let secret = value.trim();
+
+  // Render values are sometimes pasted with wrapping quotes. If kept, providers
+  // receive `Bearer "sk-..."` and reject with 401, making the assistant fall
+  // back to local mode.
+  if ((secret.startsWith('"') && secret.endsWith('"')) || (secret.startsWith("'") && secret.endsWith("'"))) {
+    secret = secret.slice(1, -1).trim();
+  }
+
+  if (secret.toLowerCase().startsWith("bearer ")) {
+    secret = secret.slice(7).trim();
+  }
+
+  return secret;
+}
+
+export function isUsableAISecret(value: string) {
+  return Boolean(value && !value.includes("your_") && value.length > 12);
+}
+
 const PROVIDERS: Array<{
   id: AIProvider;
   url: string;
@@ -23,9 +45,10 @@ const PROVIDERS: Array<{
     apiKeyEnv: "OPENROUTER_API_KEY",
     modelEnv: "OPENROUTER_MODEL",
     defaultModels: [
+      "google/gemini-2.0-flash-exp:free",
+      "meta-llama/llama-3.3-70b-instruct:free",
       "google/gemini-2.0-flash-001",
       "google/gemini-flash-1.5",
-      "meta-llama/llama-3.3-70b-instruct:free",
     ],
   },
   {
@@ -44,7 +67,7 @@ function timeoutSignal(ms: number) {
 }
 
 function modelsFor(provider: (typeof PROVIDERS)[number]) {
-  const envModel = process.env[provider.modelEnv];
+  const envModel = normalizeAIEnvValue(process.env[provider.modelEnv]);
   return [...new Set([...(envModel ? [envModel] : []), ...provider.defaultModels])];
 }
 
@@ -54,8 +77,8 @@ async function callProviderModel(
   prompt: string,
   systemPrompt: string
 ): Promise<AIProviderResult | null> {
-  const apiKey = process.env[provider.apiKeyEnv];
-  if (!apiKey) return null;
+  const apiKey = normalizeAIEnvValue(process.env[provider.apiKeyEnv]);
+  if (!isUsableAISecret(apiKey)) return null;
 
   const { signal, cancel } = timeoutSignal(18_000);
 
@@ -115,7 +138,7 @@ async function callProvider(
   prompt: string,
   systemPrompt: string
 ): Promise<AIProviderResult | null> {
-  if (!process.env[provider.apiKeyEnv]) return null;
+  if (!isUsableAISecret(normalizeAIEnvValue(process.env[provider.apiKeyEnv]))) return null;
   for (const model of modelsFor(provider)) {
     const result = await callProviderModel(provider, model, prompt, systemPrompt);
     if (result) return result;
