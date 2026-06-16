@@ -114,7 +114,7 @@ const sections = [
 ];
 
 export default function LegalDrawer() {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   const toggleSection = (id: string) => {
@@ -122,25 +122,20 @@ export default function LegalDrawer() {
   };
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto">
-      {/* Collapsible Bar */}
-      <div className="bg-[#0f0f14] border-t border-white/10 shadow-xl rounded-t-2xl overflow-hidden mx-2">
-        {/* Header Bar */}
+    <div className="fixed bottom-0 left-0 right-0 z-[55] max-w-[480px] mx-auto pointer-events-none">
+      <div className="mx-3 mb-1 pointer-events-auto">
+        {/* Small Fixed Bar */}
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="w-full flex items-center justify-between px-4 py-3 active:bg-white/5 transition-colors"
+          className="w-full flex items-center justify-center gap-2 bg-[#0f0f14] border border-white/10 rounded-2xl py-2.5 text-xs font-bold text-white/70 active:bg-white/5 transition-all shadow-lg"
         >
-          <div className="flex items-center gap-2 text-sm font-bold text-white/80">
-            <span>اطلاعات قانونی و راهنما</span>
-          </div>
-          <span className={`text-lg transition-transform ${isOpen ? "rotate-180" : ""}`}>
-            ⌄
-          </span>
+          <span>اطلاعات قانونی و راهنما</span>
+          <span className={`text-base transition-transform ${isOpen ? "rotate-180" : ""}`}>⌄</span>
         </button>
 
-        {/* Content */}
+        {/* Expandable Content */}
         {isOpen && (
-          <div className="px-2 pb-2 text-sm max-h-[55vh] overflow-y-auto border-t border-white/10">
+          <div className="mt-1 bg-[#0f0f14] border border-white/10 rounded-2xl overflow-hidden shadow-2xl max-h-[60vh] overflow-y-auto">
             {sections.map((section) => (
               <div key={section.id} className="border-b border-white/10 last:border-none">
                 <button
@@ -157,7 +152,7 @@ export default function LegalDrawer() {
                 </button>
 
                 {activeSection === section.id && (
-                  <div className="px-4 pb-5 text-white/75 text-[13px] leading-relaxed">
+                  <div className="px-4 pb-5 text-white/75 text-[13px] leading-relaxed border-t border-white/10">
                     {section.content}
                   </div>
                 )}
