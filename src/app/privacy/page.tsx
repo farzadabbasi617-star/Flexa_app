@@ -44,8 +44,9 @@ export default function PrivacyPage() {
           </section>
         </div>
       </div>
+      </main>
 
       <BottomNav />
-    </main>
+    </div>
   );
 }
