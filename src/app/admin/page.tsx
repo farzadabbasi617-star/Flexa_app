@@ -234,6 +234,7 @@ export default function AdminPage() {
               { href: "/admin/notifications", icon: "🔔", title: "اعلان سیستمی", desc: "ارسال اعلان به همه کاربران یا کاربر مشخص" },
               { href: "/admin/support", icon: "🎧", title: "پشتیبانی و تیکت", desc: "مشاهده تیکت‌ها، پاسخ رسمی و تغییر وضعیت" },
               { href: "/admin/audit", icon: "🧾", title: "لاگ فعالیت مدیران", desc: "ردیابی تغییرات حساس، حذف‌ها، ویرایش‌ها و عملیات مالی" },
+              { href: "/admin/maintenance", icon: "🧹", title: "نگهداری سیستم", desc: "پاکسازی نشست‌ها، rate limitها، چت اضافه و لاگ‌های قدیمی" },
               { href: "/admin/tournaments", icon: "🧩", title: "کنترل کامل تورنومنت", desc: "ویرایش کامل رویدادها، جوایز، قوانین، وضعیت و بنر" },
             ].map((item) => (
               <Link key={item.href} href={item.href} className="gaming-card p-6 group hover:border-neon-purple/50 transition-all relative overflow-hidden">

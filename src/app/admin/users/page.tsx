@@ -23,6 +23,7 @@ const PERMISSIONS = [
   { key: "ai", label: "هوش مصنوعی" },
   { key: "settings", label: "تنظیمات" },
   { key: "uploads", label: "آپلود فایل" },
+  { key: "maintenance", label: "نگهداری سیستم" },
 ];
 
 interface UserRow {
