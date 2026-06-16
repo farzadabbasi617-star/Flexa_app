@@ -232,6 +232,7 @@ export default function TournamentsPage() {
           <TournamentsContent canCreate={Boolean(canCreate)} walletBalanceToman={walletBalanceToman} isLoggedIn={Boolean(user)} />
         </Suspense>
       </div>
+      <BottomNav />
     </div>
   );
 }
