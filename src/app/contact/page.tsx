@@ -35,8 +35,20 @@ export default function ContactPage() {
               <span className="text-2xl mt-0.5">📱</span>
               <div>
                 <div className="font-bold mb-1">تلگرام</div>
-                <a href="https://t.me/flexa_support" target="_blank" className="text-purple-400 hover:underline">
-                  @flexa_support
+                <a href="https://t.me/Flexa_games" target="_blank" className="text-purple-400 hover:underline">
+                  @Flexa_games
+                </a>
+              </div>
+            </div>
+          </div>
+
+          <div className="glass-panel p-6 rounded-3xl border border-white/10">
+            <div className="flex items-start gap-4">
+              <span className="text-2xl mt-0.5">📷</span>
+              <div>
+                <div className="font-bold mb-1">اینستاگرام</div>
+                <a href="https://instagram.com/flexa_app" target="_blank" className="text-purple-400 hover:underline">
+                  @flexa_app
                 </a>
               </div>
             </div>
