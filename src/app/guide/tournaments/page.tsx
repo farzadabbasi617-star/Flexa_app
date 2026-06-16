@@ -1,11 +1,14 @@
 "use client";
 
+import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 
 export default function TournamentGuidePage() {
   return (
-    <main className="min-h-screen bg-[#050508] text-white pb-24">
-      <div className="max-w-[480px] mx-auto px-6 pt-12">
+    <div className="min-h-screen bg-[#050508] text-white">
+      <Navbar />
+      <main className="pb-24">
+        <div className="max-w-[480px] mx-auto px-6 pt-12">
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-3xl">🎮</span>
@@ -43,8 +46,9 @@ export default function TournamentGuidePage() {
           </div>
         </div>
       </div>
+      </main>
 
       <BottomNav />
-    </main>
+    </div>
   );
 }
