@@ -207,8 +207,10 @@ export default function AIAssistant() {
           onKeyDown={(e) => {
             if (e.key === "Enter" || e.key === " ") setIsOpen((value) => !value);
           }}
-          className={`fixed w-14 h-14 rounded-full shadow-[0_18px_45px_rgba(0,0,0,0.45)] z-[80] flex items-center justify-center text-2xl transition-transform active:scale-95 border border-white/10 touch-none select-none ${
-            isOpen ? "bg-dark-700 rotate-45" : "bg-gradient-to-br from-neon-purple to-neon-blue animate-glow"
+          className={`fixed w-14 h-14 rounded-full shadow-[0_18px_45px_rgba(0,0,0,0.45)] z-[80] flex items-center justify-center text-2xl transition-all active:scale-95 border border-white/10 touch-none select-none ${
+            isOpen 
+              ? "bg-dark-700 rotate-45" 
+              : "bg-gradient-to-br from-neon-purple to-neon-blue opacity-60 hover:opacity-100"
           }`}
           style={{ left: position.x, top: position.y }}
           aria-label={isOpen ? "بستن دستیار هوشمند" : "باز کردن دستیار هوشمند"}

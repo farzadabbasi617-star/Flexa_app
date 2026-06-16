@@ -20,7 +20,7 @@ const navItems = [
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true); // پیش‌فرض باز
   const [icons, setIcons] = useState<SiteImage[]>([]);
 
   useEffect(() => {
@@ -56,7 +56,7 @@ export default function BottomNav() {
       </button>
 
       <div
-        className={`glass-bottom rounded-[45px] py-7 px-2 flex justify-around items-center border border-white/10 shadow-[0_-20px_60px_rgba(0,0,0,0.82)] pointer-events-auto transition-all duration-300 ease-out ${
+        className={`glass-bottom rounded-[28px] py-4 px-3 flex justify-around items-center border border-white/10 shadow-[0_-15px_40px_rgba(0,0,0,0.75)] pointer-events-auto transition-all duration-300 ease-out ${
           isOpen ? "translate-y-0 opacity-100" : "translate-y-[125%] opacity-0"
         }`}
       >
@@ -82,7 +82,7 @@ export default function BottomNav() {
               ) : (
                 <div className={`text-3xl ${isActive ? "drop-shadow-[0_0_14px_#bc00ff]" : ""}`}>{item.icon}</div>
               )}
-              <span className="text-[9px] font-black uppercase">{item.label}</span>
+              <span className="text-[8px] font-black uppercase tracking-wider mt-0.5 opacity-80">{item.label}</span>
             </Link>
           );
         })}
