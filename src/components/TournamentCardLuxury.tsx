@@ -72,15 +72,22 @@ const GAME_FALLBACK: Record<string, string> = {
 function getDirectImageUrl(url: string | null | undefined): string | null {
   if (!url) return null;
 
-  // اگر لینک viewer.php باشد، آن را به لینک مستقیم تبدیل می‌کنیم
+  // پشتیبانی از لینک viewer.php
   if (url.includes("imgurl.ir/viewer.php")) {
     const match = url.match(/[?&]file=([^&]+)/);
     if (match && match[1]) {
-      return `https://cdn.imgurl.ir/uploads/${match[1]}`;
+      // حذف کاراکترهای اضافی و ساخت لینک مستقیم
+      const fileName = match[1].split("?")[0]; // در صورت وجود پارامتر اضافی
+      return `https://cdn.imgurl.ir/uploads/${fileName}`;
     }
   }
 
-  // اگر لینک مستقیم باشد، همان را برمی‌گردانیم
+  // اگر لینک مستقیم باشد (cdn.imgurl.ir)
+  if (url.includes("cdn.imgurl.ir")) {
+    return url;
+  }
+
+  // در غیر این صورت همان لینک را برمی‌گردانیم
   return url;
 }
 
@@ -90,6 +97,12 @@ const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false
 
   // تبدیل خودکار لینک تصویر
   const bannerUrl = getDirectImageUrl(t.bannerUrl);
+
+  // برای دیباگ - می‌توانی در کنسول مرورگر چک کنی
+  if (process.env.NODE_ENV === 'development' && t.bannerUrl) {
+    console.log('Original bannerUrl:', t.bannerUrl);
+    console.log('Converted bannerUrl:', bannerUrl);
+  }
 
   const entryFeeInfo = useMemo(() => {
     const rial = parseTomanToRial(t.entryFee || "");

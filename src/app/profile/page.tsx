@@ -154,13 +154,16 @@ export default function ProfilePage() {
 
         <div className="mb-8 space-y-4">
           <h3 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mr-2">تیکت‌های پشتیبانی</h3>
-          <div className="glass-panel p-5 rounded-[30px] flex items-center justify-between border-white/5">
+          <Link 
+            href="/support" 
+            className="glass-panel p-5 rounded-[30px] flex items-center justify-between border-white/5 active:scale-[0.985] transition-all block"
+          >
             <div className="text-right">
               <h4 className="text-xs font-black">مرکز پشتیبانی فلکسا</h4>
-              <p className="text-[8px] text-gray-500 uppercase">به‌زودی فعال می‌شود</p>
+              <p className="text-[8px] text-gray-500 uppercase">ارسال تیکت و پیگیری</p>
             </div>
-            <span className="bg-orange-500/10 text-orange-500 px-3 py-1 rounded-lg text-[8px] font-black uppercase">Soon</span>
-          </div>
+            <span className="text-xl">🎧</span>
+          </Link>
         </div>
 
         <button
