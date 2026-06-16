@@ -30,15 +30,16 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
 
   return (
     <div dir={dir} className="relative min-h-screen">
-      {/* بک‌گراند ثابت و اجباری */}
+      {/* بک‌گراند ثابت و قوی */}
       <div 
-        className="fixed inset-0 z-[-1]" 
+        className="fixed inset-0 -z-10 pointer-events-none"
         style={{
           backgroundImage: "url('/background.jpg')",
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundAttachment: "fixed",
-          backgroundRepeat: "no-repeat"
+          backgroundRepeat: "no-repeat",
+          opacity: 0.85
         }}
       />
       
