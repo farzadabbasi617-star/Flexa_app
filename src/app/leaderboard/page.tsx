@@ -86,13 +86,15 @@ export default function LeaderboardPage() {
           <p className="text-[10px] font-bold text-purple-400 tracking-[0.3em] uppercase opacity-70 mt-2">قهرمانان فلکسا</p>
         </header>
 
-        <div className="flex gap-2 overflow-x-auto pb-2 mb-8">
+        <div className="flex gap-2 overflow-x-auto pb-3 mb-8 scrollbar-hide">
           {BOARDS.map((item) => (
             <button
               key={item.id}
               onClick={() => setBoard(item.id)}
-              className={`whitespace-nowrap px-4 py-3 rounded-2xl text-xs font-black border transition-all ${
-                board === item.id ? "bg-purple-500/20 border-purple-400/40 text-purple-200" : "bg-white/5 border-white/5 text-gray-500"
+              className={`whitespace-nowrap px-5 py-3 rounded-2xl text-sm font-black border transition-all active:scale-[0.985] ${
+                board === item.id 
+                  ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_20px_rgba(168,85,247,.3)]" 
+                  : "bg-[#111114] border-white/10 text-gray-400 hover:border-white/30"
               }`}
             >
               {item.icon} {item.label}
@@ -106,44 +108,61 @@ export default function LeaderboardPage() {
           <div className="gaming-card p-10 text-center text-gray-500">هنوز بازیکنی برای رتبه‌بندی وجود ندارد.</div>
         ) : (
           <>
-            <section className="grid grid-cols-3 gap-3 mb-8 items-end">
+            <section className="grid grid-cols-3 gap-3 mb-10 items-end">
               {[topThree[1], topThree[0], topThree[2]].map((player, visualIndex) => {
                 if (!player) return <div key={visualIndex} />;
                 const actualIndex = sortedPlayers.findIndex((p) => p.id === player.id);
                 const isFirst = actualIndex === 0;
                 return (
-                  <Link key={player.id} href={`/players/${player.id}`} className={`gaming-card p-4 text-center ${isFirst ? "scale-105 border-yellow-500/40" : "opacity-90"}`}>
-                    <div className="text-4xl mb-2">{medal(actualIndex)}</div>
-                    <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-purple-600 to-cyan-500 grid place-items-center text-2xl font-black mb-3">
+                  <Link 
+                    key={player.id} 
+                    href={`/players/${player.id}`} 
+                    className={`glass-panel p-5 text-center active:scale-[0.985] transition-all border ${isFirst ? "border-yellow-500/50 scale-[1.03]" : "border-white/10"}`}
+                  >
+                    <div className="text-4xl mb-3">{medal(actualIndex)}</div>
+                    <div className="w-16 h-16 mx-auto rounded-full bg-gradient-to-br from-purple-600 to-cyan-500 grid place-items-center text-2xl font-black mb-3 ring-4 ring-[#050508]">
                       {player.displayName.charAt(0).toUpperCase()}
                     </div>
-                    <div className="font-black text-sm truncate">{player.displayName}</div>
-                    <div className="text-[10px] text-gray-500 truncate">@{player.username}</div>
-                    <div className="mt-2 text-neon-yellow font-black">{scoreFor(player, board).toLocaleString("fa-IR")}</div>
+                    <div className="font-black truncate text-[15px]">{player.displayName}</div>
+                    <div className="text-xs text-gray-500 truncate">@{player.username}</div>
+                    <div className="mt-3 text-yellow-400 font-black text-xl tracking-tight num-en">
+                      {scoreFor(player, board).toLocaleString("fa-IR")}
+                    </div>
                   </Link>
                 );
               })}
             </section>
 
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {sortedPlayers.map((player, idx) => {
                 const winRate = getWinRate(player);
                 return (
-                  <Link key={player.id} href={`/players/${player.id}`} className={`glass-panel p-5 rounded-[30px] flex items-center gap-4 border ${idx === 0 ? "border-yellow-500/30" : "border-white/5"}`}>
-                    <div className="w-12 text-center text-2xl font-black">{medal(idx)}</div>
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-purple-600 to-blue-600 grid place-items-center font-black">
+                  <Link 
+                    key={player.id} 
+                    href={`/players/${player.id}`} 
+                    className="glass-panel active:bg-white/5 p-5 rounded-3xl flex items-center gap-4 border border-white/10 active:scale-[0.985] transition-all"
+                  >
+                    <div className="w-11 text-center text-xl font-black text-purple-400">{medal(idx)}</div>
+                    
+                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 grid place-items-center font-black text-lg ring-4 ring-[#050508]">
                       {player.displayName.charAt(0).toUpperCase()}
                     </div>
+
                     <div className="flex-1 min-w-0 text-right">
-                      <div className="font-black truncate">{player.displayName} {player.isVerified && <span className="text-neon-green">✓</span>}</div>
-                      <div className="text-[10px] text-gray-500 truncate">@{player.username} • Level {player.level || 1}</div>
-                      <div className="mt-2 h-1.5 bg-dark-700 rounded-full overflow-hidden">
-                        <div className="h-full bg-gradient-to-r from-neon-green to-neon-blue" style={{ width: `${Math.min(winRate, 100)}%` }} />
+                      <div className="font-black flex items-center justify-end gap-1.5">
+                        {player.displayName}
+                        {player.isVerified && <span className="text-emerald-400 text-sm">✓</span>}
                       </div>
+                      <div className="text-xs text-gray-500">@{player.username} • سطح {player.level || 1}</div>
                     </div>
-                    <div className="text-left min-w-[76px]">
-                      <p className="text-lg font-black num-en">{scoreFor(player, board).toLocaleString("fa-IR")}</p>
-                      <p className="text-[9px] text-gray-600 font-bold uppercase">{board === "winrate" ? "%" : board}</p>
+
+                    <div className="text-right min-w-[68px]">
+                      <div className="font-black text-2xl num-en tracking-[-1px]">
+                        {scoreFor(player, board).toLocaleString("fa-IR")}
+                      </div>
+                      <div className="text-[10px] text-gray-500 -mt-0.5">
+                        {board === "winrate" ? "%" : board}
+                      </div>
                     </div>
                   </Link>
                 );
