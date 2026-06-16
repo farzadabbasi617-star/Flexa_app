@@ -127,41 +127,77 @@ export default function WalletPage() {
         {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-5 text-sm">{error}</div>}
         {message && <div className="bg-green-500/10 border border-green-500/30 text-green-300 rounded-xl p-3 mb-5 text-sm">{message}</div>}
 
-        <section className="gaming-card p-7 mb-6 bg-gradient-to-br from-purple-900/40 to-dark-800">
-          <p className="text-xs text-purple-300 mb-2">موجودی قابل استفاده</p>
-          <div className="text-5xl font-black text-white mb-2">{(data?.wallet.balanceToman || 0).toLocaleString("fa-IR")}</div>
-          <p className="text-sm text-gray-500">تومان</p>
-          {pendingDeposits.length > 0 && <p className="mt-4 text-xs text-yellow-300">{pendingDeposits.length.toLocaleString("fa-IR")} درخواست شارژ در انتظار تأیید مدیریت داری.</p>}
+        <section className="glass-panel p-7 mb-6 bg-gradient-to-br from-purple-900/30 to-[#0a0a0e] border-purple-500/20">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-bold text-purple-400">موجودی قابل استفاده</p>
+            {pendingDeposits.length > 0 && (
+              <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                {pendingDeposits.length} در انتظار
+              </span>
+            )}
+          </div>
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-6xl font-black tracking-tighter num-en">
+              {(data?.wallet.balanceToman || 0).toLocaleString("fa-IR")}
+            </span>
+            <span className="text-xl font-bold text-purple-400">تومان</span>
+          </div>
         </section>
 
-        <form onSubmit={requestDeposit} className="gaming-card p-5 mb-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div className="sm:col-span-3">
-            <h2 className="font-black mb-2">درخواست شارژ کیف پول</h2>
-            <p className="text-xs text-gray-500 leading-6">تا زمان اتصال درگاه پرداخت، درخواست شارژ توسط مدیریت بررسی و تأیید می‌شود.</p>
+        <form onSubmit={requestDeposit} className="glass-panel p-5 mb-6 space-y-4">
+          <div>
+            <h2 className="font-black mb-1">درخواست شارژ کیف پول</h2>
+            <p className="text-xs text-gray-500">تا اتصال درگاه، درخواست‌ها توسط مدیریت تأیید می‌شوند.</p>
           </div>
-          <input className="gaming-input" placeholder="مبلغ تومان" value={amount} onChange={(e) => setAmount(e.target.value)} />
-          <input className="gaming-input sm:col-span-2" placeholder="توضیح اختیاری / شماره پیگیری" value={note} onChange={(e) => setNote(e.target.value)} />
-          <button disabled={submitting} className="gaming-btn sm:col-span-3 disabled:opacity-50">{submitting ? "در حال ثبت..." : "ثبت درخواست شارژ"}</button>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <input 
+              className="gaming-input" 
+              placeholder="مبلغ (تومان)" 
+              value={amount} 
+              onChange={(e) => setAmount(e.target.value)} 
+            />
+            <input 
+              className="gaming-input sm:col-span-2" 
+              placeholder="توضیح اختیاری" 
+              value={note} 
+              onChange={(e) => setNote(e.target.value)} 
+            />
+          </div>
+          
+          <button 
+            disabled={submitting} 
+            className="gaming-btn w-full disabled:opacity-60"
+          >
+            {submitting ? "در حال ثبت..." : "ثبت درخواست شارژ"}
+          </button>
         </form>
 
-        <section className="gaming-card overflow-hidden">
-          <div className="p-4 border-b border-white/5 font-black">تاریخچه تراکنش‌ها</div>
+        <section className="glass-panel overflow-hidden">
+          <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
+            <span className="font-black">تاریخچه تراکنش‌ها</span>
+            <span className="text-xs text-gray-500">{data?.transactions.length || 0} مورد</span>
+          </div>
+          
           {data?.transactions.length ? (
-            <div className="divide-y divide-white/5">
+            <div className="divide-y divide-white/10 text-sm">
               {data.transactions.map((tx) => (
-                <div key={tx.id} className="p-4 flex items-center justify-between gap-4">
+                <div key={tx.id} className="px-5 py-4 flex items-center justify-between">
                   <div>
-                    <div className="font-bold text-sm">{TYPE_LABELS[tx.type] || tx.type}</div>
-                    <div className="text-xs text-gray-500 mt-1">{new Date(tx.createdAt).toLocaleString("fa-IR")} • {STATUS_LABELS[tx.status] || tx.status}</div>
+                    <div className="font-bold">{TYPE_LABELS[tx.type] || tx.type}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      {new Date(tx.createdAt).toLocaleString("fa-IR")} • {STATUS_LABELS[tx.status] || tx.status}
+                    </div>
                   </div>
-                  <div className={`font-black ${tx.type === "entry_fee" || tx.type === "withdrawal" ? "text-red-300" : "text-green-300"}`}>
-                    {tx.type === "entry_fee" || tx.type === "withdrawal" ? "-" : "+"}{tx.amountToman.toLocaleString("fa-IR")} تومان
+                  <div className={`font-black num-en ${tx.type === "entry_fee" || tx.type === "withdrawal" ? "text-red-400" : "text-emerald-400"}`}>
+                    {tx.type === "entry_fee" || tx.type === "withdrawal" ? "-" : "+"}
+                    {tx.amountToman.toLocaleString("fa-IR")}
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="p-8 text-center text-gray-500">هنوز تراکنشی ثبت نشده است.</div>
+            <div className="p-8 text-center text-gray-500 text-sm">هنوز تراکنشی ثبت نشده است.</div>
           )}
         </section>
       </main>
