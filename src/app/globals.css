@@ -19,12 +19,12 @@
 }
 
 @layer base {
-  body {
-    background-image: url('/background.jpg');
-    background-size: cover;
-    background-position: center;
-    background-attachment: fixed;
-    background-repeat: no-repeat;
+  html, body {
+    background-image: url('/background.jpg') !important;
+    background-size: cover !important;
+    background-position: center !important;
+    background-attachment: fixed !important;
+    background-repeat: no-repeat !important;
   }
 
   * {
@@ -273,6 +273,13 @@
     0 28px 80px rgba(0, 0, 0, .42),
     inset 0 1px 0 rgba(255,255,255,.08),
     inset 0 -1px 0 rgba(255,255,255,.03);
+}
+
+/* شفاف کردن پنل‌ها برای نمایش بک‌گراند */
+.glass-panel,
+.gaming-card {
+  background: rgba(15, 15, 20, 0.78) !important;
+  backdrop-filter: blur(26px) !important;
 }
 
 .fx-card::after {
