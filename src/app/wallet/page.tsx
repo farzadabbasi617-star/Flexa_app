@@ -169,7 +169,16 @@ export default function WalletPage() {
             disabled={submitting} 
             className="gaming-btn w-full disabled:opacity-60"
           >
-            {submitting ? "در حال ثبت..." : "ثبت درخواست شارژ"}
+            {submitting ? "در حال ثبت..." : "ثبت درخواست شارژ (درگاه واقعی بعداً)"}
+          </button>
+
+          {/* دکمه پرداخت آنلاین (زیرساخت آماده) */}
+          <button
+            type="button"
+            onClick={() => alert("این دکمه بعداً به درگاه واقعی متصل می‌شود")}
+            className="w-full py-3.5 rounded-2xl bg-white/5 hover:bg-white/10 text-sm font-bold border border-white/10 transition-colors"
+          >
+            پرداخت آنلاین با درگاه بانکی (به‌زودی)
           </button>
         </form>
 
