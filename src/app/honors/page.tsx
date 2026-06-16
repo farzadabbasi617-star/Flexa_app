@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import BottomNav from "@/components/BottomNav";
 
 type HonorType = "all" | "winner" | "levelup" | "news";
@@ -18,70 +18,6 @@ interface Honor {
   highlight?: boolean;
 }
 
-const allHonors: Honor[] = [
-  {
-    id: 1,
-    type: "winner",
-    icon: "🏆",
-    title: "قهرمان تورنومنت کالاف موبایل",
-    description: "علی رضایی با عملکرد درخشان در فینال، عنوان قهرمانی را از آن خود کرد.",
-    time: "۲ ساعت پیش",
-    prize: "۵۰۰٬۰۰۰ تومان",
-    username: "alireza_pro",
-    highlight: true,
-  },
-  {
-    id: 2,
-    type: "levelup",
-    icon: "⚡",
-    title: "سارا محمدی به سطح ۴۲ رسید",
-    description: "با کسب ۱۲٬۴۰۰ امتیاز تجربه، سارا به سطح جدیدی از مهارت دست یافت.",
-    time: "۵ ساعت پیش",
-    username: "sara_gamer",
-    level: 42,
-  },
-  {
-    id: 3,
-    type: "winner",
-    icon: "🏆",
-    title: "امیرحسین کریمی قهرمان فورتنایت شد",
-    description: "در رقابتی نفس‌گیر، امیرحسین با ۲۴ کیل، رتبه اول را کسب کرد.",
-    time: "دیروز",
-    prize: "۱٬۲۰۰٬۰۰۰ تومان",
-    username: "amir_king",
-    highlight: true,
-  },
-  {
-    id: 4,
-    type: "news",
-    icon: "📰",
-    title: "به‌روزرسانی بزرگ سیستم داوری هوش مصنوعی",
-    description: "دقت موتور AI فلکسا به ۹۷٪ رسید. این به‌روزرسانی شامل بهبود تشخیص تقلب و سرعت پردازش است.",
-    time: "۲ روز پیش",
-    highlight: true,
-  },
-  {
-    id: 5,
-    type: "levelup",
-    icon: "⚡",
-    title: "محمد حسینی به سطح ۳۸ رسید",
-    description: "محمد با ۸ برد پیاپی در تورنومنت‌ها، سطح خود را ارتقا داد.",
-    time: "۳ روز پیش",
-    username: "mohammad_h",
-    level: 38,
-  },
-  {
-    id: 6,
-    type: "winner",
-    icon: "🏆",
-    title: "زهرا کریمی قهرمان کلش رویال",
-    description: "زهرا با استراتژی هوشمندانه در فینال، جایزه را به خانه برد.",
-    time: "۴ روز پیش",
-    prize: "۳۵۰٬۰۰۰ تومان",
-    username: "zahra_cr",
-  },
-];
-
 const FILTERS: { id: HonorType; label: string; icon: string }[] = [
   { id: "all", label: "همه", icon: "🌟" },
   { id: "winner", label: "برندگان", icon: "🏆" },
@@ -91,18 +27,30 @@ const FILTERS: { id: HonorType; label: string; icon: string }[] = [
 
 export default function HonorsPage() {
   const [activeFilter, setActiveFilter] = useState<HonorType>("all");
+  const [honors, setHonors] = useState<Honor[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/honors")
+      .then((res) => res.json())
+      .then((data) => {
+        setHonors(data);
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
 
   const filteredHonors =
     activeFilter === "all"
-      ? allHonors
-      : allHonors.filter((h) => h.type === activeFilter);
+      ? honors
+      : honors.filter((h) => h.type === activeFilter);
 
-  const featured = allHonors.filter((h) => h.highlight);
+  const featured = honors.filter((h) => h.highlight);
 
   const stats = {
-    totalWinners: allHonors.filter((h) => h.type === "winner").length,
-    totalLevelUps: allHonors.filter((h) => h.type === "levelup").length,
-    totalNews: allHonors.filter((h) => h.type === "news").length,
+    totalWinners: honors.filter((h) => h.type === "winner").length,
+    totalLevelUps: honors.filter((h) => h.type === "levelup").length,
+    totalNews: honors.filter((h) => h.type === "news").length,
   };
 
   return (
@@ -183,7 +131,9 @@ export default function HonorsPage() {
         </div>
 
         <div className="space-y-3">
-          {filteredHonors.length > 0 ? (
+          {loading ? (
+            <div className="text-center py-12 text-gray-500">در حال بارگذاری...</div>
+          ) : filteredHonors.length > 0 ? (
             filteredHonors.map((honor) => (
               <div
                 key={honor.id}
