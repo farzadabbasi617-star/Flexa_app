@@ -278,8 +278,18 @@
 /* شفاف کردن پنل‌ها برای نمایش بک‌گراند */
 .glass-panel,
 .gaming-card {
-  background: rgba(15, 15, 20, 0.78) !important;
+  background: rgba(15, 15, 20, 0.72) !important;
   backdrop-filter: blur(26px) !important;
+}
+
+/* حذف یا شفاف کردن بک‌گراندهای تیره صفحات */
+.min-h-screen.bg-\[#050508\],
+.min-h-screen.bg-dark-900,
+.min-h-screen.bg-\[#070711\],
+.bg-\[#050508\],
+.bg-dark-900,
+.bg-\[#070711\] {
+  background-color: rgba(5, 5, 8, 0.65) !important;
 }
 
 .fx-card::after {
