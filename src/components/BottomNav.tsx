@@ -20,10 +20,7 @@ const navItems = [
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(true); // همیشه باز
   const [icons, setIcons] = useState<SiteImage[]>([]);
-
-  // حذف شد تا ناوبری همیشه باز بماند
 
   useEffect(() => {
     fetch("/api/public/images?category=icon", { cache: "no-store" })
@@ -39,25 +36,8 @@ export default function BottomNav() {
   }, [icons]);
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto px-6 pb-4 z-50 pointer-events-none">
-      <button
-        type="button"
-        onClick={() => setIsOpen((value) => !value)}
-        className={`absolute left-1/2 -translate-x-1/2 bottom-3 pointer-events-auto rounded-full border border-white/10 bg-[rgba(20,20,25,0.9)] backdrop-blur-2xl shadow-[0_0_28px_rgba(188,0,255,0.28)] transition-all duration-300 active:scale-95 ${
-          isOpen ? "w-14 h-7 -translate-y-[122px]" : "w-24 h-8"
-        }`}
-        aria-label={isOpen ? "بستن منوی پایین" : "باز کردن منوی پایین"}
-        aria-expanded={isOpen}
-      >
-        <span className="mx-auto block w-9 h-1 rounded-full bg-purple-400 shadow-[0_0_14px_#bc00ff]" />
-        {!isOpen && <span className="sr-only">منوی پایین</span>}
-      </button>
-
-      <div
-        className={`glass-bottom rounded-[28px] py-4 px-3 flex justify-around items-center border border-white/10 shadow-[0_-15px_40px_rgba(0,0,0,0.75)] pointer-events-auto transition-all duration-300 ease-out ${
-          isOpen ? "translate-y-0 opacity-100" : "translate-y-[125%] opacity-0"
-        }`}
-      >
+    <nav className="fixed bottom-0 left-0 right-0 max-w-[480px] mx-auto px-6 pb-5 z-50">
+      <div className="glass-bottom rounded-[22px] py-3.5 px-2 flex justify-around items-center border border-white/10 shadow-[0_-12px_35px_rgba(0,0,0,0.7)]">
         {navItems.map((item) => {
           const isActive = item.path === "/" ? pathname === "/" : pathname.startsWith(item.path);
           const imageIcon = iconMap[`icon-${item.id}`];
@@ -65,31 +45,29 @@ export default function BottomNav() {
             <Link
               key={item.id}
               href={item.path}
-              className={`relative min-w-16 flex flex-col items-center gap-1.5 transition-all active:scale-95 ${
-                isActive ? "text-purple-300" : "text-white/30 hover:text-white/55"
+              className={`flex flex-col items-center gap-0.5 px-3 py-1 transition-all active:scale-95 ${
+                isActive ? "text-purple-300" : "text-white/35 hover:text-white/70"
               }`}
-              aria-current={isActive ? "page" : undefined}
             >
-              {isActive && <div className="absolute -top-10 w-[35px] h-1 bg-purple-500 shadow-[0_0_18px_#bc00ff] rounded-full" />}
               {imageIcon ? (
                 <img
                   src={imageIcon.url}
                   alt={imageIcon.altText || item.label}
-                  className={`w-9 h-9 rounded-2xl object-cover ${isActive ? "drop-shadow-[0_0_14px_#bc00ff]" : "opacity-70"}`}
+                  className={`w-8 h-8 rounded-xl object-cover ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : "opacity-60"}`}
                 />
               ) : (
-                <div className={`text-3xl ${isActive ? "drop-shadow-[0_0_14px_#bc00ff]" : ""}`}>{item.icon}</div>
+                <div className={`text-[26px] ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : ""}`}>{item.icon}</div>
               )}
-              <span className="text-[8px] font-black uppercase tracking-wider mt-0.5 opacity-80">{item.label}</span>
+              <span className="text-[8px] font-black uppercase tracking-wider mt-0.5">{item.label}</span>
             </Link>
           );
         })}
       </div>
       <style jsx>{`
         .glass-bottom {
-          background: rgba(20, 20, 25, 0.86);
-          backdrop-filter: blur(28px);
-          -webkit-backdrop-filter: blur(28px);
+          background: rgba(20, 20, 25, 0.92);
+          backdrop-filter: blur(26px);
+          -webkit-backdrop-filter: blur(26px);
         }
       `}</style>
     </nav>

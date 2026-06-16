@@ -47,3 +47,19 @@ export async function DELETE(req: NextRequest) {
   honors = honors.filter((h) => h.id !== id);
   return NextResponse.json({ success: true });
 }
+
+export async function POST(req: NextRequest) {
+  const { user } = await requireUser(req);
+  if (!user || !["admin", "super_admin"].includes(user.role)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await req.json();
+  const newHonor = {
+    id: Date.now(),
+    ...body,
+  };
+
+  honors.unshift(newHonor);
+  return NextResponse.json({ success: true, honor: newHonor });
+}
