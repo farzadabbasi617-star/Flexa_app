@@ -68,9 +68,28 @@ const GAME_FALLBACK: Record<string, string> = {
   clash_royale: "radial-gradient(circle at 75% 28%, rgba(0,210,255,.38), transparent 22%), linear-gradient(135deg,#080a12,#09283a)",
 };
 
+// تابع هوشمند برای تبدیل لینک imgurl.ir به لینک مستقیم تصویر
+function getDirectImageUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+
+  // اگر لینک viewer.php باشد، آن را به لینک مستقیم تبدیل می‌کنیم
+  if (url.includes("imgurl.ir/viewer.php")) {
+    const match = url.match(/[?&]file=([^&]+)/);
+    if (match && match[1]) {
+      return `https://cdn.imgurl.ir/uploads/${match[1]}`;
+    }
+  }
+
+  // اگر لینک مستقیم باشد، همان را برمی‌گردانیم
+  return url;
+}
+
 const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false }: Props) => {
   const spotsLeft = Math.max(0, t.maxPlayers - (t.registeredCount || 0));
   const { value: countdown, expired } = useCountdown(t.startDate);
+
+  // تبدیل خودکار لینک تصویر
+  const bannerUrl = getDirectImageUrl(t.bannerUrl);
 
   const entryFeeInfo = useMemo(() => {
     const rial = parseTomanToRial(t.entryFee || "");
@@ -104,7 +123,7 @@ const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false
     <div className="relative overflow-hidden rounded-[32px] bg-[#0f0f13] border border-white/8 shadow-2xl mb-5 fx-card active:scale-[0.985] transition-transform">
       <div className="relative h-40 w-full">
         <div className="absolute inset-0" style={{ background: GAME_FALLBACK[t.game] || GAME_FALLBACK.clash_royale }} />
-        {t.bannerUrl && <img src={t.bannerUrl} alt={t.name} className="absolute inset-0 w-full h-full object-cover opacity-60" />}
+        {bannerUrl && <img src={bannerUrl} alt={t.name} className="absolute inset-0 w-full h-full object-cover opacity-60" />}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f13] via-black/30 to-black/10" />
 
         <div className="absolute bottom-4 left-5 right-5 text-right">
