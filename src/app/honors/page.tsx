@@ -15,6 +15,7 @@ interface Honor {
   prize?: string;
   username?: string;
   level?: number;
+  highlight?: boolean;
 }
 
 const allHonors: Honor[] = [
@@ -22,18 +23,19 @@ const allHonors: Honor[] = [
     id: 1,
     type: "winner",
     icon: "🏆",
-    title: "قهرمان تورنومنت",
-    description: "علی رضایی در تورنومنت کالاف موبایل قهرمان شد",
+    title: "قهرمان تورنومنت کالاف موبایل",
+    description: "علی رضایی با عملکرد درخشان در فینال، عنوان قهرمانی را از آن خود کرد.",
     time: "۲ ساعت پیش",
     prize: "۵۰۰٬۰۰۰ تومان",
     username: "alireza_pro",
+    highlight: true,
   },
   {
     id: 2,
     type: "levelup",
     icon: "⚡",
-    title: "لول‌آپ",
-    description: "سارا محمدی به سطح ۴۲ رسید",
+    title: "سارا محمدی به سطح ۴۲ رسید",
+    description: "با کسب ۱۲٬۴۰۰ امتیاز تجربه، سارا به سطح جدیدی از مهارت دست یافت.",
     time: "۵ ساعت پیش",
     username: "sara_gamer",
     level: 42,
@@ -42,26 +44,28 @@ const allHonors: Honor[] = [
     id: 3,
     type: "winner",
     icon: "🏆",
-    title: "قهرمان فورتنایت",
-    description: "امیرحسین کریمی در فورتنایت رتبه اول را کسب کرد",
+    title: "امیرحسین کریمی قهرمان فورتنایت شد",
+    description: "در رقابتی نفس‌گیر، امیرحسین با ۲۴ کیل، رتبه اول را کسب کرد.",
     time: "دیروز",
     prize: "۱٬۲۰۰٬۰۰۰ تومان",
     username: "amir_king",
+    highlight: true,
   },
   {
     id: 4,
     type: "news",
     icon: "📰",
-    title: "به‌روزرسانی سیستم داوری",
-    description: "دقت موتور هوش مصنوعی فلکسا ۱۸٪ افزایش یافت",
+    title: "به‌روزرسانی بزرگ سیستم داوری هوش مصنوعی",
+    description: "دقت موتور AI فلکسا به ۹۷٪ رسید. این به‌روزرسانی شامل بهبود تشخیص تقلب و سرعت پردازش است.",
     time: "۲ روز پیش",
+    highlight: true,
   },
   {
     id: 5,
     type: "levelup",
     icon: "⚡",
-    title: "لول‌آپ",
-    description: "محمد حسینی به سطح ۳۸ رسید",
+    title: "محمد حسینی به سطح ۳۸ رسید",
+    description: "محمد با ۸ برد پیاپی در تورنومنت‌ها، سطح خود را ارتقا داد.",
     time: "۳ روز پیش",
     username: "mohammad_h",
     level: 38,
@@ -70,8 +74,8 @@ const allHonors: Honor[] = [
     id: 6,
     type: "winner",
     icon: "🏆",
-    title: "قهرمان کلش رویال",
-    description: "زهرا کریمی در تورنومنت کلش رویال برنده شد",
+    title: "زهرا کریمی قهرمان کلش رویال",
+    description: "زهرا با استراتژی هوشمندانه در فینال، جایزه را به خانه برد.",
     time: "۴ روز پیش",
     prize: "۳۵۰٬۰۰۰ تومان",
     username: "zahra_cr",
@@ -93,6 +97,8 @@ export default function HonorsPage() {
       ? allHonors
       : allHonors.filter((h) => h.type === activeFilter);
 
+  const featured = allHonors.filter((h) => h.highlight);
+
   const stats = {
     totalWinners: allHonors.filter((h) => h.type === "winner").length,
     totalLevelUps: allHonors.filter((h) => h.type === "levelup").length,
@@ -101,29 +107,31 @@ export default function HonorsPage() {
 
   return (
     <div className="min-h-screen bg-[#050508] text-white pb-24">
-      {/* Header */}
-      <div className="max-w-[480px] mx-auto px-6 pt-10">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-3xl bg-gradient-to-br from-yellow-500 to-amber-600 mb-4">
-            <span className="text-4xl">🏆</span>
+      {/* Hero Header */}
+      <div className="relative pt-8 pb-6 px-6 bg-gradient-to-b from-[#1a0033]/40 to-transparent">
+        <div className="max-w-[480px] mx-auto text-center">
+          <div className="inline-flex items-center gap-2 bg-white/5 px-4 py-1.5 rounded-full text-xs tracking-widest mb-4 border border-white/10">
+            FLEXA COMMUNITY
           </div>
-          <h1 className="text-4xl font-black tracking-tight">تالار افتخارات</h1>
-          <p className="text-sm text-white/60 mt-2">دستاوردها و اخبار جامعه فلکسا</p>
+          <h1 className="text-5xl font-black tracking-[-2px]">تالار افتخارات</h1>
+          <p className="text-white/60 mt-2 text-sm">دستاوردها، قهرمانان و اخبار جامعه</p>
         </div>
+      </div>
 
+      <div className="max-w-[480px] mx-auto px-6">
         {/* Stats */}
-        <div className="grid grid-cols-3 gap-3 mb-8">
-          <div className="glass-panel p-4 rounded-2xl text-center border border-white/10">
-            <div className="text-2xl font-black text-yellow-400">{stats.totalWinners}</div>
-            <div className="text-xs text-gray-400 mt-1">برنده</div>
+        <div className="grid grid-cols-3 gap-3 -mt-4 mb-8">
+          <div className="glass-panel p-4 rounded-3xl text-center border border-white/10">
+            <div className="text-3xl font-black text-yellow-400">{stats.totalWinners}</div>
+            <div className="text-xs text-gray-400 mt-1 tracking-wider">قهرمان</div>
           </div>
-          <div className="glass-panel p-4 rounded-2xl text-center border border-white/10">
-            <div className="text-2xl font-black text-cyan-400">{stats.totalLevelUps}</div>
-            <div className="text-xs text-gray-400 mt-1">لول‌آپ</div>
+          <div className="glass-panel p-4 rounded-3xl text-center border border-white/10">
+            <div className="text-3xl font-black text-cyan-400">{stats.totalLevelUps}</div>
+            <div className="text-xs text-gray-400 mt-1 tracking-wider">لول‌آپ</div>
           </div>
-          <div className="glass-panel p-4 rounded-2xl text-center border border-white/10">
-            <div className="text-2xl font-black text-purple-400">{stats.totalNews}</div>
-            <div className="text-xs text-gray-400 mt-1">خبر</div>
+          <div className="glass-panel p-4 rounded-3xl text-center border border-white/10">
+            <div className="text-3xl font-black text-purple-400">{stats.totalNews}</div>
+            <div className="text-xs text-gray-400 mt-1 tracking-wider">خبر</div>
           </div>
         </div>
 
@@ -133,9 +141,9 @@ export default function HonorsPage() {
             <button
               key={filter.id}
               onClick={() => setActiveFilter(filter.id)}
-              className={`flex-shrink-0 px-5 py-2.5 rounded-2xl text-sm font-black border transition-all active:scale-[0.985] whitespace-nowrap ${
+              className={`flex-shrink-0 px-6 py-2.5 rounded-2xl text-sm font-black border transition-all active:scale-[0.985] whitespace-nowrap ${
                 activeFilter === filter.id
-                  ? "bg-purple-600 border-purple-500 text-white"
+                  ? "bg-purple-600 border-purple-500 text-white shadow-[0_0_20px_rgba(168,85,247,.3)]"
                   : "bg-[#111114] border-white/10 text-gray-400 hover:border-white/30"
               }`}
             >
@@ -144,50 +152,79 @@ export default function HonorsPage() {
           ))}
         </div>
 
-        {/* Honors List */}
+        {/* Featured News Section */}
+        {activeFilter === "all" && featured.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4 px-1">
+              <div className="text-sm font-black text-purple-400 tracking-wider">اخبار ویژه</div>
+            </div>
+            <div className="space-y-3">
+              {featured.slice(0, 2).map((item) => (
+                <div key={item.id} className="glass-panel p-6 rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-900/10 to-transparent">
+                  <div className="flex gap-4">
+                    <div className="text-4xl flex-shrink-0">{item.icon}</div>
+                    <div>
+                      <div className="font-black text-lg leading-tight mb-2">{item.title}</div>
+                      <p className="text-sm text-white/80 leading-relaxed mb-3">{item.description}</p>
+                      <div className="text-xs text-purple-400">{item.time}</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Main List */}
+        <div className="mb-4 px-1">
+          <div className="text-sm font-black text-gray-400 tracking-wider">
+            {activeFilter === "all" ? "آخرین افتخارات" : "نتایج فیلتر"}
+          </div>
+        </div>
+
         <div className="space-y-3">
           {filteredHonors.length > 0 ? (
             filteredHonors.map((honor) => (
               <div
                 key={honor.id}
-                className="glass-panel p-5 rounded-3xl border border-white/10 active:scale-[0.985] transition-all"
+                className={`glass-panel p-5 rounded-3xl border transition-all active:scale-[0.985] ${
+                  honor.highlight 
+                    ? "border-purple-500/40 bg-purple-900/5" 
+                    : "border-white/10"
+                }`}
               >
                 <div className="flex items-start gap-4">
-                  <div className="text-4xl flex-shrink-0 mt-0.5">{honor.icon}</div>
+                  <div className="text-4xl flex-shrink-0 mt-0.5 opacity-90">{honor.icon}</div>
 
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-1.5">
-                      <div className="font-black text-lg">{honor.title}</div>
+                    <div className="flex items-start justify-between gap-3 mb-1.5">
+                      <div className="font-black text-[17px] leading-tight pr-2">{honor.title}</div>
                       {honor.prize && (
-                        <div className="text-xs bg-yellow-500/10 text-yellow-400 px-3 py-1 rounded-full font-bold border border-yellow-500/20">
+                        <div className="text-xs whitespace-nowrap bg-yellow-500/10 text-yellow-400 px-3 py-1 rounded-full font-bold border border-yellow-500/20 flex-shrink-0">
                           {honor.prize}
                         </div>
                       )}
                     </div>
 
-                    <p className="text-sm text-white/80 leading-relaxed mb-3">
-                      {honor.description}
-                    </p>
+                    <p className="text-sm text-white/75 leading-relaxed mb-4">{honor.description}</p>
 
                     <div className="flex items-center justify-between text-xs">
-                      <div className="text-gray-500">
-                        {honor.username && `@${honor.username}`}
-                        {honor.level && ` • سطح ${honor.level}`}
+                      <div className="text-gray-400">
+                        {honor.username && <span>@{honor.username}</span>}
+                        {honor.level && <span className="ml-2">• سطح {honor.level}</span>}
                       </div>
-                      <div className="text-gray-500">{honor.time}</div>
+                      <div className="text-gray-500 font-medium">{honor.time}</div>
                     </div>
                   </div>
                 </div>
               </div>
             ))
           ) : (
-            <div className="text-center py-12 text-gray-500">
-              موردی برای نمایش وجود ندارد
-            </div>
+            <div className="text-center py-12 text-gray-500">موردی برای نمایش وجود ندارد</div>
           )}
         </div>
 
-        <div className="mt-12 text-center text-xs text-white/40 pb-6">
+        <div className="mt-14 text-center text-xs text-white/40 pb-6">
           این بخش به‌زودی با داده‌های واقعی و زنده به‌روزرسانی می‌شود
         </div>
       </div>
