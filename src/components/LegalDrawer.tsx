@@ -114,7 +114,7 @@ const sections = [
 ];
 
 export default function LegalDrawer() {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(true);
   const [activeSection, setActiveSection] = useState<string | null>(null);
 
   const toggleSection = (id: string) => {
@@ -122,76 +122,50 @@ export default function LegalDrawer() {
   };
 
   return (
-    <>
-      {/* Footer Trigger */}
-      <div className="max-w-[480px] mx-auto px-6 pb-20 pt-8 text-center">
+    <div className="fixed bottom-0 left-0 right-0 z-50 max-w-[480px] mx-auto">
+      {/* Collapsible Bar */}
+      <div className="bg-[#0f0f14] border-t border-white/10 shadow-xl rounded-t-2xl overflow-hidden mx-2">
+        {/* Header Bar */}
         <button
-          onClick={() => setIsOpen(true)}
-          className="text-[10px] text-white/40 hover:text-white/70 transition-colors flex items-center justify-center gap-1.5 mx-auto active:scale-95"
+          onClick={() => setIsOpen(!isOpen)}
+          className="w-full flex items-center justify-between px-4 py-3 active:bg-white/5 transition-colors"
         >
-          <span>اطلاعات قانونی و راهنما</span>
-          <span className="text-lg leading-none">↑</span>
-        </button>
-      </div>
-
-      {/* Drawer */}
-      {isOpen && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center">
-          {/* Backdrop */}
-          <div
-            className="absolute inset-0 bg-black/70 backdrop-blur-sm"
-            onClick={() => {
-              setIsOpen(false);
-              setActiveSection(null);
-            }}
-          />
-
-          {/* Drawer Content */}
-          <div className="relative w-full max-w-[480px] bg-[#0f0f14] rounded-t-3xl border-t border-white/10 shadow-2xl max-h-[85vh] overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-white/10">
-              <h3 className="font-black text-lg">اطلاعات و راهنما</h3>
-              <button
-                onClick={() => {
-                  setIsOpen(false);
-                  setActiveSection(null);
-                }}
-                className="text-2xl text-white/50 hover:text-white active:scale-90 transition"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Sections */}
-            <div className="overflow-y-auto flex-1 px-2 py-2 text-sm">
-              {sections.map((section) => (
-                <div key={section.id} className="border-b border-white/10 last:border-none">
-                  <button
-                    onClick={() => toggleSection(section.id)}
-                    className="w-full flex items-center justify-between px-5 py-4 text-right active:bg-white/5 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span className="text-xl">{section.icon}</span>
-                      <span className="font-bold">{section.title}</span>
-                    </div>
-                    <span className={`text-xl transition-transform ${activeSection === section.id ? "rotate-180" : ""}`}>
-                      ⌄
-                    </span>
-                  </button>
-
-                  {activeSection === section.id && (
-                    <div className="px-5 pb-6 text-white/80 leading-relaxed">
-                      {section.content}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            <div className="h-6 bg-[#0f0f14]" />
+          <div className="flex items-center gap-2 text-sm font-bold text-white/80">
+            <span>اطلاعات قانونی و راهنما</span>
           </div>
-        </div>
-      )}
-    </>
+          <span className={`text-lg transition-transform ${isOpen ? "rotate-180" : ""}`}>
+            ⌄
+          </span>
+        </button>
+
+        {/* Content */}
+        {isOpen && (
+          <div className="px-2 pb-2 text-sm max-h-[55vh] overflow-y-auto border-t border-white/10">
+            {sections.map((section) => (
+              <div key={section.id} className="border-b border-white/10 last:border-none">
+                <button
+                  onClick={() => toggleSection(section.id)}
+                  className="w-full flex items-center justify-between px-4 py-3.5 text-right active:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <span className="text-lg">{section.icon}</span>
+                    <span className="font-bold text-sm">{section.title}</span>
+                  </div>
+                  <span className={`text-lg transition-transform ${activeSection === section.id ? "rotate-180" : ""}`}>
+                    ⌄
+                  </span>
+                </button>
+
+                {activeSection === section.id && (
+                  <div className="px-4 pb-5 text-white/75 text-[13px] leading-relaxed">
+                    {section.content}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
