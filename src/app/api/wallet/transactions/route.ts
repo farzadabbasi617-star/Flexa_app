@@ -67,16 +67,30 @@ export async function POST(request: NextRequest) {
     if (amountRial <= BigInt(0)) return NextResponse.json({ error: "مبلغ شارژ معتبر نیست" }, { status: 400 });
 
     const wallet = await getOrCreateWallet(user.id);
+    // شارژ فوری بدون نیاز به تأیید ادمین
+    const currentBalance = bigIntFromText(wallet.balance);
+    const newBalance = currentBalance + amountRial;
+
+    // به‌روزرسانی موجودی کیف پول
+    await db
+      .update(wallets)
+      .set({ 
+        balance: newBalance.toString(),
+        updatedAt: new Date()
+      })
+      .where(eq(wallets.id, wallet.id));
+
+    // ثبت تراکنش موفق
     const [tx] = await db
       .insert(transactions)
       .values({
         walletId: wallet.id,
         amount: amountRial.toString(),
         type: "deposit",
-        status: "pending",
-        referenceId: `deposit-request-${Date.now()}`,
+        status: "completed",
+        referenceId: `deposit-${Date.now()}`,
         metadata: {
-          kind: "manual_deposit_request",
+          kind: "instant_deposit",
           userId: user.id,
           displayName: user.displayName,
           note: body.note ? String(body.note).slice(0, 300) : null,
@@ -86,7 +100,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "درخواست شارژ ثبت شد. پس از تأیید مدیریت، موجودی کیف پول افزایش می‌یابد.",
+      message: "کیف پول شما با موفقیت شارژ شد.",
       transaction: tx,
     }, { status: 201 });
   } catch (err) {
