@@ -20,12 +20,10 @@ const navItems = [
 
 export default function BottomNav() {
   const pathname = usePathname();
-  const [isOpen, setIsOpen] = useState(true); // پیش‌فرض باز
+  const [isOpen, setIsOpen] = useState(true); // همیشه باز
   const [icons, setIcons] = useState<SiteImage[]>([]);
 
-  useEffect(() => {
-    setIsOpen(false);
-  }, [pathname]);
+  // حذف شد تا ناوبری همیشه باز بماند
 
   useEffect(() => {
     fetch("/api/public/images?category=icon", { cache: "no-store" })
