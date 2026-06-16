@@ -93,15 +93,15 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
 
   return (
     <>
-      <div className="flex gap-2 mb-8 overflow-x-auto pb-2 snap-x">
+      <div className="flex gap-2 mb-8 overflow-x-auto pb-3 snap-x scrollbar-hide">
         {games.map((g) => (
           <button
             key={g.id}
             onClick={() => setActiveFilter(g.id)}
-            className={`snap-start whitespace-nowrap px-4 py-2.5 rounded-2xl text-sm font-black transition-all border ${
+            className={`snap-start whitespace-nowrap px-5 py-2.5 rounded-2xl text-sm font-black transition-all border active:scale-[0.985] ${
               activeFilter === g.id
-                ? "bg-neon-purple/20 text-neon-purple border-neon-purple/50 shadow-[0_0_25px_rgba(168,85,247,.18)]"
-                : "bg-dark-700 text-gray-400 border-gaming-border hover:border-neon-purple/30"
+                ? "bg-purple-600/90 text-white border-purple-500 shadow-[0_0_20px_rgba(168,85,247,.35)]"
+                : "bg-[#111114] text-gray-400 border-white/10 hover:border-white/25 active:bg-[#18181c]"
             }`}
           >
             {g.icon} {g.name}
@@ -153,20 +153,20 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
 
                 <div className="space-y-8">
                   {modes.map(([mode, list]) => (
-                    <div key={`${gameId}-${mode}`} className="gaming-card p-4 sm:p-5 overflow-hidden border-white/5">
-                      <div className="flex items-center justify-between gap-3 mb-4">
+                    <div key={`${gameId}-${mode}`} className="glass-panel p-5 rounded-3xl border border-white/10">
+                      <div className="flex items-center justify-between gap-3 mb-5">
                         <div>
-                          <h3 className="font-black text-neon-blue text-lg">{mode}</h3>
-                          <p className="text-xs text-gray-500 mt-1">{list.length.toLocaleString("fa-IR")} تورنومنت فعال/ثبت‌شده</p>
+                          <h3 className="font-black text-lg text-white">{mode}</h3>
+                          <p className="text-xs text-gray-500 mt-0.5">{list.length.toLocaleString("fa-IR")} روم فعال</p>
                         </div>
-                        <span className="text-xs px-3 py-1 rounded-full bg-white/5 text-gray-400 border border-white/10">
-                          ← اسکرول کن
+                        <span className="text-[10px] px-3 py-1 rounded-full bg-white/5 text-gray-400 border border-white/10">
+                          اسکرول افقی
                         </span>
                       </div>
 
-                      <div className="flex gap-5 overflow-x-auto snap-x pb-4 -mx-1 px-1">
+                      <div className="flex gap-4 overflow-x-auto snap-x pb-2 -mx-1 px-1 scrollbar-hide">
                         {list.map((tournament) => (
-                          <div key={tournament.id} className="snap-start shrink-0 w-[310px] sm:w-[340px]">
+                          <div key={tournament.id} className="snap-start shrink-0 w-[295px]">
                             <TournamentCardLuxury t={tournament} walletBalanceToman={walletBalanceToman} isLoggedIn={isLoggedIn} />
                           </div>
                         ))}
