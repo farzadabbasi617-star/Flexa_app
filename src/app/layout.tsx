@@ -38,7 +38,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
       </head>
-      <body className="text-white antialiased font-gaming min-h-screen" style={{ backgroundImage: "url('/background.jpg')", backgroundSize: "cover", backgroundPosition: "center", backgroundAttachment: "fixed" }}>
+      <body className="text-white antialiased font-gaming min-h-screen">
         <QueryProvider>
           <AuthProvider>
             <LanguageProvider>

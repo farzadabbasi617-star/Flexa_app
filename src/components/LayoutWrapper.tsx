@@ -29,7 +29,19 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   }, [dir, lang]);
 
   return (
-    <div dir={dir}>
+    <div dir={dir} className="relative min-h-screen">
+      {/* بک‌گراند ثابت و اجباری */}
+      <div 
+        className="fixed inset-0 z-[-1]" 
+        style={{
+          backgroundImage: "url('/background.jpg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundAttachment: "fixed",
+          backgroundRepeat: "no-repeat"
+        }}
+      />
+      
       <ThemeRuntime />
       {children}
       <AIAssistant />
