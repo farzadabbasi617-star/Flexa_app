@@ -19,6 +19,14 @@
 }
 
 @layer base {
+  body {
+    background-image: url('/background.jpg');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+    background-repeat: no-repeat;
+  }
+
   * {
     scrollbar-width: thin;
     scrollbar-color: var(--color-neon-purple) var(--color-dark-800);
