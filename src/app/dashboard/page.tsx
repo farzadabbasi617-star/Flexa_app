@@ -107,19 +107,28 @@ export default function DashboardPage() {
       <Navbar />
 
       <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <section className="gaming-card p-6 sm:p-8 mb-8 overflow-hidden relative border-neon-purple/20">
-          <div className="absolute -top-16 -left-16 w-56 h-56 rounded-full bg-purple-600/20 blur-3xl animate-float-slow" />
-          <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-6">
+        <section className="glass-panel p-7 sm:p-8 mb-8 relative overflow-hidden border-purple-500/20">
+          <div className="absolute -top-20 -left-20 w-64 h-64 bg-purple-600/20 rounded-full blur-[90px]" />
+          
+          <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-8">
             <div>
-              <p className="text-xs text-purple-300 font-black mb-2">FLEXA DASHBOARD</p>
-              <h1 className="text-3xl sm:text-4xl font-black">سلام {user.displayName}! 👋</h1>
-              <p className="text-gray-400 mt-2">شناسه فلکسا: <span className="text-neon-purple font-black" dir="ltr">{user.flexaId}</span></p>
+              <div className="text-xs font-black tracking-[2px] text-purple-400 mb-1">FLEXA DASHBOARD</div>
+              <h1 className="text-4xl font-black">سلام، {user.displayName} 👋</h1>
+              <p className="text-sm text-gray-400 mt-1">شناسه شما: <span className="font-mono text-purple-400">{user.flexaId}</span></p>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 min-w-full lg:min-w-[520px]">
-              <div className="bg-dark-700/70 rounded-2xl p-4"><div className="text-xs text-gray-500">رتبه</div><div className="text-2xl font-black text-neon-blue">{data?.stats.rating.toLocaleString("fa-IR")}</div></div>
-              <div className="bg-dark-700/70 rounded-2xl p-4"><div className="text-xs text-gray-500">برد</div><div className="text-2xl font-black text-neon-green">{data?.stats.wins.toLocaleString("fa-IR")}</div></div>
-              <div className="bg-dark-700/70 rounded-2xl p-4"><div className="text-xs text-gray-500">Win Rate</div><div className="text-2xl font-black text-neon-purple">{data?.stats.winRate}%</div></div>
-              <div className="bg-dark-700/70 rounded-2xl p-4"><div className="text-xs text-gray-500">کیف پول</div><div className="text-2xl font-black text-neon-yellow">{(data?.wallet.balanceToman || 0).toLocaleString("fa-IR")}</div></div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">
+              {[
+                { label: "رتبه", value: data?.stats.rating, color: "text-cyan-400" },
+                { label: "برد", value: data?.stats.wins, color: "text-emerald-400" },
+                { label: "Win Rate", value: `${data?.stats.winRate}%`, color: "text-purple-400" },
+                { label: "کیف پول", value: data?.wallet.balanceToman?.toLocaleString("fa-IR"), color: "text-yellow-400" },
+              ].map((stat, i) => (
+                <div key={i} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3.5">
+                  <div className="text-[10px] text-gray-500 mb-0.5">{stat.label}</div>
+                  <div className={`text-2xl font-black ${stat.color}`}>{stat.value}</div>
+                </div>
+              ))}
             </div>
           </div>
         </section>
@@ -134,65 +143,110 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
           {[
             { icon: "🏆", label: "تورنومنت‌های من", value: data?.stats.myTournaments, href: "/tournaments" },
             { icon: "⚔️", label: "مسابقات پیش‌رو", value: data?.stats.upcomingMatches, href: nextMatch ? `/tournaments/${nextMatch.tournamentId}` : "/tournaments" },
             { icon: "🔔", label: "اعلان خوانده‌نشده", value: data?.stats.unreadNotifications, href: "/notifications" },
             { icon: "🎧", label: "تیکت باز", value: data?.stats.openTickets, href: "/support" },
-          ].map((card) => (
-            <Link key={card.label} href={card.href} className="gaming-card p-5 group hover:border-neon-purple/40">
-              <div className="text-3xl mb-3 group-hover:scale-110 transition-transform">{card.icon}</div>
-              <div className="text-2xl font-black text-white">{Number(card.value || 0).toLocaleString("fa-IR")}</div>
-              <div className="text-xs text-gray-500 mt-1">{card.label}</div>
+          ].map((card, index) => (
+            <Link key={index} href={card.href} className="glass-panel p-5 active:scale-[0.985] transition-all border border-white/10 hover:border-purple-500/30">
+              <div className="text-3xl mb-3 opacity-90">{card.icon}</div>
+              <div className="text-3xl font-black tracking-tight">{Number(card.value || 0).toLocaleString("fa-IR")}</div>
+              <div className="text-xs text-gray-400 mt-1">{card.label}</div>
             </Link>
           ))}
         </section>
 
-        <section className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-          <div className="gaming-card p-6">
-            <div className="flex items-center justify-between mb-5"><h2 className="font-black text-neon-blue">🎯 قدم بعدی</h2><button onClick={loadDashboard} className="text-xs text-gray-400">🔄</button></div>
+        <section className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-8">
+          {/* قدم بعدی */}
+          <div className="glass-panel p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-black text-lg">🎯 قدم بعدی</h2>
+              <button onClick={loadDashboard} className="text-xs px-3 py-1 rounded-lg bg-white/5 active:bg-white/10">بروزرسانی</button>
+            </div>
+            
             {nextMatch ? (
-              <div className="bg-dark-700 rounded-2xl p-4">
-                <div className="font-black">{nextMatch.tournamentName || "مسابقه"}</div>
-                <div className="text-sm text-gray-400 mt-2">حریف: {nextMatch.opponent?.displayName || "TBD"} • وضعیت: {statusFa(nextMatch.status)}</div>
-                <div className="flex gap-2 mt-4"><Link href={`/tournaments/${nextMatch.tournamentId}`} className="gaming-btn text-xs">جزئیات</Link><Link href={`/tournaments/${nextMatch.tournamentId}/lobby`} className="px-4 py-3 rounded-xl bg-dark-600 text-xs font-bold">لابی</Link></div>
+              <div className="bg-[#111114] rounded-2xl p-5">
+                <div className="font-black mb-1">{nextMatch.tournamentName}</div>
+                <div className="text-sm text-gray-400">حریف: {nextMatch.opponent?.displayName || "نامشخص"}</div>
+                <div className="flex gap-2 mt-4">
+                  <Link href={`/tournaments/${nextMatch.tournamentId}`} className="flex-1 bg-purple-600 py-3 rounded-xl text-sm font-black text-center">جزئیات</Link>
+                  <Link href={`/tournaments/${nextMatch.tournamentId}/lobby`} className="flex-1 bg-white/10 py-3 rounded-xl text-sm font-black text-center">لابی</Link>
+                </div>
               </div>
             ) : activeTournament ? (
-              <div className="bg-dark-700 rounded-2xl p-4"><div className="font-black">{activeTournament.tournamentName || "تورنومنت فعال"}</div><p className="text-sm text-gray-400 mt-2">برای ورود به لابی یا مشاهده وضعیت، تورنومنت را باز کن.</p><Link href={`/tournaments/${activeTournament.tournamentId}`} className="gaming-btn text-xs mt-4">باز کردن</Link></div>
+              <div className="bg-[#111114] rounded-2xl p-5">
+                <div className="font-black">{activeTournament.tournamentName}</div>
+                <p className="text-sm text-gray-400 mt-1">تورنومنت فعال داری</p>
+                <Link href={`/tournaments/${activeTournament.tournamentId}`} className="gaming-btn text-sm mt-4 block text-center">باز کردن</Link>
+              </div>
             ) : (
-              <div className="text-center text-gray-500 py-8">فعلاً مسابقه یا تورنومنت فعالی نداری.</div>
+              <div className="text-center py-8 text-gray-500 text-sm">فعلاً مسابقه یا تورنومنت فعالی نداری</div>
             )}
           </div>
 
-          <div className="gaming-card p-6">
-            <h2 className="font-black text-neon-purple mb-5">⚡ دسترسی سریع</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          {/* دسترسی سریع */}
+          <div className="glass-panel p-6">
+            <h2 className="font-black text-lg mb-5">⚡ دسترسی سریع</h2>
+            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {[
-                ...(isAdmin ? [{ href: "/tournaments/create", icon: "🏆", label: "ساخت تورنومنت" }] : []),
-                { href: "/tournaments", icon: "🎮", label: "تورنومنت‌ها" },
+                ...(isAdmin ? [{ href: "/tournaments/create", icon: "🏆", label: "ساخت" }] : []),
+                { href: "/tournaments", icon: "🎮", label: "تورنومنت" },
                 { href: "/wallet", icon: "💳", label: "کیف پول" },
                 { href: "/support", icon: "🎧", label: "پشتیبانی" },
                 { href: "/chat", icon: "💬", label: "چت" },
-                { href: "/leaderboard", icon: "📊", label: "رتبه‌بندی" },
-                { href: "/profile/edit", icon: "⚙️", label: "آیدی بازی‌ها" },
-              ].map((action) => (
-                <Link key={action.href} href={action.href} className="bg-dark-700 rounded-2xl p-4 text-center hover:bg-dark-600 transition-colors">
-                  <div className="text-2xl mb-2">{action.icon}</div><div className="text-xs font-bold">{action.label}</div>
+                { href: "/leaderboard", icon: "📊", label: "رتبه‌ها" },
+                { href: "/profile/edit", icon: "⚙️", label: "آیدی‌ها" },
+              ].map((action, i) => (
+                <Link key={i} href={action.href} className="bg-[#111114] hover:bg-[#1a1a1f] active:bg-purple-900/30 transition-colors rounded-2xl p-4 text-center border border-white/5">
+                  <div className="text-2xl mb-1.5">{action.icon}</div>
+                  <div className="text-xs font-bold text-gray-300">{action.label}</div>
                 </Link>
               ))}
             </div>
           </div>
         </section>
 
-        <section className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="gaming-card p-6 lg:col-span-2">
-            <h2 className="font-black text-neon-green mb-5">🏆 تورنومنت‌های اخیر من</h2>
-            {data?.tournaments.length ? <div className="space-y-3">{data.tournaments.slice(0, 6).map((tournament) => <Link key={tournament.registrationId} href={`/tournaments/${tournament.tournamentId}`} className="block bg-dark-700 rounded-2xl p-4 hover:bg-dark-600"><div className="font-bold">{tournament.tournamentName || "—"}</div><div className="text-xs text-gray-500 mt-1">{tournament.game} • {statusFa(tournament.status)} • {tournament.checkedInAt ? "حضور تأیید شده" : "بدون check-in"}</div></Link>)}</div> : <p className="text-gray-500 text-sm">هنوز در تورنومنتی ثبت‌نام نکرده‌ای.</p>}
+        <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          {/* تورنومنت‌های اخیر */}
+          <div className="glass-panel p-6 lg:col-span-2">
+            <h2 className="font-black mb-4">🏆 تورنومنت‌های اخیر من</h2>
+            {data?.tournaments.length ? (
+              <div className="space-y-2.5">
+                {data.tournaments.slice(0, 5).map((t) => (
+                  <Link key={t.registrationId} href={`/tournaments/${t.tournamentId}`} className="flex items-center justify-between bg-[#111114] rounded-2xl px-5 py-4 active:bg-white/5">
+                    <div>
+                      <div className="font-bold text-sm">{t.tournamentName}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{t.game} • {statusFa(t.status)}</div>
+                    </div>
+                    <span className="text-xs text-purple-400">جزئیات ←</span>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 py-4">هنوز در تورنومنتی ثبت‌نام نکرده‌ای.</p>
+            )}
           </div>
-          <div className="gaming-card p-6">
-            <h2 className="font-black text-neon-yellow mb-5">💳 تراکنش‌های اخیر</h2>
-            {data?.transactions.length ? <div className="space-y-3">{data.transactions.slice(0, 6).map((tx) => <Link key={tx.id} href="/wallet" className="block bg-dark-700 rounded-xl p-3"><div className="flex justify-between gap-2"><span className="text-sm">{transactionLabel(tx.type)}</span><span className="font-black text-neon-green text-sm">{tx.amountToman.toLocaleString("fa-IR")}</span></div><div className="text-xs text-gray-500 mt-1">{statusFa(tx.status)} • {new Date(tx.createdAt).toLocaleDateString("fa-IR")}</div></Link>)}</div> : <p className="text-gray-500 text-sm">تراکنشی نداری.</p>}
+
+          {/* تراکنش‌های اخیر */}
+          <div className="glass-panel p-6">
+            <h2 className="font-black mb-4">💳 تراکنش‌های اخیر</h2>
+            {data?.transactions.length ? (
+              <div className="space-y-2">
+                {data.transactions.slice(0, 5).map((tx) => (
+                  <Link key={tx.id} href="/wallet" className="flex justify-between items-center bg-[#111114] rounded-2xl px-4 py-3 text-sm active:bg-white/5">
+                    <div>
+                      <div>{transactionLabel(tx.type)}</div>
+                      <div className="text-xs text-gray-500">{new Date(tx.createdAt).toLocaleDateString("fa-IR")}</div>
+                    </div>
+                    <div className="font-black num-en text-emerald-400">{tx.amountToman.toLocaleString("fa-IR")}</div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500 py-4">تراکنشی نداری.</p>
+            )}
           </div>
         </section>
 
