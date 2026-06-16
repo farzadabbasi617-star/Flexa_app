@@ -21,6 +21,9 @@ interface Honor {
 export default function AdminHonorsPage() {
   const [honors, setHonors] = useState<Honor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editData, setEditData] = useState<any>({});
+
   const [newHonor, setNewHonor] = useState({
     type: "news" as const,
     title: "",
@@ -95,6 +98,30 @@ export default function AdminHonorsPage() {
     fetchHonors();
   };
 
+  // شروع ویرایش
+  const startEdit = (honor: Honor) => {
+    setEditingId(honor.id);
+    setEditData({ ...honor });
+  };
+
+  // ذخیره تغییرات
+  const saveEdit = async () => {
+    if (!editingId) return;
+
+    await fetch("/api/admin/honors", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        id: editingId,
+        ...editData,
+      }),
+    });
+
+    setEditingId(null);
+    setEditData({});
+    fetchHonors();
+  };
+
   return (
     <div className="min-h-screen bg-[#070711] text-white">
       <Navbar />
@@ -107,7 +134,7 @@ export default function AdminHonorsPage() {
           <Link href="/admin" className="text-sm text-purple-400">← بازگشت به پنل</Link>
         </div>
 
-        {/* فرم ایجاد محتوا */}
+        {/* فرم ایجاد */}
         <div className="glass-panel p-6 rounded-3xl mb-10 border border-white/10">
           <h3 className="font-black mb-5 text-lg">ایجاد محتوای جدید</h3>
           
@@ -143,6 +170,13 @@ export default function AdminHonorsPage() {
             <input placeholder="لول (اختیاری)" value={newHonor.level} onChange={(e) => setNewHonor({...newHonor, level: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm" />
           </div>
 
+          <input 
+            placeholder="لینک تصویر (URL)" 
+            value={newHonor.image}
+            onChange={(e) => setNewHonor({...newHonor, image: e.target.value})}
+            className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm mb-4"
+          />
+
           <div className="flex items-center gap-3 mb-5">
             <label className="flex items-center gap-2 text-sm">
               <input 
@@ -171,38 +205,68 @@ export default function AdminHonorsPage() {
           ) : (
             honors.map((honor) => (
               <div key={honor.id} className="glass-panel p-6 rounded-3xl border border-white/10">
-                <div className="flex justify-between gap-6">
-                  <div className="flex-1">
-                    <div className="font-black text-xl mb-1.5">{honor.title}</div>
-                    <p className="text-sm text-white/80 mb-4 leading-relaxed">{honor.description}</p>
-                    
-                    <div className="text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1">
-                      {honor.username && <span>@{honor.username}</span>}
-                      {honor.level && <span>سطح {honor.level}</span>}
-                      {honor.prize && <span className="text-yellow-400">{honor.prize}</span>}
-                      <span>{honor.time}</span>
+                {editingId === honor.id ? (
+                  // فرم ویرایش
+                  <div className="space-y-4">
+                    <input 
+                      value={editData.title} 
+                      onChange={(e) => setEditData({...editData, title: e.target.value})}
+                      className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3"
+                    />
+                    <textarea 
+                      value={editData.description} 
+                      onChange={(e) => setEditData({...editData, description: e.target.value})}
+                      className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 h-24"
+                    />
+                    <input 
+                      placeholder="لینک تصویر" 
+                      value={editData.image || ""} 
+                      onChange={(e) => setEditData({...editData, image: e.target.value})}
+                      className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3"
+                    />
+                    <div className="flex gap-3">
+                      <button onClick={saveEdit} className="bg-green-600 px-6 py-2 rounded-xl text-sm">ذخیره</button>
+                      <button onClick={() => setEditingId(null)} className="bg-gray-600 px-6 py-2 rounded-xl text-sm">انصراف</button>
                     </div>
                   </div>
-
-                  <div className="flex flex-col items-end gap-2 min-w-[140px]">
-                    <div className={`text-xs px-3 py-1 rounded-full border text-center ${
-                      honor.status === "approved" ? "bg-green-500/10 text-green-400 border-green-500/20" :
-                      honor.status === "rejected" ? "bg-red-500/10 text-red-400 border-red-500/20" :
-                      "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
-                    }`}>
-                      {honor.status === "approved" ? "منتشر شده" : honor.status === "rejected" ? "رد شده" : "در انتظار تأیید"}
-                    </div>
-
-                    {honor.status === "pending" && (
-                      <div className="flex gap-2">
-                        <button onClick={() => updateStatus(honor.id, "approved")} className="text-xs px-4 py-2 bg-green-600 rounded-xl hover:bg-green-700">تأیید</button>
-                        <button onClick={() => updateStatus(honor.id, "rejected")} className="text-xs px-4 py-2 bg-red-600 rounded-xl hover:bg-red-700">رد</button>
+                ) : (
+                  // نمایش عادی
+                  <div className="flex justify-between gap-6">
+                    <div className="flex-1">
+                      <div className="font-black text-xl mb-1.5">{honor.title}</div>
+                      <p className="text-sm text-white/80 mb-4 leading-relaxed">{honor.description}</p>
+                      
+                      <div className="text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1">
+                        {honor.username && <span>@{honor.username}</span>}
+                        {honor.level && <span>سطح {honor.level}</span>}
+                        {honor.prize && <span className="text-yellow-400">{honor.prize}</span>}
+                        <span>{honor.time}</span>
                       </div>
-                    )}
+                    </div>
 
-                    <button onClick={() => deleteHonor(honor.id)} className="text-xs text-red-400 hover:text-red-500 mt-1">حذف</button>
+                    <div className="flex flex-col items-end gap-2 min-w-[150px]">
+                      <div className={`text-xs px-3 py-1 rounded-full border text-center ${
+                        honor.status === "approved" ? "bg-green-500/10 text-green-400 border-green-500/20" :
+                        honor.status === "rejected" ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                        "bg-yellow-500/10 text-yellow-400 border-yellow-500/20"
+                      }`}>
+                        {honor.status === "approved" ? "منتشر شده" : honor.status === "rejected" ? "رد شده" : "در انتظار تأیید"}
+                      </div>
+
+                      {honor.status === "pending" && (
+                        <div className="flex gap-2">
+                          <button onClick={() => updateStatus(honor.id, "approved")} className="text-xs px-4 py-2 bg-green-600 rounded-xl hover:bg-green-700">تأیید</button>
+                          <button onClick={() => updateStatus(honor.id, "rejected")} className="text-xs px-4 py-2 bg-red-600 rounded-xl hover:bg-red-700">رد</button>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2 mt-2">
+                        <button onClick={() => startEdit(honor)} className="text-xs px-4 py-1.5 bg-blue-600 rounded-xl">ویرایش</button>
+                        <button onClick={() => deleteHonor(honor.id)} className="text-xs px-4 py-1.5 bg-red-600 rounded-xl">حذف</button>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             ))
           )}
