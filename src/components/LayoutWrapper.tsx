@@ -9,7 +9,6 @@ interface BackgroundResponse {
   slug?: string;
 }
 
-// Dynamic imports with SSR disabled for client-side only components
 const AIAssistant = dynamic(() => import("./AIAssistant"), { 
   ssr: false,
   loading: () => null
@@ -28,68 +27,61 @@ const ThemeRuntime = dynamic(() => import("./ThemeRuntime"), {
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const { dir, lang } = useLanguage();
   const [bgImage, setBgImage] = useState<string>("");
-  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     document.documentElement.setAttribute("dir", dir);
     document.documentElement.setAttribute("lang", lang);
   }, [dir, lang]);
 
-  // Fetch background image from dedicated API
   useEffect(() => {
     const fetchBackground = async () => {
       try {
-        console.log("🔍 Fetching background from API...");
         const res = await fetch("/api/public/background", {
           cache: "no-store",
         });
         const data: BackgroundResponse = await res.json();
         
-        console.log("📦 Background API response:", data);
-        
         if (data.url) {
-          console.log("✅ Custom background URL:", data.url);
           setBgImage(data.url);
         } else {
-          console.log("ℹ️ No custom background, using default");
-          setBgImage("");
+          setBgImage("/background.jpg");
         }
-      } catch (error) {
-        console.error("❌ Failed to fetch background:", error);
-        setBgImage("");
-      } finally {
-        setLoading(false);
+      } catch {
+        setBgImage("/background.jpg");
       }
     };
 
     fetchBackground();
   }, []);
 
-  // Determine background URL
-  const backgroundUrl = bgImage || "/background.jpg";
-
   return (
     <div dir={dir} className="relative min-h-screen overflow-x-hidden">
-      {/* بک‌گراند اصلی - با opacity برای نمایش */}
+      {/* بک‌گراند - با opacity کمتر تا تصویر مشخص باشه */}
       <div 
-        className="fixed inset-0 pointer-events-none"
+        className="fixed inset-0"
         style={{ 
-          backgroundImage: `url('${backgroundUrl}')`,
+          backgroundImage: `url(${bgImage})`,
           backgroundSize: "cover",
-          backgroundPosition: "center",
+          backgroundPosition: "center center",
           backgroundRepeat: "no-repeat",
           backgroundAttachment: "fixed",
-          opacity: 0.85, // اضافه کردن opacity برای نمایش بهتر
-          zIndex: -1,
+          zIndex: -2,
         }}
       />
       
-      {/* لایه تیره روی بک‌گراند - فقط برای خوانایی متن */}
+      {/* گرادیان ملایم روی بک‌گراند - فقط برای خوانایی */}
       <div 
         className="fixed inset-0 pointer-events-none"
         style={{
-          background: "linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.2) 70%, rgba(0,0,0,0.5) 100%)",
-          zIndex: -0.5,
+          background: `
+            linear-gradient(to bottom, 
+              rgba(5, 5, 16, 0.6) 0%, 
+              rgba(5, 5, 16, 0.3) 40%, 
+              rgba(5, 5, 16, 0.4) 70%, 
+              rgba(5, 5, 16, 0.7) 100%
+            )
+          `,
+          zIndex: -1,
         }}
       />
       

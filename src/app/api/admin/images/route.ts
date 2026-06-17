@@ -6,7 +6,6 @@ import { requireAdminPermission } from "@/lib/admin-permissions";
 
 export const dynamic = "force-dynamic";
 
-
 export async function GET(request: NextRequest) {
   try {
     const { error, status } = await requireAdminPermission(request, "media");
@@ -34,6 +33,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "slug, title, url required" }, { status: 400 });
     }
 
+    // Check if slug already exists
+    const existing = await db
+      .select()
+      .from(siteImages)
+      .where(eq(siteImages.slug, slug));
+
+    if (existing.length > 0) {
+      // Update existing
+      const [updated] = await db
+        .update(siteImages)
+        .set({
+          title,
+          url,
+          altText: altText || null,
+          category: category || "general",
+          sortOrder: sortOrder ?? 0,
+          isActive: true, // Always set active on save
+          updatedAt: new Date(),
+        })
+        .where(eq(siteImages.slug, slug))
+        .returning();
+      return NextResponse.json(updated);
+    }
+
+    // Insert new - explicitly set isActive: true
     const [image] = await db
       .insert(siteImages)
       .values({
@@ -43,12 +67,14 @@ export async function POST(request: NextRequest) {
         altText: altText || null,
         category: category || "general",
         sortOrder: sortOrder ?? 0,
+        isActive: true, // Explicitly set to true
       })
       .returning();
 
     return NextResponse.json(image, { status: 201 });
-  } catch {
-    return NextResponse.json({ error: "Failed" }, { status: 500 });
+  } catch (err) {
+    console.error("Image POST error:", err);
+    return NextResponse.json({ error: "Failed to save image" }, { status: 500 });
   }
 }
 
@@ -64,7 +90,7 @@ export async function PATCH(request: NextRequest) {
 
     const [updated] = await db
       .update(siteImages)
-      .set({ ...data, updatedAt: undefined })
+      .set({ ...data, updatedAt: new Date() })
       .where(eq(siteImages.id, id))
       .returning();
 
