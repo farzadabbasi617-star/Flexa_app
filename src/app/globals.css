@@ -16,10 +16,8 @@
   --color-gaming-card: #12122b;
   --color-gaming-border: #2a2a5a;
   --font-family-gaming: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  
-  /* Theme runtime variables */
   --bg-main: #050510;
-  --card-bg: rgba(18, 18, 43, 0.85);
+  --card-bg: rgba(18, 18, 43, 0.9);
 }
 
 @layer base {
@@ -52,67 +50,95 @@
 }
 
 /* ============================================
-   BACKGROUND IMAGE SYSTEM
+   BASE STYLES
    ============================================ */
 
-/* Base body styles */
 html, body {
   background-color: var(--bg-main, #050510);
   min-height: 100vh;
   overflow-x: hidden;
 }
 
-/* When custom background is set - make page backgrounds transparent */
-.has-custom-bg body,
-.has-custom-bg {
+/* When background image is active - make body transparent */
+.show-bg-image body,
+.show-bg-image {
   background-color: transparent !important;
-}
-
-/* Default background image */
-body {
-  background-image: url('/background.jpg');
-  background-size: cover;
-  background-position: center center;
-  background-repeat: no-repeat;
-  background-attachment: fixed;
-}
-
-/* Page backgrounds - transparent by default to show bg image */
-.min-h-screen {
-  background-color: transparent !important;
-}
-
-/* For pages that need dark backgrounds (like admin) - use this class */
-.page-dark {
-  background-color: var(--color-dark-900) !important;
 }
 
 /* ============================================
-   GLASS PANEL & CARDS
+   PAGE CONTAINER - RESPONSIVE
+   ============================================ */
+
+/* Mobile: max 480px centered */
+/* Desktop: full width with max constraints */
+
+.page-container {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0 16px;
+}
+
+@media (min-width: 640px) {
+  .page-container {
+    padding: 0 24px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-container {
+    padding: 0 40px;
+  }
+}
+
+/* Mobile-first page wrapper */
+.page-content {
+  width: 100%;
+  max-width: 480px;
+  margin: 0 auto;
+}
+
+@media (min-width: 768px) {
+  .page-content {
+    max-width: 640px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .page-content {
+    max-width: 896px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .page-content {
+    max-width: 1024px;
+  }
+}
+
+/* ============================================
+   GLASS & CARDS
    ============================================ */
 
 .glass-panel {
-  background: rgba(18, 18, 43, 0.85) !important;
-  backdrop-filter: blur(26px) !important;
-  -webkit-backdrop-filter: blur(26px) !important;
+  background: var(--card-bg) !important;
+  backdrop-filter: blur(24px) !important;
+  -webkit-backdrop-filter: blur(24px) !important;
 }
 
 .gaming-card {
-  background: var(--card-bg, rgba(18, 18, 43, 0.85)) !important;
+  background: var(--card-bg) !important;
   border: 1px solid var(--color-gaming-border);
-  border-radius: var(--flexa-card-radius, 20px);
+  border-radius: 20px;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
 
-.gaming-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  opacity: 0.05;
-  pointer-events: none;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+.gaming-card:hover {
+  border-color: var(--color-neon-purple);
+  box-shadow: 0 0 30px rgba(168, 85, 247, 0.15);
+  transform: translateY(-2px);
 }
 
 /* ============================================
@@ -192,12 +218,7 @@ body {
   left: -100%;
   width: 50%;
   height: 100%;
-  background: linear-gradient(
-    to right,
-    transparent,
-    rgba(255, 255, 255, 0.3),
-    transparent
-  );
+  background: linear-gradient(to right, transparent, rgba(255, 255, 255, 0.3), transparent);
   transform: skewX(-25deg);
   transition: none;
   pointer-events: none;
@@ -216,7 +237,6 @@ body {
 
 .gaming-btn:active {
   transform: translateY(-1px) scale(0.98);
-  box-shadow: 0 2px 10px rgba(168, 85, 247, 0.4);
 }
 
 .gaming-btn-danger {
@@ -230,7 +250,7 @@ body {
 }
 
 /* ============================================
-   INPUTS & SELECTS
+   INPUTS
    ============================================ */
 
 .gaming-input {
@@ -289,10 +309,6 @@ body {
   box-shadow: 0 0 5px var(--color-neon-blue), inset 0 0 5px rgba(0, 212, 255, 0.1);
 }
 
-.bracket-line {
-  border-color: var(--color-gaming-border);
-}
-
 /* ============================================
    LUXURY EFFECTS
    ============================================ */
@@ -319,10 +335,9 @@ body {
 
 .fx-card {
   transform-style: preserve-3d;
-  box-shadow:
-    0 28px 80px rgba(0, 0, 0, .42),
-    inset 0 1px 0 rgba(255,255,255,.08),
-    inset 0 -1px 0 rgba(255,255,255,.03);
+  box-shadow: 0 28px 80px rgba(0, 0, 0, .42),
+              inset 0 1px 0 rgba(255,255,255,.08),
+              inset 0 -1px 0 rgba(255,255,255,.03);
 }
 
 .fx-card::after {
