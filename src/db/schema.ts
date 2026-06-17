@@ -238,6 +238,38 @@ export const registrations = pgTable("registrations", {
   playerIdIdx: index("registrations_player_id_idx").on(table.playerId),
 }));
 
+// Telegram pre-registrations
+// Leads/users collected by the official Flexa Telegram bot before the user
+// completes official tournament registration inside the web app.
+export const telegramPreRegistrations = pgTable("telegram_pre_registrations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  telegramId: varchar("telegram_id", { length: 32 }).notNull().unique(),
+  telegramUsername: varchar("telegram_username", { length: 100 }),
+  telegramFirstName: varchar("telegram_first_name", { length: 100 }),
+  telegramLastName: varchar("telegram_last_name", { length: 100 }),
+  linkedUserId: uuid("linked_user_id").references(() => users.id),
+  flexaId: varchar("flexa_id", { length: 20 }),
+  fullName: varchar("full_name", { length: 100 }).notNull(),
+  phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
+  game: varchar("game", { length: 50 }).notNull(),
+  platform: varchar("platform", { length: 50 }),
+  gamerTag: varchar("gamer_tag", { length: 100 }).notNull(),
+  city: varchar("city", { length: 100 }),
+  teamName: varchar("team_name", { length: 100 }),
+  status: varchar("status", { length: 30 }).notNull().default("new"),
+  source: varchar("source", { length: 50 }).notNull().default("telegram_bot"),
+  rawPayload: jsonb("raw_payload"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  telegramIdIdx: index("telegram_pre_reg_telegram_id_idx").on(table.telegramId),
+  flexaIdIdx: index("telegram_pre_reg_flexa_id_idx").on(table.flexaId),
+  phoneIdx: index("telegram_pre_reg_phone_idx").on(table.phoneNumber),
+  gameIdx: index("telegram_pre_reg_game_idx").on(table.game),
+  statusIdx: index("telegram_pre_reg_status_idx").on(table.status),
+  createdAtIdx: index("telegram_pre_reg_created_at_idx").on(table.createdAt),
+}));
+
 // Matches
 export const matches = pgTable("matches", {
   id: uuid("id").defaultRandom().primaryKey(),

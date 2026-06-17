@@ -8,6 +8,7 @@ import {
   players,
   registrations,
   siteImages,
+  telegramPreRegistrations,
   tournaments,
   users,
 } from "@/db/schema";
@@ -37,6 +38,11 @@ export async function GET(request: NextRequest) {
     const [jCount] = await db.select({ v: count() }).from(judgments);
     const [aiCount] = await db.select({ v: count() }).from(judgments).where(eq(judgments.isAiJudgment, true));
     const [imgCount] = await db.select({ v: count() }).from(siteImages);
+    const [telegramPreRegCount] = await db.select({ v: count() }).from(telegramPreRegistrations);
+    const [telegramNewCount] = await db
+      .select({ v: count() })
+      .from(telegramPreRegistrations)
+      .where(eq(telegramPreRegistrations.status, "new"));
 
     const userRows = await db
       .select({
@@ -155,6 +161,31 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(siteImages.createdAt))
       .limit(limit);
 
+    const telegramRows = await db
+      .select({
+        id: telegramPreRegistrations.id,
+        telegramId: telegramPreRegistrations.telegramId,
+        telegramUsername: telegramPreRegistrations.telegramUsername,
+        fullName: telegramPreRegistrations.fullName,
+        phoneNumber: telegramPreRegistrations.phoneNumber,
+        flexaId: telegramPreRegistrations.flexaId,
+        linkedUserId: telegramPreRegistrations.linkedUserId,
+        linkedDisplayName: users.displayName,
+        game: telegramPreRegistrations.game,
+        platform: telegramPreRegistrations.platform,
+        gamerTag: telegramPreRegistrations.gamerTag,
+        city: telegramPreRegistrations.city,
+        teamName: telegramPreRegistrations.teamName,
+        status: telegramPreRegistrations.status,
+        source: telegramPreRegistrations.source,
+        createdAt: telegramPreRegistrations.createdAt,
+        updatedAt: telegramPreRegistrations.updatedAt,
+      })
+      .from(telegramPreRegistrations)
+      .leftJoin(users, eq(telegramPreRegistrations.linkedUserId, users.id))
+      .orderBy(desc(telegramPreRegistrations.updatedAt))
+      .limit(limit);
+
     return NextResponse.json({
       stats: {
         users: uCount.v,
@@ -162,16 +193,21 @@ export async function GET(request: NextRequest) {
         matches: mCount.v,
         completedMatches: completedCount.v,
         disputes: dCount.v,
+        messages: 0,
         judgments: jCount.v,
         aiJudgments: aiCount.v,
         images: imgCount.v,
+        telegramPreRegistrations: telegramPreRegCount.v,
+        telegramNewPreRegistrations: telegramNewCount.v,
       },
       users: userRows,
       tournaments: tournamentRows,
       matches: matchRows,
       judgments: judgmentRows,
       disputes: disputeRows,
+      messages: [],
       images: imageRows,
+      telegramPreRegistrations: telegramRows,
     });
   } catch (err) {
     logger.error({ err }, "Admin console GET failed");
@@ -187,7 +223,9 @@ export async function DELETE(request: NextRequest) {
     const { resource, id } = await request.json();
     if (!resource || !id) return NextResponse.json({ error: "resource and id required" }, { status: 400 });
 
-    if (resource === "judgment") {
+    if (resource === "telegram_pre_registration") {
+      await db.delete(telegramPreRegistrations).where(eq(telegramPreRegistrations.id, id));
+    } else if (resource === "judgment") {
       await db.delete(judgments).where(eq(judgments.id, id));
     } else if (resource === "dispute") {
       await db.delete(disputes).where(eq(disputes.id, id));
@@ -229,6 +267,17 @@ export async function PATCH(request: NextRequest) {
 
     const { resource, id, data } = await request.json();
     if (!resource || !id || !data) return NextResponse.json({ error: "resource, id and data required" }, { status: 400 });
+
+    if (resource === "telegram_pre_registration") {
+      const allowed = ["new", "contacted", "converted", "archived"];
+      if (data.status && !allowed.includes(data.status)) return NextResponse.json({ error: "Invalid status" }, { status: 400 });
+      const [updated] = await db
+        .update(telegramPreRegistrations)
+        .set({ status: data.status || "contacted", updatedAt: new Date() })
+        .where(eq(telegramPreRegistrations.id, id))
+        .returning();
+      return NextResponse.json(updated);
+    }
 
     if (resource === "tournament") {
       const allowed = ["registration", "in_progress", "completed", "cancelled"];

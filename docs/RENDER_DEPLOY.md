@@ -45,6 +45,7 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
 OPENROUTER_API_KEY=your_openrouter_key
 GROQ_API_KEY=your_groq_key
 NODE_ENV=production
+TELEGRAM_INTEGRATION_SECRET=your_long_random_secret
 ```
 
 فعلاً چون SMS/OTP هنوز فعال نشده، FarazSMS اختیاری است:
@@ -78,6 +79,16 @@ npm run db:push
 ```
 
 برای دیتابیس production بهتر است قبل از اجرای push مطمئن شوید دیتابیس خالی است یا backup دارید.
+
+### migration دستی اتصال تلگرام
+
+اگر دیتابیس از قبل ساخته شده، برای جدول پیش‌ثبت‌نام تلگرام این SQL را هم اجرا کنید:
+
+```bash
+psql "$DATABASE_URL" -f drizzle/manual/0002_add_telegram_pre_registrations.sql
+```
+
+یا محتوای همین فایل را در SQL Editor دیتابیس paste و اجرا کنید.
 
 ## 4) Redeploy
 

@@ -6,7 +6,7 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 
-type TabKey = "overview" | "users" | "tournaments" | "matches" | "judgments" | "disputes" | "messages" | "media";
+type TabKey = "overview" | "users" | "tournaments" | "matches" | "judgments" | "disputes" | "messages" | "telegram" | "media";
 
 interface ConsoleData {
   stats: Record<string, number>;
@@ -16,6 +16,7 @@ interface ConsoleData {
   judgments: Array<Record<string, any>>;
   disputes: Array<Record<string, any>>;
   messages: Array<Record<string, any>>;
+  telegramPreRegistrations: Array<Record<string, any>>;
   images: Array<Record<string, any>>;
 }
 
@@ -27,6 +28,7 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
   { key: "judgments", label: "داوری‌ها", icon: "⚖️" },
   { key: "disputes", label: "اعتراضات", icon: "🚨" },
   { key: "messages", label: "پیام‌ها", icon: "💬" },
+  { key: "telegram", label: "تلگرام", icon: "⚡" },
   { key: "media", label: "رسانه و ظاهر", icon: "🖼️" },
 ];
 
@@ -51,6 +53,10 @@ function StatusPill({ value }: { value: string }) {
     awaiting_judgment: "bg-purple-500/10 text-purple-300 border-purple-500/30",
     open: "bg-orange-500/10 text-orange-300 border-orange-500/30",
     resolved: "bg-green-500/10 text-green-300 border-green-500/30",
+    new: "bg-cyan-500/10 text-cyan-300 border-cyan-500/30",
+    contacted: "bg-yellow-500/10 text-yellow-300 border-yellow-500/30",
+    converted: "bg-green-500/10 text-green-300 border-green-500/30",
+    archived: "bg-gray-500/10 text-gray-300 border-gray-500/30",
   };
   return <span className={`px-2 py-1 rounded-full border text-[10px] font-black ${map[value] || "bg-white/5 text-gray-300 border-white/10"}`}>{value}</span>;
 }
@@ -96,7 +102,9 @@ export default function AdminPage() {
   const filtered = useMemo(() => {
     if (!data) return [];
     const q = query.trim().toLowerCase();
-    const rows = (data[activeTab as keyof ConsoleData] as Array<Record<string, any>>) || [];
+    const rows = activeTab === "telegram"
+      ? data.telegramPreRegistrations
+      : ((data[activeTab as keyof ConsoleData] as Array<Record<string, any>>) || []);
     if (!q) return rows;
     return rows.filter((row) => JSON.stringify(row).toLowerCase().includes(q));
   }, [activeTab, data, query]);
@@ -149,6 +157,7 @@ export default function AdminPage() {
         { key: "judgments", icon: "⚖️", label: "کل داوری‌ها", value: data.stats.judgments, color: "text-neon-purple" },
         { key: "disputes", icon: "🚨", label: "اعتراضات", value: data.stats.disputes, color: "text-neon-pink" },
         { key: "messages", icon: "💬", label: "پیام‌ها", value: data.stats.messages, color: "text-gray-300" },
+        { key: "telegram", icon: "⚡", label: "پیش‌ثبت‌نام تلگرام", value: data.stats.telegramPreRegistrations, color: "text-neon-orange" },
       ]
     : [];
 
@@ -176,6 +185,7 @@ export default function AdminPage() {
               <Link href="/admin/users" className="gaming-btn text-xs">+ کاربر / نقش‌ها</Link>
               <Link href="/admin/tournaments" className="gaming-btn text-xs">کنترل تورنومنت</Link>
               <Link href="/admin/images" className="gaming-btn text-xs">+ تصویر</Link>
+              <button onClick={() => setActiveTab("telegram")} className="gaming-btn text-xs">پیش‌ثبت‌نام تلگرام</button>
               <Link href="/admin/wallets" className="gaming-btn text-xs">کیف پول</Link>
             </div>
           </div>
@@ -231,6 +241,7 @@ export default function AdminPage() {
               { href: "/admin/wallets", icon: "💳", title: "کیف پول کاربران", desc: "مشاهده موجودی کاربران و اصلاح دستی با لاگ مدیریتی" },
               { href: "/admin/finance", icon: "📈", title: "گزارش مالی", desc: "گزارش تراکنش‌ها، موجودی‌ها، ورودی‌ها، خروجی‌ها و CSV" },
               { href: "/admin/prizes", icon: "🏆", title: "پرداخت جایزه", desc: "واریز جایزه تورنومنت به کیف پول برنده‌ها" },
+              { href: "#telegram", icon: "⚡", title: "پیش‌ثبت‌نام تلگرام", desc: "مشاهده لیدهای ربات، Flexa ID، آیدی بازی، شماره تماس و وضعیت پیگیری" },
               { href: "/admin/notifications", icon: "🔔", title: "اعلان سیستمی", desc: "ارسال اعلان به همه کاربران یا کاربر مشخص" },
               { href: "/admin/support", icon: "🎧", title: "پشتیبانی و تیکت", desc: "مشاهده تیکت‌ها، پاسخ رسمی و تغییر وضعیت" },
               { href: "/admin/audit", icon: "🧾", title: "لاگ فعالیت مدیران", desc: "ردیابی تغییرات حساس، حذف‌ها، ویرایش‌ها و عملیات مالی" },
@@ -238,7 +249,7 @@ export default function AdminPage() {
               { href: "/admin/tournaments", icon: "🧩", title: "کنترل کامل تورنومنت", desc: "ویرایش کامل رویدادها، جوایز، قوانین، وضعیت و بنر" },
               { href: "/admin/honors", icon: "🏆", title: "تالار افتخارات", desc: "مدیریت محتوا، تأیید پیشنهادات هوش مصنوعی و انتشار اخبار" },
             ].map((item) => (
-              <Link key={item.href} href={item.href} className="gaming-card p-6 group hover:border-neon-purple/50 transition-all relative overflow-hidden">
+              <Link key={item.href} href={item.href} onClick={() => item.href === "#telegram" && setActiveTab("telegram")} className="gaming-card p-6 group hover:border-neon-purple/50 transition-all relative overflow-hidden">
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-neon-purple/10 to-neon-blue/5" />
                 <div className="relative flex items-center gap-4">
                   <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-500 flex items-center justify-center text-3xl group-hover:scale-110 group-hover:rotate-6 transition-transform">{item.icon}</div>
@@ -286,6 +297,22 @@ export default function AdminPage() {
 
         {activeTab === "messages" && (
           <DataGrid rows={filtered} columns={["senderName", "senderUsername", "senderRole", "message", "createdAt"]} actions={(row) => <button onClick={() => deleteResource("message", row.id)} className="text-red-400 text-xs">حذف</button>} />
+        )}
+
+        {activeTab === "telegram" && (
+          <DataGrid
+            rows={filtered}
+            columns={["fullName", "phoneNumber", "flexaId", "linkedDisplayName", "game", "platform", "gamerTag", "telegramUsername", "city", "teamName", "status", "updatedAt"]}
+            renderCell={(key, value) => key === "status" ? <StatusPill value={String(value)} /> : fmt(value)}
+            actions={(row) => (
+              <div className="flex gap-2 items-center">
+                <select defaultValue={row.status || "new"} onChange={(e) => updateResource("telegram_pre_registration", row.id, { status: e.target.value })} className="bg-dark-700 border border-gaming-border rounded-lg text-xs px-2 py-1">
+                  <option value="new">جدید</option><option value="contacted">پیگیری شد</option><option value="converted">تبدیل به کاربر/ثبت‌نام</option><option value="archived">آرشیو</option>
+                </select>
+                <button onClick={() => deleteResource("telegram_pre_registration", row.id)} className="text-red-400 text-xs">حذف</button>
+              </div>
+            )}
+          />
         )}
 
         {activeTab === "media" && (

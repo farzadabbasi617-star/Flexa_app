@@ -18,6 +18,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | File | What it does |
 |------|--------------|
 | `0001_add_rate_limits.sql` | Adds the `rate_limits` table used by the distributed (DB-backed) rate limiter in `src/lib/rate-limit.ts`. |
+| `0002_add_telegram_pre_registrations.sql` | Adds the `telegram_pre_registrations` table used by the Flexa Telegram bot integration and admin console. |
 
 > Note: the rate limiter **fails open** — if this table is missing or the DB
 > errors, requests are still allowed (and the issue is logged), so forgetting

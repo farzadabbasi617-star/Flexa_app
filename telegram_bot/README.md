@@ -1,0 +1,193 @@
+# Flexa Telegram Bot ⚡
+
+ربات تلگرام شخصی‌سازی‌شده برای وب‌اپ **Flexa — پلتفرم تورنومنت گیمینگ**.
+
+این ربات مکمل وب‌اپ است؛ یعنی:
+
+- روم‌های فعال را از API وب‌اپ Flexa می‌خواند.
+- بازیکن‌ها را برای تورنومنت‌ها به‌صورت تلگرامی پیش‌ثبت‌نام می‌کند.
+- Flexa ID، آیدی بازی، شماره تماس، پلتفرم و تیم/کلن را جمع‌آوری می‌کند.
+- لینک ثبت‌نام رسمی، پروفایل و ساخت حساب در وب‌اپ را نمایش می‌دهد.
+- ادمین می‌تواند خروجی CSV، آمار، قرعه‌کشی ساده و اطلاعیه داشته باشد.
+
+> ثبت‌نام قطعی، پرداخت ورودی احتمالی، مشاهده لابی، کیف پول و داوری نهایی همچنان داخل وب‌اپ Flexa انجام می‌شود.
+
+---
+
+## هماهنگی با سایت فعلی Flexa
+
+بر اساس سایت و ریپازیتوری شما، ربات برای این موارد تنظیم شده است:
+
+- برند: `Flexa`
+- آدرس وب‌اپ: `https://flexa-app-1.onrender.com`
+- بازی‌ها:
+  - 🎯 COD MOBILE / کالاف موبایل
+  - 🏗️ FORTNITE / فورتنایت
+  - 👑 CLASH ROYALE / کلش رویال
+- لینک روم‌ها: `/tournaments`
+- API روم‌ها: `/api/tournaments?limit=20`
+- حساب کاربری و شناسه: `Flexa ID` مثل `FLX-1234`
+- تاکید روی داوری هوشمند، قوانین ضدتقلب، ثبت آیدی صحیح بازی و ثبت‌نام رسمی از وب‌اپ
+
+---
+
+## امکانات کاربر
+
+- `/start` منوی اصلی
+- `/rooms` نمایش روم‌های فعال از وب‌اپ
+- `/rooms cod_mobile` روم‌های کالاف موبایل
+- `/rooms fortnite` روم‌های فورتنایت
+- `/rooms clash_royale` روم‌های کلش رویال
+- `/register` پیش‌ثبت‌نام تلگرامی
+- `/status` وضعیت پیش‌ثبت‌نام
+- `/rules` قوانین خلاصه Flexa
+- `/links` لینک‌های مهم
+- `/unregister` لغو پیش‌ثبت‌نام تلگرامی
+
+---
+
+## امکانات ادمین
+
+- `/admin` راهنمای پنل ادمین
+- `/stats` آمار پیش‌ثبت‌نام‌ها
+- `/players` نمایش ۲۰ پیش‌ثبت‌نام آخر
+- `/players COD MOBILE` نمایش ۲۰ پیش‌ثبت‌نام آخر یک بازی
+- `/export` خروجی CSV کامل
+- `/draw COD MOBILE` قرعه‌کشی ساده
+- `/announce متن اطلاعیه` ارسال اطلاعیه فقط به کاربران پیش‌ثبت‌نام‌شده
+
+---
+
+## نصب و اجرا
+
+### 1) ساخت ربات در BotFather
+
+در تلگرام وارد `@BotFather` شوید:
+
+```text
+/newbot
+```
+
+توکن ربات را بگیرید.
+
+### 2) گرفتن آیدی ادمین
+
+برای گرفتن آیدی عددی تلگرام خودتان می‌توانید به `@userinfobot` پیام بدهید.
+
+### 3) تنظیم فایل env
+
+```bash
+cd tournament_bot
+cp .env.example .env
+```
+
+فایل `.env` را ویرایش کنید:
+
+```env
+BOT_TOKEN=توکن_ربات_از_BotFather
+ADMIN_IDS=آیدی_عددی_تلگرام_شما
+APP_URL=https://flexa-app-1.onrender.com
+TELEGRAM_INTEGRATION_SECRET=همان_کلیدی_که_در_وب‌اپ_می‌گذارید
+```
+
+اگر خواستید Flexa ID برای پیش‌ثبت‌نام اجباری باشد:
+
+```env
+FLEXA_ID_REQUIRED=true
+```
+
+### 4) نصب وابستگی‌ها
+
+```bash
+python -m venv .venv
+source .venv/bin/activate  # Linux/Mac
+# .venv\Scripts\activate   # Windows
+
+pip install -r requirements.txt
+```
+
+### 5) اجرا
+
+```bash
+python bot.py
+```
+
+بعد در تلگرام ربات را باز کنید و `/start` را بزنید.
+
+---
+
+## دیتابیس و خروجی
+
+- دیتابیس پیش‌فرض: `flexa_telegram_bot.db`
+- خروجی CSV در پوشه `exports/` ساخته می‌شود.
+- خروجی شامل این ستون‌هاست:
+  - Telegram ID
+  - Username
+  - Flexa ID
+  - نام نمایشی/نام کامل
+  - شماره تماس
+  - بازی
+  - پلتفرم
+  - آیدی بازی
+  - شهر
+  - تیم/کلن
+  - وضعیت
+
+---
+
+## نکته مهم درباره اتصال عمیق به وب‌اپ
+
+در نسخه فعلی، ربات اطلاعات پیش‌ثبت‌نام را هم در SQLite خودش نگه می‌دارد و هم، در صورت تنظیم `TELEGRAM_INTEGRATION_SECRET`، به وب‌اپ Flexa ارسال می‌کند.
+
+API امن وب‌اپ:
+
+```text
+POST /api/integrations/telegram/pre-registrations
+```
+
+برای فعال‌سازی Sync، همین مقدار Secret را در هر دو پروژه تنظیم کنید:
+
+```env
+# در Flexa_app و tournament_bot
+TELEGRAM_INTEGRATION_SECRET=یک_کلید_طولانی_و_تصادفی
+```
+
+بعد از اجرای migration وب‌اپ، پیش‌ثبت‌نام‌ها در پنل ادمین سایت، تب «تلگرام»، نمایش داده می‌شوند.
+
+---
+
+## اجرای دائم روی VPS با systemd، اختیاری
+
+```ini
+[Unit]
+Description=Flexa Telegram Bot
+After=network.target
+
+[Service]
+WorkingDirectory=/path/to/tournament_bot
+ExecStart=/path/to/tournament_bot/.venv/bin/python /path/to/tournament_bot/bot.py
+Restart=always
+RestartSec=5
+User=ubuntu
+
+[Install]
+WantedBy=multi-user.target
+```
+
+سپس:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable flexa-telegram-bot
+sudo systemctl start flexa-telegram-bot
+sudo systemctl status flexa-telegram-bot
+```
+
+---
+
+## نکات امنیتی
+
+- فایل `.env` را عمومی نکنید؛ توکن ربات داخل آن است.
+- `ADMIN_IDS` را حتماً تنظیم کنید.
+- اطلاعیه `/announce` فقط به کاربرانی ارسال می‌شود که خودشان در ربات پیش‌ثبت‌نام کرده‌اند.
+- پرداخت و کیف پول را از داخل وب‌اپ رسمی Flexa مدیریت کنید، نه داخل ربات.
