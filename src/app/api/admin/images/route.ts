@@ -49,8 +49,7 @@ export async function POST(request: NextRequest) {
           altText: altText || null,
           category: category || "general",
           sortOrder: sortOrder ?? 0,
-          isActive: true, // Always set active on save
-          updatedAt: new Date(),
+          isActive: true,
         })
         .where(eq(siteImages.slug, slug))
         .returning();
@@ -67,7 +66,7 @@ export async function POST(request: NextRequest) {
         altText: altText || null,
         category: category || "general",
         sortOrder: sortOrder ?? 0,
-        isActive: true, // Explicitly set to true
+        isActive: true,
       })
       .returning();
 
@@ -88,9 +87,12 @@ export async function PATCH(request: NextRequest) {
 
     if (!id) return NextResponse.json({ error: "id required" }, { status: 400 });
 
+    // Don't include id in the update
+    const { id: _id, ...updateData } = data;
+
     const [updated] = await db
       .update(siteImages)
-      .set({ ...data, updatedAt: new Date() })
+      .set(updateData)
       .where(eq(siteImages.id, id))
       .returning();
 
