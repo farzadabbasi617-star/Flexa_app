@@ -60,15 +60,11 @@ export default function LuxuryHomePage() {
   }, [images]);
 
   const heroImage = imageMap.bySlug["home-hero"] || imageMap.byCategory.hero;
-  const appBackground = imageMap.bySlug["app-background"] || imageMap.byCategory.background;
 
   return (
     <main className="min-h-screen bg-[#050508] text-white relative overflow-x-hidden selection:bg-purple-500/30">
-      {/* Ambient background */}
+      {/* Ambient overlay - فقط گرادیان، نه تصویر اضافی (تصویر اصلی در LayoutWrapper) */}
       <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
-        {appBackground && (
-          <img src={appBackground.url} alt="" className="absolute inset-0 w-full h-full object-cover opacity-25 scale-105" />
-        )}
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,_rgba(92,0,160,.65)_0%,_rgba(32,0,56,.55)_30%,_transparent_70%)]" />
         <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-purple-700/20 blur-[80px] animate-pulse" />
         <div className="absolute top-72 -right-28 w-64 h-64 rounded-full bg-cyan-500/10 blur-[85px]" />
@@ -76,7 +72,7 @@ export default function LuxuryHomePage() {
       </div>
 
       <div className="relative z-10 max-w-[480px] mx-auto px-6 pb-28">
-        {/* Header - same mobile structure as the reference: brand on right, wallet on left */}
+        {/* Header */}
         <header className="pt-12 pb-8 flex justify-between items-center">
           <div className="text-right">
             <h1 className="text-4xl font-black italic tracking-tighter en-font leading-none">FLEXA</h1>
