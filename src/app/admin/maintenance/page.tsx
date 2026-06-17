@@ -10,17 +10,14 @@ interface MaintenanceStats {
   expiredSessions: number;
   rateLimitsTotal: number;
   expiredRateLimits: number;
-  chatTotal: number;
-  chatOverflow: number;
   auditTotal: number;
   oldAuditLogs: number;
 }
 
 const ACTIONS = [
-  { id: "all", title: "پاکسازی کامل", desc: "نشست‌های منقضی، rate limitهای قدیمی، پیام‌های اضافه چت و لاگ‌های خیلی قدیمی", icon: "🧹" },
+  { id: "all", title: "پاکسازی کامل", desc: "نشست‌های منقضی، rate limitهای قدیمی، و لاگ‌های خیلی قدیمی", icon: "🧹" },
   { id: "sessions", title: "نشست‌های منقضی", desc: "حذف sessionهای تاریخ‌گذشته", icon: "🔐" },
   { id: "rate_limits", title: "Rate Limitهای قدیمی", desc: "پاکسازی رکوردهای منقضی محدودیت درخواست", icon: "🛡️" },
-  { id: "chat", title: "چت اضافه", desc: "نگهداری فقط ۵۰ پیام آخر چت جهانی", icon: "💬" },
   { id: "audit", title: "لاگ‌های قدیمی", desc: "حذف audit logهای قدیمی‌تر از ۱۸۰ روز", icon: "🧾" },
 ];
 
@@ -108,8 +105,6 @@ export default function AdminMaintenancePage() {
                 ["نشست منقضی", stats.expiredSessions, "⏳"],
                 ["RateLimitها", stats.rateLimitsTotal, "🛡️"],
                 ["RateLimit منقضی", stats.expiredRateLimits, "♻️"],
-                ["پیام‌های چت", stats.chatTotal, "💬"],
-                ["پیام اضافه", stats.chatOverflow, "🧽"],
                 ["لاگ مدیران", stats.auditTotal, "🧾"],
                 ["لاگ قدیمی", stats.oldAuditLogs, "🗑️"],
               ].map(([label, value, icon]) => (

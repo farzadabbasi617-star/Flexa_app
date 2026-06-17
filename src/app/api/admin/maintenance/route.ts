@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { adminAuditLogs, globalChat, rateLimits, sessions } from "@/db/schema";
+import { adminAuditLogs, rateLimits, sessions } from "@/db/schema";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { cleanupRateLimits } from "@/lib/rate-limit";
@@ -9,7 +9,7 @@ import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-type MaintenanceAction = "all" | "sessions" | "rate_limits" | "chat" | "audit";
+type MaintenanceAction = "all" | "sessions" | "rate_limits" | "audit";
 
 async function getMaintenanceStats() {
   const [sessionsTotal] = await db.select({ value: sql<number>`count(*)` }).from(sessions);
@@ -24,7 +24,6 @@ async function getMaintenanceStats() {
     .from(rateLimits)
     .where(sql`${rateLimits.resetAt} < now()`);
 
-  const [chatTotal] = await db.select({ value: sql<number>`count(*)` }).from(globalChat);
   const [auditTotal] = await db.select({ value: sql<number>`count(*)` }).from(adminAuditLogs);
   const [oldAuditLogs] = await db
     .select({ value: sql<number>`count(*)` })
@@ -36,8 +35,6 @@ async function getMaintenanceStats() {
     expiredSessions: Number(expiredSessions.value || 0),
     rateLimitsTotal: Number(rateLimitsTotal.value || 0),
     expiredRateLimits: Number(expiredRateLimits.value || 0),
-    chatTotal: Number(chatTotal.value || 0),
-    chatOverflow: Math.max(0, Number(chatTotal.value || 0) - 50),
     auditTotal: Number(auditTotal.value || 0),
     oldAuditLogs: Number(oldAuditLogs.value || 0),
   };
@@ -46,18 +43,6 @@ async function getMaintenanceStats() {
 async function cleanupExpiredSessions() {
   const deleted = await db.delete(sessions).where(sql`${sessions.expiresAt} < now()`).returning({ id: sessions.id });
   return deleted.length;
-}
-
-async function trimGlobalChat() {
-  const oldMessages = await db
-    .select({ id: globalChat.id })
-    .from(globalChat)
-    .orderBy(desc(globalChat.createdAt))
-    .offset(50);
-
-  if (oldMessages.length === 0) return 0;
-  await db.delete(globalChat).where(sql`${globalChat.id} IN (${sql.join(oldMessages.map((m) => m.id), sql`, `)})`);
-  return oldMessages.length;
 }
 
 async function cleanupOldAuditLogs() {
@@ -95,7 +80,6 @@ export async function POST(request: NextRequest) {
       await cleanupRateLimits();
       result.expiredRateLimitsDeleted = before;
     }
-    if (action === "all" || action === "chat") result.oldChatMessagesDeleted = await trimGlobalChat();
     if (action === "all" || action === "audit") result.oldAuditLogsDeleted = await cleanupOldAuditLogs();
 
     await logAdminAction({

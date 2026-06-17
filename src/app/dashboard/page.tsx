@@ -195,7 +195,6 @@ export default function DashboardPage() {
                 { href: "/tournaments", icon: "🎮", label: "تورنومنت" },
                 { href: "/wallet", icon: "💳", label: "کیف پول" },
                 { href: "/support", icon: "🎧", label: "پشتیبانی" },
-                { href: "/chat", icon: "💬", label: "چت" },
                 { href: "/leaderboard", icon: "📊", label: "رتبه‌ها" },
                 { href: "/profile/edit", icon: "⚙️", label: "آیدی‌ها" },
               ].map((action, i) => (

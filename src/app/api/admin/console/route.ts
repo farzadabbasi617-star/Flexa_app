@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import {
   disputes,
-  globalChat,
   judgments,
   matchEvidence,
   matches,
@@ -35,7 +34,6 @@ export async function GET(request: NextRequest) {
     const [mCount] = await db.select({ v: count() }).from(matches);
     const [completedCount] = await db.select({ v: count() }).from(matches).where(eq(matches.status, "completed"));
     const [dCount] = await db.select({ v: count() }).from(disputes);
-    const [msgCount] = await db.select({ v: count() }).from(globalChat);
     const [jCount] = await db.select({ v: count() }).from(judgments);
     const [aiCount] = await db.select({ v: count() }).from(judgments).where(eq(judgments.isAiJudgment, true));
     const [imgCount] = await db.select({ v: count() }).from(siteImages);
@@ -143,21 +141,6 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(disputes.createdAt))
       .limit(limit);
 
-    const messageRows = await db
-      .select({
-        id: globalChat.id,
-        message: globalChat.message,
-        createdAt: globalChat.createdAt,
-        senderId: users.id,
-        senderName: users.displayName,
-        senderUsername: users.username,
-        senderRole: users.role,
-      })
-      .from(globalChat)
-      .leftJoin(users, eq(globalChat.senderId, users.id))
-      .orderBy(desc(globalChat.createdAt))
-      .limit(limit);
-
     const imageRows = await db
       .select({
         id: siteImages.id,
@@ -179,7 +162,6 @@ export async function GET(request: NextRequest) {
         matches: mCount.v,
         completedMatches: completedCount.v,
         disputes: dCount.v,
-        messages: msgCount.v,
         judgments: jCount.v,
         aiJudgments: aiCount.v,
         images: imgCount.v,
@@ -189,7 +171,6 @@ export async function GET(request: NextRequest) {
       matches: matchRows,
       judgments: judgmentRows,
       disputes: disputeRows,
-      messages: messageRows,
       images: imageRows,
     });
   } catch (err) {
@@ -206,9 +187,7 @@ export async function DELETE(request: NextRequest) {
     const { resource, id } = await request.json();
     if (!resource || !id) return NextResponse.json({ error: "resource and id required" }, { status: 400 });
 
-    if (resource === "message") {
-      await db.delete(globalChat).where(eq(globalChat.id, id));
-    } else if (resource === "judgment") {
+    if (resource === "judgment") {
       await db.delete(judgments).where(eq(judgments.id, id));
     } else if (resource === "dispute") {
       await db.delete(disputes).where(eq(disputes.id, id));

@@ -298,15 +298,6 @@ export const translations = {
       achievementUnlocked: "Achievement Unlocked",
     },
 
-    // Chat
-    chat: {
-      title: "Chat",
-      typeMessage: "Type a message...",
-      send: "Send",
-      noMessages: "No messages yet",
-      online: "Online",
-      offline: "Offline",
-    },
 
     // Teams
     teamsPage: {
@@ -667,15 +658,6 @@ export const translations = {
       achievementUnlocked: "دستاورد باز شد",
     },
 
-    // Chat
-    chat: {
-      title: "چت",
-      typeMessage: "پیام بنویسید...",
-      send: "ارسال",
-      noMessages: "هنوز پیامی نیست",
-      online: "آنلاین",
-      offline: "آفلاین",
-    },
 
     // Teams
     teamsPage: {

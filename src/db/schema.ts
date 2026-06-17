@@ -9,6 +9,7 @@ import {
   jsonb,
   pgEnum,
   index,
+  numeric,
 } from "drizzle-orm/pg-core";
 
 // --- ENUMS ---
@@ -84,8 +85,6 @@ export const users = pgTable("users", {
   xp: integer("xp").default(0).notNull(),
   level: integer("level").default(1).notNull(),
   rankPoints: integer("rank_points").default(1000).notNull(),
-  chatStrikes: integer("chat_strikes").default(0).notNull(),
-  chatBanUntil: timestamp("chat_ban_until"),
   clashRoyaleId: varchar("clash_royale_id", { length: 100 }),
   clashRoyaleUsername: varchar("clash_royale_username", { length: 100 }),
   clashRoyaleStatus: verificationStatusEnum("cr_status").default("unlinked"),
@@ -274,21 +273,6 @@ export const matchEvidence = pgTable("match_evidence", {
   matchIdIdx: index("match_evidence_match_id_idx").on(table.matchId),
 }));
 
-// Chat
-export const chatMessages = pgTable("chat_messages", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  senderId: uuid("sender_id").notNull().references(() => users.id),
-  receiverId: uuid("receiver_id").notNull().references(() => users.id),
-  tournamentId: uuid("tournament_id").references(() => tournaments.id),
-  matchId: uuid("match_id").references(() => matches.id),
-  message: text("message").notNull(),
-  isRead: boolean("is_read").notNull().default(false),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  senderIdx: index("chat_messages_sender_id_idx").on(table.senderId),
-  receiverIdx: index("chat_messages_receiver_id_idx").on(table.receiverId),
-}));
-
 // Judges
 export const judges = pgTable("judges", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -385,7 +369,7 @@ export const adminAuditLogs = pgTable("admin_audit_logs", {
 export const wallets = pgTable("wallets", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id).unique(),
-  balance: text("balance").notNull().default("0"),
+  balance: numeric("balance", { precision: 20, scale: 0 }).notNull().default("0"),
   currency: varchar("currency", { length: 10 }).notNull().default("RIAL"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
@@ -424,16 +408,6 @@ export const ticketMessages = pgTable("ticket_messages", {
   message: text("message").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
-
-// Ephemeral Chat
-export const globalChat = pgTable("global_chat", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  senderId: uuid("sender_id").notNull().references(() => users.id),
-  message: text("message").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-}, (table) => ({
-  createdIdx: index("chat_created_idx").on(table.createdAt),
-}));
 
 // Rate limits
 export const rateLimits = pgTable("rate_limits", {

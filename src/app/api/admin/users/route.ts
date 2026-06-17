@@ -201,7 +201,6 @@ export async function DELETE(request: NextRequest) {
           bio: null,
           isVerified: false,
           role: "player",
-          chatBanUntil: new Date(Date.now() + 100 * 365 * 24 * 60 * 60 * 1000),
         })
         .where(eq(users.id, id));
     });
