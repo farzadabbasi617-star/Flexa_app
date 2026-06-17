@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 export default function Navbar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { lang, t } = useLanguage();
+  const { lang, setLang, t } = useLanguage();
   const { user, loading, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
@@ -67,6 +67,38 @@ export default function Navbar() {
                 </Link>
               );
             })}
+
+            {/* Language Switcher */}
+            <div className="ms-2 flex items-center bg-dark-800 rounded-full p-1 border border-gaming-border">
+              <button
+                onClick={() => setLang("fa")}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === "fa" ? "bg-neon-purple text-white" : "text-gray-400 hover:text-white"}`}
+              >
+                🇮🇷
+              </button>
+              <button
+                onClick={() => setLang("en")}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === "en" ? "bg-neon-purple text-white" : "text-gray-400 hover:text-white"}`}
+              >
+                🇬🇧
+              </button>
+            </div>
+
+            {/* Language Switcher */}
+            <div className="ms-2 flex items-center bg-dark-800 rounded-full p-1 border border-gaming-border">
+              <button
+                onClick={() => setLang("fa")}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === "fa" ? "bg-neon-purple text-white" : "text-gray-400 hover:text-white"}`}
+              >
+                🇮🇷
+              </button>
+              <button
+                onClick={() => setLang("en")}
+                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === "en" ? "bg-neon-purple text-white" : "text-gray-400 hover:text-white"}`}
+              >
+                🇬🇧
+              </button>
+            </div>
 
             {/* User/Auth */}
             <div className="ms-4 border-s border-gaming-border ps-4">
