@@ -28,43 +28,11 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   }, [dir, lang]);
 
   return (
-    <div dir={dir} className="relative min-h-screen overflow-x-hidden">
-      {/* بک‌گراند ثابت - با background-attachment: fixed */}
-      {/* این تصویر با اسکرول تکون نمی‌خوره و فیکس میمونه */}
-      <div 
-        className="fixed inset-0 w-full h-full"
-        style={{
-          backgroundImage: "url(/background.jpg)",
-          backgroundSize: "cover",
-          backgroundPosition: "center center",
-          backgroundRepeat: "no-repeat",
-          backgroundAttachment: "fixed",
-          zIndex: -2,
-        }}
-      />
-      
-      {/* گرادیان ملایم روی بک‌گراند برای خوانایی متن */}
-      <div 
-        className="fixed inset-0 pointer-events-none"
-        style={{
-          background: `
-            linear-gradient(
-              to bottom, 
-              rgba(5, 5, 16, 0.7) 0%, 
-              rgba(5, 5, 16, 0.4) 30%, 
-              rgba(5, 5, 16, 0.3) 50%, 
-              rgba(5, 5, 16, 0.5) 80%, 
-              rgba(5, 5, 16, 0.8) 100%
-            )
-          `,
-          zIndex: -1,
-        }}
-      />
-      
+    <>
       <ThemeRuntime />
       {children}
       <AIAssistant />
       <PWAInstall />
-    </div>
+    </>
   );
 }

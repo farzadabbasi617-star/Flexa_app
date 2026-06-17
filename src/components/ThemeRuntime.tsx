@@ -2,52 +2,104 @@
 
 import { useEffect, useState } from "react";
 
-const COLOR_MAP: Record<string, string> = {
-  primary_color: "--color-neon-purple",
-  secondary_color: "--color-neon-blue",
-  accent_color: "--color-neon-pink",
-  bg_color: "--color-dark-900",
-  card_color: "--color-gaming-card",
-};
+interface ThemeSettings {
+  primary_color?: string;
+  secondary_color?: string;
+  accent_color?: string;
+  bg_color?: string;
+  card_color?: string;
+  font_family?: string;
+  card_radius?: string;
+  announcement_active?: string;
+  announcement_text_fa?: string;
+  announcement_color?: string;
+}
+
+interface BackgroundImage {
+  url: string;
+}
 
 export default function ThemeRuntime() {
-  const [announcement, setAnnouncement] = useState("");
-  const [announcementColor, setAnnouncementColor] = useState("#a855f7");
+  const [settings, setSettings] = useState<ThemeSettings>({});
+  const [bgImage, setBgImage] = useState<BackgroundImage | null>(null);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function loadSettings() {
+    async function loadTheme() {
       try {
-        const res = await fetch("/api/public/settings", { cache: "no-store" });
-        const settings = await res.json();
-        if (cancelled || !settings || typeof settings !== "object") return;
+        // Load theme settings
+        const [settingsRes, bgRes] = await Promise.all([
+          fetch("/api/public/settings", { cache: "no-store" }),
+          fetch("/api/public/background", { cache: "no-store" })
+        ]);
 
-        for (const [key, cssVar] of Object.entries(COLOR_MAP)) {
-          const value = settings[key];
-          if (typeof value === "string" && /^#[0-9a-fA-F]{6}$/.test(value)) {
-            document.documentElement.style.setProperty(cssVar, value);
-          }
+        const settingsData = await settingsRes.json();
+        const bgData = await bgRes.json();
+
+        if (cancelled) return;
+
+        // Apply theme colors
+        if (settingsData.primary_color) {
+          document.documentElement.style.setProperty("--color-neon-purple", settingsData.primary_color);
+        }
+        if (settingsData.secondary_color) {
+          document.documentElement.style.setProperty("--color-neon-blue", settingsData.secondary_color);
+        }
+        if (settingsData.accent_color) {
+          document.documentElement.style.setProperty("--color-neon-pink", settingsData.accent_color);
+        }
+        if (settingsData.bg_color) {
+          document.documentElement.style.setProperty("--bg-main", settingsData.bg_color);
+        }
+        if (settingsData.card_color) {
+          document.documentElement.style.setProperty("--card-bg", settingsData.card_color);
+        }
+        if (settingsData.font_family) {
+          document.documentElement.style.setProperty("--font-family-gaming", settingsData.font_family);
+        }
+        if (settingsData.card_radius) {
+          document.documentElement.style.setProperty("--flexa-card-radius", `${settingsData.card_radius}px`);
         }
 
-        if (settings.font_family) document.documentElement.style.setProperty("--font-family-gaming", settings.font_family);
-        if (settings.card_radius) document.documentElement.style.setProperty("--flexa-card-radius", `${settings.card_radius}px`);
-        if (settings.announcement_active === "true" && settings.announcement_text_fa) {
-          setAnnouncement(settings.announcement_text_fa);
-          setAnnouncementColor(settings.announcement_color || settings.primary_color || "#a855f7");
+        // Set background image URL
+        if (bgData?.url) {
+          setBgImage({ url: bgData.url });
+          // When custom bg is set, make page backgrounds semi-transparent
+          document.documentElement.classList.add("has-custom-bg");
         } else {
-          setAnnouncement("");
+          document.documentElement.classList.remove("has-custom-bg");
         }
-      } catch {
-        // Public settings are cosmetic; ignore errors.
+
+        setSettings(settingsData);
+      } catch (error) {
+        console.error("Theme load error:", error);
       }
     }
 
-    loadSettings();
-    return () => {
-      cancelled = true;
-    };
+    loadTheme();
+    return () => { cancelled = true; };
   }, []);
+
+  // Apply background image to body
+  useEffect(() => {
+    if (bgImage?.url) {
+      document.body.style.backgroundImage = `url('${bgImage.url}')`;
+      document.body.style.backgroundSize = "cover";
+      document.body.style.backgroundPosition = "center center";
+      document.body.style.backgroundRepeat = "no-repeat";
+      document.body.style.backgroundAttachment = "fixed";
+    } else {
+      document.body.style.backgroundImage = "url('/background.jpg')";
+      document.body.style.backgroundSize = "cover";
+      document.body.style.backgroundPosition = "center center";
+      document.body.style.backgroundRepeat = "no-repeat";
+      document.body.style.backgroundAttachment = "fixed";
+    }
+  }, [bgImage]);
+
+  const announcement = settings.announcement_active === "true" ? settings.announcement_text_fa : null;
+  const announcementColor = settings.announcement_color || settings.primary_color || "#a855f7";
 
   if (!announcement) return null;
 

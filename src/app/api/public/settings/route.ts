@@ -1,15 +1,17 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { siteSettings } from "@/db/schema";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const rows = await db.select().from(siteSettings);
-    const settings: Record<string, string> = {};
-    for (const row of rows) settings[row.key] = row.value || "";
-    return NextResponse.json(settings);
+    const settings = await db.select().from(siteSettings);
+    const result: Record<string, string> = {};
+    for (const s of settings) {
+      result[s.key] = s.value || "";
+    }
+    return NextResponse.json(result);
   } catch {
     return NextResponse.json({});
   }
