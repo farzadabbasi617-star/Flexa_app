@@ -4,12 +4,13 @@ import { siteImages } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   try {
+    console.log("🔵 Background API called");
+    
     // First try to find app-background
-    let [bgImage] = await db
+    let images = await db
       .select()
       .from(siteImages)
       .where(and(
@@ -17,28 +18,35 @@ export async function GET(request: NextRequest) {
         eq(siteImages.isActive, true)
       ));
     
+    console.log("📊 Query for 'app-background':", images.length, "found");
+    
     // If not found, try "background" slug
-    if (!bgImage) {
-      [bgImage] = await db
+    if (images.length === 0) {
+      images = await db
         .select()
         .from(siteImages)
         .where(and(
           eq(siteImages.slug, "background"),
           eq(siteImages.isActive, true)
         ));
+      console.log("📊 Query for 'background':", images.length, "found");
     }
 
-    if (bgImage) {
+    if (images.length > 0 && images[0].url) {
+      const bgImage = images[0];
+      console.log("✅ Background found:", bgImage.url);
       return NextResponse.json({ 
         url: bgImage.url,
-        slug: bgImage.slug 
+        slug: bgImage.slug,
+        title: bgImage.title
       });
     }
 
     // No custom background found - return null to use default
+    console.log("ℹ️ No custom background found, using default");
     return NextResponse.json({ url: null });
   } catch (error) {
-    console.error("Background API error:", error);
-    return NextResponse.json({ url: null });
+    console.error("❌ Background API error:", error);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

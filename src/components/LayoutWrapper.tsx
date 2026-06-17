@@ -27,7 +27,7 @@ const ThemeRuntime = dynamic(() => import("./ThemeRuntime"), {
 
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const { dir, lang } = useLanguage();
-  const [bgImage, setBgImage] = useState<string | null>(null);
+  const [bgImage, setBgImage] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,22 +39,24 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
   useEffect(() => {
     const fetchBackground = async () => {
       try {
+        console.log("🔍 Fetching background from API...");
         const res = await fetch("/api/public/background", {
           cache: "no-store",
-          headers: {
-            "Cache-Control": "no-cache, no-store, must-revalidate",
-          },
         });
         const data: BackgroundResponse = await res.json();
         
+        console.log("📦 Background API response:", data);
+        
         if (data.url) {
+          console.log("✅ Custom background URL:", data.url);
           setBgImage(data.url);
         } else {
-          setBgImage(null); // Use default
+          console.log("ℹ️ No custom background, using default");
+          setBgImage("");
         }
       } catch (error) {
-        console.error("Failed to fetch background:", error);
-        setBgImage(null); // Use default on error
+        console.error("❌ Failed to fetch background:", error);
+        setBgImage("");
       } finally {
         setLoading(false);
       }
@@ -63,26 +65,31 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
     fetchBackground();
   }, []);
 
+  // Determine background URL
+  const backgroundUrl = bgImage || "/background.jpg";
+
   return (
     <div dir={dir} className="relative min-h-screen overflow-x-hidden">
-      {/* بک‌گراند ثابت */}
+      {/* بک‌گراند اصلی - با opacity برای نمایش */}
       <div 
-        className="fixed inset-0 -z-10 pointer-events-none"
+        className="fixed inset-0 pointer-events-none"
         style={{ 
-          backgroundImage: bgImage 
-            ? `url('${bgImage}')` 
-            : "url('/background.jpg')",
+          backgroundImage: `url('${backgroundUrl}')`,
           backgroundSize: "cover",
           backgroundPosition: "center",
           backgroundRepeat: "no-repeat",
           backgroundAttachment: "fixed",
+          opacity: 0.85, // اضافه کردن opacity برای نمایش بهتر
+          zIndex: -1,
         }}
       />
       
-      {/* Overlay gradient for depth - always on top */}
-      <div className="fixed inset-0 -z-[5] pointer-events-none" 
+      {/* لایه تیره روی بک‌گراند - فقط برای خوانایی متن */}
+      <div 
+        className="fixed inset-0 pointer-events-none"
         style={{
-          background: "linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 30%, rgba(0,0,0,0.35) 70%, rgba(0,0,0,0.65) 100%)"
+          background: "linear-gradient(180deg, rgba(0,0,0,0.4) 0%, rgba(0,0,0,0.15) 40%, rgba(0,0,0,0.2) 70%, rgba(0,0,0,0.5) 100%)",
+          zIndex: -0.5,
         }}
       />
       
