@@ -22,6 +22,8 @@ services:
         sync: false
       - key: TELEGRAM_ADMIN_IDS
         sync: false
+      - key: TELEGRAM_CHANNEL_URL
+        value: https://t.me/Flexa_games
       - key: TELEGRAM_INTEGRATION_SECRET
         sync: false
       - key: FARAZSMS_API_KEY

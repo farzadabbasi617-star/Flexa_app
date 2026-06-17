@@ -77,6 +77,7 @@ src/
 BOT_TOKEN="telegram_bot_token_from_botfather"
 TELEGRAM_WEBHOOK_SECRET="your_long_random_webhook_secret"
 TELEGRAM_ADMIN_IDS="your_numeric_telegram_id"
+TELEGRAM_CHANNEL_URL="https://t.me/Flexa_games"
 ```
 
 Migrationهای لازم:
@@ -95,6 +96,18 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://flexa-app-1.onren
 ```
 
 پیش‌ثبت‌نام‌ها داخل پنل ادمین، تب «تلگرام»، نمایش داده می‌شوند.
+
+قابلیت‌های فعلی ربات Webhook:
+
+- `/start` منوی اصلی با لینک وب‌اپ و کانال
+- `/rooms` نمایش روم‌های فعال
+- `/register` پیش‌ثبت‌نام مستقیم در پنل سایت
+- `/profile` نمایش پروفایل/وضعیت لینک حساب
+- `/channel` لینک کانال `Flexa_games`
+- `/players` برای ادمین: آخرین پیش‌ثبت‌نام‌ها
+- `/announce` برای ادمین: ارسال اطلاعیه عمومی
+- `/announce_game` برای ادمین: ارسال اطلاعیه هدفمند بر اساس بازی
+- اطلاع خودکار به ادمین‌ها هنگام پیش‌ثبت‌نام جدید
 
 ---
 

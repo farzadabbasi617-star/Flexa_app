@@ -71,6 +71,7 @@ interface BotSession {
 }
 
 const APP_URL = (process.env.APP_URL || "https://flexa-app-1.onrender.com").replace(/\/$/, "");
+const CHANNEL_URL = (process.env.TELEGRAM_CHANNEL_URL || process.env.CHANNEL_URL || "https://t.me/Flexa_games").trim();
 const SKIP_TEXT = "رد کردن";
 const CANCEL_TEXT = "لغو";
 const FLEXA_ID_REQUIRED = process.env.FLEXA_ID_REQUIRED === "true" || process.env.TELEGRAM_FLEXA_ID_REQUIRED === "true";
@@ -182,9 +183,9 @@ function removeKeyboard() {
 }
 
 function mainMenuKeyboard() {
-  return {
-    inline_keyboard: [
+  const rows: Array<Array<Record<string, string>>> = [
       [{ text: "⚡ ورود به وب‌اپ Flexa", url: APP_URL }],
+      ...(CHANNEL_URL ? [[{ text: "📣 کانال Flexa Games", url: CHANNEL_URL }]] : []),
       [
         { text: "🏟 روم‌های فعال", callback_data: "menu:rooms" },
         { text: "🎮 پیش‌ثبت‌نام", callback_data: "menu:register" },
@@ -197,8 +198,8 @@ function mainMenuKeyboard() {
         { text: "🆕 ساخت حساب", url: `${APP_URL}/register` },
         { text: "👤 پروفایل", url: `${APP_URL}/profile` },
       ],
-    ],
-  };
+    ];
+  return { inline_keyboard: rows };
 }
 
 function gameKeyboard() {
@@ -381,6 +382,10 @@ async function savePreRegistration(user: TelegramUser, data: SessionData) {
       target: telegramPreRegistrations.telegramId,
       set: values,
     });
+
+  await notifyAdminsOnPreRegistration(user, data, linkedUserId).catch((err) => {
+    logger.warn({ err, telegramId: user.id }, "Failed to notify Telegram admins about pre-registration");
+  });
 }
 
 async function startCommand(chatId: number) {
@@ -392,13 +397,23 @@ async function startCommand(chatId: number) {
 }
 
 async function linksCommand(chatId: number) {
-  await sendMessage(chatId, "🔗 لینک‌های مهم Flexa:", {
-    inline_keyboard: [
-      [{ text: "⚡ وب‌اپ Flexa", url: APP_URL }],
-      [{ text: "🏟 تورنومنت‌ها", url: `${APP_URL}/tournaments` }],
-      [{ text: "🆕 ساخت حساب", url: `${APP_URL}/register` }],
-      [{ text: "👤 پروفایل", url: `${APP_URL}/profile` }],
-    ],
+  const rows: Array<Array<Record<string, string>>> = [
+    [{ text: "⚡ وب‌اپ Flexa", url: APP_URL }],
+    [{ text: "🏟 تورنومنت‌ها", url: `${APP_URL}/tournaments` }],
+    [{ text: "🆕 ساخت حساب", url: `${APP_URL}/register` }],
+    [{ text: "👤 پروفایل", url: `${APP_URL}/profile` }],
+  ];
+  if (CHANNEL_URL) rows.push([{ text: "📣 کانال Flexa Games", url: CHANNEL_URL }]);
+  await sendMessage(chatId, "🔗 لینک‌های مهم Flexa:", { inline_keyboard: rows });
+}
+
+async function channelCommand(chatId: number) {
+  if (!CHANNEL_URL) {
+    await sendMessage(chatId, "لینک کانال هنوز تنظیم نشده است.", mainMenuKeyboard());
+    return;
+  }
+  await sendMessage(chatId, "📣 کانال رسمی Flexa Games:", {
+    inline_keyboard: [[{ text: "ورود به کانال", url: CHANNEL_URL }]],
   });
 }
 
@@ -488,6 +503,63 @@ async function statusCommand(chatId: number, telegramId: string) {
   );
 }
 
+async function profileCommand(chatId: number, telegramId: string) {
+  const [row] = await db
+    .select({
+      preFullName: telegramPreRegistrations.fullName,
+      preGame: telegramPreRegistrations.game,
+      preGamerTag: telegramPreRegistrations.gamerTag,
+      preFlexaId: telegramPreRegistrations.flexaId,
+      preStatus: telegramPreRegistrations.status,
+      linkedUserId: telegramPreRegistrations.linkedUserId,
+      displayName: users.displayName,
+      username: users.username,
+      userFlexaId: users.flexaId,
+      level: users.level,
+      rankPoints: users.rankPoints,
+      clashRoyaleUsername: users.clashRoyaleUsername,
+      codMobileUsername: users.codMobileUsername,
+      fortniteUsername: users.fortniteUsername,
+    })
+    .from(telegramPreRegistrations)
+    .leftJoin(users, eq(telegramPreRegistrations.linkedUserId, users.id))
+    .where(eq(telegramPreRegistrations.telegramId, telegramId))
+    .limit(1);
+
+  if (!row) {
+    await sendMessage(
+      chatId,
+      "هنوز حساب تلگرام شما در Flexa شناسایی نشده است. اول /register را بزن یا در وب‌اپ حساب بساز.",
+      mainMenuKeyboard()
+    );
+    return;
+  }
+
+  const lines = [
+    "👤 <b>پروفایل Flexa شما</b>",
+    "",
+    row.linkedUserId ? "✅ حساب تلگرام به حساب وب‌اپ لینک شده است." : "⚠️ حساب وب‌اپ هنوز کامل لینک نشده؛ با Flexa ID/شماره مشابه در سایت ثبت‌نام کن.",
+    `نام: <b>${html(row.displayName || row.preFullName)}</b>`,
+    `Username: <b>${html(row.username || "—")}</b>`,
+    `Flexa ID: <code>${html(row.userFlexaId || row.preFlexaId || "—")}</code>`,
+    row.linkedUserId ? `Level: <b>${row.level}</b> | RP: <b>${row.rankPoints}</b>` : "",
+    "",
+    `آخرین بازی ثبت‌شده: <b>${html(gameLabel(row.preGame))}</b>`,
+    `آیدی بازی: <b>${html(row.preGamerTag)}</b>`,
+    `وضعیت پیش‌ثبت‌نام: <b>${html(row.preStatus)}</b>`,
+    row.codMobileUsername ? `COD: <b>${html(row.codMobileUsername)}</b>` : "",
+    row.clashRoyaleUsername ? `Clash Royale: <b>${html(row.clashRoyaleUsername)}</b>` : "",
+    row.fortniteUsername ? `Fortnite: <b>${html(row.fortniteUsername)}</b>` : "",
+  ].filter(Boolean).join("\n");
+
+  const keyboardRows: Array<Array<Record<string, string>>> = [
+    [{ text: "👤 باز کردن پروفایل در وب‌اپ", url: `${APP_URL}/profile` }],
+    [{ text: "🏟 روم‌های فعال", url: `${APP_URL}/tournaments` }],
+  ];
+  if (CHANNEL_URL) keyboardRows.push([{ text: "📣 کانال Flexa Games", url: CHANNEL_URL }]);
+  await sendMessage(chatId, lines, { inline_keyboard: keyboardRows });
+}
+
 async function unregisterCommand(chatId: number, telegramId: string) {
   await db
     .update(telegramPreRegistrations)
@@ -504,17 +576,143 @@ function getAdminIds() {
     .filter(Boolean);
 }
 
+function hasAdminAccess(telegramId: string) {
+  return getAdminIds().includes(telegramId);
+}
+
+async function notifyAdminsOnPreRegistration(user: TelegramUser, data: SessionData, linkedUserId: string | null) {
+  const adminIds = getAdminIds();
+  if (!adminIds.length) return;
+
+  const username = user.username ? `@${user.username}` : "—";
+  const text = [
+    "🆕 <b>پیش‌ثبت‌نام جدید Flexa</b>",
+    "",
+    registrationSummary(data),
+    "",
+    `Telegram: <code>${html(user.id)}</code> | ${html(username)}`,
+    linkedUserId ? "✅ حساب وب‌اپ شناسایی/لینک شد" : "⚠️ حساب وب‌اپ هنوز لینک نشده",
+  ].join("\n");
+
+  for (const adminId of adminIds) {
+    const numericId = Number(adminId);
+    if (!Number.isFinite(numericId)) continue;
+    await sendMessage(numericId, text, {
+      inline_keyboard: [[{ text: "مشاهده پنل ادمین", url: `${APP_URL}/admin` }]],
+    });
+  }
+}
+
 async function adminCommand(chatId: number, telegramId: string) {
-  if (!getAdminIds().includes(telegramId)) {
+  if (!hasAdminAccess(telegramId)) {
     await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
     return;
   }
   const [total] = await db.select({ value: count() }).from(telegramPreRegistrations);
+  const [newItems] = await db
+    .select({ value: count() })
+    .from(telegramPreRegistrations)
+    .where(eq(telegramPreRegistrations.status, "new"));
   await sendMessage(
     chatId,
-    `🛠 <b>پنل ادمین Flexa</b>\n\nپیش‌ثبت‌نام‌های تلگرام: <b>${total.value}</b>\n\nمدیریت کامل از داخل پنل سایت انجام می‌شود:`,
+    [
+      "🛠 <b>پنل ادمین Flexa</b>",
+      "",
+      `کل پیش‌ثبت‌نام‌های تلگرام: <b>${total.value}</b>`,
+      `جدید و پیگیری‌نشده: <b>${newItems.value}</b>`,
+      "",
+      "/players — آخرین پیش‌ثبت‌نام‌ها",
+      "/announce متن — ارسال اطلاعیه به همه کاربران ربات",
+      "/announce_game cod_mobile متن — اطلاعیه هدفمند برای یک بازی",
+      "",
+      "مدیریت کامل از داخل پنل سایت انجام می‌شود.",
+    ].join("\n"),
     { inline_keyboard: [[{ text: "ورود به پنل ادمین", url: `${APP_URL}/admin` }]] }
   );
+}
+
+async function playersCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) {
+    await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+    return;
+  }
+
+  const rows = await db
+    .select({
+      fullName: telegramPreRegistrations.fullName,
+      game: telegramPreRegistrations.game,
+      gamerTag: telegramPreRegistrations.gamerTag,
+      flexaId: telegramPreRegistrations.flexaId,
+      telegramUsername: telegramPreRegistrations.telegramUsername,
+      status: telegramPreRegistrations.status,
+      updatedAt: telegramPreRegistrations.updatedAt,
+    })
+    .from(telegramPreRegistrations)
+    .orderBy(desc(telegramPreRegistrations.updatedAt))
+    .limit(12);
+
+  if (!rows.length) {
+    await sendMessage(chatId, "هنوز پیش‌ثبت‌نامی ثبت نشده است.");
+    return;
+  }
+
+  const text = [
+    "👥 <b>آخرین پیش‌ثبت‌نام‌های تلگرام</b>",
+    "",
+    ...rows.map((row, index) => {
+      const username = row.telegramUsername ? `@${row.telegramUsername}` : "—";
+      return `${index + 1}) <b>${html(row.fullName)}</b> | ${html(gameLabel(row.game))}\n🏷 ${html(row.gamerTag)} | 🆔 ${html(row.flexaId || "—")} | ${html(username)} | ${html(row.status)}`;
+    }),
+  ].join("\n\n");
+
+  await sendMessage(chatId, text, { inline_keyboard: [[{ text: "پنل کامل", url: `${APP_URL}/admin` }]] });
+}
+
+async function announceCommand(chatId: number, telegramId: string, text: string, gameFilter?: string) {
+  if (!hasAdminAccess(telegramId)) {
+    await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+    return;
+  }
+
+  const message = text.trim();
+  if (!message) {
+    await sendMessage(chatId, "متن اطلاعیه را وارد کن. مثال:\n<code>/announce امشب روم کلش ساعت ۹ فعال است.</code>");
+    return;
+  }
+
+  const normalizedGame = gameFilter ? normalizeGame(gameFilter) : "";
+  const rows = await db
+    .select({ telegramId: telegramPreRegistrations.telegramId, status: telegramPreRegistrations.status, game: telegramPreRegistrations.game })
+    .from(telegramPreRegistrations)
+    .orderBy(desc(telegramPreRegistrations.updatedAt))
+    .limit(500);
+
+  let sent = 0;
+  let skipped = 0;
+  let failed = 0;
+  for (const row of rows) {
+    if (row.status === "archived") {
+      skipped += 1;
+      continue;
+    }
+    if (normalizedGame && normalizeGame(row.game) !== normalizedGame) {
+      skipped += 1;
+      continue;
+    }
+    const numericId = Number(row.telegramId);
+    if (!Number.isFinite(numericId)) {
+      failed += 1;
+      continue;
+    }
+    try {
+      await sendMessage(numericId, `📢 <b>اطلاعیه Flexa</b>\n\n${html(message)}`, mainMenuKeyboard());
+      sent += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+
+  await sendMessage(chatId, `ارسال اطلاعیه تمام شد.\n✅ موفق: ${sent}\n⏭ ردشده: ${skipped}\n❌ ناموفق: ${failed}`);
 }
 
 async function handleCommand(message: TelegramMessage, text: string) {
@@ -528,12 +726,20 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/start") return startCommand(chatId);
   if (normalizedCommand === "/help") return startCommand(chatId);
   if (normalizedCommand === "/links") return linksCommand(chatId);
+  if (normalizedCommand === "/channel") return channelCommand(chatId);
+  if (normalizedCommand === "/profile") return profileCommand(chatId, telegramId);
   if (normalizedCommand === "/rules") return rulesCommand(chatId);
   if (normalizedCommand === "/rooms") return roomsCommand(chatId, args.join(" "));
   if (normalizedCommand === "/register") return registerStart(chatId, telegramId);
   if (normalizedCommand === "/status") return statusCommand(chatId, telegramId);
   if (normalizedCommand === "/unregister") return unregisterCommand(chatId, telegramId);
   if (normalizedCommand === "/admin" || normalizedCommand === "/stats") return adminCommand(chatId, telegramId);
+  if (normalizedCommand === "/players") return playersCommand(chatId, telegramId);
+  if (normalizedCommand === "/announce") return announceCommand(chatId, telegramId, args.join(" "));
+  if (normalizedCommand === "/announce_game") {
+    const [game, ...messageParts] = args;
+    return announceCommand(chatId, telegramId, messageParts.join(" "), game);
+  }
 
   return sendMessage(chatId, "دستور را متوجه نشدم. از /start استفاده کن.", mainMenuKeyboard());
 }

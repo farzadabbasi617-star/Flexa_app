@@ -48,6 +48,7 @@ NODE_ENV=production
 BOT_TOKEN=telegram_bot_token_from_botfather
 TELEGRAM_WEBHOOK_SECRET=your_long_random_webhook_secret
 TELEGRAM_ADMIN_IDS=your_numeric_telegram_id
+TELEGRAM_CHANNEL_URL=https://t.me/Flexa_games
 # Optional legacy Python-worker integration:
 TELEGRAM_INTEGRATION_SECRET=your_long_random_secret
 ```
