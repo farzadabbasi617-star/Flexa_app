@@ -25,7 +25,6 @@ export default function AdminSettingsPage() {
     prize_delivery_hours: "48",
     ai_auto_judge: "true",
     ai_min_confidence: "70",
-    chat_moderation: "true",
     registration_open: "true",
     maintenance_mode: "false",
     announcement_fa: "",
@@ -96,7 +95,6 @@ export default function AdminSettingsPage() {
       fields: [
         { key: "ai_auto_judge", label: lang === "fa" ? "داوری خودکار AI" : "AI Auto Judge", type: "toggle" },
         { key: "ai_min_confidence", label: lang === "fa" ? "حداقل اطمینان AI (%)" : "AI Min Confidence (%)", type: "number" },
-        { key: "chat_moderation", label: lang === "fa" ? "مدریشن چت" : "Chat Moderation", type: "toggle" },
       ],
     },
     {

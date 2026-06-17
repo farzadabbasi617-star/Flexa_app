@@ -267,13 +267,24 @@
     inset 0 -1px 0 rgba(255,255,255,.03);
 }
 
-/* بک‌گراند ثابت و اجباری روی html */
+/* بک‌گراند ثابت و بهینه‌شده برای موبایل */
 html {
-  background-image: url('/background.jpg') !important;
-  background-size: cover !important;
-  background-position: center !important;
-  background-attachment: fixed !important;
-  background-repeat: no-repeat !important;
+  background-color: var(--color-dark-950) !important;
+}
+
+html::before {
+  content: '';
+  position: fixed;
+  top: -15vh;
+  bottom: -15vh;
+  left: 0;
+  right: 0;
+  z-index: -2;
+  background-image: url('/background.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  pointer-events: none;
 }
 
 /* حذف بک‌گراند تیره از همه عناصر */

@@ -20,7 +20,6 @@ interface Notification {
 const TYPE_ICONS: Record<string, string> = {
   match_start: "⚔️",
   tournament_update: "🏆",
-  chat: "💬",
   achievement: "🏅",
   system: "📢",
 };
