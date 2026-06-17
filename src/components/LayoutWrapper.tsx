@@ -1,13 +1,8 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useLanguage } from "@/contexts/LanguageContext";
-
-interface BackgroundResponse {
-  url: string | null;
-  slug?: string;
-}
 
 const AIAssistant = dynamic(() => import("./AIAssistant"), { 
   ssr: false,
@@ -26,41 +21,20 @@ const ThemeRuntime = dynamic(() => import("./ThemeRuntime"), {
 
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const { dir, lang } = useLanguage();
-  const [bgImage, setBgImage] = useState<string>("");
 
   useEffect(() => {
     document.documentElement.setAttribute("dir", dir);
     document.documentElement.setAttribute("lang", lang);
   }, [dir, lang]);
 
-  useEffect(() => {
-    const fetchBackground = async () => {
-      try {
-        const res = await fetch("/api/public/background", {
-          cache: "no-store",
-        });
-        const data: BackgroundResponse = await res.json();
-        
-        if (data.url) {
-          setBgImage(data.url);
-        } else {
-          setBgImage("/background.jpg");
-        }
-      } catch {
-        setBgImage("/background.jpg");
-      }
-    };
-
-    fetchBackground();
-  }, []);
-
   return (
     <div dir={dir} className="relative min-h-screen overflow-x-hidden">
-      {/* بک‌گراند - با opacity کمتر تا تصویر مشخص باشه */}
+      {/* بک‌گراند ثابت - با background-attachment: fixed */}
+      {/* این تصویر با اسکرول تکون نمی‌خوره و فیکس میمونه */}
       <div 
-        className="fixed inset-0"
-        style={{ 
-          backgroundImage: `url(${bgImage})`,
+        className="fixed inset-0 w-full h-full"
+        style={{
+          backgroundImage: "url(/background.jpg)",
           backgroundSize: "cover",
           backgroundPosition: "center center",
           backgroundRepeat: "no-repeat",
@@ -69,16 +43,18 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
         }}
       />
       
-      {/* گرادیان ملایم روی بک‌گراند - فقط برای خوانایی */}
+      {/* گرادیان ملایم روی بک‌گراند برای خوانایی متن */}
       <div 
         className="fixed inset-0 pointer-events-none"
         style={{
           background: `
-            linear-gradient(to bottom, 
-              rgba(5, 5, 16, 0.6) 0%, 
-              rgba(5, 5, 16, 0.3) 40%, 
-              rgba(5, 5, 16, 0.4) 70%, 
-              rgba(5, 5, 16, 0.7) 100%
+            linear-gradient(
+              to bottom, 
+              rgba(5, 5, 16, 0.7) 0%, 
+              rgba(5, 5, 16, 0.4) 30%, 
+              rgba(5, 5, 16, 0.3) 50%, 
+              rgba(5, 5, 16, 0.5) 80%, 
+              rgba(5, 5, 16, 0.8) 100%
             )
           `,
           zIndex: -1,
