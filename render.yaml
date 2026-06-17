@@ -16,6 +16,12 @@ services:
         sync: false
       - key: GROQ_API_KEY
         sync: false
+      - key: BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_WEBHOOK_SECRET
+        sync: false
+      - key: TELEGRAM_ADMIN_IDS
+        sync: false
       - key: TELEGRAM_INTEGRATION_SECRET
         sync: false
       - key: FARAZSMS_API_KEY

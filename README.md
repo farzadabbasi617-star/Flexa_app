@@ -65,32 +65,36 @@ src/
 
 ## 🤖 اتصال ربات تلگرام Flexa
 
-کد ربات داخل پوشه `telegram_bot/` همین ریپازیتوری قرار دارد.
+دو حالت برای ربات وجود دارد:
 
-برای همگام‌سازی پیش‌ثبت‌نام‌های ربات تلگرام با پنل ادمین وب‌اپ، این API اضافه شده است:
+1. **حالت پیشنهادی و رایگان:** Webhook داخل همین وب‌اپ Next.js  
+   مسیر: `POST /api/telegram/webhook`
+2. **حالت Worker/Python، اختیاری:** کد قدیمی‌تر داخل پوشه `telegram_bot/` قرار دارد و برای VPS یا Background Worker قابل استفاده است.
 
-```text
-POST /api/integrations/telegram/pre-registrations
-```
-
-فعال‌سازی:
-
-1. یک کلید طولانی و تصادفی بسازید و در env وب‌اپ قرار دهید:
+برای حالت Webhook، این envها را در سرویس Render سایت تنظیم کنید:
 
 ```env
-TELEGRAM_INTEGRATION_SECRET="your_long_random_secret"
+BOT_TOKEN="telegram_bot_token_from_botfather"
+TELEGRAM_WEBHOOK_SECRET="your_long_random_webhook_secret"
+TELEGRAM_ADMIN_IDS="your_numeric_telegram_id"
 ```
 
-2. همین مقدار را در فایل `.env` ربات تلگرام هم بگذارید.
-3. migration دستی زیر را روی دیتابیس اجرا کنید:
+Migrationهای لازم:
 
 ```bash
 psql "$DATABASE_URL" -f drizzle/manual/0002_add_telegram_pre_registrations.sql
+psql "$DATABASE_URL" -f drizzle/manual/0003_add_telegram_bot_sessions.sql
 ```
 
-یا محتوای فایل را داخل SQL Editor دیتابیس/Neon اجرا کنید.
+یا محتوای فایل‌ها را داخل SQL Editor دیتابیس/Neon اجرا کنید.
 
-بعد از فعال‌سازی، داده‌ها در پنل ادمین، تب «تلگرام»، نمایش داده می‌شوند.
+بعد از Deploy، webhook تلگرام را ست کنید:
+
+```text
+https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://flexa-app-1.onrender.com/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
+```
+
+پیش‌ثبت‌نام‌ها داخل پنل ادمین، تب «تلگرام»، نمایش داده می‌شوند.
 
 ---
 

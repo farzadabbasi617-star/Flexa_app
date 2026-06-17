@@ -45,6 +45,10 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
 OPENROUTER_API_KEY=your_openrouter_key
 GROQ_API_KEY=your_groq_key
 NODE_ENV=production
+BOT_TOKEN=telegram_bot_token_from_botfather
+TELEGRAM_WEBHOOK_SECRET=your_long_random_webhook_secret
+TELEGRAM_ADMIN_IDS=your_numeric_telegram_id
+# Optional legacy Python-worker integration:
 TELEGRAM_INTEGRATION_SECRET=your_long_random_secret
 ```
 
@@ -82,13 +86,20 @@ npm run db:push
 
 ### migration دستی اتصال تلگرام
 
-اگر دیتابیس از قبل ساخته شده، برای جدول پیش‌ثبت‌نام تلگرام این SQL را هم اجرا کنید:
+اگر دیتابیس از قبل ساخته شده، برای جدول پیش‌ثبت‌نام و وضعیت مکالمه تلگرام این SQLها را هم اجرا کنید:
 
 ```bash
 psql "$DATABASE_URL" -f drizzle/manual/0002_add_telegram_pre_registrations.sql
+psql "$DATABASE_URL" -f drizzle/manual/0003_add_telegram_bot_sessions.sql
 ```
 
-یا محتوای همین فایل را در SQL Editor دیتابیس paste و اجرا کنید.
+یا محتوای همین فایل‌ها را در SQL Editor دیتابیس paste و اجرا کنید.
+
+بعد از Deploy، webhook را با BotFather/API تلگرام ست کنید:
+
+```txt
+https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://flexa-app-1.onrender.com/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
+```
 
 ## 4) Redeploy
 

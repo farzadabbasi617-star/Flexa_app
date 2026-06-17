@@ -270,6 +270,19 @@ export const telegramPreRegistrations = pgTable("telegram_pre_registrations", {
   createdAtIdx: index("telegram_pre_reg_created_at_idx").on(table.createdAt),
 }));
 
+// Telegram webhook conversation sessions
+export const telegramBotSessions = pgTable("telegram_bot_sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  telegramId: varchar("telegram_id", { length: 32 }).notNull().unique(),
+  state: varchar("state", { length: 50 }).notNull().default("idle"),
+  data: jsonb("data").notNull().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  telegramIdIdx: index("telegram_bot_sessions_telegram_id_idx").on(table.telegramId),
+  updatedAtIdx: index("telegram_bot_sessions_updated_at_idx").on(table.updatedAt),
+}));
+
 // Matches
 export const matches = pgTable("matches", {
   id: uuid("id").defaultRandom().primaryKey(),
