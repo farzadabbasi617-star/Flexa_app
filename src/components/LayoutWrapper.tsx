@@ -30,11 +30,13 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
 
   return (
     <div dir={dir} className="relative min-h-screen overflow-x-hidden">
-      {/* بک‌گراند ثابت و روان برای موبایل و دسکتاپ */}
-      <img 
-        src="/background.jpg" 
-        alt=""
-        className="fixed inset-0 w-full h-full object-cover z-[-1] pointer-events-none"
+      {/* بک‌گراند ثابت با CSS - بدون لگ و پرش */}
+      <div 
+        className="fixed inset-0 -z-10 bg-fixed bg-center bg-cover pointer-events-none"
+        style={{ 
+          backgroundImage: "url('/background.jpg')",
+          willChange: "transform"
+        }}
       />
       
       <ThemeRuntime />

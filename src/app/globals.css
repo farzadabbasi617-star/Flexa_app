@@ -267,31 +267,19 @@
     inset 0 -1px 0 rgba(255,255,255,.03);
 }
 
-/* بک‌گراند ثابت و بهینه‌شده برای موبایل */
-html {
-  background-color: var(--color-dark-950) !important;
+/* بک‌گراند ثابت و بهینه‌شده */
+html, body {
+  background-color: var(--color-dark-950);
 }
 
-html::before {
-  content: '';
-  position: fixed;
-  top: -15vh;
-  bottom: -15vh;
-  left: 0;
-  right: 0;
-  z-index: -2;
-  background-image: url('/background.jpg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-  pointer-events: none;
+/* حذف بک‌گراند تیره از همه عناصر - بهینه برای موبایل */
+body > * {
+  background-color: transparent;
 }
 
-/* حذف بک‌گراند تیره از همه عناصر */
-body,
-body *,
-.min-h-screen {
-  background-color: transparent !important;
+body {
+  min-height: 100vh;
+  overflow-x: hidden;
 }
 
 /* پنل‌های شیشه‌ای شفاف */
@@ -299,22 +287,19 @@ body *,
 .gaming-card {
   background: rgba(15, 15, 20, 0.72) !important;
   backdrop-filter: blur(26px) !important;
+  -webkit-backdrop-filter: blur(26px) !important;
 }
 
-/* عمق و افکت سینمایی روی بک‌گراند */
-body::before {
+/* عمق و افکت سینمایی روی بک‌گراند - فقط روی overlay div */
+.bg-overlay::before {
   content: '';
   position: fixed;
   inset: 0;
-  z-index: -1;
+  z-index: 0;
   pointer-events: none;
-  
-  /* گرادیان عمق از بالا و پایین */
   background: 
     linear-gradient(to bottom, rgba(0,0,0,0.55) 0%, rgba(0,0,0,0.25) 30%, rgba(0,0,0,0.35) 70%, rgba(0,0,0,0.65) 100%),
     radial-gradient(circle at 50% 40%, rgba(0,0,0,0.15) 0%, transparent 70%);
-  
-  /* افکت وینیت (تیره شدن گوشه‌ها) */
   box-shadow: 
     inset 0 0 120px rgba(0,0,0,0.6),
     inset 0 0 60px rgba(0,0,0,0.4);
