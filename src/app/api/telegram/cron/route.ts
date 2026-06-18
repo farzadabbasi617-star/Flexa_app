@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, count, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions } from "@/db/schema";
 import { getTelegramChannelChatId, sendTelegramMessage } from "@/lib/telegram";
@@ -148,6 +148,158 @@ async function sendDailyAdminReport() {
   return sent;
 }
 
+async function getTelegramIdForPlayer(playerId?: string | null) {
+  if (!playerId) return null;
+  const [player] = await db.select({ visibleUserId: players.visibleUserId }).from(players).where(eq(players.id, playerId)).limit(1);
+  if (!player?.visibleUserId) return null;
+  const [account] = await db.select({ telegramId: telegramAccounts.telegramId }).from(telegramAccounts).where(eq(telegramAccounts.userId, player.visibleUserId)).limit(1);
+  return account?.telegramId || null;
+}
+
+async function getPlayerName(playerId?: string | null) {
+  if (!playerId) return "بازیکن";
+  const [player] = await db.select({ displayName: players.displayName, username: players.username }).from(players).where(eq(players.id, playerId)).limit(1);
+  return player?.displayName || player?.username || "بازیکن";
+}
+
+async function sendMatchAssignmentNotifications() {
+  const pendingMatches = await db
+    .select({
+      id: matches.id,
+      tournamentId: matches.tournamentId,
+      player1Id: matches.player1Id,
+      player2Id: matches.player2Id,
+      round: matches.round,
+      matchNumber: matches.matchNumber,
+      tournamentName: tournaments.name,
+      tournamentGame: tournaments.game,
+      startDate: tournaments.startDate,
+    })
+    .from(matches)
+    .leftJoin(tournaments, eq(matches.tournamentId, tournaments.id))
+    .where(and(eq(matches.status, "pending"), sql`${matches.player1Id} IS NOT NULL AND ${matches.player2Id} IS NOT NULL`));
+
+  let sent = 0;
+  for (const match of pendingMatches) {
+    if (!match.player1Id || !match.player2Id) continue;
+
+    const playerIds = [match.player1Id, match.player2Id];
+    const names: Record<string, string> = {};
+    for (const pid of playerIds) names[pid] = await getPlayerName(pid);
+
+    const startText = match.startDate
+      ? `\n⏰ شروع تقریبی: <b>${new Date(match.startDate).toLocaleString("fa-IR")}</b>`
+      : "";
+
+    for (const pid of playerIds) {
+      const telegramId = await getTelegramIdForPlayer(pid);
+      if (!telegramId) continue;
+      const opponentId = pid === match.player1Id ? match.player2Id : match.player1Id;
+      const key = `match:assigned:${match.id}:${telegramId}`;
+      if (await hasSent(key)) continue;
+      await sendTelegramMessage(
+        telegramId,
+        `⚔️ <b>حریف تو مشخص شد!</b>\n\n🏆 ${html(match.tournamentName)}\n🎮 ${html(gameLabel(match.tournamentGame))}\n🆚 حریف: <b>${html(names[opponentId])}</b>\n🔁 دور ${match.round} — مسابقه ${match.matchNumber}${startText}\n\nآماده باش و به‌موقع وارد لابی شو.`,
+        { inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/tournaments/${match.tournamentId}` }]] }
+      );
+      await markSent(key, "match_assigned", match.tournamentId, telegramId);
+      sent += 1;
+    }
+  }
+  return sent;
+}
+
+async function sendMatchScheduleNotifications() {
+  const now = new Date();
+  const scheduledMatches = await db
+    .select({
+      id: matches.id,
+      tournamentId: matches.tournamentId,
+      player1Id: matches.player1Id,
+      player2Id: matches.player2Id,
+      scheduledAt: matches.scheduledAt,
+      tournamentName: tournaments.name,
+      tournamentGame: tournaments.game,
+    })
+    .from(matches)
+    .leftJoin(tournaments, eq(matches.tournamentId, tournaments.id))
+    .where(and(sql`${matches.scheduledAt} IS NOT NULL`, inArray(matches.status, ["pending", "in_progress"])));
+
+  let sent = 0;
+  for (const match of scheduledMatches) {
+    if (!match.player1Id || !match.player2Id || !match.scheduledAt) continue;
+    const scheduledTime = new Date(match.scheduledAt).getTime();
+    if (scheduledTime < now.getTime() || scheduledTime > now.getTime() + 24 * 60 * 60 * 1000) continue;
+    const minutesLeft = Math.round((scheduledTime - now.getTime()) / 60000);
+
+    const playerIds = [match.player1Id, match.player2Id];
+    for (const pid of playerIds) {
+      const telegramId = await getTelegramIdForPlayer(pid);
+      if (!telegramId) continue;
+      const key = `match:scheduled:${match.id}:${telegramId}`;
+      if (await hasSent(key)) continue;
+      await sendTelegramMessage(
+        telegramId,
+        `⏰ <b>مسابقه شروع می‌شود!</b>\n\n🏆 ${html(match.tournamentName)}\n🎮 ${html(gameLabel(match.tournamentGame))}\n\nمسابقه حدود <b>${minutesLeft} دقیقه</b> دیگر شروع می‌شود.`,
+        { inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/tournaments/${match.tournamentId}` }]] }
+      );
+      await markSent(key, "match_scheduled", match.tournamentId, telegramId);
+      sent += 1;
+    }
+  }
+  return sent;
+}
+
+async function sendMatchResultNotifications() {
+  const resultMatches = await db
+    .select({
+      id: matches.id,
+      tournamentId: matches.tournamentId,
+      player1Id: matches.player1Id,
+      player2Id: matches.player2Id,
+      winnerId: matches.winnerId,
+      status: matches.status,
+      tournamentName: tournaments.name,
+      tournamentGame: tournaments.game,
+    })
+    .from(matches)
+    .leftJoin(tournaments, eq(matches.tournamentId, tournaments.id))
+    .where(inArray(matches.status, ["completed", "disputed"]));
+
+  let sent = 0;
+  for (const match of resultMatches) {
+    if (!match.player1Id || !match.player2Id) continue;
+    const playerIds = [match.player1Id, match.player2Id];
+    const names: Record<string, string> = {};
+    for (const pid of playerIds) names[pid] = await getPlayerName(pid);
+
+    for (const pid of playerIds) {
+      const telegramId = await getTelegramIdForPlayer(pid);
+      if (!telegramId) continue;
+      const key = `match:result:${match.status}:${match.id}:${telegramId}`;
+      if (await hasSent(key)) continue;
+
+      let message = "";
+      if (match.status === "completed") {
+        const isWinner = match.winnerId === pid;
+        const winnerName = match.winnerId ? names[match.winnerId] || "بازیکن" : "—";
+        message = isWinner
+          ? `🎉 <b>تبریک! شما برنده شدید</b>\n\n🏆 ${html(match.tournamentName)}\n🎮 ${html(gameLabel(match.tournamentGame))}\n🆚 حریف: ${html(names[pid === match.player1Id ? match.player2Id : match.player1Id])}\n\nجایزه به زودی واریز می‌شود.`
+          : `🏁 <b>مسابقه به پایان رسید</b>\n\n🏆 ${html(match.tournamentName)}\n🎮 ${html(gameLabel(match.tournamentGame))}\n🥇 برنده: <b>${html(winnerName)}</b>\n\nبرد و باخت توی مسابقه طبیعیه. موفق باشی در مسابقه بعدی!`;
+      } else {
+        message = `🚨 <b>مسابقه در حال بررسی/اعتراض</b>\n\n🏆 ${html(match.tournamentName)}\n🎮 ${html(gameLabel(match.tournamentGame))}\n\nنتیجه این مسابقه در پنل داوری بررسی می‌شود. به زودی نتیجه نهایی اعلام می‌شود.`;
+      }
+
+      await sendTelegramMessage(telegramId, message, {
+        inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/tournaments/${match.tournamentId}` }]],
+      });
+      await markSent(key, `match_${match.status}`, match.tournamentId, telegramId);
+      sent += 1;
+    }
+  }
+  return sent;
+}
+
 async function publishCompletedResults() {
   const completed = await db.select().from(tournaments).where(eq(tournaments.status, "completed"));
   let published = 0;
@@ -185,9 +337,22 @@ export async function GET(request: NextRequest) {
     const reminders = await sendReminders();
     const capacity = await sendCapacityAlerts();
     const lobby = await sendLobbyNotices();
+    const matchAssigned = await sendMatchAssignmentNotifications();
+    const matchScheduled = await sendMatchScheduleNotifications();
+    const matchResults = await sendMatchResultNotifications();
     const results = await publishCompletedResults();
     const dailyReports = await sendDailyAdminReport();
-    return NextResponse.json({ ok: true, reminders, capacity, lobby, results, dailyReports });
+    return NextResponse.json({
+      ok: true,
+      reminders,
+      capacity,
+      lobby,
+      matchAssigned,
+      matchScheduled,
+      matchResults,
+      results,
+      dailyReports,
+    });
   } catch (err) {
     logger.error({ err }, "Telegram cron failed");
     return NextResponse.json({ error: "Telegram cron failed" }, { status: 500 });
