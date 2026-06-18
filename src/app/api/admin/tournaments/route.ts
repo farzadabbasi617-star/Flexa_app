@@ -5,6 +5,7 @@ import { count, desc, eq, inArray } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { refundTournamentEntryFees } from "@/lib/tournament-finance";
+import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -122,6 +123,10 @@ export async function POST(request: NextRequest) {
       entityId: created.id,
       metadata: { name: created.name, game: created.game },
       ipAddress: getClientIp(request.headers),
+    });
+
+    publishTournamentToTelegramChannel(created).catch((err) => {
+      logger.warn({ err, tournamentId: created.id }, "Failed to publish admin-created tournament to Telegram channel");
     });
 
     return NextResponse.json(created, { status: 201 });

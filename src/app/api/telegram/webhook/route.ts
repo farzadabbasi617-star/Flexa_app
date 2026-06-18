@@ -4,6 +4,7 @@ import { and, count, desc, eq, or } from "drizzle-orm";
 import { db } from "@/db";
 import { registrations, telegramBotSessions, telegramPreRegistrations, tournaments, users } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
+import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -624,6 +625,7 @@ async function adminCommand(chatId: number, telegramId: string) {
       "/players — آخرین پیش‌ثبت‌نام‌ها",
       "/announce متن — ارسال اطلاعیه به همه کاربران ربات",
       "/announce_game cod_mobile متن — اطلاعیه هدفمند برای یک بازی",
+      "/post_latest — انتشار آخرین تورنومنت فعال در کانال",
       "",
       "مدیریت کامل از داخل پنل سایت انجام می‌شود.",
     ].join("\n"),
@@ -715,6 +717,32 @@ async function announceCommand(chatId: number, telegramId: string, text: string,
   await sendMessage(chatId, `ارسال اطلاعیه تمام شد.\n✅ موفق: ${sent}\n⏭ ردشده: ${skipped}\n❌ ناموفق: ${failed}`);
 }
 
+async function postLatestTournamentCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) {
+    await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+    return;
+  }
+
+  const [latest] = await db
+    .select()
+    .from(tournaments)
+    .where(eq(tournaments.status, "registration"))
+    .orderBy(desc(tournaments.createdAt))
+    .limit(1);
+
+  if (!latest) {
+    await sendMessage(chatId, "تورنومنت فعالی برای انتشار در کانال پیدا نشد.");
+    return;
+  }
+
+  const result = await publishTournamentToTelegramChannel(latest);
+  if (result.ok) {
+    await sendMessage(chatId, `✅ آخرین تورنومنت در کانال منتشر شد:\n<b>${html(latest.name)}</b>`);
+  } else {
+    await sendMessage(chatId, `❌ انتشار در کانال انجام نشد.\n${html(result.description || "خطای نامشخص")}`);
+  }
+}
+
 async function handleCommand(message: TelegramMessage, text: string) {
   const chatId = message.chat.id;
   const user = message.from;
@@ -735,6 +763,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/unregister") return unregisterCommand(chatId, telegramId);
   if (normalizedCommand === "/admin" || normalizedCommand === "/stats") return adminCommand(chatId, telegramId);
   if (normalizedCommand === "/players") return playersCommand(chatId, telegramId);
+  if (normalizedCommand === "/post_latest") return postLatestTournamentCommand(chatId, telegramId);
   if (normalizedCommand === "/announce") return announceCommand(chatId, telegramId, args.join(" "));
   if (normalizedCommand === "/announce_game") {
     const [game, ...messageParts] = args;

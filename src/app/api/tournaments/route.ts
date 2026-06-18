@@ -3,6 +3,8 @@ import { db } from "@/db";
 import { tournaments, registrations } from "@/db/schema";
 import { desc, eq, count } from "drizzle-orm";
 import { requireRole, validateSession } from "@/lib/auth";
+import { publishTournamentToTelegramChannel } from "@/lib/telegram";
+import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -126,6 +128,10 @@ export async function POST(request: NextRequest) {
         startDate: startDate ? new Date(startDate) : null,
       })
       .returning();
+
+    publishTournamentToTelegramChannel(tournament).catch((err) => {
+      logger.warn({ err, tournamentId: tournament.id }, "Failed to publish new tournament to Telegram channel");
+    });
 
     return NextResponse.json(tournament, { status: 201 });
   } catch (err) {

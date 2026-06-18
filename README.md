@@ -78,6 +78,7 @@ BOT_TOKEN="telegram_bot_token_from_botfather"
 TELEGRAM_WEBHOOK_SECRET="your_long_random_webhook_secret"
 TELEGRAM_ADMIN_IDS="your_numeric_telegram_id"
 TELEGRAM_CHANNEL_URL="https://t.me/Flexa_games"
+TELEGRAM_CHANNEL_ID="@Flexa_games"
 ```
 
 Migrationهای لازم:
@@ -107,6 +108,8 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://flexa-app-1.onren
 - `/players` برای ادمین: آخرین پیش‌ثبت‌نام‌ها
 - `/announce` برای ادمین: ارسال اطلاعیه عمومی
 - `/announce_game` برای ادمین: ارسال اطلاعیه هدفمند بر اساس بازی
+- `/post_latest` برای ادمین: انتشار دستی آخرین تورنومنت فعال در کانال
+- انتشار خودکار تورنومنت جدید در کانال `@Flexa_games`
 - اطلاع خودکار به ادمین‌ها هنگام پیش‌ثبت‌نام جدید
 
 ---
