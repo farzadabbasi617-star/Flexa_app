@@ -32,6 +32,21 @@ const CATEGORIES = [
   { value: "general", label: { fa: "عمومی", en: "General" } },
 ];
 
+const COMMON_SLUGS = [
+  { value: "home-hero", label: { fa: "بنر اصلی صفحه اول", en: "Homepage Hero" } },
+  { value: "app-bg", label: { fa: "پس‌زمینه کلی اپلیکیشن", en: "App Global Background" } },
+  { value: "chat-bg", label: { fa: "پس‌زمینه چت", en: "Chat Background" } },
+  { value: "profile-bg", label: { fa: "پس‌زمینه پروفایل", en: "Profile Background" } },
+  { value: "login-bg", label: { fa: "پس‌زمینه صفحه ورود", en: "Login Background" } },
+  { value: "icon-home", label: { fa: "آیکون خانه", en: "Home Icon" } },
+  { value: "icon-wallet", label: { fa: "آیکون کیف پول", en: "Wallet Icon" } },
+  { value: "icon-profile", label: { fa: "آیکون پروفایل", en: "Profile Icon" } },
+  { value: "icon-chat", label: { fa: "آیکون چت", en: "Chat Icon" } },
+  { value: "icon-tournament", label: { fa: "آیکون تورنومنت", en: "Tournament Icon" } },
+  { value: "logo-main", label: { fa: "لوگوی اصلی", en: "Main Logo" } },
+  { value: "custom", label: { fa: "سایر (تایپ دستی)", en: "Custom (Manual Type)" } },
+];
+
 export default function AdminImagesPage() {
   const { lang } = useLanguage();
   const { user, loading } = useAuth();
@@ -203,14 +218,30 @@ export default function AdminImagesPage() {
                 <label className="block text-xs text-gray-500 mb-1">
                   {lang === "fa" ? "شناسه (انگلیسی)" : "Slug"} *
                 </label>
-                <input
-                  type="text"
-                  required
-                  className="gaming-input text-sm"
-                  placeholder="hero-banner"
-                  value={form.slug}
-                  onChange={(e) => setForm({ ...form, slug: e.target.value.replace(/\s/g, "-").toLowerCase() })}
-                />
+                <div className="flex flex-col gap-2">
+                  <select
+                    className="gaming-select text-sm"
+                    value={form.slug === "custom" ? "" : form.slug}
+                    onChange={(e) => setForm({ ...form, slug: e.target.value })}
+                  >
+                    <option value="" disabled>{lang === "fa" ? "انتخاب کنید..." : "Select..."}</option>
+                    {COMMON_SLUGS.map((s) => (
+                      <option key={s.value} value={s.value}>
+                        {lang === "fa" ? s.label.fa : s.label.en}
+                      </option>
+                    ))}
+                  </select>
+                  {form.slug === "custom" || (form.slug && !COMMON_SLUGS.some(s => s.value === form.slug)) ? (
+                    <input
+                      type="text"
+                      required
+                      className="gaming-input text-sm"
+                      placeholder="hero-banner"
+                      value={form.slug}
+                      onChange={(e) => setForm({ ...form, slug: e.target.value.replace(/\s/g, "-").toLowerCase() })}
+                    />
+                  ) : null}
+                </div>
               </div>
               <div>
                 <label className="block text-xs text-gray-500 mb-1">
