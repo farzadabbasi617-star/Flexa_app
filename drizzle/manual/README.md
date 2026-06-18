@@ -23,6 +23,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | `0004_add_telegram_account_linking.sql` | Adds `telegram_accounts` and `telegram_link_codes` for linking Telegram accounts to Flexa users with one-time codes. |
 | `0005_add_telegram_growth_and_notifications.sql` | Adds referral tracking and notification de-duplication for reminders, lobby notices and channel result posts. |
 | `0006_add_telegram_marketing_and_waitlist.sql` | Adds campaign analytics, real coupons/redemptions, tournament waiting list and Telegram channel post tracking. |
+| `0007_add_classified_ads.sql` | Adds `classified_ads` and `classified_scrape_logs` tables for monitoring Divar/Sheypoor gaming ads. |
 
 > Note: the rate limiter **fails open** — if this table is missing or the DB
 > errors, requests are still allowed (and the issue is logged), so forgetting

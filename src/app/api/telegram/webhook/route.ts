@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { classifiedAds, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets } from "@/db/schema";
+import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { generateRealAssistantResponse } from "@/lib/ai-service";
@@ -1762,6 +1762,45 @@ async function classifiedAdsCommand(chatId: number, telegramId: string) {
   });
 }
 
+async function classifiedAdsStatsCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) {
+    await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+    return;
+  }
+  const allAds = await db.select({ status: classifiedAds.status, platform: classifiedAds.platform }).from(classifiedAds);
+  const byStatus: Record<string, number> = {};
+  const byPlatform: Record<string, number> = {};
+  for (const ad of allAds) {
+    byStatus[ad.status] = (byStatus[ad.status] || 0) + 1;
+    byPlatform[ad.platform] = (byPlatform[ad.platform] || 0) + 1;
+  }
+
+  const [lastLog] = await db.select().from(classifiedScrapeLogs).orderBy(desc(classifiedScrapeLogs.createdAt)).limit(1);
+
+  const text = [
+    "📊 <b>آمار آگهی‌های گیمینگ</b>",
+    "",
+    "📁 کل آگهی‌ها: <b>" + allAds.length + "</b>",
+    "🆕 جدید: <b>" + (byStatus.new || 0) + "</b>",
+    "✅ تماس گرفته شده: <b>" + (byStatus.contacted || 0) + "</b>",
+    "❌ نادیده: <b>" + (byStatus.ignored || 0) + "</b>",
+    "",
+    "🏪 دیوار: <b>" + (byPlatform.divar || 0) + "</b>",
+    "🏪 شیپور: <b>" + (byPlatform.sheypoor || 0) + "</b>",
+    "",
+    lastLog
+      ? `آخرین اسکن: <b>${lastLog.platform}</b> | ${lastLog.status} | ${lastLog.itemsFound} یافت، ${lastLog.itemsNew} جدید`
+      : "هنوز اسکنی ثبت نشده.",
+  ].join("\n");
+
+  await sendMessage(chatId, text, {
+    inline_keyboard: [
+      [{ text: "🔍 مشاهده آگهی‌های جدید", callback_data: "menu:ads" }],
+      [{ text: "🚀 شروع اسکن دستی", callback_data: "menu:ads_scan" }],
+    ],
+  });
+}
+
 async function classifiedAdsScanCommand(chatId: number, telegramId: string) {
   if (!hasAdminAccess(telegramId)) {
     await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
@@ -1867,6 +1906,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/poll") return pollCommand(chatId, telegramId, args.join(" "));
   if (normalizedCommand === "/ads") return classifiedAdsCommand(chatId, telegramId);
   if (normalizedCommand === "/ads_scan") return classifiedAdsScanCommand(chatId, telegramId);
+  if (normalizedCommand === "/ads_stats") return classifiedAdsStatsCommand(chatId, telegramId);
   if (normalizedCommand === "/rules") return rulesCommand(chatId);
   if (normalizedCommand === "/howto" || normalizedCommand === "/guide") {
     const game = normalizeGame(args.join(" "));
@@ -2090,6 +2130,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:rooms") return roomsCommand(chatId);
   if (data === "menu:register") return registerStart(chatId, telegramId);
   if (data === "menu:ads") return classifiedAdsCommand(chatId, telegramId);
+  if (data === "menu:ads_scan") return classifiedAdsScanCommand(chatId, telegramId);
   if (data.startsWith("howto:")) {
     const game = data.replace("howto:", "");
     const guide = getGameIdGuide(game);

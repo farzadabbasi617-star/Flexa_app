@@ -121,6 +121,21 @@ async function sendLobbyNotices() {
   return sent;
 }
 
+async function runDailyClassifiedScrape() {
+  const enabled = process.env.CLASSIFIED_AUTO_SCAN_ENABLED === "true";
+  if (!enabled) return { ran: false as const, reason: "disabled" };
+
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
+  const key = `classified-scrape:${today}`;
+  if (await hasSent(key)) return { ran: false as const, reason: "already_today" };
+
+  const { runClassifiedScrape } = await import("@/lib/classified-scraper");
+  const results = await runClassifiedScrape({ limit: 20 });
+  const totalNew = results.reduce((sum, r) => sum + r.new, 0);
+  await markSent(key, "classified_scrape");
+  return { ran: true as const, results, totalNew };
+}
+
 async function sendDailyAdminReport() {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
   const key = `daily-report:${today}`;
@@ -341,6 +356,7 @@ export async function GET(request: NextRequest) {
     const matchScheduled = await sendMatchScheduleNotifications();
     const matchResults = await sendMatchResultNotifications();
     const results = await publishCompletedResults();
+    const classifiedScrape = await runDailyClassifiedScrape();
     const dailyReports = await sendDailyAdminReport();
     return NextResponse.json({
       ok: true,
@@ -351,6 +367,7 @@ export async function GET(request: NextRequest) {
       matchScheduled,
       matchResults,
       results,
+      classifiedScrape,
       dailyReports,
     });
   } catch (err) {
