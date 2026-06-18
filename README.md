@@ -86,6 +86,7 @@ Migrationهای لازم:
 ```bash
 psql "$DATABASE_URL" -f drizzle/manual/0002_add_telegram_pre_registrations.sql
 psql "$DATABASE_URL" -f drizzle/manual/0003_add_telegram_bot_sessions.sql
+psql "$DATABASE_URL" -f drizzle/manual/0004_add_telegram_account_linking.sql
 ```
 
 یا محتوای فایل‌ها را داخل SQL Editor دیتابیس/Neon اجرا کنید.
@@ -103,6 +104,7 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://flexa-app-1.onren
 - `/start` منوی اصلی با لینک وب‌اپ و کانال
 - `/rooms` نمایش روم‌های فعال
 - `/register` پیش‌ثبت‌نام مستقیم در پنل سایت
+- `/link` ساخت کد یک‌بارمصرف برای اتصال قطعی حساب تلگرام به حساب Flexa
 - `/profile` نمایش پروفایل/وضعیت لینک حساب
 - `/channel` لینک کانال `Flexa_games`
 - `/players` برای ادمین: آخرین پیش‌ثبت‌نام‌ها

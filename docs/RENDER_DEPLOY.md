@@ -93,6 +93,7 @@ npm run db:push
 ```bash
 psql "$DATABASE_URL" -f drizzle/manual/0002_add_telegram_pre_registrations.sql
 psql "$DATABASE_URL" -f drizzle/manual/0003_add_telegram_bot_sessions.sql
+psql "$DATABASE_URL" -f drizzle/manual/0004_add_telegram_account_linking.sql
 ```
 
 یا محتوای همین فایل‌ها را در SQL Editor دیتابیس paste و اجرا کنید.

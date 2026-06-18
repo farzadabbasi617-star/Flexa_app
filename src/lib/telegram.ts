@@ -85,7 +85,7 @@ export function formatTournamentChannelPost(tournament: TelegramTournamentPost) 
   ].filter(Boolean).join("\n");
 }
 
-async function telegramApi(method: string, payload: Record<string, unknown>) {
+export async function telegramApi(method: string, payload: Record<string, unknown>) {
   const token = process.env.BOT_TOKEN?.trim();
   if (!token) {
     logger.warn("BOT_TOKEN is missing; cannot call Telegram API");
@@ -104,6 +104,16 @@ async function telegramApi(method: string, payload: Record<string, unknown>) {
     logger.warn({ method, status: response.status, result }, "Telegram API call failed");
   }
   return result || { ok: false, description: "Invalid Telegram response" };
+}
+
+export async function sendTelegramMessage(chatId: string | number, text: string, replyMarkup?: Record<string, unknown>) {
+  return telegramApi("sendMessage", {
+    chat_id: chatId,
+    text,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+    reply_markup: replyMarkup,
+  });
 }
 
 export async function publishTournamentToTelegramChannel(tournament: TelegramTournamentPost) {

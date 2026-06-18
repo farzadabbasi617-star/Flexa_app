@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, count, desc, eq, or } from "drizzle-orm";
 import { db } from "@/db";
-import { registrations, telegramBotSessions, telegramPreRegistrations, tournaments, users } from "@/db/schema";
+import { registrations, telegramAccounts, telegramBotSessions, telegramLinkCodes, telegramPreRegistrations, tournaments, users } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import logger from "@/lib/logger";
@@ -164,6 +164,14 @@ function normalizeFlexaId(value: string) {
   return normalizeDigits(value).trim().toUpperCase().replace(/\s+/g, "");
 }
 
+function linkCodeHash(code: string) {
+  return crypto.createHash("sha256").update(code).digest("hex");
+}
+
+function generateLinkCode() {
+  return crypto.randomInt(100000, 1000000).toString();
+}
+
 function isValidFlexaId(value: string) {
   const normalized = normalizeFlexaId(value);
   if (!normalized.startsWith("FLX-")) return false;
@@ -196,8 +204,12 @@ function mainMenuKeyboard() {
         { text: "👤 وضعیت من", callback_data: "menu:status" },
       ],
       [
+        { text: "🔗 اتصال حساب", callback_data: "menu:link" },
+        { text: "👤 پروفایل", callback_data: "menu:profile" },
+      ],
+      [
         { text: "🆕 ساخت حساب", url: `${APP_URL}/register` },
-        { text: "👤 پروفایل", url: `${APP_URL}/profile` },
+        { text: "🌐 پروفایل وب", url: `${APP_URL}/profile` },
       ],
     ];
   return { inline_keyboard: rows };
@@ -504,7 +516,104 @@ async function statusCommand(chatId: number, telegramId: string) {
   );
 }
 
+async function linkCommand(chatId: number, user: TelegramUser) {
+  const telegramId = String(user.id);
+  const [existing] = await db
+    .select({
+      telegramId: telegramAccounts.telegramId,
+      telegramUsername: telegramAccounts.telegramUsername,
+      linkedAt: telegramAccounts.linkedAt,
+      displayName: users.displayName,
+      flexaId: users.flexaId,
+    })
+    .from(telegramAccounts)
+    .leftJoin(users, eq(telegramAccounts.userId, users.id))
+    .where(eq(telegramAccounts.telegramId, telegramId))
+    .limit(1);
+
+  const code = generateLinkCode();
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+
+  await db.insert(telegramLinkCodes).values({
+    telegramId,
+    codeHash: linkCodeHash(code),
+    telegramUsername: user.username || null,
+    telegramFirstName: user.first_name || null,
+    telegramLastName: user.last_name || null,
+    expiresAt,
+  });
+
+  const alreadyLinked = existing?.flexaId
+    ? `\n\nاکنون به حساب <b>${html(existing.displayName || "Flexa")}</b> با Flexa ID <code>${html(existing.flexaId)}</code> لینک هستی. اگر کد جدید را در حساب دیگری وارد کنی، اتصال منتقل می‌شود.`
+    : "";
+
+  await sendMessage(
+    chatId,
+    [
+      "🔗 <b>اتصال حساب تلگرام به Flexa</b>",
+      "",
+      "کد زیر را داخل سایت Flexa، صفحه پروفایل، بخش «اتصال تلگرام» وارد کن:",
+      "",
+      `<code>${code}</code>`,
+      "",
+      "⏳ اعتبار کد: ۱۰ دقیقه",
+      alreadyLinked,
+      "",
+      "اگر هنوز حساب Flexa نداری، اول ثبت‌نام کن و بعد همین کد را وارد کن.",
+    ].join("\n"),
+    {
+      inline_keyboard: [
+        [{ text: "👤 ورود به پروفایل و وارد کردن کد", url: `${APP_URL}/profile` }],
+        [{ text: "🆕 ساخت حساب Flexa", url: `${APP_URL}/register` }],
+      ],
+    }
+  );
+}
+
 async function profileCommand(chatId: number, telegramId: string) {
+  const [linked] = await db
+    .select({
+      telegramUsername: telegramAccounts.telegramUsername,
+      linkedAt: telegramAccounts.linkedAt,
+      displayName: users.displayName,
+      username: users.username,
+      userFlexaId: users.flexaId,
+      level: users.level,
+      rankPoints: users.rankPoints,
+      clashRoyaleUsername: users.clashRoyaleUsername,
+      codMobileUsername: users.codMobileUsername,
+      fortniteUsername: users.fortniteUsername,
+    })
+    .from(telegramAccounts)
+    .leftJoin(users, eq(telegramAccounts.userId, users.id))
+    .where(eq(telegramAccounts.telegramId, telegramId))
+    .limit(1);
+
+  if (linked?.userFlexaId) {
+    const lines = [
+      "👤 <b>پروفایل Flexa شما</b>",
+      "",
+      "✅ حساب تلگرام به حساب وب‌اپ لینک شده است.",
+      `نام: <b>${html(linked.displayName || "—")}</b>`,
+      `Username: <b>${html(linked.username || "—")}</b>`,
+      `Flexa ID: <code>${html(linked.userFlexaId)}</code>`,
+      `Level: <b>${linked.level}</b> | RP: <b>${linked.rankPoints}</b>`,
+      linked.codMobileUsername ? `COD: <b>${html(linked.codMobileUsername)}</b>` : "",
+      linked.clashRoyaleUsername ? `Clash Royale: <b>${html(linked.clashRoyaleUsername)}</b>` : "",
+      linked.fortniteUsername ? `Fortnite: <b>${html(linked.fortniteUsername)}</b>` : "",
+      "",
+      "برای انتقال اتصال به حساب دیگر، در آن حساب وب‌اپ کد جدید /link را وارد کن.",
+    ].filter(Boolean).join("\n");
+
+    await sendMessage(chatId, lines, {
+      inline_keyboard: [
+        [{ text: "👤 باز کردن پروفایل در وب‌اپ", url: `${APP_URL}/profile` }],
+        [{ text: "🏟 روم‌های فعال", url: `${APP_URL}/tournaments` }],
+      ],
+    });
+    return;
+  }
+
   const [row] = await db
     .select({
       preFullName: telegramPreRegistrations.fullName,
@@ -755,6 +864,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/help") return startCommand(chatId);
   if (normalizedCommand === "/links") return linksCommand(chatId);
   if (normalizedCommand === "/channel") return channelCommand(chatId);
+  if (normalizedCommand === "/link") return linkCommand(chatId, user);
   if (normalizedCommand === "/profile") return profileCommand(chatId, telegramId);
   if (normalizedCommand === "/rules") return rulesCommand(chatId);
   if (normalizedCommand === "/rooms") return roomsCommand(chatId, args.join(" "));
@@ -883,6 +993,8 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:register") return registerStart(chatId, telegramId);
   if (data === "menu:rules") return rulesCommand(chatId);
   if (data === "menu:status") return statusCommand(chatId, telegramId);
+  if (data === "menu:link") return linkCommand(chatId, callback.from);
+  if (data === "menu:profile") return profileCommand(chatId, telegramId);
 
   if (data === "reg:abort") {
     await clearSession(telegramId);

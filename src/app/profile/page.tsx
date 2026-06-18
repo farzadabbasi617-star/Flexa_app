@@ -5,10 +5,23 @@ import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 
+interface TelegramLinkAccount {
+  telegramId: string;
+  telegramUsername: string | null;
+  telegramFirstName: string | null;
+  telegramLastName: string | null;
+  linkedAt: string;
+}
+
 export default function ProfilePage() {
   const { user, loading, logout } = useAuth();
   const [balance, setBalance] = useState(0);
   const [walletLoading, setWalletLoading] = useState(false);
+  const [telegramAccount, setTelegramAccount] = useState<TelegramLinkAccount | null>(null);
+  const [telegramLoading, setTelegramLoading] = useState(false);
+  const [telegramCode, setTelegramCode] = useState("");
+  const [telegramMessage, setTelegramMessage] = useState("");
+  const [telegramError, setTelegramError] = useState("");
 
   useEffect(() => {
     if (!user) return;
@@ -31,6 +44,72 @@ export default function ProfilePage() {
       cancelled = true;
     };
   }, [user]);
+
+  async function loadTelegramLink() {
+    if (!user) return;
+    setTelegramLoading(true);
+    try {
+      const res = await fetch("/api/telegram/link", { credentials: "include", cache: "no-store" });
+      const data = await res.json();
+      if (res.ok) setTelegramAccount(data.account || null);
+    } catch {
+      setTelegramAccount(null);
+    }
+    setTelegramLoading(false);
+  }
+
+  useEffect(() => {
+    loadTelegramLink();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
+  async function submitTelegramCode() {
+    setTelegramMessage("");
+    setTelegramError("");
+    const code = telegramCode.replace(/\D/g, "").slice(0, 6);
+    if (code.length !== 6) {
+      setTelegramError("کد اتصال باید ۶ رقم باشد.");
+      return;
+    }
+    setTelegramLoading(true);
+    try {
+      const res = await fetch("/api/telegram/link", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        credentials: "include",
+        body: JSON.stringify({ code }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "اتصال تلگرام انجام نشد.");
+      setTelegramMessage("حساب تلگرام با موفقیت لینک شد.");
+      setTelegramCode("");
+      await loadTelegramLink();
+    } catch (err) {
+      setTelegramError(err instanceof Error ? err.message : "اتصال تلگرام انجام نشد.");
+    }
+    setTelegramLoading(false);
+  }
+
+  async function unlinkTelegram() {
+    if (!confirm("اتصال تلگرام حذف شود؟")) return;
+    setTelegramMessage("");
+    setTelegramError("");
+    setTelegramLoading(true);
+    try {
+      const res = await fetch("/api/telegram/link", {
+        method: "DELETE",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        credentials: "include",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "حذف اتصال انجام نشد.");
+      setTelegramAccount(null);
+      setTelegramMessage("اتصال تلگرام حذف شد.");
+    } catch (err) {
+      setTelegramError(err instanceof Error ? err.message : "حذف اتصال انجام نشد.");
+    }
+    setTelegramLoading(false);
+  }
 
   if (loading) {
     return (
@@ -119,6 +198,58 @@ export default function ProfilePage() {
                 تراکنش‌ها
               </Link>
             </div>
+          </div>
+        </div>
+
+        <div className="mb-8">
+          <div className="glass-panel p-6 rounded-[34px] border border-cyan-500/20 bg-gradient-to-br from-cyan-900/20 to-purple-900/10">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="text-right">
+                <h3 className="text-sm font-black">🔗 اتصال تلگرام</h3>
+                <p className="text-[10px] text-gray-500 mt-1 leading-5">
+                  در ربات <span dir="ltr" className="text-cyan-300">@FlexaTournamentBot</span> دستور <code className="text-cyan-300">/link</code> را بزن و کد ۶ رقمی را اینجا وارد کن.
+                </p>
+              </div>
+              <Link href="https://t.me/FlexaTournamentBot" className="text-[10px] bg-cyan-500/15 text-cyan-200 px-3 py-2 rounded-2xl border border-cyan-500/20 whitespace-nowrap">
+                ربات
+              </Link>
+            </div>
+
+            {telegramAccount ? (
+              <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 mb-4">
+                <div className="text-xs font-black text-green-300 mb-1">✅ تلگرام لینک شده</div>
+                <div className="text-[11px] text-gray-300" dir="ltr">
+                  {telegramAccount.telegramUsername ? `@${telegramAccount.telegramUsername}` : `ID: ${telegramAccount.telegramId}`}
+                </div>
+              </div>
+            ) : (
+              <div className="flex gap-2 mb-4" dir="ltr">
+                <input
+                  value={telegramCode}
+                  onChange={(e) => setTelegramCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                  className="flex-1 bg-black/25 border border-white/10 rounded-2xl px-4 py-3 text-center text-lg font-black tracking-[0.35em] outline-none focus:border-cyan-400"
+                  placeholder="123456"
+                  inputMode="numeric"
+                  maxLength={6}
+                />
+                <button
+                  onClick={submitTelegramCode}
+                  disabled={telegramLoading || telegramCode.replace(/\D/g, "").length !== 6}
+                  className="bg-gradient-to-r from-cyan-600 to-blue-600 disabled:opacity-40 px-5 rounded-2xl text-xs font-black"
+                >
+                  اتصال
+                </button>
+              </div>
+            )}
+
+            {telegramMessage && <div className="text-green-300 text-xs mb-3">{telegramMessage}</div>}
+            {telegramError && <div className="text-red-300 text-xs mb-3">{telegramError}</div>}
+
+            {telegramAccount && (
+              <button onClick={unlinkTelegram} disabled={telegramLoading} className="text-[10px] text-red-300 bg-red-500/10 px-3 py-2 rounded-xl border border-red-500/20">
+                حذف اتصال تلگرام
+              </button>
+            )}
           </div>
         </div>
 
