@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournaments, transactions, users, wallets } from "@/db/schema";
+import { couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { generateRealAssistantResponse } from "@/lib/ai-service";
@@ -518,18 +518,34 @@ async function savePreRegistration(user: TelegramUser, data: SessionData) {
 }
 
 async function recordReferralIfNeeded(user: TelegramUser, startPayload?: string) {
-  if (!startPayload?.startsWith("ref_")) return;
-  const referrerTelegramId = startPayload.replace("ref_", "").trim();
+  if (!startPayload) return;
+  const payload = startPayload.trim().slice(0, 100);
   const referredTelegramId = String(user.id);
-  if (!/^\d+$/.test(referrerTelegramId) || referrerTelegramId === referredTelegramId) return;
-  await db
-    .insert(telegramReferrals)
-    .values({
-      referrerTelegramId,
-      referredTelegramId,
-      referredUsername: user.username || null,
-    })
-    .onConflictDoNothing({ target: telegramReferrals.referredTelegramId });
+
+  if (payload.startsWith("ref_")) {
+    const referrerTelegramId = payload.replace("ref_", "").trim();
+    if (/^\d+$/.test(referrerTelegramId) && referrerTelegramId !== referredTelegramId) {
+      await db
+        .insert(telegramReferrals)
+        .values({
+          referrerTelegramId,
+          referredTelegramId,
+          referredUsername: user.username || null,
+        })
+        .onConflictDoNothing({ target: telegramReferrals.referredTelegramId });
+    }
+    return;
+  }
+
+  if (payload.startsWith("campaign_") || payload.startsWith("streamer_") || payload.startsWith("utm_")) {
+    await db.insert(telegramCampaignEvents).values({
+      campaign: payload,
+      telegramId: referredTelegramId,
+      telegramUsername: user.username || null,
+      eventType: "start",
+      rawPayload: { firstName: user.first_name || null, lastName: user.last_name || null },
+    });
+  }
 }
 
 async function startCommand(chatId: number) {
@@ -659,15 +675,57 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
     if (existing) return { ok: false as const, code: "DUPLICATE" };
 
     let paymentText = "";
+    let finalEntryFeeRial = entryFeeRial;
+    let couponRedemptionId: string | null = null;
+    let couponId: string | null = null;
+    let discountRial = BigInt(0);
+
     if (isPaid) {
+      const [activeCoupon] = await tx
+        .select({
+          redemptionId: couponRedemptions.id,
+          couponId: coupons.id,
+          code: coupons.code,
+          discountPercent: coupons.discountPercent,
+          expiresAt: coupons.expiresAt,
+          game: coupons.game,
+          couponTournamentId: coupons.tournamentId,
+          maxUses: coupons.maxUses,
+          usedCount: coupons.usedCount,
+        })
+        .from(couponRedemptions)
+        .innerJoin(coupons, eq(couponRedemptions.couponId, coupons.id))
+        .where(and(eq(couponRedemptions.userId, linked.userId), eq(couponRedemptions.status, "active"), eq(coupons.isActive, true)))
+        .orderBy(desc(couponRedemptions.createdAt))
+        .limit(1);
+
+      const couponValid = activeCoupon
+        && (!activeCoupon.expiresAt || new Date(activeCoupon.expiresAt) > new Date())
+        && (!activeCoupon.game || activeCoupon.game === tournament.game)
+        && (!activeCoupon.couponTournamentId || activeCoupon.couponTournamentId === tournament.id)
+        && (!activeCoupon.maxUses || activeCoupon.usedCount < activeCoupon.maxUses)
+        && activeCoupon.discountPercent > 0;
+
+      if (couponValid) {
+        couponRedemptionId = activeCoupon.redemptionId;
+        couponId = activeCoupon.couponId;
+        discountRial = (entryFeeRial * BigInt(activeCoupon.discountPercent)) / BigInt(100);
+        finalEntryFeeRial = entryFeeRial - discountRial;
+        paymentText += `\n🎟 کوپن <code>${html(activeCoupon.code)}</code>: <b>${activeCoupon.discountPercent}% تخفیف</b>`;
+      }
+
       const wallet = await getOrCreateWallet(linked.userId, tx);
       const balance = bigIntFromText(wallet.balance);
-      if (balance < entryFeeRial) return { ok: false as const, code: "INSUFFICIENT", balance };
-      const nextBalance = balance - entryFeeRial;
+      if (balance < finalEntryFeeRial) return { ok: false as const, code: "INSUFFICIENT", balance, finalEntryFeeRial };
+      const nextBalance = balance - finalEntryFeeRial;
       await tx.update(wallets).set({ balance: nextBalance.toString(), updatedAt: new Date() }).where(eq(wallets.id, wallet.id));
+      if (couponRedemptionId && couponId) {
+        await tx.update(couponRedemptions).set({ status: "used", tournamentId: tournament.id, discountRial: discountRial.toString(), usedAt: new Date() }).where(eq(couponRedemptions.id, couponRedemptionId));
+        await tx.update(coupons).set({ usedCount: sql`${coupons.usedCount} + 1` }).where(eq(coupons.id, couponId));
+      }
       await tx.insert(transactions).values({
         walletId: wallet.id,
-        amount: entryFeeRial.toString(),
+        amount: finalEntryFeeRial.toString(),
         type: "entry_fee",
         status: "completed",
         referenceId: `telegram-entry-${tournamentId}-${linked.userId}-${Date.now()}`,
@@ -679,9 +737,12 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
           playerName: player.displayName,
           userId: linked.userId,
           telegramId,
+          originalEntryFeeRial: entryFeeRial.toString(),
+          discountRial: discountRial.toString(),
+          couponRedemptionId,
         },
       });
-      paymentText = `\n💳 ورودی از کیف پول کسر شد: <b>${html(formatTomanFromRial(entryFeeRial))}</b>`;
+      paymentText += `\n💳 ورودی از کیف پول کسر شد: <b>${html(formatTomanFromRial(finalEntryFeeRial))}</b>`;
     }
 
     await tx.insert(registrations).values({ tournamentId, playerId: player.id, visibleUserId: linked.userId });
@@ -689,14 +750,16 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
   });
 
   if (!result.ok) {
-    if (result.code === "FULL") return sendMessage(chatId, "ظرفیت این تورنومنت تکمیل شده است.");
+    if (result.code === "FULL") return sendMessage(chatId, "ظرفیت این تورنومنت تکمیل شده است. می‌خواهی در لیست انتظار قرار بگیری؟", {
+      inline_keyboard: [[{ text: "🕒 ورود به لیست انتظار", callback_data: `waitlist:${tournament.id}` }]],
+    });
     if (result.code === "DUPLICATE") {
       return sendMessage(chatId, "شما قبلاً در این تورنومنت ثبت‌نام کرده‌اید.", {
         inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
       });
     }
     if (result.code === "INSUFFICIENT") {
-      return sendMessage(chatId, `موجودی کیف پول کافی نیست.\nمبلغ لازم: <b>${html(formatTomanFromRial(entryFeeRial))}</b>\nموجودی شما: <b>${html(formatTomanFromRial(result.balance || BigInt(0)))}</b>`, {
+      return sendMessage(chatId, `موجودی کیف پول کافی نیست.\nمبلغ لازم: <b>${html(formatTomanFromRial(result.finalEntryFeeRial || entryFeeRial))}</b>\nموجودی شما: <b>${html(formatTomanFromRial(result.balance || BigInt(0)))}</b>`, {
         inline_keyboard: [[{ text: "شارژ کیف پول", url: `${APP_URL}/wallet` }], [{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
       });
     }
@@ -708,6 +771,40 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
 
   await sendMessage(chatId, `✅ ثبت‌نام شما در تورنومنت انجام شد.\n\n🏆 <b>${html(tournament.name)}</b>\n🎮 ${html(gameLabel(tournament.game))}${result.paymentText}${xpText}`, {
     inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
+  });
+}
+
+async function joinWaitlist(chatId: number, telegramId: string, tournamentId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) return sendMessage(chatId, "برای لیست انتظار، اول حساب را با /link وصل کن.");
+  const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+  if (!tournament) return sendMessage(chatId, "تورنومنت پیدا نشد.");
+  const [existing] = await db
+    .select({ id: tournamentWaitlist.id })
+    .from(tournamentWaitlist)
+    .where(and(eq(tournamentWaitlist.tournamentId, tournamentId), eq(tournamentWaitlist.userId, linked.userId), eq(tournamentWaitlist.status, "waiting")))
+    .limit(1);
+  if (!existing) {
+    await db.insert(tournamentWaitlist).values({ tournamentId, userId: linked.userId, telegramId, status: "waiting" });
+  }
+  await sendMessage(chatId, `✅ شما در لیست انتظار <b>${html(tournament.name)}</b> قرار گرفتید. اگر ظرفیت آزاد شود اطلاع می‌دهیم.`);
+}
+
+async function notifyWaitlistSpot(tournamentId: string) {
+  const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+  if (!tournament) return;
+  const [{ value }] = await db.select({ value: count() }).from(registrations).where(eq(registrations.tournamentId, tournamentId));
+  if (value >= tournament.maxPlayers) return;
+  const [waiting] = await db
+    .select()
+    .from(tournamentWaitlist)
+    .where(and(eq(tournamentWaitlist.tournamentId, tournamentId), eq(tournamentWaitlist.status, "waiting")))
+    .orderBy(tournamentWaitlist.createdAt)
+    .limit(1);
+  if (!waiting?.telegramId) return;
+  await db.update(tournamentWaitlist).set({ status: "notified", notifiedAt: new Date() }).where(eq(tournamentWaitlist.id, waiting.id));
+  await sendMessage(Number(waiting.telegramId), `🎟 یک ظرفیت در تورنومنت <b>${html(tournament.name)}</b> آزاد شد.`, {
+    inline_keyboard: [[{ text: "ثبت‌نام سریع", callback_data: `join:${tournament.id}` }]],
   });
 }
 
@@ -1180,6 +1277,7 @@ async function cancelRegistrationCommand(chatId: number, telegramId: string, reg
   });
 
   await sendMessage(chatId, `✅ ثبت‌نام شما در <b>${html(row.tournamentName)}</b> لغو شد.${refundText}`);
+  await notifyWaitlistSpot(row.tournamentId).catch(() => undefined);
 }
 
 async function walletCommand(chatId: number, telegramId: string) {
@@ -1555,10 +1653,22 @@ async function couponCommand(chatId: number, telegramId: string, code: string) {
   const value = code.trim().toUpperCase();
   if (!value) return sendMessage(chatId, "کد تخفیف را بعد از دستور وارد کن. مثال: <code>/coupon FLEXA50</code>");
   const linked = await getLinkedUserByTelegram(telegramId);
-  const valid = ["FLEXA50", "FLEXA20", "WELCOME"].includes(value);
-  if (!valid) return sendMessage(chatId, "این کد فعلاً معتبر نیست یا منقضی شده است.");
-  const xpText = linked?.userId ? await rewardUserXP(linked.userId, 10, `کد ${value}`) : "";
-  await sendMessage(chatId, `🎟 کد <code>${html(value)}</code> ثبت شد.\nدر نسخه پرداخت نهایی، این کد روی ورودی‌های واجد شرایط اعمال می‌شود.${xpText}`);
+  if (!linked?.userId) return sendMessage(chatId, "برای استفاده از کوپن، اول حساب را با /link وصل کن.");
+
+  const [coupon] = await db.select().from(coupons).where(eq(coupons.code, value)).limit(1);
+  if (!coupon || !coupon.isActive || (coupon.expiresAt && new Date(coupon.expiresAt) < new Date())) {
+    return sendMessage(chatId, "این کد معتبر نیست یا منقضی شده است.");
+  }
+  if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) return sendMessage(chatId, "ظرفیت استفاده از این کد تمام شده است.");
+
+  await db.insert(couponRedemptions).values({
+    couponId: coupon.id,
+    userId: linked.userId,
+    telegramId,
+    status: "active",
+  });
+  const xpText = await rewardUserXP(linked.userId, 10, `کد ${value}`);
+  await sendMessage(chatId, `🎟 کد <code>${html(value)}</code> فعال شد.\nتخفیف: <b>${coupon.discountPercent}%</b>\nدر ثبت‌نام پولی بعدی از تلگرام اعمال می‌شود.${xpText}`);
 }
 
 async function pollCommand(chatId: number, telegramId: string, question: string) {
@@ -1875,6 +1985,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:rooms") return roomsCommand(chatId);
   if (data === "menu:register") return registerStart(chatId, telegramId);
   if (data.startsWith("join:")) return joinTournamentFromTelegram(chatId, telegramId, data.replace("join:", ""));
+  if (data.startsWith("waitlist:")) return joinWaitlist(chatId, telegramId, data.replace("waitlist:", ""));
   if (data === "menu:rules") return rulesCommand(chatId);
   if (data === "menu:status") return statusCommand(chatId, telegramId);
   if (data === "menu:link") return linkCommand(chatId, callback.from);

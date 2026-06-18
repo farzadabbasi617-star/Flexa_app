@@ -341,6 +341,87 @@ export const telegramSentNotifications = pgTable("telegram_sent_notifications", 
   typeIdx: index("telegram_sent_notifications_type_idx").on(table.type),
 }));
 
+// Telegram campaign analytics for /start campaign_* and other deep links
+export const telegramCampaignEvents = pgTable("telegram_campaign_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  campaign: varchar("campaign", { length: 100 }).notNull(),
+  telegramId: varchar("telegram_id", { length: 32 }).notNull(),
+  telegramUsername: varchar("telegram_username", { length: 100 }),
+  eventType: varchar("event_type", { length: 50 }).notNull().default("start"),
+  rawPayload: jsonb("raw_payload"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  campaignIdx: index("telegram_campaign_events_campaign_idx").on(table.campaign),
+  telegramIdx: index("telegram_campaign_events_telegram_idx").on(table.telegramId),
+  eventIdx: index("telegram_campaign_events_event_idx").on(table.eventType),
+}));
+
+// Coupons usable by Telegram and web registration flows
+export const coupons = pgTable("coupons", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: varchar("code", { length: 50 }).notNull().unique(),
+  title: varchar("title", { length: 120 }),
+  discountPercent: integer("discount_percent").notNull().default(0),
+  maxUses: integer("max_uses"),
+  usedCount: integer("used_count").notNull().default(0),
+  game: varchar("game", { length: 50 }),
+  tournamentId: uuid("tournament_id").references(() => tournaments.id),
+  expiresAt: timestamp("expires_at"),
+  isActive: boolean("is_active").notNull().default(true),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  codeIdx: index("coupons_code_idx").on(table.code),
+  activeIdx: index("coupons_active_idx").on(table.isActive),
+  tournamentIdx: index("coupons_tournament_idx").on(table.tournamentId),
+}));
+
+export const couponRedemptions = pgTable("coupon_redemptions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  couponId: uuid("coupon_id").notNull().references(() => coupons.id),
+  userId: uuid("user_id").references(() => users.id),
+  telegramId: varchar("telegram_id", { length: 32 }),
+  tournamentId: uuid("tournament_id").references(() => tournaments.id),
+  status: varchar("status", { length: 30 }).notNull().default("active"),
+  discountRial: numeric("discount_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  usedAt: timestamp("used_at"),
+}, (table) => ({
+  couponIdx: index("coupon_redemptions_coupon_idx").on(table.couponId),
+  userIdx: index("coupon_redemptions_user_idx").on(table.userId),
+  telegramIdx: index("coupon_redemptions_telegram_idx").on(table.telegramId),
+  statusIdx: index("coupon_redemptions_status_idx").on(table.status),
+}));
+
+// Waiting list for full tournaments
+export const tournamentWaitlist = pgTable("tournament_waitlist", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tournamentId: uuid("tournament_id").notNull().references(() => tournaments.id),
+  userId: uuid("user_id").references(() => users.id),
+  telegramId: varchar("telegram_id", { length: 32 }),
+  status: varchar("status", { length: 30 }).notNull().default("waiting"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  notifiedAt: timestamp("notified_at"),
+}, (table) => ({
+  tournamentIdx: index("tournament_waitlist_tournament_idx").on(table.tournamentId),
+  userIdx: index("tournament_waitlist_user_idx").on(table.userId),
+  telegramIdx: index("tournament_waitlist_telegram_idx").on(table.telegramId),
+  statusIdx: index("tournament_waitlist_status_idx").on(table.status),
+}));
+
+// Telegram channel message tracking, used to edit capacity/status later
+export const telegramChannelPosts = pgTable("telegram_channel_posts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tournamentId: uuid("tournament_id").notNull().references(() => tournaments.id),
+  chatId: varchar("chat_id", { length: 100 }).notNull(),
+  messageId: integer("message_id").notNull(),
+  kind: varchar("kind", { length: 50 }).notNull().default("tournament"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  tournamentIdx: index("telegram_channel_posts_tournament_idx").on(table.tournamentId),
+  chatIdx: index("telegram_channel_posts_chat_idx").on(table.chatId),
+}));
+
 // Matches
 export const matches = pgTable("matches", {
   id: uuid("id").defaultRandom().primaryKey(),
