@@ -6,6 +6,7 @@ import { couponRedemptions, coupons, disputes, matchEvidence, matches, players, 
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { generateRealAssistantResponse } from "@/lib/ai-service";
+import { getGameIdGuide, gameGuideKeyboard } from "./guide";
 import { bigIntFromText, formatTomanFromRial } from "@/lib/money";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
 import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achievement-service";
@@ -1771,6 +1772,14 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/export_telegram") return exportTelegramCommand(chatId, telegramId);
   if (normalizedCommand === "/poll") return pollCommand(chatId, telegramId, args.join(" "));
   if (normalizedCommand === "/rules") return rulesCommand(chatId);
+  if (normalizedCommand === "/howto" || normalizedCommand === "/guide") {
+    const game = normalizeGame(args.join(" "));
+    if (game && ["cod_mobile", "clash_royale", "fortnite"].includes(game)) {
+      const guide = getGameIdGuide(game);
+      return sendMessage(chatId, [`<b>${guide.title}</b>`, "", ...guide.steps].join("\n"));
+    }
+    return sendMessage(chatId, "🎮 برای کدام بازی آیدی را پیدا می‌کنی؟", gameGuideKeyboard());
+  }
   if (normalizedCommand === "/rooms") return roomsCommand(chatId, args.join(" "));
   if (normalizedCommand === "/register") return registerStart(chatId, telegramId);
   if (normalizedCommand === "/status") return statusCommand(chatId, telegramId);
@@ -1984,6 +1993,11 @@ async function handleCallback(callback: TelegramCallbackQuery) {
 
   if (data === "menu:rooms") return roomsCommand(chatId);
   if (data === "menu:register") return registerStart(chatId, telegramId);
+  if (data.startsWith("howto:")) {
+    const game = data.replace("howto:", "");
+    const guide = getGameIdGuide(game);
+    return sendMessage(chatId, [`<b>${guide.title}</b>`, "", ...guide.steps].join("\n"));
+  }
   if (data.startsWith("join:")) return joinTournamentFromTelegram(chatId, telegramId, data.replace("join:", ""));
   if (data.startsWith("waitlist:")) return joinWaitlist(chatId, telegramId, data.replace("waitlist:", ""));
   if (data === "menu:rules") return rulesCommand(chatId);
