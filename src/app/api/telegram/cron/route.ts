@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, count, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { matches, players, registrations, telegramAccounts, telegramSentNotifications, tournaments } from "@/db/schema";
+import { matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions } from "@/db/schema";
 import { getTelegramChannelChatId, sendTelegramMessage } from "@/lib/telegram";
 import logger from "@/lib/logger";
 
@@ -78,6 +78,26 @@ async function sendReminders() {
   return sent;
 }
 
+async function sendCapacityAlerts() {
+  const rows = await db.select().from(tournaments).where(eq(tournaments.status, "registration"));
+  let sent = 0;
+  for (const tournament of rows) {
+    const [{ value }] = await db.select({ value: count() }).from(registrations).where(eq(registrations.tournamentId, tournament.id));
+    if (tournament.maxPlayers <= 0 || value / tournament.maxPlayers < 0.8) continue;
+    const key = `capacity:${tournament.id}:80`;
+    if (await hasSent(key)) continue;
+    const left = Math.max(0, tournament.maxPlayers - value);
+    await sendTelegramMessage(
+      getTelegramChannelChatId(),
+      `⚠️ <b>ظرفیت رو به اتمام!</b>\n\n🏆 ${html(tournament.name)}\n🎮 ${html(gameLabel(tournament.game))}\n👥 ثبت‌نام: <b>${value}/${tournament.maxPlayers}</b>\nفقط <b>${left}</b> جای خالی باقی مانده.`,
+      { inline_keyboard: [[{ text: "ثبت‌نام", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/tournaments/${tournament.id}` }]] }
+    );
+    await markSent(key, "capacity", tournament.id);
+    sent += 1;
+  }
+  return sent;
+}
+
 async function sendLobbyNotices() {
   const now = new Date();
   const rows = await db.select().from(tournaments).where(inArray(tournaments.status, ["registration", "in_progress"]));
@@ -98,6 +118,33 @@ async function sendLobbyNotices() {
       sent += 1;
     }
   }
+  return sent;
+}
+
+async function sendDailyAdminReport() {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
+  const key = `daily-report:${today}`;
+  if (await hasSent(key)) return 0;
+
+  const adminIds = (process.env.TELEGRAM_ADMIN_IDS || process.env.ADMIN_IDS || "").split(",").map((x) => x.trim()).filter(Boolean);
+  if (!adminIds.length) return 0;
+
+  const [preRegs] = await db.select({ value: count() }).from(telegramPreRegistrations);
+  const [activeTournaments] = await db.select({ value: count() }).from(tournaments).where(inArray(tournaments.status, ["registration", "in_progress"]));
+  const [openTickets] = await db.select({ value: count() }).from(tickets).where(eq(tickets.status, "open"));
+  const [completedMatches] = await db.select({ value: count() }).from(matches).where(eq(matches.status, "completed"));
+  const txRows = await db.select({ amount: transactions.amount }).from(transactions).where(eq(transactions.type, "entry_fee"));
+  const revenueToman = txRows.reduce((sum, row) => sum + Number((BigInt(row.amount || "0") / BigInt(10)).toString()), 0);
+
+  const text = `📊 <b>گزارش روزانه Flexa</b>\n\nپیش‌ثبت‌نام‌های تلگرام: <b>${preRegs.value}</b>\nتورنومنت‌های فعال: <b>${activeTournaments.value}</b>\nمسابقات تکمیل‌شده: <b>${completedMatches.value}</b>\nتیکت‌های باز: <b>${openTickets.value}</b>\nدرآمد ورودی‌ها: <b>${revenueToman.toLocaleString("fa-IR")} تومان</b>`;
+  let sent = 0;
+  for (const id of adminIds) {
+    const numericId = Number(id);
+    if (!Number.isFinite(numericId)) continue;
+    await sendTelegramMessage(numericId, text, { inline_keyboard: [[{ text: "پنل ادمین", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/admin` }]] });
+    sent += 1;
+  }
+  await markSent(key, "daily_report");
   return sent;
 }
 
@@ -136,9 +183,11 @@ export async function GET(request: NextRequest) {
   if (!validateCron(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const reminders = await sendReminders();
+    const capacity = await sendCapacityAlerts();
     const lobby = await sendLobbyNotices();
     const results = await publishCompletedResults();
-    return NextResponse.json({ ok: true, reminders, lobby, results });
+    const dailyReports = await sendDailyAdminReport();
+    return NextResponse.json({ ok: true, reminders, capacity, lobby, results, dailyReports });
   } catch (err) {
     logger.error({ err }, "Telegram cron failed");
     return NextResponse.json({ error: "Telegram cron failed" }, { status: 500 });

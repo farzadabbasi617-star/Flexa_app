@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, eq, gt, isNull, or } from "drizzle-orm";
 import { db } from "@/db";
-import { telegramAccounts, telegramLinkCodes, telegramPreRegistrations, users } from "@/db/schema";
+import { telegramAccounts, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { sendTelegramMessage } from "@/lib/telegram";
+import { LevelingService } from "@/lib/leveling-service";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -103,9 +104,32 @@ export async function POST(request: NextRequest) {
       return created;
     });
 
+    await db.transaction(async (tx) => {
+      await LevelingService.addXP(tx, user.id, 50);
+    }).catch((err) => logger.warn({ err, userId: user.id }, "Failed to reward Telegram link XP"));
+
+    const [referral] = await db
+      .select({ referrerTelegramId: telegramReferrals.referrerTelegramId })
+      .from(telegramReferrals)
+      .where(eq(telegramReferrals.referredTelegramId, linkCode.telegramId))
+      .limit(1);
+    if (referral?.referrerTelegramId) {
+      const [referrer] = await db
+        .select({ userId: telegramAccounts.userId })
+        .from(telegramAccounts)
+        .where(eq(telegramAccounts.telegramId, referral.referrerTelegramId))
+        .limit(1);
+      if (referrer?.userId) {
+        await db.transaction(async (tx) => {
+          await LevelingService.addXP(tx, referrer.userId, 50);
+        }).catch((err) => logger.warn({ err, userId: referrer.userId }, "Failed to reward referral XP"));
+        await sendTelegramMessage(referral.referrerTelegramId, `🎉 یک کاربر دعوتی شما حسابش را لینک کرد.\n🎁 +50 XP برای دعوت موفق!`).catch(() => undefined);
+      }
+    }
+
     await sendTelegramMessage(
       linkCode.telegramId,
-      `✅ حساب تلگرام شما با موفقیت به حساب Flexa لینک شد.\n\n👤 ${user.displayName}\n🆔 <code>${user.flexaId}</code>`
+      `✅ حساب تلگرام شما با موفقیت به حساب Flexa لینک شد.\n\n👤 ${user.displayName}\n🆔 <code>${user.flexaId}</code>\n🎁 +50 XP`
     ).catch((err) => logger.warn({ err, telegramId: linkCode.telegramId }, "Failed to notify linked Telegram user"));
 
     return NextResponse.json({ ok: true, linked: true, account });

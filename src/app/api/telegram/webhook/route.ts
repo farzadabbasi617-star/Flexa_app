@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, count, desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
-import { disputes, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, tickets, ticketMessages, tournaments, users } from "@/db/schema";
+import { disputes, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, tickets, ticketMessages, tournaments, transactions, users, wallets } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { generateRealAssistantResponse } from "@/lib/ai-service";
+import { bigIntFromText, formatTomanFromRial } from "@/lib/money";
+import { getEntryFeeRial } from "@/lib/tournament-finance";
+import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achievement-service";
+import { LevelingService } from "@/lib/leveling-service";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -374,6 +378,23 @@ async function getOrCreateUserPlayer(userId: string, fallbackName: string, usern
   return created;
 }
 
+async function getOrCreateWallet(userId: string, tx: any = db) {
+  const [existing] = await tx.select().from(wallets).where(eq(wallets.userId, userId)).limit(1);
+  if (existing) return existing;
+  const [created] = await tx.insert(wallets).values({ userId, balance: "0", currency: "RIAL" }).returning();
+  return created;
+}
+
+async function rewardUserXP(userId: string, amount: number, reason: string) {
+  try {
+    const result = await db.transaction(async (tx) => LevelingService.addXP(tx, userId, amount));
+    return `\n🎁 +${amount} XP (${reason}) — Level ${result.level}`;
+  } catch (err) {
+    logger.warn({ err, userId, amount, reason }, "Failed to reward XP");
+    return "";
+  }
+}
+
 async function getSession(telegramId: string): Promise<BotSession> {
   const [row] = await db
     .select({ state: telegramBotSessions.state, data: telegramBotSessions.data })
@@ -594,33 +615,71 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
     await sendMessage(chatId, "ثبت‌نام این تورنومنت در حال حاضر باز نیست.");
     return;
   }
-  if (!isFreeEntryFee(tournament.entryFee)) {
-    await sendMessage(chatId, "این تورنومنت ورودی دارد. برای پرداخت و ثبت‌نام وارد وب‌اپ شو:", {
-      inline_keyboard: [[{ text: "ثبت‌نام در وب‌اپ", url: `${APP_URL}/tournaments/${tournament.id}` }]],
-    });
-    return;
-  }
 
+  const entryFeeRial = getEntryFeeRial(tournament.entryFee);
+  const isPaid = entryFeeRial > BigInt(0);
   const player = await getOrCreateUserPlayer(linked.userId, linked.displayName || linked.username || "Flexa Player", linked.username);
-  const [{ value: registeredCount }] = await db.select({ value: count() }).from(registrations).where(eq(registrations.tournamentId, tournamentId));
-  if (registeredCount >= tournament.maxPlayers) {
-    await sendMessage(chatId, "ظرفیت این تورنومنت تکمیل شده است.");
-    return;
-  }
-  const [existing] = await db
-    .select({ id: registrations.id })
-    .from(registrations)
-    .where(and(eq(registrations.tournamentId, tournamentId), eq(registrations.visibleUserId, linked.userId)))
-    .limit(1);
-  if (existing) {
-    await sendMessage(chatId, "شما قبلاً در این تورنومنت ثبت‌نام کرده‌اید.", {
-      inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
-    });
-    return;
+
+  const result = await db.transaction(async (tx) => {
+    const [{ value: registeredCount }] = await tx.select({ value: count() }).from(registrations).where(eq(registrations.tournamentId, tournamentId));
+    if (registeredCount >= tournament.maxPlayers) return { ok: false as const, code: "FULL" };
+
+    const [existing] = await tx
+      .select({ id: registrations.id })
+      .from(registrations)
+      .where(and(eq(registrations.tournamentId, tournamentId), eq(registrations.visibleUserId, linked.userId)))
+      .limit(1);
+    if (existing) return { ok: false as const, code: "DUPLICATE" };
+
+    let paymentText = "";
+    if (isPaid) {
+      const wallet = await getOrCreateWallet(linked.userId, tx);
+      const balance = bigIntFromText(wallet.balance);
+      if (balance < entryFeeRial) return { ok: false as const, code: "INSUFFICIENT", balance };
+      const nextBalance = balance - entryFeeRial;
+      await tx.update(wallets).set({ balance: nextBalance.toString(), updatedAt: new Date() }).where(eq(wallets.id, wallet.id));
+      await tx.insert(transactions).values({
+        walletId: wallet.id,
+        amount: entryFeeRial.toString(),
+        type: "entry_fee",
+        status: "completed",
+        referenceId: `telegram-entry-${tournamentId}-${linked.userId}-${Date.now()}`,
+        metadata: {
+          kind: "telegram_entry_fee",
+          tournamentId,
+          tournamentName: tournament.name,
+          playerId: player.id,
+          playerName: player.displayName,
+          userId: linked.userId,
+          telegramId,
+        },
+      });
+      paymentText = `\n💳 ورودی از کیف پول کسر شد: <b>${html(formatTomanFromRial(entryFeeRial))}</b>`;
+    }
+
+    await tx.insert(registrations).values({ tournamentId, playerId: player.id, visibleUserId: linked.userId });
+    return { ok: true as const, paymentText };
+  });
+
+  if (!result.ok) {
+    if (result.code === "FULL") return sendMessage(chatId, "ظرفیت این تورنومنت تکمیل شده است.");
+    if (result.code === "DUPLICATE") {
+      return sendMessage(chatId, "شما قبلاً در این تورنومنت ثبت‌نام کرده‌اید.", {
+        inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
+      });
+    }
+    if (result.code === "INSUFFICIENT") {
+      return sendMessage(chatId, `موجودی کیف پول کافی نیست.\nمبلغ لازم: <b>${html(formatTomanFromRial(entryFeeRial))}</b>\nموجودی شما: <b>${html(formatTomanFromRial(result.balance || BigInt(0)))}</b>`, {
+        inline_keyboard: [[{ text: "شارژ کیف پول", url: `${APP_URL}/wallet` }], [{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
+      });
+    }
+    return sendMessage(chatId, "ثبت‌نام انجام نشد.");
   }
 
-  await db.insert(registrations).values({ tournamentId, playerId: player.id, visibleUserId: linked.userId });
-  await sendMessage(chatId, `✅ ثبت‌نام شما در تورنومنت انجام شد.\n\n🏆 <b>${html(tournament.name)}</b>\n🎮 ${html(gameLabel(tournament.game))}`, {
+  await evaluateUserAchievements(linked.userId).catch(() => undefined);
+  const xpText = await rewardUserXP(linked.userId, isPaid ? 25 : 15, isPaid ? "ثبت‌نام پولی" : "ثبت‌نام تورنومنت");
+
+  await sendMessage(chatId, `✅ ثبت‌نام شما در تورنومنت انجام شد.\n\n🏆 <b>${html(tournament.name)}</b>\n🎮 ${html(gameLabel(tournament.game))}${result.paymentText}${xpText}`, {
     inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
   });
 }
@@ -988,6 +1047,49 @@ async function postLatestTournamentCommand(chatId: number, telegramId: string) {
   }
 }
 
+async function walletCommand(chatId: number, telegramId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(chatId, "برای مشاهده کیف پول، اول حساب تلگرامت را با /link به Flexa وصل کن.", {
+      inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]],
+    });
+    return;
+  }
+  const wallet = await getOrCreateWallet(linked.userId);
+  const balance = bigIntFromText(wallet.balance);
+  const txRows = await db.select().from(transactions).where(eq(transactions.walletId, wallet.id)).orderBy(desc(transactions.createdAt)).limit(5);
+  const recent = txRows.length
+    ? txRows.map((tx) => `• ${html(tx.type)}: <b>${html(formatTomanFromRial(bigIntFromText(tx.amount)))}</b> — ${html(tx.status)}`).join("\n")
+    : "هنوز تراکنشی ندارید.";
+  await sendMessage(chatId, `💳 <b>کیف پول Flexa</b>\n\nموجودی: <b>${html(formatTomanFromRial(balance))}</b>\n\nآخرین تراکنش‌ها:\n${recent}`, {
+    inline_keyboard: [[{ text: "شارژ کیف پول", url: `${APP_URL}/wallet` }], [{ text: "تراکنش‌ها", url: `${APP_URL}/wallet` }]],
+  });
+}
+
+async function achievementsCommand(chatId: number, telegramId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(chatId, "برای مشاهده دستاوردها، اول حساب را با /link وصل کن.", {
+      inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]],
+    });
+    return;
+  }
+  const progress = await achievementProgressForUser(linked.userId);
+  type AchievementProgressItem = Awaited<ReturnType<typeof achievementProgressForUser>>[number];
+  const unlocked = progress.filter((item: AchievementProgressItem) => item.unlocked).slice(0, 8);
+  const locked = progress.filter((item: AchievementProgressItem) => !item.unlocked).slice(0, 5);
+  const text = [
+    "🏅 <b>دستاوردهای Flexa</b>",
+    "",
+    unlocked.length ? "✅ بازشده:" : "هنوز دستاوردی باز نشده.",
+    ...unlocked.map((item: AchievementProgressItem) => `${item.icon} <b>${html(item.nameFA)}</b> — +${item.points} XP`),
+    "",
+    locked.length ? "⬜ بعدی‌ها:" : "",
+    ...locked.map((item: AchievementProgressItem) => `${item.icon} ${html(item.nameFA)} — ${item.progress}/${item.requirement}`),
+  ].filter(Boolean).join("\n");
+  await sendMessage(chatId, text, { inline_keyboard: [[{ text: "مشاهده در وب‌اپ", url: `${APP_URL}/achievements` }]] });
+}
+
 async function supportStartCommand(chatId: number, telegramId: string) {
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) {
@@ -1272,6 +1374,8 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/channel") return channelCommand(chatId);
   if (normalizedCommand === "/link") return linkCommand(chatId, user);
   if (normalizedCommand === "/profile") return profileCommand(chatId, telegramId);
+  if (normalizedCommand === "/wallet") return walletCommand(chatId, telegramId);
+  if (normalizedCommand === "/achievements") return achievementsCommand(chatId, telegramId);
   if (normalizedCommand === "/invite") return inviteCommand(chatId, telegramId);
   if (normalizedCommand === "/missions") return missionsCommand(chatId, telegramId);
   if (normalizedCommand === "/leaderboard") return leaderboardCommand(chatId);
