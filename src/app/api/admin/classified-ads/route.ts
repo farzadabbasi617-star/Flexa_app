@@ -38,8 +38,18 @@ export async function POST(request: NextRequest) {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   try {
-    const body = (await request.json().catch(() => ({}))) as { platforms?: ("divar" | "sheypoor")[]; limit?: number };
-    const results = await runClassifiedScrape({ platforms: body.platforms, limit: Math.min(body.limit || 10, 50) });
+    const body = (await request.json().catch(() => ({}))) as {
+      platforms?: ("divar" | "sheypoor")[];
+      cities?: string[];
+      limitPerCity?: number;
+      allCities?: boolean;
+    };
+    const results = await runClassifiedScrape({
+      platforms: body.platforms,
+      cities: body.cities,
+      limitPerCity: Math.min(body.limitPerCity || 5, 10),
+      allCities: body.allCities,
+    });
     return NextResponse.json({ ok: true, results });
   } catch (err) {
     logger.error({ err }, "Classified ads scrape failed");

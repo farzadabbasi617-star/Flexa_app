@@ -85,6 +85,7 @@ interface SessionData {
   supportSubject?: string;
   disputeMatchId?: string;
   evidenceMatchId?: string;
+  selectedAdIds?: string[];
 }
 
 interface BotSession {
@@ -1743,23 +1744,133 @@ async function classifiedAdsCommand(chatId: number, telegramId: string) {
     await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
     return;
   }
+  await clearSession(telegramId);
   const rows = await db
     .select()
     .from(classifiedAds)
     .where(eq(classifiedAds.status, "new"))
     .orderBy(desc(classifiedAds.createdAt))
-    .limit(10);
+    .limit(20);
 
   if (!rows.length) {
-    await sendMessage(chatId, "🔍 آگهی جدیدی یافت نشد.\n\nبرای اسکن دستور زیر را بزن:\n<code>/ads_scan</code>", mainMenuKeyboard());
+    await sendMessage(chatId, "🔍 آگهی جدیدی یافت نشد.\n\nبرای اسکن دستور زیر را بزن:\n<code>/ads_scan</code>\nیا برای اسکن کل کشور:\n<code>/ads_allcities</code>", mainMenuKeyboard());
     return;
   }
 
-  await sendMessage(chatId, `📋 <b>${rows.length} آگهی گیمینگ جدید</b> یافت شد. برای مشاهده هر آگهی روی دکمه کلیک کن:`, {
-    inline_keyboard: rows.map((ad, index) => [
-      { text: `${index + 1}) ${ad.platform} | ${ad.title.slice(0, 35)}`, callback_data: `ad:view:${ad.id}` },
+  await sendMessage(chatId, `📋 <b>${rows.length} آگهی گیمینگ جدید</b>.\n\nبرای انتخاب گروهی، روی دکمه‌های ✅/⬜ کلیک کن. سپس عملیات گروهی را انتخاب کن:`, {
+    inline_keyboard: rows.flatMap((ad) => [
+      [{ text: `⬜ ${ad.platform} | ${ad.title.slice(0, 40)}`, callback_data: `ad:select:${ad.id}` }],
     ]),
   });
+  await sendMessage(chatId, "عملیات گروهی:", {
+    inline_keyboard: [
+      [{ text: "📋 انتخاب همه", callback_data: "ad:bulk:select_all" }],
+      [{ text: "✅ علامت‌گذاری انتخاب‌شده‌ها", callback_data: "ad:bulk:contact" }, { text: "❌ نادیده انتخاب‌شده‌ها", callback_data: "ad:bulk:ignore" }],
+      [{ text: "📤 خروجی CSV انتخاب‌شده‌ها", callback_data: "ad:bulk:export" }],
+      [{ text: "🔗 باز کردن همه انتخاب‌شده‌ها", callback_data: "ad:bulk:open" }],
+    ],
+  });
+}
+
+async function toggleAdSelection(chatId: number, telegramId: string, adId: string, messageId?: number) {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const session = await getSession(telegramId);
+  const selected = new Set(session.data.selectedAdIds || []);
+  if (selected.has(adId)) selected.delete(adId);
+  else selected.add(adId);
+  await setSession(telegramId, session.state, { ...session.data, selectedAdIds: Array.from(selected) });
+
+  // Refresh list if possible
+  await refreshAdsList(chatId, telegramId, messageId);
+}
+
+async function refreshAdsList(chatId: number, telegramId: string, messageId?: number) {
+  if (!hasAdminAccess(telegramId)) return;
+  const session = await getSession(telegramId);
+  const selected = new Set(session.data.selectedAdIds || []);
+  const rows = await db
+    .select()
+    .from(classifiedAds)
+    .where(eq(classifiedAds.status, "new"))
+    .orderBy(desc(classifiedAds.createdAt))
+    .limit(20);
+
+  const keyboard = rows.flatMap((ad) => {
+    const isSelected = selected.has(ad.id);
+    return [
+      [{ text: `${isSelected ? "✅" : "⬜"} ${ad.platform} | ${ad.title.slice(0, 40)}`, callback_data: `ad:select:${ad.id}` }],
+      [{ text: "👁 مشاهده", callback_data: `ad:view:${ad.id}` }, { text: "🔗 باز کردن", url: ad.url }],
+    ];
+  });
+
+  const text = `📋 <b>${rows.length} آگهی گیمینگ جدید</b>. انتخاب‌شده: <b>${selected.size}</b>`;
+  if (messageId) await editMessage(chatId, messageId, text, { inline_keyboard: keyboard });
+  else await sendMessage(chatId, text, { inline_keyboard: keyboard });
+}
+
+async function selectAllAds(chatId: number, telegramId: string, messageId?: number) {
+  if (!hasAdminAccess(telegramId)) return;
+  const rows = await db
+    .select({ id: classifiedAds.id })
+    .from(classifiedAds)
+    .where(eq(classifiedAds.status, "new"))
+    .orderBy(desc(classifiedAds.createdAt))
+    .limit(20);
+  await setSession(telegramId, "idle", { selectedAdIds: rows.map((r) => r.id) });
+  await refreshAdsList(chatId, telegramId, messageId);
+}
+
+async function bulkMarkAds(chatId: number, telegramId: string, mode: "contacted" | "ignored") {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const session = await getSession(telegramId);
+  const ids = session.data.selectedAdIds || [];
+  if (!ids.length) return sendMessage(chatId, "هیچ آگهی انتخاب نشده. اول /ads را بزن و آگهی‌ها را انتخاب کن.");
+
+  for (const id of ids) {
+    await db.delete(classifiedAds).where(eq(classifiedAds.id, id));
+  }
+  await clearSession(telegramId);
+  await sendMessage(chatId, `🗑 ${ids.length} آگهی ${mode === "contacted" ? "تماس‌گرفته‌شده" : "نادیده"} از لیست حذف شد.`, mainMenuKeyboard());
+}
+
+async function bulkExportAds(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const session = await getSession(telegramId);
+  const ids = session.data.selectedAdIds || [];
+  if (!ids.length) return sendMessage(chatId, "هیچ آگهی انتخاب نشده.");
+
+  const rows = await db.select().from(classifiedAds).where(inArray(classifiedAds.id, ids));
+  const headers = ["platform", "city", "title", "price", "url", "keywords", "status"];
+  const csv = [headers.join(","), ...rows.map((r) => [
+    r.platform, r.city || "", r.title, r.price || "", r.url, (r.keywords as string[]).join("|"), r.status,
+  ].map((v) => `"${String(v).replace(/"/g, '""')}"`).join(","))].join("\n");
+
+  await sendDocument(chatId, "\ufeff" + csv, `selected_ads_${Date.now()}.csv`, `${rows.length} آگهی انتخاب‌شده`);
+  await clearSession(telegramId);
+}
+
+async function bulkOpenAds(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const session = await getSession(telegramId);
+  const ids = session.data.selectedAdIds || [];
+  if (!ids.length) return sendMessage(chatId, "هیچ آگهی انتخاب نشده.");
+  const rows = await db.select({ url: classifiedAds.url, title: classifiedAds.title }).from(classifiedAds).where(inArray(classifiedAds.id, ids));
+  const links = rows.map((r, i) => `${i + 1}. <a href="${r.url}">${r.title.slice(0, 30)}</a>`).join("\n");
+  await sendMessage(chatId, `🔗 <b>آگهی‌های انتخاب‌شده</b>\n\n${links}\n\nروی هر لینک کلیک کن و در دیوار/شیپور پیام بده.`, mainMenuKeyboard());
+}
+
+async function classifiedAdsScanCommand(chatId: number, telegramId: string, allCities = false) {
+  if (!hasAdminAccess(telegramId)) {
+    await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+    return;
+  }
+  await sendMessage(chatId, `🔍 در حال اسکن ${allCities ? "کل کشور" : "تهران"} ... این فرایند چند دقیقه طول می‌کشد.`);
+  const { runClassifiedScrape } = await import("@/lib/classified-scraper");
+  const results = await runClassifiedScrape({ allCities, limitPerCity: 5 });
+  const totalFound = results.reduce((sum, r) => sum + r.found, 0);
+  const totalNew = results.reduce((sum, r) => sum + r.new, 0);
+  const summary = results.filter((r) => r.found > 0 || r.status === "error").map((r) => `${r.platform} ${r.city}: ${r.found} یافت، ${r.new} جدید${r.error ? " (خطا)" : ""}`).join("\n");
+  await sendMessage(chatId, `✅ اسکن تمام شد.\n\n<b>کل یافت: ${totalFound}</b>\n<b>کل جدید: ${totalNew}</b>\n\n${html(summary)}\n\nبرای مشاهده: /ads`, mainMenuKeyboard());
 }
 
 async function classifiedAdsStatsCommand(chatId: number, telegramId: string) {
@@ -1796,21 +1907,9 @@ async function classifiedAdsStatsCommand(chatId: number, telegramId: string) {
   await sendMessage(chatId, text, {
     inline_keyboard: [
       [{ text: "🔍 مشاهده آگهی‌های جدید", callback_data: "menu:ads" }],
-      [{ text: "🚀 شروع اسکن دستی", callback_data: "menu:ads_scan" }],
+      [{ text: "🚀 اسکن تهران", callback_data: "menu:ads_scan" }, { text: "🇮🇷 اسکن کل کشور", callback_data: "menu:ads_scan_all" }],
     ],
   });
-}
-
-async function classifiedAdsScanCommand(chatId: number, telegramId: string) {
-  if (!hasAdminAccess(telegramId)) {
-    await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
-    return;
-  }
-  await sendMessage(chatId, "🔍 در حال اسکن دیوار و شیپور... این فرایند چند دقیقه طول می‌کشد.");
-  const { runClassifiedScrape } = await import("@/lib/classified-scraper");
-  const results = await runClassifiedScrape({ limit: 10 });
-  const summary = results.map((r) => `${r.platform}: ${r.found} یافت، ${r.new} جدید`).join("\n");
-  await sendMessage(chatId, `✅ اسکن تمام شد:\n\n${html(summary)}\n\nبرای مشاهده: /ads`, mainMenuKeyboard());
 }
 
 async function viewClassifiedAd(chatId: number, telegramId: string, adId: string) {
@@ -1821,8 +1920,8 @@ async function viewClassifiedAd(chatId: number, telegramId: string, adId: string
   const text = [
     `📌 <b>${html(ad.title)}</b>`,
     `🏪 پلتفرم: <b>${html(ad.platform)}</b>`,
-    ad.price ? `💰 قیمت: <b>${html(ad.price)}</b>` : "",
     ad.city ? `📍 شهر: <b>${html(ad.city)}</b>` : "",
+    ad.price ? `💰 قیمت: <b>${html(ad.price)}</b>` : "",
     ad.keywords && (ad.keywords as string[]).length ? `🏷 کلمات: <b>${(ad.keywords as string[]).join(", ")}</b>` : "",
     "",
     `📝 ${html(ad.description || "بدون توضیحات")}`,
@@ -1835,16 +1934,25 @@ async function viewClassifiedAd(chatId: number, telegramId: string, adId: string
         { text: "✅ تماس گرفتم", callback_data: `ad:contact:${ad.id}` },
         { text: "❌ نادیده", callback_data: `ad:ignore:${ad.id}` },
       ],
-      [{ text: "📋 کپی متن پیام", callback_data: `ad:copy:${ad.id}` }],
+      [
+        { text: "📋 کپی متن پیام", callback_data: `ad:copy:${ad.id}` },
+        { text: "🗑 حذف از لیست", callback_data: `ad:delete:${ad.id}` },
+      ],
       [{ text: "🔙 لیست آگهی‌ها", callback_data: "menu:ads" }],
     ],
   });
 }
 
-async function contactClassifiedAd(chatId: number, telegramId: string, adId: string, method: "contact" | "ignore") {
+async function contactClassifiedAd(chatId: number, telegramId: string, adId: string, method: "contact" | "ignore" | "delete") {
   if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
   const [ad] = await db.select().from(classifiedAds).where(eq(classifiedAds.id, adId)).limit(1);
   if (!ad) return sendMessage(chatId, "آگهی پیدا نشد.");
+
+  if (method === "delete") {
+    await db.delete(classifiedAds).where(eq(classifiedAds.id, adId));
+    await sendMessage(chatId, "🗑 آگهی از لیست حذف شد.", mainMenuKeyboard());
+    return;
+  }
 
   const status = method === "contact" ? "contacted" : "ignored";
   await db
@@ -1857,7 +1965,7 @@ async function contactClassifiedAd(chatId: number, telegramId: string, adId: str
       inline_keyboard: [[{ text: "🔗 باز کردن آگهی", url: ad.url }], [{ text: "🔙 لیست آگهی‌ها", callback_data: "menu:ads" }]],
     });
   } else {
-    await sendMessage(chatId, "آگهی نادیده گرفته شد.", mainMenuKeyboard());
+    await sendMessage(chatId, "آگهی نادیده گرفته شد. از لیست حذف شد.", mainMenuKeyboard());
   }
 }
 
@@ -1905,7 +2013,8 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/export_telegram") return exportTelegramCommand(chatId, telegramId);
   if (normalizedCommand === "/poll") return pollCommand(chatId, telegramId, args.join(" "));
   if (normalizedCommand === "/ads") return classifiedAdsCommand(chatId, telegramId);
-  if (normalizedCommand === "/ads_scan") return classifiedAdsScanCommand(chatId, telegramId);
+  if (normalizedCommand === "/ads_scan") return classifiedAdsScanCommand(chatId, telegramId, false);
+  if (normalizedCommand === "/ads_allcities") return classifiedAdsScanCommand(chatId, telegramId, true);
   if (normalizedCommand === "/ads_stats") return classifiedAdsStatsCommand(chatId, telegramId);
   if (normalizedCommand === "/rules") return rulesCommand(chatId);
   if (normalizedCommand === "/howto" || normalizedCommand === "/guide") {
@@ -2130,15 +2239,23 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:rooms") return roomsCommand(chatId);
   if (data === "menu:register") return registerStart(chatId, telegramId);
   if (data === "menu:ads") return classifiedAdsCommand(chatId, telegramId);
-  if (data === "menu:ads_scan") return classifiedAdsScanCommand(chatId, telegramId);
+  if (data === "menu:ads_scan") return classifiedAdsScanCommand(chatId, telegramId, false);
+  if (data === "menu:ads_scan_all") return classifiedAdsScanCommand(chatId, telegramId, true);
   if (data.startsWith("howto:")) {
     const game = data.replace("howto:", "");
     const guide = getGameIdGuide(game);
     return sendMessage(chatId, [`<b>${guide.title}</b>`, "", ...guide.steps].join("\n"));
   }
+  if (data.startsWith("ad:select:")) return toggleAdSelection(chatId, telegramId, data.replace("ad:select:", ""), messageId);
+  if (data === "ad:bulk:select_all") return selectAllAds(chatId, telegramId, messageId);
+  if (data === "ad:bulk:contact") return bulkMarkAds(chatId, telegramId, "contacted");
+  if (data === "ad:bulk:ignore") return bulkMarkAds(chatId, telegramId, "ignored");
+  if (data === "ad:bulk:export") return bulkExportAds(chatId, telegramId);
+  if (data === "ad:bulk:open") return bulkOpenAds(chatId, telegramId);
   if (data.startsWith("ad:view:")) return viewClassifiedAd(chatId, telegramId, data.replace("ad:view:", ""));
   if (data.startsWith("ad:contact:")) return contactClassifiedAd(chatId, telegramId, data.replace("ad:contact:", ""), "contact");
   if (data.startsWith("ad:ignore:")) return contactClassifiedAd(chatId, telegramId, data.replace("ad:ignore:", ""), "ignore");
+  if (data.startsWith("ad:delete:")) return contactClassifiedAd(chatId, telegramId, data.replace("ad:delete:", ""), "delete");
   if (data.startsWith("ad:copy:")) return copyOutreachMessage(chatId, telegramId, data.replace("ad:copy:", ""));
   if (data.startsWith("join:")) return joinTournamentFromTelegram(chatId, telegramId, data.replace("join:", ""));
   if (data.startsWith("waitlist:")) return joinWaitlist(chatId, telegramId, data.replace("waitlist:", ""));

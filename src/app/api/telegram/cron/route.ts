@@ -48,6 +48,13 @@ async function tournamentRecipients(tournamentId: string) {
     .where(eq(registrations.tournamentId, tournamentId));
 }
 
+async function cleanupClassifiedAds() {
+  const maxAgeDays = Number(process.env.CLASSIFIED_ADS_MAX_AGE_DAYS || "7");
+  if (maxAgeDays <= 0) return { deleted: 0, reason: "disabled" };
+  const { cleanupOldClassifiedAds } = await import("@/lib/classified-scraper");
+  return cleanupOldClassifiedAds();
+}
+
 async function sendReminders() {
   const now = Date.now();
   const futureLimit = new Date(now + 24 * 60 * 60 * 1000 + 5 * 60 * 1000);
@@ -121,19 +128,23 @@ async function sendLobbyNotices() {
   return sent;
 }
 
-async function runDailyClassifiedScrape() {
+async function runHourlyClassifiedScrape() {
   const enabled = process.env.CLASSIFIED_AUTO_SCAN_ENABLED === "true";
   if (!enabled) return { ran: false as const, reason: "disabled" };
 
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
-  const key = `classified-scrape:${today}`;
-  if (await hasSent(key)) return { ran: false as const, reason: "already_today" };
+  const intervalHours = Math.max(1, Math.min(Number(process.env.CLASSIFIED_SCAN_INTERVAL_HOURS || "1"), 24));
+  const now = new Date();
+  const hourKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}_${String(now.getHours()).padStart(2, "0")}`;
+  const key = `classified-scrape:${hourKey}`;
+  if (await hasSent(key)) return { ran: false as const, reason: "already_this_hour" };
 
   const { runClassifiedScrape } = await import("@/lib/classified-scraper");
-  const results = await runClassifiedScrape({ limit: 20 });
+  const allCities = process.env.CLASSIFIED_SCAN_ALL_CITIES === "true";
+  const limitPerCity = Math.max(1, Math.min(Number(process.env.CLASSIFIED_LIMIT_PER_CITY || "5"), 10));
+  const results = await runClassifiedScrape({ allCities, limitPerCity });
   const totalNew = results.reduce((sum, r) => sum + r.new, 0);
   await markSent(key, "classified_scrape");
-  return { ran: true as const, results, totalNew };
+  return { ran: true as const, results, totalNew, intervalHours };
 }
 
 async function sendDailyAdminReport() {
@@ -356,7 +367,8 @@ export async function GET(request: NextRequest) {
     const matchScheduled = await sendMatchScheduleNotifications();
     const matchResults = await sendMatchResultNotifications();
     const results = await publishCompletedResults();
-    const classifiedScrape = await runDailyClassifiedScrape();
+    const classifiedScrape = await runHourlyClassifiedScrape();
+    const classifiedCleanup = await cleanupClassifiedAds();
     const dailyReports = await sendDailyAdminReport();
     return NextResponse.json({
       ok: true,
@@ -368,6 +380,7 @@ export async function GET(request: NextRequest) {
       matchResults,
       results,
       classifiedScrape,
+      classifiedCleanup,
       dailyReports,
     });
   } catch (err) {
