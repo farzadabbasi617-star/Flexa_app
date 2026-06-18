@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import { and, count, desc, eq, or } from "drizzle-orm";
+import { and, count, desc, eq, inArray, or } from "drizzle-orm";
 import { db } from "@/db";
-import { registrations, telegramAccounts, telegramBotSessions, telegramLinkCodes, telegramPreRegistrations, tournaments, users } from "@/db/schema";
+import { disputes, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, tickets, ticketMessages, tournaments, users } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
+import { generateRealAssistantResponse } from "@/lib/ai-service";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,10 @@ type BotState =
   | "flexa_id"
   | "city"
   | "team"
-  | "confirm";
+  | "confirm"
+  | "support_subject"
+  | "support_message"
+  | "dispute_reason";
 
 interface TelegramUser {
   id: number;
@@ -64,6 +68,8 @@ interface SessionData {
   flexaId?: string;
   city?: string;
   teamName?: string;
+  supportSubject?: string;
+  disputeMatchId?: string;
 }
 
 interface BotSession {
@@ -250,10 +256,15 @@ function confirmKeyboard() {
   };
 }
 
-function roomsKeyboard(rows: Array<{ id: string; name: string | null }>) {
+function roomsKeyboard(rows: Array<{ id: string; name: string | null; entryFee?: string | null; registeredCount?: number; maxPlayers?: number }>) {
   const keyboard: Array<Array<Record<string, string>>> = [[{ text: "🌐 مشاهده همه روم‌ها در وب‌اپ", url: `${APP_URL}/tournaments` }]];
   for (const row of rows.slice(0, 5)) {
-    keyboard.push([{ text: `جزئیات: ${(row.name || "روم Flexa").slice(0, 32)}`, url: `${APP_URL}/tournaments/${row.id}` }]);
+    const title = (row.name || "روم Flexa").slice(0, 28);
+    const isFull = typeof row.registeredCount === "number" && typeof row.maxPlayers === "number" && row.registeredCount >= row.maxPlayers;
+    keyboard.push([
+      { text: isFull ? `ظرفیت تکمیل: ${title}` : `✅ ثبت‌نام: ${title}`, callback_data: `join:${row.id}` },
+    ]);
+    keyboard.push([{ text: `جزئیات: ${title}`, url: `${APP_URL}/tournaments/${row.id}` }]);
   }
   keyboard.push([{ text: "🎮 پیش‌ثبت‌نام", callback_data: "menu:register" }]);
   return { inline_keyboard: keyboard };
@@ -270,7 +281,7 @@ async function telegramApi(method: string, payload: Record<string, unknown>) {
     cache: "no-store",
   });
 
-  const result = await response.json().catch(() => null) as { ok?: boolean; description?: string } | null;
+  const result = await response.json().catch(() => null) as { ok?: boolean; description?: string; result?: unknown } | null;
   if (!response.ok || !result?.ok) {
     logger.warn({ method, status: response.status, result }, "Telegram API call failed");
   }
@@ -304,6 +315,63 @@ async function answerCallback(callbackQueryId: string, text?: string) {
     text,
     show_alert: false,
   });
+}
+
+async function isChannelMember(telegramId: string) {
+  const requireMembership = process.env.TELEGRAM_REQUIRE_CHANNEL_MEMBERSHIP === "true";
+  if (!requireMembership) return true;
+  const result = await telegramApi("getChatMember", {
+    chat_id: process.env.TELEGRAM_CHANNEL_ID || "@Flexa_games",
+    user_id: Number(telegramId),
+  });
+  const member = result?.result as { status?: string } | undefined;
+  return Boolean(member?.status && !["left", "kicked"].includes(member.status));
+}
+
+async function promptChannelMembership(chatId: number) {
+  await sendMessage(chatId, "برای ادامه، اول عضو کانال رسمی Flexa Games شو و بعد دوباره تلاش کن:", {
+    inline_keyboard: [
+      [{ text: "📣 عضویت در کانال", url: CHANNEL_URL || "https://t.me/Flexa_games" }],
+      [{ text: "✅ عضو شدم", callback_data: "menu:register" }],
+    ],
+  });
+}
+
+async function getLinkedUserByTelegram(telegramId: string) {
+  const [row] = await db
+    .select({
+      userId: telegramAccounts.userId,
+      flexaId: users.flexaId,
+      displayName: users.displayName,
+      username: users.username,
+      level: users.level,
+      rankPoints: users.rankPoints,
+    })
+    .from(telegramAccounts)
+    .leftJoin(users, eq(telegramAccounts.userId, users.id))
+    .where(eq(telegramAccounts.telegramId, telegramId))
+    .limit(1);
+  return row || null;
+}
+
+function isFreeEntryFee(entryFee?: string | null) {
+  const value = normalizeDigits(entryFee || "").trim().toLowerCase();
+  if (!value || value === "0") return true;
+  return ["رایگان", "free", "مجانی"].some((word) => value.includes(word));
+}
+
+async function getOrCreateUserPlayer(userId: string, fallbackName: string, username?: string | null) {
+  const [existing] = await db.select().from(players).where(eq(players.visibleUserId, userId)).limit(1);
+  if (existing) return existing;
+  const [created] = await db
+    .insert(players)
+    .values({
+      visibleUserId: userId,
+      username: username || fallbackName || `player_${userId.slice(0, 6)}`,
+      displayName: fallbackName || username || "Flexa Player",
+    })
+    .returning();
+  return created;
 }
 
 async function getSession(telegramId: string): Promise<BotSession> {
@@ -401,6 +469,21 @@ async function savePreRegistration(user: TelegramUser, data: SessionData) {
   });
 }
 
+async function recordReferralIfNeeded(user: TelegramUser, startPayload?: string) {
+  if (!startPayload?.startsWith("ref_")) return;
+  const referrerTelegramId = startPayload.replace("ref_", "").trim();
+  const referredTelegramId = String(user.id);
+  if (!/^\d+$/.test(referrerTelegramId) || referrerTelegramId === referredTelegramId) return;
+  await db
+    .insert(telegramReferrals)
+    .values({
+      referrerTelegramId,
+      referredTelegramId,
+      referredUsername: user.username || null,
+    })
+    .onConflictDoNothing({ target: telegramReferrals.referredTelegramId });
+}
+
 async function startCommand(chatId: number) {
   await sendMessage(
     chatId,
@@ -435,6 +518,10 @@ async function rulesCommand(chatId: number) {
 }
 
 async function registerStart(chatId: number, telegramId: string) {
+  if (!(await isChannelMember(telegramId))) {
+    await promptChannelMembership(chatId);
+    return;
+  }
   await setSession(telegramId, "idle", {});
   await sendMessage(
     chatId,
@@ -487,6 +574,55 @@ async function roomsCommand(chatId: number, gameFilter?: string) {
   ].join("\n\n");
 
   await sendMessage(chatId, text, roomsKeyboard(rows));
+}
+
+async function joinTournamentFromTelegram(chatId: number, telegramId: string, tournamentId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(chatId, "برای ثبت‌نام مستقیم، اول حساب تلگرامت را با /link به Flexa وصل کن.", {
+      inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }], [{ text: "ورود به پروفایل", url: `${APP_URL}/profile` }]],
+    });
+    return;
+  }
+
+  const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+  if (!tournament) {
+    await sendMessage(chatId, "تورنومنت پیدا نشد یا حذف شده است.");
+    return;
+  }
+  if (tournament.status !== "registration") {
+    await sendMessage(chatId, "ثبت‌نام این تورنومنت در حال حاضر باز نیست.");
+    return;
+  }
+  if (!isFreeEntryFee(tournament.entryFee)) {
+    await sendMessage(chatId, "این تورنومنت ورودی دارد. برای پرداخت و ثبت‌نام وارد وب‌اپ شو:", {
+      inline_keyboard: [[{ text: "ثبت‌نام در وب‌اپ", url: `${APP_URL}/tournaments/${tournament.id}` }]],
+    });
+    return;
+  }
+
+  const player = await getOrCreateUserPlayer(linked.userId, linked.displayName || linked.username || "Flexa Player", linked.username);
+  const [{ value: registeredCount }] = await db.select({ value: count() }).from(registrations).where(eq(registrations.tournamentId, tournamentId));
+  if (registeredCount >= tournament.maxPlayers) {
+    await sendMessage(chatId, "ظرفیت این تورنومنت تکمیل شده است.");
+    return;
+  }
+  const [existing] = await db
+    .select({ id: registrations.id })
+    .from(registrations)
+    .where(and(eq(registrations.tournamentId, tournamentId), eq(registrations.visibleUserId, linked.userId)))
+    .limit(1);
+  if (existing) {
+    await sendMessage(chatId, "شما قبلاً در این تورنومنت ثبت‌نام کرده‌اید.", {
+      inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
+    });
+    return;
+  }
+
+  await db.insert(registrations).values({ tournamentId, playerId: player.id, visibleUserId: linked.userId });
+  await sendMessage(chatId, `✅ ثبت‌نام شما در تورنومنت انجام شد.\n\n🏆 <b>${html(tournament.name)}</b>\n🎮 ${html(gameLabel(tournament.game))}`, {
+    inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
+  });
 }
 
 async function statusCommand(chatId: number, telegramId: string) {
@@ -852,6 +988,273 @@ async function postLatestTournamentCommand(chatId: number, telegramId: string) {
   }
 }
 
+async function supportStartCommand(chatId: number, telegramId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(chatId, "برای ثبت تیکت پشتیبانی، اول حساب تلگرامت را با /link به Flexa وصل کن.", {
+      inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]],
+    });
+    return;
+  }
+  await setSession(telegramId, "support_subject", {});
+  await sendMessage(chatId, "🎧 موضوع تیکت پشتیبانی را بنویس:", replyKeyboard([[CANCEL_TEXT]]));
+}
+
+async function userMatchRows(telegramId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) return { linked: null, rows: [] as Array<{ id: string; status: string; round: number; matchNumber: number; tournamentName: string | null; playerId: string | null }> };
+  const myPlayers = await db.select({ id: players.id }).from(players).where(eq(players.visibleUserId, linked.userId));
+  const playerIds = myPlayers.map((p) => p.id);
+  if (!playerIds.length) return { linked, rows: [] };
+  const rows = await db
+    .select({
+      id: matches.id,
+      status: matches.status,
+      round: matches.round,
+      matchNumber: matches.matchNumber,
+      tournamentName: tournaments.name,
+      player1Id: matches.player1Id,
+      player2Id: matches.player2Id,
+    })
+    .from(matches)
+    .leftJoin(tournaments, eq(matches.tournamentId, tournaments.id))
+    .where(or(inArray(matches.player1Id, playerIds), inArray(matches.player2Id, playerIds)))
+    .orderBy(desc(matches.createdAt))
+    .limit(10);
+  return { linked, rows: rows.map((row) => ({ ...row, playerId: playerIds.includes(row.player1Id || "") ? row.player1Id : row.player2Id })) };
+}
+
+async function matchesCommand(chatId: number, telegramId: string) {
+  const { linked, rows } = await userMatchRows(telegramId);
+  if (!linked) {
+    await sendMessage(chatId, "برای مشاهده مسابقات، اول حساب تلگرامت را با /link وصل کن.", {
+      inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]],
+    });
+    return;
+  }
+  if (!rows.length) {
+    await sendMessage(chatId, "فعلاً مسابقه‌ای برای حساب شما پیدا نشد.", mainMenuKeyboard());
+    return;
+  }
+  const keyboard = rows.slice(0, 6).flatMap((match, index) => [
+    [{ text: `${index + 1}) ${match.tournamentName || "مسابقه"} | R${match.round}-${match.matchNumber}`, callback_data: `match:${match.id}` }],
+  ]);
+  await sendMessage(chatId, "⚔️ مسابقات اخیر شما؛ یکی را انتخاب کن:", { inline_keyboard: keyboard });
+}
+
+async function handleMatchAction(chatId: number, telegramId: string, matchId: string) {
+  const { linked, rows } = await userMatchRows(telegramId);
+  const match = rows.find((row) => row.id === matchId);
+  if (!linked || !match) {
+    await sendMessage(chatId, "این مسابقه برای حساب شما پیدا نشد.");
+    return;
+  }
+  await sendMessage(chatId, `⚔️ <b>${html(match.tournamentName || "مسابقه")}</b>\nوضعیت: <b>${html(match.status)}</b>\n\nنتیجه یا عملیات را انتخاب کن:`, {
+    inline_keyboard: [
+      [{ text: "✅ بردم", callback_data: `result:win:${matchId}` }, { text: "❌ باختم", callback_data: `result:lose:${matchId}` }],
+      [{ text: "🚨 اعتراض دارم", callback_data: `dispute:${matchId}` }],
+    ],
+  });
+}
+
+async function submitTelegramResult(chatId: number, telegramId: string, matchId: string, action: "win" | "lose") {
+  const { linked, rows } = await userMatchRows(telegramId);
+  const match = rows.find((row) => row.id === matchId);
+  if (!linked || !match) {
+    await sendMessage(chatId, "این مسابقه برای حساب شما پیدا نشد.");
+    return;
+  }
+  await db
+    .update(matches)
+    .set({
+      status: "awaiting_judgment",
+      evidence: {
+        source: "telegram",
+        reporterTelegramId: telegramId,
+        reporterUserId: linked.userId,
+        reporterClaim: action,
+        reportedAt: new Date().toISOString(),
+      },
+    })
+    .where(eq(matches.id, matchId));
+  await sendMessage(chatId, action === "win" ? "✅ نتیجه شما ثبت شد و برای داوری ارسال شد." : "✅ گزارش باخت ثبت شد. ممنون از اعلام نتیجه.");
+}
+
+async function startDispute(chatId: number, telegramId: string, matchId: string) {
+  await setSession(telegramId, "dispute_reason", { disputeMatchId: matchId });
+  await sendMessage(chatId, "🚨 دلیل اعتراض را بنویس. اگر مدرک داری، توضیح بده کجا قابل بررسی است:", replyKeyboard([[CANCEL_TEXT]]));
+}
+
+async function aiCommand(chatId: number, prompt: string, telegramId: string) {
+  const query = prompt.trim();
+  if (!query) {
+    await sendMessage(chatId, "سؤال را بعد از دستور بنویس. مثال:\n<code>/ai بهترین دک کلش رویال برای شروع تورنومنت چیه؟</code>");
+    return;
+  }
+  const linked = await getLinkedUserByTelegram(telegramId);
+  await sendMessage(chatId, "🤖 در حال فکر کردن...");
+  const response = await generateRealAssistantResponse(query, { lang: "fa", userName: linked?.displayName || undefined });
+  await sendMessage(chatId, `🤖 <b>دستیار Flexa</b>\n\n${html(response.response)}\n\n<code>${response.provider}</code>`);
+}
+
+async function inviteCommand(chatId: number, telegramId: string) {
+  const username = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
+  const link = `https://t.me/${username}?start=ref_${telegramId}`;
+  const [{ value }] = await db.select({ value: count() }).from(telegramReferrals).where(eq(telegramReferrals.referrerTelegramId, telegramId));
+  await sendMessage(chatId, `🎁 <b>لینک دعوت اختصاصی شما</b>\n\n${html(link)}\n\nدعوت‌های ثبت‌شده: <b>${value}</b>\n\nاین لینک را برای دوستات بفرست؛ در فاز جایزه، دعوت‌های معتبر امتیاز می‌گیرند.`, {
+    inline_keyboard: [[{ text: "اشتراک‌گذاری", url: `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("به Flexa بپیوند و توی تورنومنت‌های گیمینگ شرکت کن!")}` }]],
+  });
+}
+
+async function missionsCommand(chatId: number, telegramId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  const [preReg] = await db.select({ id: telegramPreRegistrations.id }).from(telegramPreRegistrations).where(eq(telegramPreRegistrations.telegramId, telegramId)).limit(1);
+  const [{ value: invites }] = await db.select({ value: count() }).from(telegramReferrals).where(eq(telegramReferrals.referrerTelegramId, telegramId));
+  const channelMember = await isChannelMember(telegramId);
+  await sendMessage(chatId, [
+    "🎯 <b>مأموریت‌های Flexa</b>",
+    "",
+    `${channelMember ? "✅" : "⬜"} عضویت در کانال Flexa Games`,
+    `${linked ? "✅" : "⬜"} اتصال حساب با /link`,
+    `${preReg ? "✅" : "⬜"} پیش‌ثبت‌نام در ربات`,
+    `${invites > 0 ? "✅" : "⬜"} دعوت حداقل یک نفر با /invite`,
+    "",
+    "جایزه XP/اعتبار برای مأموریت‌ها در فاز بعدی فعال می‌شود.",
+  ].join("\n"), mainMenuKeyboard());
+}
+
+async function sendLobbyToRegisteredUsers(chatId: number, tournamentId: string) {
+  const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+  if (!tournament) {
+    await sendMessage(chatId, "تورنومنت پیدا نشد.");
+    return;
+  }
+  if (!tournament.roomId) {
+    await sendMessage(chatId, "برای این تورنومنت هنوز Room ID ثبت نشده است.");
+    return;
+  }
+  const recipients = await db
+    .select({ telegramId: telegramAccounts.telegramId })
+    .from(registrations)
+    .innerJoin(telegramAccounts, eq(registrations.visibleUserId, telegramAccounts.userId))
+    .where(eq(registrations.tournamentId, tournamentId));
+  let sent = 0;
+  for (const row of recipients) {
+    await sendMessage(Number(row.telegramId), `🏟 <b>اطلاعات لابی آماده شد</b>\n\n🏆 ${html(tournament.name)}\nRoom ID: <code>${html(tournament.roomId)}</code>\nPassword: <code>${html(tournament.roomPassword || "بدون رمز")}</code>\n\n${html(tournament.lobbyNotes || "لطفاً به‌موقع وارد لابی شوید.")}`);
+    sent += 1;
+  }
+  await sendMessage(chatId, `✅ اطلاعات لابی برای ${sent} نفر ارسال شد.`);
+}
+
+async function checkInCommand(chatId: number, telegramId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(chatId, "برای چک‌این، اول حساب را با /link وصل کن.", { inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]] });
+    return;
+  }
+  const rows = await db
+    .select({ id: registrations.id, checkedInAt: registrations.checkedInAt, tournamentId: tournaments.id, name: tournaments.name, status: tournaments.status })
+    .from(registrations)
+    .innerJoin(tournaments, eq(registrations.tournamentId, tournaments.id))
+    .where(and(eq(registrations.visibleUserId, linked.userId), inArray(tournaments.status, ["registration", "in_progress"])))
+    .orderBy(desc(registrations.registeredAt))
+    .limit(8);
+  if (!rows.length) {
+    await sendMessage(chatId, "ثبت‌نام فعالی برای چک‌این پیدا نشد.");
+    return;
+  }
+  await sendMessage(chatId, "✅ برای کدام تورنومنت حضور داری؟", {
+    inline_keyboard: rows.map((row) => [{ text: `${row.checkedInAt ? "✅" : "⬜"} ${row.name.slice(0, 35)}`, callback_data: `checkin:${row.id}` }]),
+  });
+}
+
+async function handleCheckIn(chatId: number, telegramId: string, registrationId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(chatId, "حساب شما لینک نیست.");
+    return;
+  }
+  const [row] = await db
+    .select({ id: registrations.id, tournamentName: tournaments.name })
+    .from(registrations)
+    .innerJoin(tournaments, eq(registrations.tournamentId, tournaments.id))
+    .where(and(eq(registrations.id, registrationId), eq(registrations.visibleUserId, linked.userId)))
+    .limit(1);
+  if (!row) {
+    await sendMessage(chatId, "این ثبت‌نام برای شما پیدا نشد.");
+    return;
+  }
+  await db.update(registrations).set({ checkedInAt: new Date() }).where(eq(registrations.id, registrationId));
+  await sendMessage(chatId, `✅ حضور شما برای تورنومنت <b>${html(row.tournamentName)}</b> ثبت شد.`);
+}
+
+async function adminTournamentsCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) {
+    await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+    return;
+  }
+  const rows = await db.select().from(tournaments).orderBy(desc(tournaments.createdAt)).limit(8);
+  if (!rows.length) {
+    await sendMessage(chatId, "تورنومنتی پیدا نشد.");
+    return;
+  }
+  const keyboard = rows.flatMap((tournament, index) => [
+    [{ text: `${index + 1}) ${tournament.name.slice(0, 28)} | ${tournament.status}`, callback_data: `adm:info:${tournament.id}` }],
+    [
+      { text: "📣 کانال", callback_data: `adm:post:${tournament.id}` },
+      { text: "🏟 لابی", callback_data: `adm:lobby:${tournament.id}` },
+      { text: "▶️ شروع", callback_data: `adm:start:${tournament.id}` },
+      { text: "⛔ بستن", callback_data: `adm:close:${tournament.id}` },
+    ],
+  ]);
+  await sendMessage(chatId, "🧩 مدیریت سریع تورنومنت‌ها:", { inline_keyboard: keyboard });
+}
+
+async function handleAdminTournamentAction(chatId: number, telegramId: string, action: string, tournamentId: string) {
+  if (!hasAdminAccess(telegramId)) {
+    await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+    return;
+  }
+  const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+  if (!tournament) {
+    await sendMessage(chatId, "تورنومنت پیدا نشد.");
+    return;
+  }
+  if (action === "post") {
+    const result = await publishTournamentToTelegramChannel(tournament);
+    await sendMessage(chatId, result.ok ? "✅ در کانال منتشر شد." : `❌ انتشار انجام نشد: ${html(result.description || "خطا")}`);
+    return;
+  }
+  if (action === "lobby") return sendLobbyToRegisteredUsers(chatId, tournamentId);
+  if (action === "start") {
+    await db.update(tournaments).set({ status: "in_progress", updatedAt: new Date() }).where(eq(tournaments.id, tournamentId));
+    await sendMessage(chatId, "▶️ وضعیت تورنومنت به in_progress تغییر کرد.");
+    return;
+  }
+  if (action === "close") {
+    await db.update(tournaments).set({ status: "cancelled", updatedAt: new Date() }).where(eq(tournaments.id, tournamentId));
+    await sendMessage(chatId, "⛔ تورنومنت لغو/بسته شد.");
+    return;
+  }
+  await sendMessage(chatId, `🏆 <b>${html(tournament.name)}</b>\n🎮 ${html(gameLabel(tournament.game))}\nوضعیت: <b>${html(tournament.status)}</b>\nورودی: <b>${html(tournament.entryFee || "رایگان")}</b>`, {
+    inline_keyboard: [[{ text: "مشاهده در سایت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
+  });
+}
+
+async function leaderboardCommand(chatId: number) {
+  const rows = await db
+    .select({ displayName: users.displayName, username: users.username, flexaId: users.flexaId, rankPoints: users.rankPoints, level: users.level })
+    .from(users)
+    .orderBy(desc(users.rankPoints))
+    .limit(10);
+  const text = [
+    "🏆 <b>لیدربورد Flexa</b>",
+    "",
+    ...rows.map((row, index) => `${index + 1}) <b>${html(row.displayName || row.username)}</b> — RP <b>${row.rankPoints}</b> | Lv ${row.level}\n<code>${html(row.flexaId)}</code>`),
+  ].join("\n\n");
+  await sendMessage(chatId, text);
+}
+
 async function handleCommand(message: TelegramMessage, text: string) {
   const chatId = message.chat.id;
   const user = message.from;
@@ -860,12 +1263,22 @@ async function handleCommand(message: TelegramMessage, text: string) {
   const [command, ...args] = text.trim().split(/\s+/);
   const normalizedCommand = command.split("@")[0].toLowerCase();
 
-  if (normalizedCommand === "/start") return startCommand(chatId);
+  if (normalizedCommand === "/start") {
+    await recordReferralIfNeeded(user, args[0]);
+    return startCommand(chatId);
+  }
   if (normalizedCommand === "/help") return startCommand(chatId);
   if (normalizedCommand === "/links") return linksCommand(chatId);
   if (normalizedCommand === "/channel") return channelCommand(chatId);
   if (normalizedCommand === "/link") return linkCommand(chatId, user);
   if (normalizedCommand === "/profile") return profileCommand(chatId, telegramId);
+  if (normalizedCommand === "/invite") return inviteCommand(chatId, telegramId);
+  if (normalizedCommand === "/missions") return missionsCommand(chatId, telegramId);
+  if (normalizedCommand === "/leaderboard") return leaderboardCommand(chatId);
+  if (normalizedCommand === "/ai") return aiCommand(chatId, args.join(" "), telegramId);
+  if (normalizedCommand === "/support") return supportStartCommand(chatId, telegramId);
+  if (normalizedCommand === "/matches") return matchesCommand(chatId, telegramId);
+  if (normalizedCommand === "/checkin") return checkInCommand(chatId, telegramId);
   if (normalizedCommand === "/rules") return rulesCommand(chatId);
   if (normalizedCommand === "/rooms") return roomsCommand(chatId, args.join(" "));
   if (normalizedCommand === "/register") return registerStart(chatId, telegramId);
@@ -873,6 +1286,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/unregister") return unregisterCommand(chatId, telegramId);
   if (normalizedCommand === "/admin" || normalizedCommand === "/stats") return adminCommand(chatId, telegramId);
   if (normalizedCommand === "/players") return playersCommand(chatId, telegramId);
+  if (normalizedCommand === "/manage" || normalizedCommand === "/tournaments_admin") return adminTournamentsCommand(chatId, telegramId);
   if (normalizedCommand === "/post_latest") return postLatestTournamentCommand(chatId, telegramId);
   if (normalizedCommand === "/announce") return announceCommand(chatId, telegramId, args.join(" "));
   if (normalizedCommand === "/announce_game") {
@@ -899,6 +1313,60 @@ async function handleConversationMessage(message: TelegramMessage) {
 
   const session = await getSession(telegramId);
   const data = { ...session.data };
+
+  if (session.state === "support_subject") {
+    if (text.length < 3 || text.length > 120) {
+      await sendMessage(chatId, "موضوع باید بین ۳ تا ۱۲۰ کاراکتر باشد. دوباره بنویس:");
+      return;
+    }
+    data.supportSubject = text;
+    await setSession(telegramId, "support_message", data);
+    await sendMessage(chatId, "متن پیام پشتیبانی را بنویس:");
+    return;
+  }
+
+  if (session.state === "support_message") {
+    const linked = await getLinkedUserByTelegram(telegramId);
+    if (!linked?.userId) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "حساب شما لینک نیست. اول /link را انجام بده.");
+      return;
+    }
+    if (text.length < 5 || text.length > 2000) {
+      await sendMessage(chatId, "متن پیام باید بین ۵ تا ۲۰۰۰ کاراکتر باشد. دوباره بنویس:");
+      return;
+    }
+    const [ticket] = await db.insert(tickets).values({ userId: linked.userId, subject: data.supportSubject || "پشتیبانی تلگرام" }).returning();
+    await db.insert(ticketMessages).values({ ticketId: ticket.id, senderId: linked.userId, message: text });
+    await clearSession(telegramId);
+    await sendMessage(chatId, "✅ تیکت پشتیبانی شما ثبت شد. از داخل سایت هم می‌توانید پیگیری کنید.", {
+      inline_keyboard: [[{ text: "مرکز پشتیبانی", url: `${APP_URL}/support` }]],
+    });
+    return;
+  }
+
+  if (session.state === "dispute_reason") {
+    const linked = await getLinkedUserByTelegram(telegramId);
+    if (!linked?.userId || !data.disputeMatchId) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "اطلاعات اعتراض ناقص است. دوباره /matches را بزن.");
+      return;
+    }
+    const myPlayers = await db.select({ id: players.id }).from(players).where(eq(players.visibleUserId, linked.userId));
+    const playerIds = myPlayers.map((p) => p.id);
+    const [match] = await db.select().from(matches).where(eq(matches.id, data.disputeMatchId)).limit(1);
+    const raisedById = playerIds.find((id) => id === match?.player1Id || id === match?.player2Id);
+    if (!match || !raisedById) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "این مسابقه برای حساب شما پیدا نشد.");
+      return;
+    }
+    await db.insert(disputes).values({ matchId: match.id, raisedById, reason: text, evidenceUrls: [] });
+    await db.update(matches).set({ status: "disputed" }).where(eq(matches.id, match.id));
+    await clearSession(telegramId);
+    await sendMessage(chatId, "✅ اعتراض شما ثبت شد و در پنل داوری بررسی می‌شود.");
+    return;
+  }
 
   if (session.state === "full_name") {
     if (text.length < 2 || text.length > 80) {
@@ -991,10 +1459,22 @@ async function handleCallback(callback: TelegramCallbackQuery) {
 
   if (data === "menu:rooms") return roomsCommand(chatId);
   if (data === "menu:register") return registerStart(chatId, telegramId);
+  if (data.startsWith("join:")) return joinTournamentFromTelegram(chatId, telegramId, data.replace("join:", ""));
   if (data === "menu:rules") return rulesCommand(chatId);
   if (data === "menu:status") return statusCommand(chatId, telegramId);
   if (data === "menu:link") return linkCommand(chatId, callback.from);
   if (data === "menu:profile") return profileCommand(chatId, telegramId);
+  if (data.startsWith("match:")) return handleMatchAction(chatId, telegramId, data.replace("match:", ""));
+  if (data.startsWith("result:")) {
+    const [, action, matchId] = data.split(":");
+    if ((action === "win" || action === "lose") && matchId) return submitTelegramResult(chatId, telegramId, matchId, action);
+  }
+  if (data.startsWith("dispute:")) return startDispute(chatId, telegramId, data.replace("dispute:", ""));
+  if (data.startsWith("adm:")) {
+    const [, action, tournamentId] = data.split(":");
+    if (action && tournamentId) return handleAdminTournamentAction(chatId, telegramId, action, tournamentId);
+  }
+  if (data.startsWith("checkin:")) return handleCheckIn(chatId, telegramId, data.replace("checkin:", ""));
 
   if (data === "reg:abort") {
     await clearSession(telegramId);

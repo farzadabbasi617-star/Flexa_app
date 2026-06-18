@@ -315,6 +315,32 @@ export const telegramLinkCodes = pgTable("telegram_link_codes", {
   expiresAtIdx: index("telegram_link_codes_expires_at_idx").on(table.expiresAt),
 }));
 
+// Referral tracking for Telegram growth loops
+export const telegramReferrals = pgTable("telegram_referrals", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  referrerTelegramId: varchar("referrer_telegram_id", { length: 32 }).notNull(),
+  referredTelegramId: varchar("referred_telegram_id", { length: 32 }).notNull().unique(),
+  referredUsername: varchar("referred_username", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  referrerIdx: index("telegram_referrals_referrer_idx").on(table.referrerTelegramId),
+  referredIdx: index("telegram_referrals_referred_idx").on(table.referredTelegramId),
+}));
+
+// De-duplication for reminders, lobby notices and channel result posts
+export const telegramSentNotifications = pgTable("telegram_sent_notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  dedupeKey: varchar("dedupe_key", { length: 180 }).notNull().unique(),
+  telegramId: varchar("telegram_id", { length: 32 }),
+  tournamentId: uuid("tournament_id").references(() => tournaments.id),
+  type: varchar("type", { length: 50 }).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  dedupeIdx: index("telegram_sent_notifications_dedupe_idx").on(table.dedupeKey),
+  tournamentIdx: index("telegram_sent_notifications_tournament_idx").on(table.tournamentId),
+  typeIdx: index("telegram_sent_notifications_type_idx").on(table.type),
+}));
+
 // Matches
 export const matches = pgTable("matches", {
   id: uuid("id").defaultRandom().primaryKey(),

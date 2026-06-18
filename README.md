@@ -87,6 +87,7 @@ Migrationهای لازم:
 psql "$DATABASE_URL" -f drizzle/manual/0002_add_telegram_pre_registrations.sql
 psql "$DATABASE_URL" -f drizzle/manual/0003_add_telegram_bot_sessions.sql
 psql "$DATABASE_URL" -f drizzle/manual/0004_add_telegram_account_linking.sql
+psql "$DATABASE_URL" -f drizzle/manual/0005_add_telegram_growth_and_notifications.sql
 ```
 
 یا محتوای فایل‌ها را داخل SQL Editor دیتابیس/Neon اجرا کنید.
@@ -111,7 +112,16 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://flexa-app-1.onren
 - `/announce` برای ادمین: ارسال اطلاعیه عمومی
 - `/announce_game` برای ادمین: ارسال اطلاعیه هدفمند بر اساس بازی
 - `/post_latest` برای ادمین: انتشار دستی آخرین تورنومنت فعال در کانال
+- `/matches` مشاهده مسابقات و ثبت نتیجه/اعتراض تلگرامی
+- `/checkin` ثبت حضور در تورنومنت
+- `/support` ساخت تیکت پشتیبانی از تلگرام
+- `/invite` لینک دعوت اختصاصی
+- `/missions` مأموریت‌های رشد/گیمیفیکیشن
+- `/leaderboard` لیدربورد Flexa
+- `/ai` دستیار هوشمند Flexa داخل تلگرام
+- `/manage` مدیریت سریع تورنومنت برای ادمین
 - انتشار خودکار تورنومنت جدید در کانال `@Flexa_games`
+- یادآوری مسابقات، ارسال لابی و انتشار نتایج با Cron endpoint
 - اطلاع خودکار به ادمین‌ها هنگام پیش‌ثبت‌نام جدید
 
 ---

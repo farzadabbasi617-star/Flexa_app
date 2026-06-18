@@ -26,6 +26,12 @@ services:
         value: https://t.me/Flexa_games
       - key: TELEGRAM_CHANNEL_ID
         value: '@Flexa_games'
+      - key: TELEGRAM_BOT_USERNAME
+        value: FlexaTournamentBot
+      - key: TELEGRAM_CRON_SECRET
+        sync: false
+      - key: TELEGRAM_REQUIRE_CHANNEL_MEMBERSHIP
+        value: 'false'
       - key: TELEGRAM_INTEGRATION_SECRET
         sync: false
       - key: FARAZSMS_API_KEY
