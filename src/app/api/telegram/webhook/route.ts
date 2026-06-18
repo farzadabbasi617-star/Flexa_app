@@ -730,7 +730,16 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
           ));
 
         if (updateResult.rowCount === 0) {
-          return { ok: false as const, code: "INSUFFICIENT", finalEntryFeeRial };
+          // Fetch actual balance only on failure to show the user
+          const [currentWallet] = await tx.select().from(wallets).where(eq(wallets.id, wallet.id)).limit(1);
+          const actualBalance = currentWallet ? bigIntFromText(currentWallet.balance) : BigInt(0);
+          
+          return { 
+            ok: false as const, 
+            code: "INSUFFICIENT", 
+            balance: actualBalance, 
+            finalEntryFeeRial 
+          };
         }
 
         if (couponRedemptionId && couponId) {
