@@ -7,8 +7,14 @@ import { bigIntFromText, formatTomanFromRial } from "@/lib/money";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
 import { evaluateUserAchievements } from "@/lib/achievement-service";
 import logger from "@/lib/logger";
+import { z } from "zod";
 
 export const dynamic = "force-dynamic";
+
+const registrationSchema = z.object({
+  tournamentId: z.string().uuid(),
+  playerId: z.string().uuid(),
+});
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,11 +28,11 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "نشست کاربری معتبر نیست. دوباره وارد شو." }, { status: 401 });
 
     const body = await request.json();
-    const { tournamentId, playerId } = body;
-
-    if (!tournamentId || !playerId) {
-      return NextResponse.json({ error: "شناسه تورنومنت و بازیکن الزامی است" }, { status: 400 });
+    const validation = registrationSchema.safeParse(body);
+    if (!validation.success) {
+      return NextResponse.json({ error: "ورودی‌های ارسالی نامعتبر هستند.", details: validation.error.format() }, { status: 400 });
     }
+    const { tournamentId, playerId } = validation.data;
 
     const isAdmin = user.role === "admin" || user.role === "super_admin";
 
@@ -70,29 +76,29 @@ export async function POST(request: NextRequest) {
       const entryFeeRial = getEntryFeeRial(tournament.entryFee);
       let paymentTransactionId: string | null = null;
 
-      // Normal users pay the entry fee from their own wallet. Admins can add
-      // players without silently charging those users.
       if (!isAdmin && entryFeeRial > BigInt(0)) {
         let [wallet] = await tx.select().from(wallets).where(eq(wallets.userId, ownerId)).limit(1);
         if (!wallet) {
           [wallet] = await tx.insert(wallets).values({ userId: ownerId, balance: "0", currency: "RIAL" }).returning();
         }
 
-        // Row-level lock for balance safety.
-        await tx.execute(sql`select id from wallets where id = ${wallet.id} for update`);
-        const [lockedWallet] = await tx.select().from(wallets).where(eq(wallets.id, wallet.id)).limit(1);
-        const balance = bigIntFromText(lockedWallet?.balance);
-        if (balance < entryFeeRial) {
+        const updateResult = await tx.update(wallets)
+          .set({ 
+            balance: sql`${wallets.balance} - ${entryFeeRial.toString()}`, 
+            updatedAt: new Date() 
+          })
+          .where(and(
+            eq(wallets.id, wallet.id),
+            sql`${wallets.balance} >= ${entryFeeRial.toString()}`
+          ));
+
+        if (updateResult.rowCount === 0) {
           const err = new Error("INSUFFICIENT_BALANCE");
           (err as Error & { details?: unknown }).details = {
             requiredToman: Number(entryFeeRial / BigInt(10)),
-            balanceToman: Number(balance / BigInt(10)),
           };
           throw err;
         }
-
-        const nextBalance = balance - entryFeeRial;
-        await tx.update(wallets).set({ balance: nextBalance.toString(), updatedAt: new Date() }).where(eq(wallets.id, wallet.id));
 
         const [paymentTx] = await tx
           .insert(transactions)
@@ -141,10 +147,9 @@ export async function POST(request: NextRequest) {
     if (message === "INSUFFICIENT_BALANCE") {
       const details = (err as Error & { details?: { requiredToman?: number; balanceToman?: number } }).details;
       const required = details?.requiredToman?.toLocaleString("fa-IR") || "نامشخص";
-      const balance = details?.balanceToman?.toLocaleString("fa-IR") || "۰";
       return NextResponse.json(
         {
-          error: `موجودی کیف پول کافی نیست. مبلغ لازم: ${required} تومان، موجودی شما: ${balance} تومان.`,
+          error: `موجودی کیف پول کافی نیست. مبلغ لازم: ${required} تومان.`,
           code: "INSUFFICIENT_BALANCE",
           details,
         },

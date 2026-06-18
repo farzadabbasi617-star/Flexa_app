@@ -682,70 +682,82 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
     let couponId: string | null = null;
     let discountRial = BigInt(0);
 
-    if (isPaid) {
-      const [activeCoupon] = await tx
-        .select({
-          redemptionId: couponRedemptions.id,
-          couponId: coupons.id,
-          code: coupons.code,
-          discountPercent: coupons.discountPercent,
-          expiresAt: coupons.expiresAt,
-          game: coupons.game,
-          couponTournamentId: coupons.tournamentId,
-          maxUses: coupons.maxUses,
-          usedCount: coupons.usedCount,
-        })
-        .from(couponRedemptions)
-        .innerJoin(coupons, eq(couponRedemptions.couponId, coupons.id))
-        .where(and(eq(couponRedemptions.userId, linked.userId), eq(couponRedemptions.status, "active"), eq(coupons.isActive, true)))
-        .orderBy(desc(couponRedemptions.createdAt))
-        .limit(1);
+      if (isPaid) {
+        const [activeCoupon] = await tx
+          .select({
+            redemptionId: couponRedemptions.id,
+            couponId: coupons.id,
+            code: coupons.code,
+            discountPercent: coupons.discountPercent,
+            expiresAt: coupons.expiresAt,
+            game: coupons.game,
+            couponTournamentId: coupons.tournamentId,
+            maxUses: coupons.maxUses,
+            usedCount: coupons.usedCount,
+          })
+          .from(couponRedemptions)
+          .innerJoin(coupons, eq(couponRedemptions.couponId, coupons.id))
+          .where(and(eq(couponRedemptions.userId, linked.userId), eq(couponRedemptions.status, "active"), eq(coupons.isActive, true)))
+          .orderBy(desc(couponRedemptions.createdAt))
+          .limit(1);
 
-      const couponValid = activeCoupon
-        && (!activeCoupon.expiresAt || new Date(activeCoupon.expiresAt) > new Date())
-        && (!activeCoupon.game || activeCoupon.game === tournament.game)
-        && (!activeCoupon.couponTournamentId || activeCoupon.couponTournamentId === tournament.id)
-        && (!activeCoupon.maxUses || activeCoupon.usedCount < activeCoupon.maxUses)
-        && activeCoupon.discountPercent > 0;
+        const couponValid = activeCoupon
+          && (!activeCoupon.expiresAt || new Date(activeCoupon.expiresAt) > new Date())
+          && (!activeCoupon.game || activeCoupon.game === tournament.game)
+          && (!activeCoupon.couponTournamentId || activeCoupon.couponTournamentId === tournament.id)
+          && (!activeCoupon.maxUses || activeCoupon.usedCount < activeCoupon.maxUses)
+          && activeCoupon.discountPercent > 0;
 
-      if (couponValid) {
-        couponRedemptionId = activeCoupon.redemptionId;
-        couponId = activeCoupon.couponId;
-        discountRial = (entryFeeRial * BigInt(activeCoupon.discountPercent)) / BigInt(100);
-        finalEntryFeeRial = entryFeeRial - discountRial;
-        paymentText += `\n🎟 کوپن <code>${html(activeCoupon.code)}</code>: <b>${activeCoupon.discountPercent}% تخفیف</b>`;
+        if (couponValid) {
+          couponRedemptionId = activeCoupon.redemptionId;
+          couponId = activeCoupon.couponId;
+          discountRial = (entryFeeRial * BigInt(activeCoupon.discountPercent)) / BigInt(100);
+          finalEntryFeeRial = entryFeeRial - discountRial;
+          paymentText += `\n🎟 کوپن <code>${html(activeCoupon.code)}</code>: <b>${activeCoupon.discountPercent}% تخفیف</b>`;
+        }
+
+        const wallet = await getOrCreateWallet(linked.userId, tx);
+        
+        // ATOMIC UPDATE: Use WHERE balance >= finalEntryFeeRial to prevent over-spending
+        const updateResult = await tx.update(wallets)
+          .set({ 
+            balance: sql`${wallets.balance} - ${finalEntryFeeRial.toString()}`, 
+            updatedAt: new Date() 
+          })
+          .where(and(
+            eq(wallets.id, wallet.id),
+            sql`${wallets.balance} >= ${finalEntryFeeRial.toString()}`
+          ));
+
+        if (updateResult.rowCount === 0) {
+          return { ok: false as const, code: "INSUFFICIENT", finalEntryFeeRial };
+        }
+
+        if (couponRedemptionId && couponId) {
+          await tx.update(couponRedemptions).set({ status: "used", tournamentId: tournament.id, discountRial: discountRial.toString(), usedAt: new Date() }).where(eq(couponRedemptions.id, couponRedemptionId));
+          await tx.update(coupons).set({ usedCount: sql`${coupons.usedCount} + 1` }).where(eq(coupons.id, couponId));
+        }
+        await tx.insert(transactions).values({
+          walletId: wallet.id,
+          amount: finalEntryFeeRial.toString(),
+          type: "entry_fee",
+          status: "completed",
+          referenceId: `telegram-entry-${tournamentId}-${linked.userId}-${Date.now()}`,
+          metadata: {
+            kind: "telegram_entry_fee",
+            tournamentId,
+            tournamentName: tournament.name,
+            playerId: player.id,
+            playerName: player.displayName,
+            userId: linked.userId,
+            telegramId,
+            originalEntryFeeRial: entryFeeRial.toString(),
+            discountRial: discountRial.toString(),
+            couponRedemptionId,
+          },
+        });
+        paymentText += `\n💳 ورودی از کیف پول کسر شد: <b>${html(formatTomanFromRial(finalEntryFeeRial))}</b>`;
       }
-
-      const wallet = await getOrCreateWallet(linked.userId, tx);
-      const balance = bigIntFromText(wallet.balance);
-      if (balance < finalEntryFeeRial) return { ok: false as const, code: "INSUFFICIENT", balance, finalEntryFeeRial };
-      const nextBalance = balance - finalEntryFeeRial;
-      await tx.update(wallets).set({ balance: nextBalance.toString(), updatedAt: new Date() }).where(eq(wallets.id, wallet.id));
-      if (couponRedemptionId && couponId) {
-        await tx.update(couponRedemptions).set({ status: "used", tournamentId: tournament.id, discountRial: discountRial.toString(), usedAt: new Date() }).where(eq(couponRedemptions.id, couponRedemptionId));
-        await tx.update(coupons).set({ usedCount: sql`${coupons.usedCount} + 1` }).where(eq(coupons.id, couponId));
-      }
-      await tx.insert(transactions).values({
-        walletId: wallet.id,
-        amount: finalEntryFeeRial.toString(),
-        type: "entry_fee",
-        status: "completed",
-        referenceId: `telegram-entry-${tournamentId}-${linked.userId}-${Date.now()}`,
-        metadata: {
-          kind: "telegram_entry_fee",
-          tournamentId,
-          tournamentName: tournament.name,
-          playerId: player.id,
-          playerName: player.displayName,
-          userId: linked.userId,
-          telegramId,
-          originalEntryFeeRial: entryFeeRial.toString(),
-          discountRial: discountRial.toString(),
-          couponRedemptionId,
-        },
-      });
-      paymentText += `\n💳 ورودی از کیف پول کسر شد: <b>${html(formatTomanFromRial(finalEntryFeeRial))}</b>`;
-    }
 
     await tx.insert(registrations).values({ tournamentId, playerId: player.id, visibleUserId: linked.userId });
     return { ok: true as const, paymentText };
@@ -1265,8 +1277,7 @@ async function cancelRegistrationCommand(chatId: number, telegramId: string, reg
     if (existingRefund) return "";
     const amount = bigIntFromText(entry.amount);
     if (amount <= BigInt(0)) return "";
-    const nextBalance = bigIntFromText(wallet.balance) + amount;
-    await tx.update(wallets).set({ balance: nextBalance.toString(), updatedAt: new Date() }).where(eq(wallets.id, wallet.id));
+        await tx.update(wallets).set({ balance: sql`${wallets.balance} + ${amount.toString()}`, updatedAt: new Date() }).where(eq(wallets.id, wallet.id));
     await tx.insert(transactions).values({
       walletId: wallet.id,
       amount: amount.toString(),

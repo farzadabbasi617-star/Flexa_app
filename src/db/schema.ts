@@ -564,7 +564,7 @@ export const wallets = pgTable("wallets", {
 export const transactions = pgTable("transactions", {
   id: uuid("id").defaultRandom().primaryKey(),
   walletId: uuid("wallet_id").notNull().references(() => wallets.id),
-  amount: text("amount").notNull(),
+  amount: numeric("amount", { precision: 20, scale: 0 }).notNull(),
   type: transactionTypeEnum("type").notNull(),
   status: transactionStatusEnum("status").notNull().default("pending"),
   referenceId: varchar("reference_id", { length: 255 }),

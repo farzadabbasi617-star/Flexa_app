@@ -27,18 +27,22 @@ export async function refundTournamentEntryFees(tx: any, tournamentId: string, a
 
     if (existingRefund) continue;
 
-    const amount = bigIntFromText(entry.amount);
+    const amountStr = entry.amount;
+    if (!amountStr) continue;
+    const amount = bigIntFromText(amountStr);
     if (amount <= BigInt(0)) continue;
 
-    const [wallet] = await tx.select().from(wallets).where(eq(wallets.id, entry.walletId)).limit(1);
-    if (!wallet) continue;
-
-    const nextBalance = bigIntFromText(wallet.balance) + amount;
-    await tx.update(wallets).set({ balance: nextBalance.toString(), updatedAt: new Date() }).where(eq(wallets.id, entry.walletId));
+    // ATOMIC UPDATE: Prevent race conditions by doing the addition in the DB
+    await tx.update(wallets)
+      .set({ 
+        balance: sql`${wallets.balance} + ${amountStr}`, 
+        updatedAt: new Date() 
+      })
+      .where(eq(wallets.id, entry.walletId));
 
     await tx.insert(transactions).values({
       walletId: entry.walletId,
-      amount: amount.toString(),
+      amount: amountStr,
       type: "refund",
       status: "completed",
       referenceId: `refund-${entry.id}`,

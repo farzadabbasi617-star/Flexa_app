@@ -1,5 +1,6 @@
 import { fetchAIResponse } from "./ai-provider-manager";
 import { analyzeMatch, generateAssistantResponse, AIJudgmentResult } from "./ai-engine";
+import { safeParseAIJson } from "./ai-utils";
 
 export interface AssistantAIResponse {
   response: string;
@@ -80,18 +81,14 @@ export async function analyzeMatchWithAI(
     return analyzeMatch(player1Score, player2Score, player1Rating, player2Rating, player1History, player2History, hasEvidence);
   }
 
-  try {
-    const jsonStr = aiResult.content.includes("```json")
-      ? aiResult.content.split("```json")[1].split("```")[0].trim()
-      : aiResult.content.trim();
+  const parsed = safeParseAIJson<AIJudgmentResult>(aiResult.content);
 
-    const parsed = JSON.parse(jsonStr);
-
-    return {
-      ...parsed,
-      factors: analyzeMatch(player1Score, player2Score, player1Rating, player2Rating, player1History, player2History, hasEvidence).factors,
-    };
-  } catch {
+  if (!parsed) {
     return analyzeMatch(player1Score, player2Score, player1Rating, player2Rating, player1History, player2History, hasEvidence);
   }
+
+  return {
+    ...parsed,
+    factors: analyzeMatch(player1Score, player2Score, player1Rating, player2Rating, player1History, player2History, hasEvidence).factors,
+  };
 }
