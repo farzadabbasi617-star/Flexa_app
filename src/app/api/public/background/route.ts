@@ -9,16 +9,16 @@ export async function GET(request: NextRequest) {
   try {
     console.log("🔵 Background API called");
     
-    // First try to find app-background
+    // First try to find app-background or app-bg
     let images = await db
       .select()
       .from(siteImages)
       .where(and(
-        eq(siteImages.slug, "app-background"),
+        sql`slug IN ('app-background', 'app-bg')`,
         eq(siteImages.isActive, true)
       ));
     
-    console.log("📊 Query for 'app-background':", images.length, "found");
+    console.log("📊 Query for background slugs:", images.length, "found");
     
     // If not found, try "background" slug
     if (images.length === 0) {
