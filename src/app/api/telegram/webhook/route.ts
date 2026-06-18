@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets } from "@/db/schema";
+import { classifiedAds, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { generateRealAssistantResponse } from "@/lib/ai-service";
@@ -1736,6 +1736,100 @@ async function handleJudgeAction(chatId: number, telegramId: string, action: str
   await sendMessage(chatId, `Match ID: <code>${html(match.id)}</code>\nStatus: <b>${html(match.status)}</b>`);
 }
 
+const OUTREACH_MESSAGE_TEMPLATE = `سلام 👋\n\nمن از تیم Flexa هستم، پلتفرم برگزاری تورنومنت‌های گیمینگ (Call of Duty Mobile, Clash Royale, Fortnite).\n\nاگر به مسابقات گیمینگ، تورنومنت‌های پولی یا جامعهٔ بازیکنان علاقه‌مند هستی، به ما سر بزن:\n\n🔗 https://flexa-app-1.onrender.com\n\nثبت‌نام اولیه از طریق ربات تلگرام هم امکان‌پذیره: @FlexaTournamentBot`;
+
+async function classifiedAdsCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) {
+    await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+    return;
+  }
+  const rows = await db
+    .select()
+    .from(classifiedAds)
+    .where(eq(classifiedAds.status, "new"))
+    .orderBy(desc(classifiedAds.createdAt))
+    .limit(10);
+
+  if (!rows.length) {
+    await sendMessage(chatId, "🔍 آگهی جدیدی یافت نشد.\n\nبرای اسکن دستور زیر را بزن:\n<code>/ads_scan</code>", mainMenuKeyboard());
+    return;
+  }
+
+  await sendMessage(chatId, `📋 <b>${rows.length} آگهی گیمینگ جدید</b> یافت شد. برای مشاهده هر آگهی روی دکمه کلیک کن:`, {
+    inline_keyboard: rows.map((ad, index) => [
+      { text: `${index + 1}) ${ad.platform} | ${ad.title.slice(0, 35)}`, callback_data: `ad:view:${ad.id}` },
+    ]),
+  });
+}
+
+async function classifiedAdsScanCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) {
+    await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+    return;
+  }
+  await sendMessage(chatId, "🔍 در حال اسکن دیوار و شیپور... این فرایند چند دقیقه طول می‌کشد.");
+  const { runClassifiedScrape } = await import("@/lib/classified-scraper");
+  const results = await runClassifiedScrape({ limit: 10 });
+  const summary = results.map((r) => `${r.platform}: ${r.found} یافت، ${r.new} جدید`).join("\n");
+  await sendMessage(chatId, `✅ اسکن تمام شد:\n\n${html(summary)}\n\nبرای مشاهده: /ads`, mainMenuKeyboard());
+}
+
+async function viewClassifiedAd(chatId: number, telegramId: string, adId: string) {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const [ad] = await db.select().from(classifiedAds).where(eq(classifiedAds.id, adId)).limit(1);
+  if (!ad) return sendMessage(chatId, "آگهی پیدا نشد.");
+
+  const text = [
+    `📌 <b>${html(ad.title)}</b>`,
+    `🏪 پلتفرم: <b>${html(ad.platform)}</b>`,
+    ad.price ? `💰 قیمت: <b>${html(ad.price)}</b>` : "",
+    ad.city ? `📍 شهر: <b>${html(ad.city)}</b>` : "",
+    ad.keywords && (ad.keywords as string[]).length ? `🏷 کلمات: <b>${(ad.keywords as string[]).join(", ")}</b>` : "",
+    "",
+    `📝 ${html(ad.description || "بدون توضیحات")}`,
+  ].filter(Boolean).join("\n");
+
+  await sendMessage(chatId, text, {
+    inline_keyboard: [
+      [{ text: "🔗 باز کردن آگهی", url: ad.url }],
+      [
+        { text: "✅ تماس گرفتم", callback_data: `ad:contact:${ad.id}` },
+        { text: "❌ نادیده", callback_data: `ad:ignore:${ad.id}` },
+      ],
+      [{ text: "📋 کپی متن پیام", callback_data: `ad:copy:${ad.id}` }],
+      [{ text: "🔙 لیست آگهی‌ها", callback_data: "menu:ads" }],
+    ],
+  });
+}
+
+async function contactClassifiedAd(chatId: number, telegramId: string, adId: string, method: "contact" | "ignore") {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const [ad] = await db.select().from(classifiedAds).where(eq(classifiedAds.id, adId)).limit(1);
+  if (!ad) return sendMessage(chatId, "آگهی پیدا نشد.");
+
+  const status = method === "contact" ? "contacted" : "ignored";
+  await db
+    .update(classifiedAds)
+    .set({ status, contactedAt: method === "contact" ? new Date() : null, contactMethod: "telegram_admin", updatedAt: new Date() })
+    .where(eq(classifiedAds.id, adId));
+
+  if (method === "contact") {
+    await sendMessage(chatId, `✅ آگهی <b>${html(ad.title)}</b> به عنوان «تماس گرفته شده» ثبت شد.\n\nمتن پیشنهادی برای ارسال دستی در دیوار/شیپور:\n\n<pre>${html(OUTREACH_MESSAGE_TEMPLATE)}</pre>`, {
+      inline_keyboard: [[{ text: "🔗 باز کردن آگهی", url: ad.url }], [{ text: "🔙 لیست آگهی‌ها", callback_data: "menu:ads" }]],
+    });
+  } else {
+    await sendMessage(chatId, "آگهی نادیده گرفته شد.", mainMenuKeyboard());
+  }
+}
+
+async function copyOutreachMessage(chatId: number, telegramId: string, adId: string) {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const [ad] = await db.select().from(classifiedAds).where(eq(classifiedAds.id, adId)).limit(1);
+  await sendMessage(chatId, `📋 متن آماده برای ارسال دستی به آگهی <b>${html(ad?.title || "")}</b>:\n\n<pre>${html(OUTREACH_MESSAGE_TEMPLATE)}</pre>\n\nبرای ارسال، روی لینک آگهی کلیک کن و در دیوار/شیپور پیام را بچسبان.`, {
+    inline_keyboard: [[{ text: "🔗 باز کردن آگهی", url: ad?.url || APP_URL }], [{ text: "✅ تماس گرفتم", callback_data: `ad:contact:${adId}` }]],
+  });
+}
+
 async function handleCommand(message: TelegramMessage, text: string) {
   const chatId = message.chat.id;
   const user = message.from;
@@ -1771,6 +1865,8 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/health") return healthCommand(chatId, telegramId);
   if (normalizedCommand === "/export_telegram") return exportTelegramCommand(chatId, telegramId);
   if (normalizedCommand === "/poll") return pollCommand(chatId, telegramId, args.join(" "));
+  if (normalizedCommand === "/ads") return classifiedAdsCommand(chatId, telegramId);
+  if (normalizedCommand === "/ads_scan") return classifiedAdsScanCommand(chatId, telegramId);
   if (normalizedCommand === "/rules") return rulesCommand(chatId);
   if (normalizedCommand === "/howto" || normalizedCommand === "/guide") {
     const game = normalizeGame(args.join(" "));
@@ -1993,11 +2089,16 @@ async function handleCallback(callback: TelegramCallbackQuery) {
 
   if (data === "menu:rooms") return roomsCommand(chatId);
   if (data === "menu:register") return registerStart(chatId, telegramId);
+  if (data === "menu:ads") return classifiedAdsCommand(chatId, telegramId);
   if (data.startsWith("howto:")) {
     const game = data.replace("howto:", "");
     const guide = getGameIdGuide(game);
     return sendMessage(chatId, [`<b>${guide.title}</b>`, "", ...guide.steps].join("\n"));
   }
+  if (data.startsWith("ad:view:")) return viewClassifiedAd(chatId, telegramId, data.replace("ad:view:", ""));
+  if (data.startsWith("ad:contact:")) return contactClassifiedAd(chatId, telegramId, data.replace("ad:contact:", ""), "contact");
+  if (data.startsWith("ad:ignore:")) return contactClassifiedAd(chatId, telegramId, data.replace("ad:ignore:", ""), "ignore");
+  if (data.startsWith("ad:copy:")) return copyOutreachMessage(chatId, telegramId, data.replace("ad:copy:", ""));
   if (data.startsWith("join:")) return joinTournamentFromTelegram(chatId, telegramId, data.replace("join:", ""));
   if (data.startsWith("waitlist:")) return joinWaitlist(chatId, telegramId, data.replace("waitlist:", ""));
   if (data === "menu:rules") return rulesCommand(chatId);

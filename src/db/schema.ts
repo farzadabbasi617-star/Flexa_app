@@ -601,3 +601,42 @@ export const rateLimits = pgTable("rate_limits", {
 }, (table) => ({
   resetAtIdx: index("rate_limits_reset_at_idx").on(table.resetAt),
 }));
+
+// Classified ads monitoring (Divar / Sheypoor)
+export const classifiedAds = pgTable("classified_ads", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  platform: varchar("platform", { length: 30 }).notNull(),
+  externalId: varchar("external_id", { length: 255 }).notNull(),
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  url: text("url").notNull(),
+  price: varchar("price", { length: 100 }),
+  city: varchar("city", { length: 100 }),
+  district: varchar("district", { length: 100 }),
+  category: varchar("category", { length: 100 }),
+  imageUrl: text("image_url"),
+  keywords: jsonb("keywords").notNull().default('[]'),
+  rawPayload: jsonb("raw_payload"),
+  status: varchar("status", { length: 30 }).notNull().default("new"),
+  contactedAt: timestamp("contacted_at"),
+  contactMethod: varchar("contact_method", { length: 50 }),
+  adminNote: text("admin_note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  platformExternalIdUnique: index("classified_ads_platform_external_id_idx").on(table.platform, table.externalId),
+  statusIdx: index("classified_ads_status_idx").on(table.status),
+  platformIdx: index("classified_ads_platform_idx").on(table.platform),
+  createdAtIdx: index("classified_ads_created_at_idx").on(table.createdAt),
+  keywordsIdx: index("classified_ads_keywords_idx").on(table.keywords),
+}));
+
+export const classifiedScrapeLogs = pgTable("classified_scrape_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  platform: varchar("platform", { length: 30 }).notNull(),
+  status: varchar("status", { length: 30 }).notNull(),
+  itemsFound: integer("items_found").default(0).notNull(),
+  itemsNew: integer("items_new").default(0).notNull(),
+  errorMessage: text("error_message"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
