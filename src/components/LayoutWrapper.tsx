@@ -4,11 +4,6 @@ import { ReactNode, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useLanguage } from "@/contexts/LanguageContext";
 
-const AIAssistant = dynamic(() => import("./AIAssistant"), { 
-  ssr: false,
-  loading: () => null
-});
-
 const PWAInstall = dynamic(() => import("./PWAInstall"), { 
   ssr: false,
   loading: () => null 
@@ -31,7 +26,6 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
     <>
       <ThemeRuntime />
       {children}
-      <AIAssistant />
       <PWAInstall />
     </>
   );

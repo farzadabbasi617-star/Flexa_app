@@ -67,7 +67,6 @@ const COMMON_SLUGS = [
   { value: "icon-home", label: { fa: "آیکون خانه", en: "Home Icon" } },
   { value: "icon-wallet", label: { fa: "آیکون کیف پول", en: "Wallet Icon" } },
   { value: "icon-profile", label: { fa: "آیکون پروفایل", en: "Profile Icon" } },
-  { value: "icon-chat", label: { fa: "آیکون چت", en: "Chat Icon" } },
   { value: "icon-tournament", label: { fa: "آیکون تورنومنت", en: "Tournament Icon" } },
   { value: "icon-notifications", label: { fa: "آیکون اعلان‌ها", en: "Notifications Icon" } },
   { value: "icon-settings", label: { fa: "آیکون تنظیمات", en: "Settings Icon" } },
@@ -77,7 +76,7 @@ const COMMON_SLUGS = [
   { value: "bg-fortnite", label: { fa: "پس‌زمینه اختصاصی فورتنایت", en: "Fortnite Specific BG" } },
   { value: "bg-clash", label: { fa: "پس‌زمینه اختصاصی کلش", en: "Clash Royale Specific BG" } },
   
-  { value: "custom", label: { fa: "سایر (تایپ دستی)", en: "Custom (Manual Type)" } },
+  { value, label: { fa: "سایر (تایپ دستی)", en: "Custom (Manual Type)" } },
 ];
 
 export default function AdminImagesPage() {
