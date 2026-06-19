@@ -64,7 +64,7 @@ export default function ThemeRuntime() {
           right: 0,
           bottom: 0,
           zIndex: -99,
-          background: 'linear-gradient(180deg, rgba(5,5,16,0.4) 0%, rgba(5,5,16,0.2) 40%, rgba(5,5,16,0.4) 100%)',
+          background: 'linear-gradient(180deg, rgba(5,5,16,0.3) 0%, rgba(5,5,16,0.1) 40%, rgba(5,5,16,0.3) 100%)',
           pointerEvents: 'none',
         }}
       />

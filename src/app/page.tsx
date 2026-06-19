@@ -96,7 +96,7 @@ export default function LuxuryHomePage() {
             <Link href="/tournaments" className="block active:scale-[.99] transition-transform">
               <div className="glass-panel rounded-3xl sm:rounded-[42px] overflow-hidden relative h-44 sm:h-56 border border-purple-400/20">
                 <div className="absolute inset-0 hero-art" />
-                {heroImage && <img src={heroImage.url} alt={heroImage.altText || heroImage.title} className="absolute inset-0 w-full h-full object-cover opacity-70 scale-105" />}
+                {heroImage && <img src={heroImage.url} alt={heroImage.altText || heroImage.title} className="absolute inset-0 w-full h-full object-cover opacity-85 scale-105" />}
                 <div className="absolute inset-0 bg-gradient-to-t from-[#050508] via-[#050508]/25 to-transparent" />
                 <div className="absolute top-4 left-4 sm:top-5 sm:left-5 w-8 h-8 sm:w-9 sm:h-9 rounded-full border border-white/10 bg-white/5 backdrop-blur-xl" />
                 <div className="absolute -top-6 -right-10 w-32 h-32 sm:w-40 sm:h-40 rounded-full bg-purple-500/15 blur-3xl" />
