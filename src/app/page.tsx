@@ -87,8 +87,8 @@ export default function LuxuryHomePage() {
               href="/profile"
               className="glass-panel px-4 py-3 rounded-2xl sm:rounded-[28px] flex items-center gap-3 border border-white/10 active:scale-95 transition-transform"
             >
-              <span className="grid place-items-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-700 text-lg shadow-[0_0_22px_rgba(188,0,255,.45)]">
-                +
+              <span className="grid place-items-center w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-700 text-lg shadow-[0_0_22px_rgba(188,0,255,.45)] overflow-hidden">
+                <img src="/icons/wallet_icon.png" alt="Wallet" className="w-full h-full object-contain p-1" />
               </span>
               <span className="text-sm font-black num-en tracking-wide hidden sm:inline">2,450,000</span>
             </Link>

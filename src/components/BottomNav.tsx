@@ -41,7 +41,15 @@ export default function BottomNav() {
         {navItems.map((item) => {
           const isActive = item.path === "/" ? pathname === "/" : pathname.startsWith(item.path);
           const imageIcon = iconMap[`icon-${item.id}`];
-          const finalIconUrl = item.id === "arena" ? "/arena_icon.png" : imageIcon?.url;
+          
+          const customIcons: Record<string, string> = {
+            arena: "/arena_icon.png",
+            rankings: "/icons/rankings_icon.png",
+            honors: "/icons/honors_icon.png",
+            profile: "/icons/profile_icon.png",
+          };
+          
+          const finalIconUrl = customIcons[item.id] || imageIcon?.url;
           
           return (
             <Link
