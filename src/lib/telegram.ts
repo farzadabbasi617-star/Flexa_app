@@ -120,10 +120,13 @@ export async function publishTournamentToTelegramChannel(tournament: TelegramTou
   const channelId = getTelegramChannelChatId();
   const url = `${appUrl()}/tournaments/${tournament.id}`;
   const caption = formatTournamentChannelPost(tournament);
+  
   const replyMarkup = {
     inline_keyboard: [
-      [{ text: "🎮 ثبت‌نام در تورنومنت", url }],
-      [{ text: "⚡ ورود به Flexa", url: appUrl() }],
+      [
+        { text: "🎮 ثبت‌نام در تورنومنت", web_app: { url: url } },
+        { text: "⚡ ورود به Flexa", web_app: { url: appUrl() } },
+      ],
     ],
   };
 
