@@ -76,7 +76,7 @@ const COMMON_SLUGS = [
   { value: "bg-fortnite", label: { fa: "پس‌زمینه اختصاصی فورتنایت", en: "Fortnite Specific BG" } },
   { value: "bg-clash", label: { fa: "پس‌زمینه اختصاصی کلش", en: "Clash Royale Specific BG" } },
   
-  { value, label: { fa: "سایر (تایپ دستی)", en: "Custom (Manual Type)" } },
+  { value: "custom", label: { fa: "سایر (تایپ دستی)", en: "Custom (Manual Type)" } },
 ];
 
 export default function AdminImagesPage() {
