@@ -146,7 +146,17 @@ export default function LuxuryHomePage() {
                     />
 
                     <div className="absolute inset-y-0 right-6 sm:right-8 flex flex-col justify-center text-right">
-                      <div className="text-3xl sm:text-4xl mb-1 sm:mb-2 drop-shadow-[0_0_18px_rgba(255,255,255,.15)]">{game.icon}</div>
+                      <div className="text-3xl sm:text-4xl mb-1 sm:mb-2 drop-shadow-[0_0_18px_rgba(255,255,255,.15)]">
+                    {imageMap.bySlug[`icon-${game.id}`] ? (
+                      <img 
+                        src={imageMap.bySlug[`icon-${game.id}`].url} 
+                        alt={game.name} 
+                        className="w-10 h-10 sm:w-12 sm:h-12 object-contain" 
+                      />
+                    ) : (
+                      game.icon
+                    )}
+                  </div>
                       <h4 className="text-xl sm:text-2xl font-black en-font italic tracking-tight">{game.name}</h4>
                       <p className="mt-1 text-[9px] sm:text-xs font-black text-gray-400 tracking-wider">
                         مشاهده روم‌های فعال • {game.faName}
