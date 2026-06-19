@@ -166,12 +166,12 @@ export default function LuxuryHomePage() {
                         alt={game.name} 
                         className="w-10 h-10 sm:w-12 sm:h-12 object-contain" 
                         onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                          // fallback to emoji if image fails
+                          const target = e.target as HTMLElement;
+                          target.style.display = 'none';
                           const emoji = document.createElement('span');
                           emoji.innerText = game.icon;
                           emoji.className = 'text-3xl sm:text-4xl';
-                          e.target.parentNode?.appendChild(emoji);
+                          target.parentNode?.appendChild(emoji);
                         }}
                       />
                     )}
