@@ -17,7 +17,6 @@ export default function ThemeRuntime() {
         
         if (data?.url) {
           setBgImage(data.url);
-          // Add class for transparent pages
           document.documentElement.classList.add("show-bg-image");
         } else {
           setBgImage(null);
@@ -33,7 +32,7 @@ export default function ThemeRuntime() {
 
   return (
     <>
-      {/* بک‌گراند با روش جدید - فیکس و بدون لگ */}
+      {/* بک‌گراند با متد dvh برای حذف لگ و فضای سفید در موبایل */}
       <div 
         id="fixed-bg"
         style={{
@@ -42,20 +41,20 @@ export default function ThemeRuntime() {
           left: 0,
           right: 0,
           bottom: 0,
+          width: '100vw',
+          height: '100dvh',
           zIndex: -100,
           backgroundImage: bgImage ? `url('${bgImage}')` : "url('/background.jpg')",
           backgroundSize: 'cover',
           backgroundPosition: 'center center',
           backgroundRepeat: 'no-repeat',
-          // transform trick for mobile fixed background
-          transform: 'translateZ(0)',
-          willChange: 'transform',
-          // Disable pointer events
           pointerEvents: 'none',
+          willChange: 'transform',
+          transform: 'translateZ(0)',
         }}
       />
       
-      {/* گرادیان روی بک‌گراند */}
+      {/* گرادینت بسیار شفاف برای حفظ درخشش تصاویر */}
       <div 
         style={{
           position: 'fixed',
@@ -63,8 +62,10 @@ export default function ThemeRuntime() {
           left: 0,
           right: 0,
           bottom: 0,
+          width: '100vw',
+          height: '100dvh',
           zIndex: -99,
-          background: 'linear-gradient(180deg, rgba(5,5,16,0.3) 0%, rgba(5,5,16,0.1) 40%, rgba(5,5,16,0.3) 100%)',
+          background: 'linear-gradient(180deg, rgba(15,15,26,0.2) 0%, rgba(15,15,26,0.1) 50%, rgba(15,15,26,0.3) 100%)',
           pointerEvents: 'none',
         }}
       />

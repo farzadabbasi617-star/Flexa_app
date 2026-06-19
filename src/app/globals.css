@@ -7,17 +7,17 @@
   --color-neon-green: #39ff14;
   --color-neon-orange: #ff6b00;
   --color-neon-yellow: #ffe600;
-  --color-dark-950: #050510;
-  --color-dark-900: #0a0a1a;
-  --color-dark-800: #12122b;
-  --color-dark-700: #1a1a3a;
-  --color-dark-600: #252550;
-  --color-dark-500: #2d2d6a;
-  --color-gaming-card: #12122b;
-  --color-gaming-border: #2a2a5a;
+  --color-dark-950: #0f0f1a; /* Lightened from #050510 */
+  --color-dark-900: #16162a; /* Lightened from #0a0a1a */
+  --color-dark-800: #1d1d3d; /* Lightened from #12122b */
+  --color-dark-700: #252550;
+  --color-dark-600: #2d2d6a;
+  --color-dark-500: #35358a;
+  --color-gaming-card: #1d1d3d;
+  --color-gaming-border: #3a3a6a;
   --font-family-gaming: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --bg-main: #050510;
-  --card-bg: rgba(18, 18, 43, 0.9);
+  --bg-main: #0f0f1a; /* Lightened from #050510 */
+  --card-bg: rgba(29, 29, 61, 0.85);
 }
 
 @layer base {
