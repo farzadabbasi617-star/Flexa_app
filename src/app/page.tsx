@@ -161,7 +161,19 @@ export default function LuxuryHomePage() {
                         className="w-10 h-10 sm:w-12 sm:h-12 object-contain" 
                       />
                     ) : (
-                      game.icon
+                      <img 
+                        src={`/icons/icon-${game.id}.png`} 
+                        alt={game.name} 
+                        className="w-10 h-10 sm:w-12 sm:h-12 object-contain" 
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                          // fallback to emoji if image fails
+                          const emoji = document.createElement('span');
+                          emoji.innerText = game.icon;
+                          emoji.className = 'text-3xl sm:text-4xl';
+                          e.target.parentNode?.appendChild(emoji);
+                        }}
+                      />
                     )}
                   </div>
                       <h4 className="text-xl sm:text-2xl font-black en-font italic tracking-tight">{game.name}</h4>
