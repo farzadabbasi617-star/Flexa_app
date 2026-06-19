@@ -60,7 +60,7 @@ export default function ThemeRuntime() {
           position: 'fixed',
           inset: 0,
           zIndex: -99,
-          background: 'linear-gradient(180deg, rgba(15,15,26,0.2) 0%, rgba(15,15,26,0.1) 50%, rgba(15,15,26,0.3) 100%)',
+          background: 'linear-gradient(180deg, rgba(15,15,26,0.1) 0%, rgba(15,15,26,0.05) 50%, rgba(15,15,26,0.2) 100%)',
           pointerEvents: 'none',
         }}
       />
