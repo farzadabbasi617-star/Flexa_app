@@ -33,17 +33,50 @@ const CATEGORIES = [
 ];
 
 const COMMON_SLUGS = [
+  // --- Global & Core ---
   { value: "home-hero", label: { fa: "بنر اصلی صفحه اول", en: "Homepage Hero" } },
-  { value: "app-bg", label: { fa: "پس‌زمینه کلی اپلیکیشن", en: "App Global Background" } },
-  { value: "chat-bg", label: { fa: "پس‌زمینه چت", en: "Chat Background" } },
-  { value: "profile-bg", label: { fa: "پس‌زمینه پروفایل", en: "Profile Background" } },
+  { value: "app-global-bg", label: { fa: "پس‌زمینه کلی اپلیکیشن", en: "App Global Background" } },
+  { value: "logo-main", label: { fa: "لوگوی اصلی", en: "Main Logo" } },
+  
+  // --- Authentication ---
   { value: "login-bg", label: { fa: "پس‌زمینه صفحه ورود", en: "Login Background" } },
+  { value: "register-bg", label: { fa: "پس‌زمینه صفحه ثبت‌نام", en: "Register Background" } },
+  
+  // --- User & Profile ---
+  { value: "profile-bg", label: { fa: "پس‌زمینه پروفایل", en: "Profile Background" } },
+  { value: "profile-banner", label: { fa: "بنر بالای پروفایل", en: "Profile Top Banner" } },
+  { value: "wallet-bg", label: { fa: "پس‌زمینه کیف پول", en: "Wallet Background" } },
+  
+  // --- Gameplay & Tournaments ---
+  { value: "tournaments-bg", label: { fa: "پس‌زمینه لیست تورنومنت‌ها", en: "Tournaments Background" } },
+  { value: "tournament-detail-bg", label: { fa: "پس‌زمینه جزئیات تورنومنت", en: "Tournament Detail Background" } },
+  { value: "leaderboard-bg", label: { fa: "پس‌زمینه لیدربورد", en: "Leaderboard Background" } },
+  { value: "match-result-bg", label: { fa: "پس‌زمینه نتیجه مسابقه", en: "Match Result Background" } },
+  
+  // --- Support & Info ---
+  { value: "faq-bg", label: { fa: "پس‌زمینه سوالات متداول", en: "FAQ Background" } },
+  { value: "support-bg", label: { fa: "پس‌زمینه پشتیبانی", en: "Support Background" } },
+  { value: "rules-bg", label: { fa: "پس‌زمینه قوانین", en: "Rules Background" } },
+  { value: "about-bg", label: { fa: "پس‌زمینه درباره ما", en: "About Background" } },
+  
+  // --- Admin Panel ---
+  { value: "admin-dashboard-bg", label: { fa: "پس‌زمینه داشبورد ادمین", en: "Admin Dashboard Background" } },
+  { value: "admin-users-bg", label: { fa: "پس‌زمینه مدیریت کاربران", en: "Admin Users Background" } },
+  
+  // --- UI Elements (Icons/Decorative) ---
   { value: "icon-home", label: { fa: "آیکون خانه", en: "Home Icon" } },
   { value: "icon-wallet", label: { fa: "آیکون کیف پول", en: "Wallet Icon" } },
   { value: "icon-profile", label: { fa: "آیکون پروفایل", en: "Profile Icon" } },
   { value: "icon-chat", label: { fa: "آیکون چت", en: "Chat Icon" } },
   { value: "icon-tournament", label: { fa: "آیکون تورنومنت", en: "Tournament Icon" } },
-  { value: "logo-main", label: { fa: "لوگوی اصلی", en: "Main Logo" } },
+  { value: "icon-notifications", label: { fa: "آیکون اعلان‌ها", en: "Notifications Icon" } },
+  { value: "icon-settings", label: { fa: "آیکون تنظیمات", en: "Settings Icon" } },
+  
+  // --- Game Specific Slots ---
+  { value: "bg-codm", label: { fa: "پس‌زمینه اختصاصی کالاف", en: "COD Mobile Specific BG" } },
+  { value: "bg-fortnite", label: { fa: "پس‌زمینه اختصاصی فورتنایت", en: "Fortnite Specific BG" } },
+  { value: "bg-clash", label: { fa: "پس‌زمینه اختصاصی کلش", en: "Clash Royale Specific BG" } },
+  
   { value: "custom", label: { fa: "سایر (تایپ دستی)", en: "Custom (Manual Type)" } },
 ];
 

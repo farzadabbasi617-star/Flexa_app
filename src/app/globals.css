@@ -59,9 +59,12 @@ html, body {
   overflow-x: hidden;
 }
 
-/* When background image is active - make body transparent */
+/* When background image is active - make body and all main containers transparent */
 .show-bg-image body,
-.show-bg-image {
+.show-bg-image,
+.show-bg-image main,
+.show-bg-image .page-container,
+.show-bg-image .page-content {
   background-color: transparent !important;
 }
 
