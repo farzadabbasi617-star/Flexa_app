@@ -36,7 +36,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" href="/icons/icon-192.svg" />
+        <link rel="apple-touch-icon" href="/icons/arena_icon.png" />
+        <link rel="icon" href="/icons/arena_icon.png" />
       </head>
       <body className="text-white antialiased font-gaming min-h-screen">
         <QueryProvider>

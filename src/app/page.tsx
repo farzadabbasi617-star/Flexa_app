@@ -69,11 +69,18 @@ export default function LuxuryHomePage() {
         {/* Header */}
         <header className="pt-8 pb-6 px-4 sm:px-6 max-w-7xl mx-auto">
           <div className="flex justify-between items-center">
-            <div className="text-right">
-              <h1 className="text-3xl sm:text-4xl font-black italic tracking-tighter en-font leading-none">FLEXA</h1>
-              <p className="mt-2 text-xs font-black text-purple-300/90 tracking-[0.28em] uppercase">
-                Elite Esports Hub
-              </p>
+            <div className="flex items-center gap-3 text-right">
+              <img 
+                src="/icons/arena_icon.png" 
+                alt="Flexa Logo" 
+                className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-[0_0_15px_rgba(188,0,255,0.5)]" 
+              />
+              <div>
+                <h1 className="text-3xl sm:text-4xl font-black italic tracking-tighter en-font leading-none">FLEXA</h1>
+                <p className="mt-2 text-xs font-black text-purple-300/90 tracking-[0.28em] uppercase">
+                  Elite Esports Hub
+                </p>
+              </div>
             </div>
 
             <Link

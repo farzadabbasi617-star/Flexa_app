@@ -41,6 +41,8 @@ export default function BottomNav() {
         {navItems.map((item) => {
           const isActive = item.path === "/" ? pathname === "/" : pathname.startsWith(item.path);
           const imageIcon = iconMap[`icon-${item.id}`];
+          const finalIconUrl = item.id === "arena" ? "/arena_icon.png" : imageIcon?.url;
+          
           return (
             <Link
               key={item.id}
@@ -49,11 +51,11 @@ export default function BottomNav() {
                 isActive ? "text-purple-300" : "text-white/35 hover:text-white/70"
               }`}
             >
-              {imageIcon ? (
+              {finalIconUrl ? (
                 <img
-                  src={imageIcon.url}
-                  alt={imageIcon.altText || item.label}
-                  className={`w-8 h-8 rounded-xl object-cover ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : "opacity-60"}`}
+                  src={finalIconUrl}
+                  alt={item.label}
+                  className={`w-8 h-8 rounded-xl object-contain ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : "opacity-60"}`}
                 />
               ) : (
                 <div className={`text-[26px] ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : ""}`}>{item.icon}</div>
