@@ -255,29 +255,29 @@ export default function ProfilePage() {
 
         <div className="grid grid-cols-2 gap-3 mb-8">
           <Link href="/profile/edit" className="glass-panel p-5 rounded-[28px] border border-white/5 text-center active:scale-95 transition-transform">
-            <div className="text-3xl mb-2">🎮</div>
+            <img src="/icons/profile_game_ids.png" alt="Game IDs" className="w-12 h-12 mx-auto mb-2 object-contain" />
             <div className="text-xs font-black">آیدی بازی‌ها</div>
           </Link>
           <Link href="/dashboard" className="glass-panel p-5 rounded-[28px] border border-white/5 text-center active:scale-95 transition-transform">
-            <div className="text-3xl mb-2">📊</div>
+            <img src="/icons/profile_dashboard.png" alt="Dashboard" className="w-12 h-12 mx-auto mb-2 object-contain" />
             <div className="text-xs font-black">داشبورد</div>
           </Link>
           <Link href="/support" className="glass-panel p-5 rounded-[28px] border border-white/5 text-center active:scale-95 transition-transform col-span-2">
-            <div className="text-3xl mb-2">🎧</div>
+            <img src="/icons/profile_tickets.png" alt="Support" className="w-12 h-12 mx-auto mb-2 object-contain" />
             <div className="text-xs font-black">پشتیبانی و تیکت‌ها</div>
           </Link>
           <Link href="/profile/security" className="glass-panel p-5 rounded-[28px] border border-white/5 text-center active:scale-95 transition-transform col-span-2">
-            <div className="text-3xl mb-2">🔐</div>
+            <img src="/icons/profile_security.png" alt="Security" className="w-12 h-12 mx-auto mb-2 object-contain" />
             <div className="text-xs font-black">امنیت حساب و دستگاه‌ها</div>
           </Link>
 
           <Link href="/profile/privacy" className="glass-panel p-5 rounded-[28px] border border-white/5 text-center active:scale-95 transition-transform col-span-2">
-            <div className="text-3xl mb-2">🔒</div>
+            <img src="/icons/profile_privacy.png" alt="Privacy" className="w-12 h-12 mx-auto mb-2 object-contain" />
             <div className="text-xs font-black">حریم خصوصی</div>
           </Link>
           {isAdmin && (
             <Link href="/admin" className="glass-panel p-5 rounded-[28px] border border-fuchsia-500/20 text-center active:scale-95 transition-transform col-span-2">
-              <div className="text-3xl mb-2">👑</div>
+              <img src="/icons/profile_admin.png" alt="Admin" className="w-12 h-12 mx-auto mb-2 object-contain" />
               <div className="text-xs font-black text-fuchsia-300">پنل مدیریت</div>
             </Link>
           )}
@@ -293,7 +293,7 @@ export default function ProfilePage() {
               <h4 className="text-xs font-black">مرکز پشتیبانی فلکسا</h4>
               <p className="text-[8px] text-gray-500 uppercase">ارسال تیکت و پیگیری</p>
             </div>
-            <span className="text-xl">🎧</span>
+            <img src="/icons/profile_support_center.png" alt="Support Center" className="w-10 h-10 object-contain" />
           </Link>
         </div>
 
