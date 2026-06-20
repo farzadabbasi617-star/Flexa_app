@@ -46,7 +46,7 @@ export default function BottomNav() {
             arena: "/arena_icon.png",
             rankings: "/icons/rankings_icon.png",
             honors: "/icons/honors_icon.png",
-            profile: "/icons/profile_icon.png",
+            profile: "/icons/settings_icon.png",
           };
           
           const finalIconUrl = customIcons[item.id] || imageIcon?.url;
