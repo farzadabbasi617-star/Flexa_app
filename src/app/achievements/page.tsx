@@ -5,6 +5,12 @@ import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 
+// ... existing imports ...
+import { useCallback, useEffect, useState } from "react";
+import Navbar from "@/components/Navbar";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
+
 interface Achievement {
   id: string;
   name: string;
@@ -20,7 +26,47 @@ interface Achievement {
   progressPercent?: number;
 }
 
+const RANKS = {
+  1: {
+    fa: "سرباز تازه‌کار",
+    en: "The Recruit",
+    icon: "/icons/achievement_lvl1.png",
+    color: "text-gray-300",
+    glow: "shadow-[0_0_10px_rgba(209,213,219,0.3)]",
+  },
+  25: {
+    fa: "مبارز جسور",
+    en: "The Bold Fighter",
+    icon: "/icons/achievement_lvl25.png",
+    color: "text-blue-400",
+    glow: "shadow-[0_0_15px_rgba(96,165,250,0.4)]",
+  },
+  50: {
+    fa: "فرمانده میدان",
+    en: "The Field Commander",
+    icon: "/icons/achievement_lvl50.png",
+    color: "text-purple-400",
+    glow: "shadow-[0_0_20px_rgba(192,132,252,0.5)]",
+  },
+  75: {
+    fa: "جنگ‌سالار نخبه",
+    en: "The Elite Warlord",
+    icon: "/icons/achievement_lvl75.png",
+    color: "text-red-400",
+    glow: "shadow-[0_0_25px_rgba(248,113,113,0.6)]",
+  },
+  100: {
+    fa: "امپراتور جاودانه",
+    en: "The Immortal Emperor",
+    icon: "/icons/achievement_lvl100.png",
+    color: "text-yellow-400",
+    glow: "shadow-[0_0_30px_rgba(250,204,21,0.8)]",
+  },
+};
+
 const CATEGORY_LABELS = {
+// ... rest of the file ...
+
   en: { wins: "Wins", tournaments: "Tournaments", rating: "Rating", special: "Special" },
   fa: { wins: "بردها", tournaments: "تورنومنت‌ها", rating: "امتیاز", special: "ویژه" },
 };
@@ -48,7 +94,16 @@ export default function AchievementsPage() {
     fetchAchievements();
   }, [fetchAchievements]);
 
+  const getRank = (points: number) => {
+    if (points >= 100) return RANKS[100];
+    if (points >= 50) return RANKS[75];
+    if (points >= 30) return RANKS[50];
+    if (points >= 10) return RANKS[25];
+    return RANKS[1];
+  };
+
   const categories = ["all", "wins", "tournaments", "rating", "special"];
+
   const filteredAchievements =
     filter === "all"
       ? achievements
@@ -134,30 +189,43 @@ export default function AchievementsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAchievements.map((achievement) => (
-              <div
-                key={achievement.id}
-                className={`gaming-card p-5 relative overflow-hidden ${
-                  achievement.unlocked
-                    ? "border-neon-green/50"
-                    : "opacity-60 grayscale"
-                }`}
-              >
-                {achievement.unlocked && (
-                  <div className="absolute top-2 end-2">
-                    <span className="text-neon-green text-xl">✓</span>
+            {filteredAchievements.map((achievement) => {
+              const rank = getRank(achievement.points);
+              return (
+                <div
+                  key={achievement.id}
+                  className={`gaming-card p-5 relative overflow-hidden ${
+                    achievement.unlocked
+                      ? "border-neon-green/50"
+                      : "opacity-60 grayscale"
+                  }`}
+                >
+                  {achievement.unlocked && (
+                    <div className="absolute top-2 end-2">
+                      <span className="text-neon-green text-xl">✓</span>
+                    </div>
+                  )}
+                  
+                  <div className={`text-center text-[10px] font-black uppercase tracking-widest mb-3 ${rank.color} ${rank.glow}`}>
+                    {lang === "fa" ? rank.fa : rank.en}
                   </div>
-                )}
-                <div className="flex items-center gap-4">
-                  <div
-                    className={`w-14 h-14 rounded-xl flex items-center justify-center text-3xl ${
-                      achievement.unlocked
-                        ? "bg-gradient-to-br from-neon-purple to-neon-blue"
-                        : "bg-dark-600"
-                    }`}
-                  >
-                    {achievement.icon}
-                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden ${
+                        achievement.unlocked
+                          ? "bg-gradient-to-br from-neon-purple to-neon-blue shadow-lg"
+                          : "bg-dark-600"
+                      }`}
+                    >
+                      <img 
+                        src={rank.icon} 
+                        alt={rank.fa} 
+                        className={`w-full h-full object-cover ${achievement.unlocked ? "opacity-100" : "opacity-30 grayscale"}`}
+                      />
+                    </div>
+// ... rest of the content ...
+
                   <div className="flex-1">
                     <h3 className="font-bold">
                       {lang === "fa" ? achievement.nameFA : achievement.name}
