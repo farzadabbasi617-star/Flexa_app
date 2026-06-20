@@ -25,6 +25,7 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json();
     const {
       displayName,
+      avatarUrl,
       clashRoyaleId,
       clashRoyaleUsername,
       codMobileId,
@@ -35,7 +36,8 @@ export async function PATCH(request: NextRequest) {
 
     const updateData: Record<string, string | null> = {};
 
-    if (displayName !== undefined) updateData.displayName = displayName;
+    if (displayName !== undefined) updateData.displayName = String(displayName).trim().slice(0, 100);
+    if (avatarUrl !== undefined) updateData.avatarUrl = String(avatarUrl || "").startsWith("/icons/") ? String(avatarUrl) : null;
     if (clashRoyaleId !== undefined) updateData.clashRoyaleId = clashRoyaleId || null;
     if (clashRoyaleUsername !== undefined) updateData.clashRoyaleUsername = clashRoyaleUsername || null;
     if (codMobileId !== undefined) updateData.codMobileId = codMobileId || null;
