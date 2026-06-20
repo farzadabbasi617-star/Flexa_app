@@ -5,12 +5,6 @@ import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 
-// ... existing imports ...
-import { useCallback, useEffect, useState } from "react";
-import Navbar from "@/components/Navbar";
-import { useLanguage } from "@/contexts/LanguageContext";
-import { useAuth } from "@/contexts/AuthContext";
-
 interface Achievement {
   id: string;
   name: string;
@@ -30,48 +24,6 @@ const RANKS = {
   1: {
     fa: "سرباز تازه‌کار",
     en: "The Recruit",
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-    icon: "/icons/achievement_lvl1.png",
-    color: "text-gray-300",
-    glow: "shadow-[0_0_10px_rgba(209,213,219,0.3)]",
-  },
-  25: {
-    fa: "مبارز جسور",
-    en: "The Bold Fighter",
-    icon: "/icons/achievement_lvl25.png",
-    color: "text-blue-400",
-    glow: "shadow-[0_0_15px_rgba(96,165,250,0.4)]",
-  },
-  50: {
-    fa: "فرمانده میدان",
-    en: "The Field Commander",
-    icon: "/icons/achievement_lvl50.png",
-    color: "text-purple-400",
-    glow: "shadow-[0_0_20px_rgba(192,132,252,0.5)]",
-  },
-  75: {
-    fa: "جنگ‌سالار نخبه",
-    en: "The Elite Warlord",
-    icon: "/icons/achievement_lvl75.png",
-    color: "text-red-400",
-    glow: "shadow-[0_0_25px_rgba(248,113,113,0.6)]",
-  },
-  100: {
-    fa: "امپراتور جاودانه",
-    en: "The Immortal Emperor",
-    icon: "/icons/achievement_lvl100.png",
-    color: "text-yellow-400",
-    glow: "shadow-[0_0_30px_rgba(250,204,21,0.8)]",
-=======
-=======
->>>>>>> 3691880 (fix: resolve merge conflicts in achievements page)
-=======
->>>>>>> 00a40f7 (fix: completely remove merge conflict markers from achievements page)
-=======
->>>>>>> b91942c (fix: complete rewrite of achievements page to remove all merge conflicts)
     icon: "/icons/achievement_rank1.png",
     color: "text-gray-400",
     glow: "shadow-[0_0_10px_rgba(156,163,175,0.3)]",
@@ -138,22 +90,10 @@ const RANKS = {
     icon: "/icons/achievement_rank10.png",
     color: "text-yellow-400",
     glow: "shadow-[0_0_35px_rgba(250,204,21,1)]",
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> 4daaa09 (feat: expand achievement system to 10 luxury ranks)
-=======
->>>>>>> 3691880 (fix: resolve merge conflicts in achievements page)
-=======
->>>>>>> 00a40f7 (fix: completely remove merge conflict markers from achievements page)
-=======
->>>>>>> b91942c (fix: complete rewrite of achievements page to remove all merge conflicts)
   },
 };
 
 const CATEGORY_LABELS = {
-// ... rest of the file ...
-
   en: { wins: "Wins", tournaments: "Tournaments", rating: "Rating", special: "Special" },
   fa: { wins: "بردها", tournaments: "تورنومنت‌ها", rating: "امتیاز", special: "ویژه" },
 };
@@ -182,21 +122,6 @@ export default function AchievementsPage() {
   }, [fetchAchievements]);
 
   const getRank = (points: number) => {
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-    if (points >= 100) return RANKS[100];
-    if (points >= 50) return RANKS[75];
-    if (points >= 30) return RANKS[50];
-    if (points >= 10) return RANKS[25];
-=======
-=======
->>>>>>> 3691880 (fix: resolve merge conflicts in achievements page)
-=======
->>>>>>> 00a40f7 (fix: completely remove merge conflict markers from achievements page)
-=======
->>>>>>> b91942c (fix: complete rewrite of achievements page to remove all merge conflicts)
     if (points >= 91) return RANKS[91];
     if (points >= 81) return RANKS[81];
     if (points >= 71) return RANKS[71];
@@ -206,16 +131,6 @@ export default function AchievementsPage() {
     if (points >= 31) return RANKS[31];
     if (points >= 21) return RANKS[21];
     if (points >= 11) return RANKS[11];
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
->>>>>>> 4daaa09 (feat: expand achievement system to 10 luxury ranks)
-=======
->>>>>>> 3691880 (fix: resolve merge conflicts in achievements page)
-=======
->>>>>>> 00a40f7 (fix: completely remove merge conflict markers from achievements page)
-=======
->>>>>>> b91942c (fix: complete rewrite of achievements page to remove all merge conflicts)
     return RANKS[1];
   };
 
@@ -240,12 +155,15 @@ export default function AchievementsPage() {
         {/* Header */}
         <div className="text-center mb-8">
           <h1 className="text-3xl sm:text-4xl font-bold mb-2">
-            🏅 <span className="neon-text-purple">{t.achievementsPage.title}</span>
+            🏅 <span className="neon-text-purple">{t.achievementsPage?.title || "Achievements"}</span>
           </h1>
-          <p className="text-gray-400">{t.achievementsPage.subtitle}</p>
+          <p className="text-gray-400">{t.achievementsPage?.subtitle || "Track your progress and unlock rewards"}</p>
           {user && (
-            <button onClick={fetchAchievements} className="mt-4 px-4 py-2 rounded-xl bg-dark-700 text-xs font-black text-neon-blue hover:bg-dark-600">
-              🔄 بروزرسانی دستاوردها
+            <button
+              onClick={fetchAchievements}
+              className="mt-4 px-4 py-2 rounded-xl bg-dark-700 text-xs font-black text-neon-blue hover:bg-dark-600"
+            >
+              🔄 {lang === "fa" ? "بروزرسانی دستاوردها" : "Refresh Achievements"}
             </button>
           )}
         </div>
@@ -258,12 +176,14 @@ export default function AchievementsPage() {
                 {unlockedCount}/{achievements.length}
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                {t.achievementsPage.unlocked}
+                {t.achievementsPage?.unlocked || "Unlocked"}
               </div>
             </div>
             <div className="gaming-card p-4 text-center">
               <div className="text-2xl font-bold text-neon-blue">{totalPoints}</div>
-              <div className="text-xs text-gray-500 mt-1">{t.achievementsPage.points}</div>
+              <div className="text-xs text-gray-500 mt-1">
+                {t.achievementsPage?.points || "Points"}
+              </div>
             </div>
             <div className="gaming-card p-4 text-center col-span-2 sm:col-span-1">
               <div className="text-2xl font-bold text-neon-green">
@@ -272,7 +192,9 @@ export default function AchievementsPage() {
                   : 0}
                 %
               </div>
-              <div className="text-xs text-gray-500 mt-1">{t.achievementsPage.progress}</div>
+              <div className="text-xs text-gray-500 mt-1">
+                {t.achievementsPage?.progress || "Progress"}
+              </div>
             </div>
           </div>
         )}
@@ -302,129 +224,101 @@ export default function AchievementsPage() {
         {loading ? (
           <div className="text-center py-20">
             <div className="text-4xl animate-neon-pulse mb-4">🏅</div>
-            <p className="text-gray-400">{lang === "fa" ? "در حال بارگذاری..." : "Loading..."}</p>
+            <p className="text-gray-400">
+              {lang === "fa" ? "در حال بارگذاری..." : "Loading..."}
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredAchievements.map((achievement) => {
-              const rank = getRank(achievement.points);
-              return (
-                <div
-                  key={achievement.id}
-                  className={`gaming-card p-5 relative overflow-hidden ${
-                    achievement.unlocked
-                      ? "border-neon-green/50"
-                      : "opacity-60 grayscale"
-                  }`}
-                >
-                  {achievement.unlocked && (
-                    <div className="absolute top-2 end-2">
-                      <span className="text-neon-green text-xl">✓</span>
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-                    </div>
-                  )}
-                  
-                  <div className={`text-center text-[10px] font-black uppercase tracking-widest mb-3 ${rank.color} ${rank.glow}`}>
-                    {lang === "fa" ? rank.fa : rank.en}
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden ${
-                        achievement.unlocked
-                          ? "bg-gradient-to-br from-neon-purple to-neon-blue shadow-lg"
-                          : "bg-dark-600"
-                      }`}
-                    >
-                      <img 
-                        src={rank.icon} 
-                        alt={rank.fa} 
-                        className={`w-full h-full object-cover ${achievement.unlocked ? "opacity-100" : "opacity-30 grayscale"}`}
-                      />
-                    </div>
-// ... rest of the content ...
-
-                  <div className="flex-1">
-                    <h3 className="font-bold">
-                      {lang === "fa" ? achievement.nameFA : achievement.name}
-                    </h3>
-                    <p className="text-sm text-gray-400">
-                      {lang === "fa" ? achievement.descriptionFA : achievement.description}
-                    </p>
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
-                        <span>پیشرفت</span>
-                        <span>{(achievement.progress || 0).toLocaleString("fa-IR")} / {achievement.requirement.toLocaleString("fa-IR")}</span>
+            {filteredAchievements.length > 0 ? (
+              filteredAchievements.map((achievement) => {
+                const rank = getRank(achievement.points);
+                return (
+                  <div
+                    key={achievement.id}
+                    className={`gaming-card p-5 relative overflow-hidden ${
+                      achievement.unlocked
+                        ? "border-neon-green/50"
+                        : "opacity-60 grayscale"
+                    }`}
+                  >
+                    {achievement.unlocked && (
+                      <div className="absolute top-2 end-2">
+                        <span className="text-neon-green text-xl">✓</span>
                       </div>
-                      <div className="h-1.5 bg-dark-700 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${achievement.unlocked ? "bg-neon-green" : "bg-gradient-to-r from-neon-purple to-neon-blue"}`}
-                          style={{ width: `${achievement.progressPercent || 0}%` }}
+                    )}
+
+                    <div
+                      className={`text-center text-[10px] font-black uppercase tracking-widest mb-3 ${rank.color} ${rank.glow}`}
+                    >
+                      {lang === "fa" ? rank.fa : rank.en}
+                    </div>
+
+                    <div className="flex items-center gap-4">
+                      <div
+                        className={`w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden ${
+                          achievement.unlocked
+                            ? "bg-gradient-to-br from-neon-purple to-neon-blue shadow-lg"
+                            : "bg-dark-600"
+                        }`}
+                      >
+                        <img
+                          src={rank.icon}
+                          alt={rank.fa}
+                          className={`w-full h-full object-cover ${
+                            achievement.unlocked ? "opacity-100" : "opacity-30 grayscale"
+                          }`}
                         />
                       </div>
-=======
->>>>>>> 3691880 (fix: resolve merge conflicts in achievements page)
-=======
->>>>>>> 00a40f7 (fix: completely remove merge conflict markers from achievements page)
-=======
->>>>>>> b91942c (fix: complete rewrite of achievements page to remove all merge conflicts)
-                    </div>
-                  )}
-                  
-                  <div className={`text-center text-[10px] font-black uppercase tracking-widest mb-3 ${rank.color} ${rank.glow}`}>
-                    {lang === "fa" ? rank.fa : rank.en}
-                  </div>
 
-                  <div className="flex items-center gap-4">
-                    <div
-                      className={`w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden ${
-                        achievement.unlocked
-                          ? "bg-gradient-to-br from-neon-purple to-neon-blue shadow-lg"
-                          : "bg-dark-600"
-                      }`}
-                    >
-                      <img 
-                        src={rank.icon} 
-                        alt={rank.fa} 
-                        className={`w-full h-full object-cover ${achievement.unlocked ? "opacity-100" : "opacity-30 grayscale"}`}
-                      />
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="font-bold">
-                        {lang === "fa" ? achievement.nameFA : achievement.name}
-                      </h3>
-                      <p className="text-sm text-gray-400">
-                        {lang === "fa" ? achievement.descriptionFA : achievement.description}
-                      </p>
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
-                          <span>پیشرفت</span>
-                          <span>{(achievement.progress || 0).toLocaleString("fa-IR")} / {achievement.requirement.toLocaleString("fa-IR")}</span>
+                      <div className="flex-1">
+                        <h3 className="font-bold">
+                          {lang === "fa" ? achievement.nameFA : achievement.name}
+                        </h3>
+                        <p className="text-sm text-gray-400">
+                          {lang === "fa" ? achievement.descriptionFA : achievement.description}
+                        </p>
+
+                        <div className="mt-3">
+                          <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
+                            <span>{lang === "fa" ? "پیشرفت" : "Progress"}</span>
+                            <span>
+                              {(achievement.progress || 0).toLocaleString("fa-IR")} /{" "}
+                              {achievement.requirement.toLocaleString("fa-IR")}
+                            </span>
+                          </div>
+                          <div className="h-1.5 bg-dark-700 rounded-full overflow-hidden">
+                            <div
+                              className={`h-full rounded-full ${
+                                achievement.unlocked
+                                  ? "bg-neon-green"
+                                  : "bg-gradient-to-r from-neon-purple to-neon-blue"
+                              }`}
+                              style={{ width: `${achievement.progressPercent || 0}%` }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-1.5 bg-dark-700 rounded-full overflow-hidden">
-                          <div
-                            className={`h-full rounded-full ${achievement.unlocked ? "bg-neon-green" : "bg-gradient-to-r from-neon-purple to-neon-blue"}`}
-                            style={{ width: `${achievement.progressPercent || 0}%` }}
-                          />
+
+                        <div className="flex items-center gap-2 mt-3">
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-neon-purple/20 text-neon-purple">
+                            {achievement.points} {t.achievementsPage?.points || "pts"}
+                          </span>
+                          <span className="text-xs text-gray-500">
+                            {CATEGORY_LABELS[lang === "fa" ? "fa" : "en"][
+                              achievement.category as keyof typeof CATEGORY_LABELS.en
+                            ]}
+                          </span>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-2 mt-3">
-                        <span className="text-xs px-2 py-0.5 rounded-full bg-neon-purple/20 text-neon-purple">
-                          {achievement.points} {t.achievementsPage.points}
-                        </span>
-                        <span className="text-xs text-gray-500">
-                          {CATEGORY_LABELS[lang === "fa" ? "fa" : "en"][
-                            achievement.category as keyof typeof CATEGORY_LABELS.en
-                          ]}
-                        </span>
                       </div>
                     </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            ) : (
+              <div className="col-span-3 text-center py-12 text-gray-400">
+                {lang === "fa" ? "هیچ دستاوردی یافت نشد" : "No achievements found"}
+              </div>
+            )}
           </div>
         )}
       </div>
