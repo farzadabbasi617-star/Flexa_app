@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
       const amount = bi(tx.amount);
       if (tx.status === "completed") completedTransactions += 1;
       if (tx.status === "pending") pendingTransactions += 1;
+      if (tx.status !== "completed") continue;
       if (tx.type === "deposit") totalDeposits += amount;
       if (tx.type === "withdrawal") totalWithdrawals += amount;
       if (tx.type === "entry_fee") totalEntryFees += amount;
@@ -103,6 +104,9 @@ export async function PATCH(request: NextRequest) {
     }
 
     const result = await db.transaction(async (tx) => {
+      // Lock the transaction row first so two admins cannot approve the same
+      // pending deposit at the same time and credit the wallet twice.
+      await tx.execute(sql`select id from transactions where id = ${transactionId} for update`);
       const [transaction] = await tx.select().from(transactions).where(eq(transactions.id, transactionId)).limit(1);
       if (!transaction) throw new Error("TRANSACTION_NOT_FOUND");
       if (transaction.status !== "pending") throw new Error("TRANSACTION_NOT_PENDING");

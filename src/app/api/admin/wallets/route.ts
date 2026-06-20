@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { transactions, users, wallets } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
+import { createWalletReference } from "@/lib/wallet-security";
 
 export const dynamic = "force-dynamic";
 
@@ -72,34 +73,45 @@ export async function PATCH(request: NextRequest) {
     const amountRial = tomanToRial(body.amountToman);
 
     const result = await db.transaction(async (tx) => {
-      let [wallet] = await tx.select().from(wallets).where(eq(wallets.userId, userId));
-      if (!wallet) {
-        [wallet] = await tx.insert(wallets).values({ userId, balance: "0", currency: "RIAL" }).returning();
-      }
+      await tx
+        .insert(wallets)
+        .values({ userId, balance: "0", currency: "RIAL" })
+        .onConflictDoNothing({ target: wallets.userId });
 
-      const current = toBigIntSafe(wallet.balance);
-      const next = direction === "increase" ? current + amountRial : current - amountRial;
-      if (next < BigInt(0)) throw new Error("موجودی کافی نیست");
+      const [before] = await tx.select().from(wallets).where(eq(wallets.userId, userId)).limit(1);
+      if (!before) throw new Error("کیف پول پیدا نشد");
+      const current = toBigIntSafe(before.balance);
 
       const [updated] = await tx
         .update(wallets)
-        .set({ balance: next.toString(), updatedAt: new Date() })
-        .where(eq(wallets.id, wallet.id))
+        .set({
+          balance: direction === "increase"
+            ? sql`${wallets.balance} + ${amountRial.toString()}::numeric`
+            : sql`${wallets.balance} - ${amountRial.toString()}::numeric`,
+          updatedAt: new Date(),
+        })
+        .where(
+          direction === "increase"
+            ? eq(wallets.id, before.id)
+            : and(eq(wallets.id, before.id), sql`${wallets.balance} >= ${amountRial.toString()}::numeric`)
+        )
         .returning();
 
+      if (!updated) throw new Error("موجودی کافی نیست");
+
       await tx.insert(transactions).values({
-        walletId: wallet.id,
+        walletId: updated.id,
         amount: amountRial.toString(),
         type: direction === "increase" ? "deposit" : "withdrawal",
         status: "completed",
-        referenceId: `admin-${Date.now()}`,
+        referenceId: createWalletReference("admin"),
         metadata: {
           kind: "admin_adjustment",
           direction,
           reason,
           adminId: auth.user!.id,
           previousBalance: current.toString(),
-          nextBalance: next.toString(),
+          nextBalance: updated.balance,
         },
       });
 

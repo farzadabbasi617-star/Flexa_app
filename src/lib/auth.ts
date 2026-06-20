@@ -5,6 +5,7 @@ import crypto from "crypto";
 import logger from "@/lib/logger";
 import { NextRequest } from "next/server";
 import { hashPassword as argonHash, comparePassword as argonCompare } from "@/lib/auth-utils";
+import { hashSessionToken } from "@/lib/session-token";
 
 export function generateToken(): string {
   return crypto.randomBytes(48).toString("hex");
@@ -76,7 +77,7 @@ export async function createSession(userId: string, ip: string, userAgent: strin
 
   await db.insert(sessions).values({
     userId,
-    token,
+    token: hashSessionToken(token),
     expiresAt,
     ipAddress: ip,
     userAgent: userAgent,
@@ -97,10 +98,25 @@ export async function validateSession(token: string, currentIp: string, currentU
       }
     }
 
-    const [session] = await db
+    const tokenHash = hashSessionToken(token);
+    let [session] = await db
       .select()
       .from(sessions)
-      .where(eq(sessions.token, token));
+      .where(eq(sessions.token, tokenHash));
+
+    // Backward compatibility for sessions created before token hashing was
+    // enabled. On first successful validation, migrate the DB value to the hash
+    // while keeping the user's cookie unchanged.
+    if (!session) {
+      [session] = await db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.token, token));
+
+      if (session) {
+        await db.update(sessions).set({ token: tokenHash }).where(eq(sessions.id, session.id));
+      }
+    }
 
     if (!session) return null;
 
@@ -135,10 +151,18 @@ export async function validateSession(token: string, currentIp: string, currentU
 
 export async function rotateSession(oldToken: string, currentIp: string, currentUserAgent: string): Promise<string | null> {
   try {
-    const [session] = await db
+    const oldTokenHash = hashSessionToken(oldToken);
+    let [session] = await db
       .select()
       .from(sessions)
-      .where(eq(sessions.token, oldToken));
+      .where(eq(sessions.token, oldTokenHash));
+
+    if (!session) {
+      [session] = await db
+        .select()
+        .from(sessions)
+        .where(eq(sessions.token, oldToken));
+    }
 
     if (!session) return null;
 
@@ -146,7 +170,7 @@ export async function rotateSession(oldToken: string, currentIp: string, current
     
     await db.update(sessions)
       .set({ 
-        token: newToken,
+        token: hashSessionToken(newToken),
         ipAddress: currentIp,
         userAgent: currentUserAgent 
       })
@@ -162,6 +186,8 @@ export async function rotateSession(oldToken: string, currentIp: string, current
 export async function deleteSession(token: string) {
   if (!token) return;
   try {
+    await db.delete(sessions).where(eq(sessions.token, hashSessionToken(token)));
+    // Best-effort cleanup for legacy rows that may still contain raw tokens.
     await db.delete(sessions).where(eq(sessions.token, token));
   } catch (error) {
     logger.error({ error }, 'Session deletion error');

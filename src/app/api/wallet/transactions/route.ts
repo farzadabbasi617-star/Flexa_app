@@ -4,6 +4,8 @@ import { transactions, wallets } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 import { bigIntFromText, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
+import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
+import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -11,8 +13,18 @@ export const dynamic = "force-dynamic";
 async function getOrCreateWallet(userId: string) {
   const [existing] = await db.select().from(wallets).where(eq(wallets.userId, userId)).limit(1);
   if (existing) return existing;
-  const [created] = await db.insert(wallets).values({ userId, balance: "0", currency: "RIAL" }).returning();
-  return created;
+
+  const [created] = await db
+    .insert(wallets)
+    .values({ userId, balance: "0", currency: "RIAL" })
+    .onConflictDoNothing({ target: wallets.userId })
+    .returning();
+
+  if (created) return created;
+
+  const [afterConflict] = await db.select().from(wallets).where(eq(wallets.userId, userId)).limit(1);
+  if (!afterConflict) throw new Error("WALLET_CREATE_FAILED");
+  return afterConflict;
 }
 
 export async function GET(request: NextRequest) {
@@ -62,45 +74,48 @@ export async function POST(request: NextRequest) {
     const user = await validateSession(token || "", ip, ua, request);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const limit = await rateLimit(`wallet:deposit:${user.id}`, 3, 10 * 60 * 1000);
+    if (!limit.success) {
+      return NextResponse.json(
+        { error: "تعداد درخواست‌های شارژ زیاد است. لطفاً چند دقیقه بعد دوباره امتحان کنید." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const amountRial = parseTomanToRial(String(body.amountToman || ""));
-    if (amountRial <= BigInt(0)) return NextResponse.json({ error: "مبلغ شارژ معتبر نیست" }, { status: 400 });
+    const amountValidation = validateDepositAmountRial(amountRial);
+    if (!amountValidation.ok) return NextResponse.json({ error: amountValidation.error }, { status: 400 });
 
     const wallet = await getOrCreateWallet(user.id);
-    // شارژ فوری بدون نیاز به تأیید ادمین
-    const currentBalance = bigIntFromText(wallet.balance);
-    const newBalance = currentBalance + amountRial;
 
-    // به‌روزرسانی موجودی کیف پول
-    await db
-      .update(wallets)
-      .set({ 
-        balance: newBalance.toString(),
-        updatedAt: new Date()
-      })
-      .where(eq(wallets.id, wallet.id));
-
-    // ثبت تراکنش موفق
+    // IMPORTANT: Until a real payment gateway is connected, users can only
+    // create a pending deposit request. Balance is never increased here.
+    // Admin approval/payment gateway verification is the only place that may
+    // turn this transaction into "completed" and credit the wallet.
     const [tx] = await db
       .insert(transactions)
       .values({
         walletId: wallet.id,
         amount: amountRial.toString(),
         type: "deposit",
-        status: "completed",
-        referenceId: `deposit-${Date.now()}`,
+        status: "pending",
+        referenceId: createWalletReference("deposit"),
         metadata: {
-          kind: "instant_deposit",
+          kind: "manual_deposit_request",
+          provider: "manual_until_gateway_connected",
           userId: user.id,
           displayName: user.displayName,
-          note: body.note ? String(body.note).slice(0, 300) : null,
+          note: sanitizeWalletNote(body.note),
+          requestedIp: ip,
+          userAgent: ua.slice(0, 300),
         },
       })
       .returning();
 
     return NextResponse.json({
       success: true,
-      message: "کیف پول شما با موفقیت شارژ شد.",
+      message: "درخواست شارژ ثبت شد و بعد از تأیید مدیریت/درگاه به موجودی اضافه می‌شود.",
       transaction: tx,
     }, { status: 201 });
   } catch (err) {
