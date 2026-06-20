@@ -30,6 +30,7 @@ const RANKS = {
   1: {
     fa: "سرباز تازه‌کار",
     en: "The Recruit",
+<<<<<<< HEAD
     icon: "/icons/achievement_lvl1.png",
     color: "text-gray-300",
     glow: "shadow-[0_0_10px_rgba(209,213,219,0.3)]",
@@ -61,6 +62,74 @@ const RANKS = {
     icon: "/icons/achievement_lvl100.png",
     color: "text-yellow-400",
     glow: "shadow-[0_0_30px_rgba(250,204,21,0.8)]",
+=======
+    icon: "/icons/achievement_rank1.png",
+    color: "text-gray-400",
+    glow: "shadow-[0_0_10px_rgba(156,163,175,0.3)]",
+  },
+  11: {
+    fa: "کاوشگر میدان",
+    en: "The Seeker",
+    icon: "/icons/achievement_rank2.png",
+    color: "text-orange-300",
+    glow: "shadow-[0_0_12px_rgba(253,186,116,0.4)]",
+  },
+  21: {
+    fa: "مبارز جسور",
+    en: "The Bold Fighter",
+    icon: "/icons/achievement_rank3.png",
+    color: "text-blue-400",
+    glow: "shadow-[0_0_15px_rgba(96,165,250,0.4)]",
+  },
+  31: {
+    fa: "تخریب‌گر",
+    en: "The Crusher",
+    icon: "/icons/achievement_rank4.png",
+    color: "text-blue-700",
+    glow: "shadow-[0_0_18px_rgba(29,78,216,0.5)]",
+  },
+  41: {
+    fa: "کهنه‌کار نبرد",
+    en: "The Veteran",
+    icon: "/icons/achievement_rank5.png",
+    color: "text-purple-400",
+    glow: "shadow-[0_0_20px_rgba(192,132,252,0.5)]",
+  },
+  51: {
+    fa: "فرمانده میدان",
+    en: "The Field Commander",
+    icon: "/icons/achievement_rank6.png",
+    color: "text-fuchsia-400",
+    glow: "shadow-[0_0_22px_rgba(232,121,249,0.6)]",
+  },
+  61: {
+    fa: "پیشرو نخبه",
+    en: "The Elite Vanguard",
+    icon: "/icons/achievement_rank7.png",
+    color: "text-yellow-500",
+    glow: "shadow-[0_0_25px_rgba(234,179,8,0.7)]",
+  },
+  71: {
+    fa: "جنگ‌سالار",
+    en: "The Warlord",
+    icon: "/icons/achievement_rank8.png",
+    color: "text-red-500",
+    glow: "shadow-[0_0_28px_rgba(239,68,68,0.8)]",
+  },
+  81: {
+    fa: "افسانه زنده",
+    en: "The Living Legend",
+    icon: "/icons/achievement_rank9.png",
+    color: "text-cyan-400",
+    glow: "shadow-[0_0_30px_rgba(34,211,238,0.9)]",
+  },
+  91: {
+    fa: "امپراتور جاودانه",
+    en: "The Immortal Emperor",
+    icon: "/icons/achievement_rank10.png",
+    color: "text-yellow-400",
+    glow: "shadow-[0_0_35px_rgba(250,204,21,1)]",
+>>>>>>> 4daaa09 (feat: expand achievement system to 10 luxury ranks)
   },
 };
 
@@ -95,10 +164,22 @@ export default function AchievementsPage() {
   }, [fetchAchievements]);
 
   const getRank = (points: number) => {
+<<<<<<< HEAD
     if (points >= 100) return RANKS[100];
     if (points >= 50) return RANKS[75];
     if (points >= 30) return RANKS[50];
     if (points >= 10) return RANKS[25];
+=======
+    if (points >= 91) return RANKS[91];
+    if (points >= 81) return RANKS[81];
+    if (points >= 71) return RANKS[71];
+    if (points >= 61) return RANKS[61];
+    if (points >= 51) return RANKS[51];
+    if (points >= 41) return RANKS[41];
+    if (points >= 31) return RANKS[31];
+    if (points >= 21) return RANKS[21];
+    if (points >= 11) return RANKS[11];
+>>>>>>> 4daaa09 (feat: expand achievement system to 10 luxury ranks)
     return RANKS[1];
   };
 
