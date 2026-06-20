@@ -125,7 +125,7 @@ export default function Navbar() {
                           <span>📊</span> {lang === "fa" ? "داشبورد" : "Dashboard"}
                         </Link>
                         <Link href="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
-                          <span>👤</span> {t.auth.profile}
+                          <span>⚙️</span> تنظیمات
                         </Link>
                         <Link href="/profile/edit" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                           <span>🎮</span> {t.auth.gameIds}
