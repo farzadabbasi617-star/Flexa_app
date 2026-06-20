@@ -32,6 +32,7 @@ const RANKS = {
     en: "The Recruit",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     icon: "/icons/achievement_lvl1.png",
     color: "text-gray-300",
     glow: "shadow-[0_0_10px_rgba(209,213,219,0.3)]",
@@ -66,6 +67,8 @@ const RANKS = {
 =======
 =======
 >>>>>>> 3691880 (fix: resolve merge conflicts in achievements page)
+=======
+>>>>>>> 00a40f7 (fix: completely remove merge conflict markers from achievements page)
     icon: "/icons/achievement_rank1.png",
     color: "text-gray-400",
     glow: "shadow-[0_0_10px_rgba(156,163,175,0.3)]",
@@ -133,9 +136,12 @@ const RANKS = {
     color: "text-yellow-400",
     glow: "shadow-[0_0_35px_rgba(250,204,21,1)]",
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> 4daaa09 (feat: expand achievement system to 10 luxury ranks)
 =======
 >>>>>>> 3691880 (fix: resolve merge conflicts in achievements page)
+=======
+>>>>>>> 00a40f7 (fix: completely remove merge conflict markers from achievements page)
   },
 };
 
@@ -172,6 +178,7 @@ export default function AchievementsPage() {
   const getRank = (points: number) => {
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     if (points >= 100) return RANKS[100];
     if (points >= 50) return RANKS[75];
     if (points >= 30) return RANKS[50];
@@ -179,6 +186,8 @@ export default function AchievementsPage() {
 =======
 =======
 >>>>>>> 3691880 (fix: resolve merge conflicts in achievements page)
+=======
+>>>>>>> 00a40f7 (fix: completely remove merge conflict markers from achievements page)
     if (points >= 91) return RANKS[91];
     if (points >= 81) return RANKS[81];
     if (points >= 71) return RANKS[71];
@@ -189,9 +198,12 @@ export default function AchievementsPage() {
     if (points >= 21) return RANKS[21];
     if (points >= 11) return RANKS[11];
 <<<<<<< HEAD
+<<<<<<< HEAD
 >>>>>>> 4daaa09 (feat: expand achievement system to 10 luxury ranks)
 =======
 >>>>>>> 3691880 (fix: resolve merge conflicts in achievements page)
+=======
+>>>>>>> 00a40f7 (fix: completely remove merge conflict markers from achievements page)
     return RANKS[1];
   };
 
@@ -297,6 +309,7 @@ export default function AchievementsPage() {
                     <div className="absolute top-2 end-2">
                       <span className="text-neon-green text-xl">✓</span>
 <<<<<<< HEAD
+<<<<<<< HEAD
                     </div>
                   )}
                   
@@ -340,6 +353,8 @@ export default function AchievementsPage() {
                       </div>
 =======
 >>>>>>> 3691880 (fix: resolve merge conflicts in achievements page)
+=======
+>>>>>>> 00a40f7 (fix: completely remove merge conflict markers from achievements page)
                     </div>
                   )}
                   
