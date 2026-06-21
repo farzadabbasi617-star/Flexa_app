@@ -25,6 +25,8 @@ export default function AdminHonorsPage() {
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<any>({});
+  const [aiDraftLoading, setAiDraftLoading] = useState(false);
+  const [telegramDraft, setTelegramDraft] = useState("");
 
   const [newHonor, setNewHonor] = useState({
     type: "news" as const,
@@ -33,6 +35,7 @@ export default function AdminHonorsPage() {
     prize: "",
     username: "",
     level: "",
+    game: "",
     highlight: false,
     image: "",
   });
@@ -67,6 +70,25 @@ export default function AdminHonorsPage() {
     fetchHonors();
   };
 
+  const generateAiDraft = async () => {
+    setAiDraftLoading(true);
+    try {
+      const res = await fetch("/api/admin/honors/ai-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify(newHonor),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "ساخت متن انجام نشد");
+      setNewHonor((prev) => ({ ...prev, title: data.title || prev.title, description: data.description || prev.description }));
+      setTelegramDraft(data.telegramPost || "");
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "ساخت متن انجام نشد");
+    } finally {
+      setAiDraftLoading(false);
+    }
+  };
+
   const createHonor = async () => {
     if (!newHonor.title || !newHonor.description) {
       alert("عنوان و توضیحات الزامی است");
@@ -93,6 +115,7 @@ export default function AdminHonorsPage() {
       prize: "",
       username: "",
       level: "",
+      game: "",
       highlight: false,
       image: "",
     });
@@ -166,10 +189,16 @@ export default function AdminHonorsPage() {
             className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm mb-4 h-24 resize-y"
           />
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <input placeholder="نام کاربری" value={newHonor.username} onChange={(e) => setNewHonor({...newHonor, username: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm" />
             <input placeholder="جایزه (اختیاری)" value={newHonor.prize} onChange={(e) => setNewHonor({...newHonor, prize: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm" />
             <input placeholder="لول (اختیاری)" value={newHonor.level} onChange={(e) => setNewHonor({...newHonor, level: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm" />
+            <select value={newHonor.game} onChange={(e) => setNewHonor({...newHonor, game: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm">
+              <option value="">همه بازی‌ها</option>
+              <option value="clash_royale">کلش رویال</option>
+              <option value="cod_mobile">کالاف موبایل</option>
+              <option value="fortnite">فورتنایت</option>
+            </select>
           </div>
 
           <input 
@@ -190,12 +219,28 @@ export default function AdminHonorsPage() {
             </label>
           </div>
 
-          <button 
-            onClick={createHonor} 
-            className="bg-purple-600 hover:bg-purple-700 px-8 py-3 rounded-2xl text-sm font-black transition-all"
-          >
-            ایجاد محتوا
-          </button>
+          {telegramDraft && (
+            <div className="bg-black/25 border border-white/10 rounded-2xl p-4 mb-4">
+              <div className="text-xs font-black text-cyan-300 mb-2">متن پیشنهادی تلگرام</div>
+              <pre className="whitespace-pre-wrap text-[11px] leading-6 text-gray-300 font-sans">{telegramDraft}</pre>
+            </div>
+          )}
+
+          <div className="flex flex-wrap gap-3">
+            <button
+              onClick={generateAiDraft}
+              disabled={aiDraftLoading}
+              className="bg-cyan-600 hover:bg-cyan-700 disabled:opacity-50 px-8 py-3 rounded-2xl text-sm font-black transition-all"
+            >
+              {aiDraftLoading ? "در حال ساخت..." : "✨ ساخت متن با AI"}
+            </button>
+            <button 
+              onClick={createHonor} 
+              className="bg-purple-600 hover:bg-purple-700 px-8 py-3 rounded-2xl text-sm font-black transition-all"
+            >
+              ایجاد محتوا
+            </button>
+          </div>
         </div>
 
         {/* لیست محتواها */}

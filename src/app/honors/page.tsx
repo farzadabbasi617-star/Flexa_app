@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 
 type HonorType = "all" | "winner" | "levelup" | "news";
@@ -17,6 +18,7 @@ interface Honor {
   level?: number;
   highlight?: boolean;
   image?: string;
+  game?: string;
 }
 
 const FILTERS: { id: HonorType; label: string; icon: string }[] = [
@@ -26,8 +28,17 @@ const FILTERS: { id: HonorType; label: string; icon: string }[] = [
   { id: "news", label: "اخبار", icon: "📰" },
 ];
 
+const GAME_FILTERS = [
+  { id: "all", label: "همه بازی‌ها" },
+  { id: "clash_royale", label: "کلش رویال" },
+  { id: "cod_mobile", label: "کالاف موبایل" },
+  { id: "fortnite", label: "فورتنایت" },
+];
+
 export default function HonorsPage() {
   const [activeFilter, setActiveFilter] = useState<HonorType>("all");
+  const [activeGame, setActiveGame] = useState("all");
+  const [query, setQuery] = useState("");
   const [honors, setHonors] = useState<Honor[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -41,10 +52,13 @@ export default function HonorsPage() {
       .catch(() => setLoading(false));
   }, []);
 
-  const filteredHonors =
-    activeFilter === "all"
-      ? honors
-      : honors.filter((h) => h.type === activeFilter);
+  const filteredHonors = honors.filter((honor) => {
+    const byType = activeFilter === "all" || honor.type === activeFilter;
+    const byGame = activeGame === "all" || honor.game === activeGame;
+    const q = query.trim().toLowerCase();
+    const byQuery = !q || `${honor.title} ${honor.description} ${honor.username || ""}`.toLowerCase().includes(q);
+    return byType && byGame && byQuery;
+  });
 
   const featured = honors.filter((h) => h.highlight);
 
@@ -63,20 +77,43 @@ export default function HonorsPage() {
 
       <div className="max-w-[480px] mx-auto px-5">
         {/* Filters */}
-        <div className="flex gap-2 mb-8 overflow-x-auto pb-3">
-          {FILTERS.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setActiveFilter(f.id)}
-              className={`px-6 py-2.5 rounded-2xl text-sm font-black border transition-all active:scale-95 whitespace-nowrap ${
-                activeFilter === f.id
-                  ? "bg-purple-600 border-purple-500 text-white shadow-[0_0_25px_rgba(168,85,247,.4)]"
-                  : "bg-[#111114] border-white/10 text-white/70"
-              }`}
-            >
-              {f.icon} {f.label}
-            </button>
-          ))}
+        <div className="mb-5 space-y-3">
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="جستجوی بازیکن، عنوان یا توضیحات..."
+            className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-purple-400"
+          />
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setActiveFilter(f.id)}
+                className={`px-6 py-2.5 rounded-2xl text-sm font-black border transition-all active:scale-95 whitespace-nowrap ${
+                  activeFilter === f.id
+                    ? "bg-purple-600 border-purple-500 text-white shadow-[0_0_25px_rgba(168,85,247,.4)]"
+                    : "bg-[#111114] border-white/10 text-white/70"
+                }`}
+              >
+                {f.icon} {f.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-3">
+            {GAME_FILTERS.map((game) => (
+              <button
+                key={game.id}
+                onClick={() => setActiveGame(game.id)}
+                className={`px-4 py-2 rounded-2xl text-xs font-black border transition-all active:scale-95 whitespace-nowrap ${
+                  activeGame === game.id
+                    ? "bg-cyan-600/80 border-cyan-400 text-white"
+                    : "bg-[#111114] border-white/10 text-white/60"
+                }`}
+              >
+                {game.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Featured Big Visual Cards */}
@@ -106,9 +143,10 @@ export default function HonorsPage() {
             <div className="text-center py-12 text-white/50">در حال بارگذاری...</div>
           ) : filteredHonors.length > 0 ? (
             filteredHonors.map((honor) => (
-              <div
+              <Link
                 key={honor.id}
-                className="glass-panel rounded-3xl overflow-hidden border border-white/10 active:scale-[0.985] transition-all"
+                href={`/honors/${honor.id}`}
+                className="block glass-panel rounded-3xl overflow-hidden border border-white/10 active:scale-[0.985] transition-all"
               >
                 <div className="flex">
                   {/* Image Side */}
@@ -140,7 +178,7 @@ export default function HonorsPage() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </Link>
             ))
           ) : (
             <div className="text-center py-10 text-white/50">موردی برای نمایش وجود ندارد</div>
