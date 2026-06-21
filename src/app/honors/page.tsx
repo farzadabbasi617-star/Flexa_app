@@ -6,8 +6,8 @@ import BottomNav from "@/components/BottomNav";
 type HonorType = "all" | "winner" | "levelup" | "news";
 
 interface Honor {
-  id: number;
-  type: "winner" | "levelup" | "news";
+  id: string;
+  type: "winner" | "levelup" | "news" | string;
   icon: string;
   title: string;
   description: string;

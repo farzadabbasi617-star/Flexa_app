@@ -5,8 +5,8 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 
 interface Honor {
-  id: number;
-  type: "winner" | "levelup" | "news";
+  id: string;
+  type: "winner" | "levelup" | "news" | string;
   title: string;
   description: string;
   time: string;
@@ -16,12 +16,14 @@ interface Honor {
   highlight: boolean;
   status: "pending" | "approved" | "rejected";
   image?: string;
+  createdAt?: string;
+  publishedAt?: string | null;
 }
 
 export default function AdminHonorsPage() {
   const [honors, setHonors] = useState<Honor[]>([]);
   const [loading, setLoading] = useState(true);
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<any>({});
 
   const [newHonor, setNewHonor] = useState({
@@ -36,9 +38,9 @@ export default function AdminHonorsPage() {
   });
 
   const fetchHonors = async () => {
-    const res = await fetch("/api/admin/honors");
+    const res = await fetch("/api/admin/honors", { cache: "no-store" });
     const data = await res.json();
-    setHonors(data);
+    setHonors(Array.isArray(data) ? data : []);
     setLoading(false);
   };
 
@@ -46,20 +48,20 @@ export default function AdminHonorsPage() {
     fetchHonors();
   }, []);
 
-  const updateStatus = async (id: number, status: "approved" | "rejected") => {
+  const updateStatus = async (id: string, status: "approved" | "rejected") => {
     await fetch("/api/admin/honors", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({ id, status }),
     });
     fetchHonors();
   };
 
-  const deleteHonor = async (id: number) => {
+  const deleteHonor = async (id: string) => {
     if (!confirm("حذف شود؟")) return;
     await fetch("/api/admin/honors", {
       method: "DELETE",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({ id }),
     });
     fetchHonors();
@@ -80,7 +82,7 @@ export default function AdminHonorsPage() {
 
     await fetch("/api/admin/honors", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify(payload),
     });
 
@@ -110,7 +112,7 @@ export default function AdminHonorsPage() {
 
     await fetch("/api/admin/honors", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({
         id: editingId,
         ...editData,
@@ -240,7 +242,7 @@ export default function AdminHonorsPage() {
                         {honor.username && <span>@{honor.username}</span>}
                         {honor.level && <span>سطح {honor.level}</span>}
                         {honor.prize && <span className="text-yellow-400">{honor.prize}</span>}
-                        <span>{honor.time}</span>
+                        <span>{honor.time || (honor.publishedAt || honor.createdAt ? new Date(honor.publishedAt || honor.createdAt!).toLocaleString("fa-IR") : "—")}</span>
                       </div>
                     </div>
 

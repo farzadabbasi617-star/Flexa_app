@@ -207,6 +207,37 @@ export const tournaments = pgTable("tournaments", {
   startDate: timestamp("start_date"),
 });
 
+// Honors / Hall of Fame
+export const honors = pgTable("honors", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  type: varchar("type", { length: 30 }).notNull().default("news"),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  icon: varchar("icon", { length: 20 }).notNull().default("🏆"),
+  imageUrl: text("image_url"),
+  prize: varchar("prize", { length: 120 }),
+  username: varchar("username", { length: 100 }),
+  level: integer("level"),
+  highlight: boolean("highlight").notNull().default(false),
+  game: varchar("game", { length: 50 }),
+  tournamentId: uuid("tournament_id").references(() => tournaments.id),
+  userId: uuid("user_id").references(() => users.id),
+  createdById: uuid("created_by_id").references(() => users.id),
+  approvedById: uuid("approved_by_id").references(() => users.id),
+  source: varchar("source", { length: 50 }).notNull().default("manual"),
+  metadata: jsonb("metadata"),
+  publishedAt: timestamp("published_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index("honors_status_idx").on(table.status),
+  typeIdx: index("honors_type_idx").on(table.type),
+  gameIdx: index("honors_game_idx").on(table.game),
+  createdAtIdx: index("honors_created_at_idx").on(table.createdAt),
+  publishedAtIdx: index("honors_published_at_idx").on(table.publishedAt),
+}));
+
 // Players
 export const players = pgTable("players", {
   id: uuid("id").defaultRandom().primaryKey(),

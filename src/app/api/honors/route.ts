@@ -1,83 +1,60 @@
 import { NextResponse } from "next/server";
+import { db } from "@/db";
+import { honors } from "@/db/schema";
+import { desc, eq } from "drizzle-orm";
+import logger from "@/lib/logger";
 
-interface Honor {
-  id: number;
-  type: "winner" | "levelup" | "news";
-  icon: string;
-  title: string;
-  description: string;
-  time: string;
-  prize?: string;
-  username?: string;
-  level?: number;
-  highlight?: boolean;
+export const dynamic = "force-dynamic";
+
+function iconForType(type: string) {
+  if (type === "winner" || type === "runner_up" || type === "record") return "🏆";
+  if (type === "levelup" || type === "rankup") return "⚡";
+  if (type === "fairplay") return "🤝";
+  if (type === "team") return "🛡️";
+  if (type === "event") return "🎉";
+  return "📰";
 }
 
-// موقتاً داده‌های استاتیک. بعداً از دیتابیس خوانده می‌شود.
-const honors: Honor[] = [
-  {
-    id: 1,
-    type: "winner",
-    icon: "🏆",
-    title: "قهرمان تورنومنت کالاف موبایل",
-    description: "علی رضایی با عملکرد درخشان در فینال، عنوان قهرمانی را از آن خود کرد.",
-    time: "۲ ساعت پیش",
-    prize: "۵۰۰٬۰۰۰ تومان",
-    username: "alireza_pro",
-    highlight: true,
-  },
-  {
-    id: 2,
-    type: "levelup",
-    icon: "⚡",
-    title: "سارا محمدی به سطح ۴۲ رسید",
-    description: "با کسب ۱۲٬۴۰۰ امتیاز تجربه، سارا به سطح جدیدی از مهارت دست یافت.",
-    time: "۵ ساعت پیش",
-    username: "sara_gamer",
-    level: 42,
-  },
-  {
-    id: 3,
-    type: "winner",
-    icon: "🏆",
-    title: "امیرحسین کریمی قهرمان فورتنایت شد",
-    description: "در رقابتی نفس‌گیر، امیرحسین با ۲۴ کیل، رتبه اول را کسب کرد.",
-    time: "دیروز",
-    prize: "۱٬۲۰۰٬۰۰۰ تومان",
-    username: "amir_king",
-    highlight: true,
-  },
-  {
-    id: 4,
-    type: "news",
-    icon: "📰",
-    title: "به‌روزرسانی بزرگ سیستم داوری هوش مصنوعی",
-    description: "دقت موتور AI فلکسا به ۹۷٪ رسید. این به‌روزرسانی شامل بهبود تشخیص تقلب و سرعت پردازش است.",
-    time: "۲ روز پیش",
-    highlight: true,
-  },
-  {
-    id: 5,
-    type: "levelup",
-    icon: "⚡",
-    title: "محمد حسینی به سطح ۳۸ رسید",
-    description: "محمد با ۸ برد پیاپی در تورنومنت‌ها، سطح خود را ارتقا داد.",
-    time: "۳ روز پیش",
-    username: "mohammad_h",
-    level: 38,
-  },
-  {
-    id: 6,
-    type: "winner",
-    icon: "🏆",
-    title: "زهرا کریمی قهرمان کلش رویال",
-    description: "زهرا با استراتژی هوشمندانه در فینال، جایزه را به خانه برد.",
-    time: "۴ روز پیش",
-    prize: "۳۵۰٬۰۰۰ تومان",
-    username: "zahra_cr",
-  },
-];
+function relativeTime(date: Date | string | null | undefined) {
+  if (!date) return "به‌تازگی";
+  const diffMs = Date.now() - new Date(date).getTime();
+  const minutes = Math.max(1, Math.floor(diffMs / 60_000));
+  if (minutes < 60) return `${minutes.toLocaleString("fa-IR")} دقیقه پیش`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours.toLocaleString("fa-IR")} ساعت پیش`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days.toLocaleString("fa-IR")} روز پیش`;
+  return new Date(date).toLocaleDateString("fa-IR");
+}
 
 export async function GET() {
-  return NextResponse.json(honors);
+  try {
+    const rows = await db
+      .select()
+      .from(honors)
+      .where(eq(honors.status, "approved"))
+      .orderBy(desc(honors.highlight), desc(honors.publishedAt), desc(honors.createdAt))
+      .limit(100);
+
+    return NextResponse.json(
+      rows.map((row) => ({
+        id: row.id,
+        type: row.type,
+        icon: row.icon || iconForType(row.type),
+        title: row.title,
+        description: row.description,
+        time: relativeTime(row.publishedAt || row.createdAt),
+        prize: row.prize || undefined,
+        username: row.username || undefined,
+        level: row.level || undefined,
+        highlight: row.highlight,
+        image: row.imageUrl || undefined,
+        game: row.game || undefined,
+        publishedAt: row.publishedAt,
+      }))
+    );
+  } catch (err) {
+    logger.error({ err }, "Public honors GET failed");
+    return NextResponse.json([], { status: 200 });
+  }
 }
