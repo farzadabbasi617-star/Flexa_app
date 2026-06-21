@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { judgments, matches, players, matchEvidence } from "@/db/schema";
 import { eq, count } from "drizzle-orm";
-import { analyzeMatch } from "@/lib/ai-engine";
+import { analyzeMatchWithAI } from "@/lib/ai-service";
 import { requireRole } from "@/lib/auth";
 import { evaluateUserAchievements } from "@/lib/achievement-service";
 
@@ -64,8 +64,9 @@ export async function POST(request: NextRequest) {
     
     const hasEvidence = evidenceCount.count > 0;
 
-    // Run AI analysis
-    const aiResult = analyzeMatch(
+    // Run real multi-provider AI analysis (OpenRouter primary, Groq failover)
+    // with a deterministic local fallback inside analyzeMatchWithAI.
+    const aiResult = await analyzeMatchWithAI(
       match.player1Score || 0,
       match.player2Score || 0,
       p1Rating,
