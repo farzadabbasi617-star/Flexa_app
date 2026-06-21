@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { fetchAIResponse } from "@/lib/ai-provider-manager";
+import { flexaSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
   "telegramPost": "متن تبلیغاتی کوتاه برای کانال تلگرام"
 }`;
 
-    const systemPrompt = "تو دستیار مدیریت Flexa هستی. برای تورنومنت‌های گیمینگ قوانین منصفانه، ضدتقلب و قابل اجرا می‌نویسی. فقط JSON معتبر بدون markdown برگردان.";
+    const systemPrompt = flexaSystemPrompt("tournamentDraft", "فقط JSON معتبر بدون markdown برگردان.");
     const ai = await fetchAIResponse(prompt, systemPrompt);
     const parsed = ai ? safeParseAIJson<Partial<DraftResult>>(ai.content) : null;
     const draft = normalizeDraft(parsed, fallback);

@@ -1,4 +1,5 @@
 import { fetchAIResponse } from './ai-provider-manager';
+import { flexaSystemPrompt } from './ai-prompts';
 import { db } from '@/db';
 import { aiProposals } from '@/db/schema';
 import { safeParseAIJson } from './ai-utils';
@@ -6,7 +7,7 @@ import { safeParseAIJson } from './ai-utils';
 export const AIManager = {
   async proposeMatchResult(matchId: string, resultData: any) {
     const prompt = `Review match ${matchId}. Scores: ${JSON.stringify(resultData)}.`;
-    const res = await fetchAIResponse(prompt, "You are an AI Manager. Propose action in JSON.");
+    const res = await fetchAIResponse(prompt, flexaSystemPrompt("manager", "Propose action in valid JSON only."));
     if (res) {
       const suggestion = safeParseAIJson<{ action: string, confidence: number, reasoning: string }>(res.content);
       if (suggestion) {

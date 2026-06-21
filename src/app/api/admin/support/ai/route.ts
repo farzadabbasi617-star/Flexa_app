@@ -4,6 +4,7 @@ import { ticketMessages, tickets, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { fetchAIResponse } from "@/lib/ai-provider-manager";
+import { flexaSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
@@ -130,7 +131,7 @@ ${transcript}
   "requiredInfo": ["اطلاعات لازم برای ادامه بررسی"]
 }`;
 
-    const systemPrompt = "تو دستیار پشتیبانی Flexa هستی. تیکت‌ها را دقیق، امن و کوتاه تحلیل می‌کنی. اگر موضوع مالی یا داوری است با احتیاط پاسخ بده و قول قطعی نده. فقط JSON معتبر بدون markdown برگردان.";
+    const systemPrompt = flexaSystemPrompt("support", "فقط JSON معتبر بدون markdown برگردان.");
     const ai = await fetchAIResponse(prompt, systemPrompt);
     const parsed = ai ? safeParseAIJson<Partial<SupportAIInsight>>(ai.content) : null;
     const insight = normalizeInsight(parsed, fallback);

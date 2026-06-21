@@ -4,6 +4,7 @@ import { disputes, matches, players, transactions, users, wallets } from "@/db/s
 import { desc, eq, gte, sql } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { fetchAIResponse } from "@/lib/ai-provider-manager";
+import { flexaSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
@@ -213,7 +214,7 @@ ${JSON.stringify(snapshot, null, 2)}
   "nextActions": ["..."]
 }`;
 
-    const systemPrompt = "تو تحلیل‌گر ریسک عملیاتی و ضدتقلب Flexa هستی. محتاط، دقیق و فارسی پاسخ بده. فقط JSON معتبر بدون markdown برگردان. هیچ اتهام قطعی نزن؛ فقط بگو نیازمند بررسی.";
+    const systemPrompt = flexaSystemPrompt("riskReport", "فقط JSON معتبر بدون markdown برگردان.");
     const ai = await fetchAIResponse(prompt, systemPrompt);
     const parsed = ai ? safeParseAIJson<Partial<RiskReport>>(ai.content) : null;
     const report = normalizeReport(parsed, fallback);

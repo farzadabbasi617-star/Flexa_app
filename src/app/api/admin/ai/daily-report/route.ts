@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { fetchAIResponse } from "@/lib/ai-provider-manager";
+import { flexaSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { eq, gte, sql } from "drizzle-orm";
@@ -128,7 +129,7 @@ ${JSON.stringify(snapshot, null, 2)}
   "recommendedActions": ["اقدام‌های پیشنهادی مشخص"]
 }`;
 
-    const systemPrompt = "تو دستیار مدیریتی Flexa هستی. گزارش روزانه کوتاه، اجرایی و فارسی می‌نویسی. فقط JSON معتبر بدون markdown برگردان.";
+    const systemPrompt = flexaSystemPrompt("dailyReport", "فقط JSON معتبر بدون markdown برگردان.");
     const ai = await fetchAIResponse(prompt, systemPrompt);
     const parsed = ai ? safeParseAIJson<Partial<DailyReport>>(ai.content) : null;
     const report = normalizeReport(parsed, fallback);
