@@ -151,6 +151,9 @@ export default function CreateTournamentPage() {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [form, setForm] = useState<FormState>(initialForm);
   const [imageOptions, setImageOptions] = useState<SiteImage[]>([]);
+  const [aiDraftLoading, setAiDraftLoading] = useState(false);
+  const [aiDraftError, setAiDraftError] = useState("");
+  const [telegramDraft, setTelegramDraft] = useState("");
 
   const selectedGame = GAME_CONFIG[form.game];
   const selectedFormat = useMemo(
@@ -188,6 +191,51 @@ export default function CreateTournamentPage() {
       maxPlayers: config.defaultMaxPlayers,
       rules: prev.rules || config.rulesPlaceholder,
     }));
+  }
+
+  async function generateAiDraft() {
+    setAiDraftLoading(true);
+    setAiDraftError("");
+    setError("");
+    try {
+      const res = await fetch("/api/ai/tournament-draft", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "XMLHttpRequest",
+        },
+        credentials: "include",
+        body: JSON.stringify({
+          game: form.game,
+          format: form.format,
+          name: form.name,
+          gameMode: form.gameMode,
+          mapName: form.mapName,
+          maxPlayers: form.maxPlayers,
+          serverSlots: form.serverSlots,
+          entryFee: form.entryFee,
+          prizePool: form.prizePool,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "پیش‌نویس AI ساخته نشد.");
+
+      setForm((prev) => ({
+        ...prev,
+        description: data.description || prev.description,
+        rules: data.rules || prev.rules,
+      }));
+      setTelegramDraft(data.telegramPost || "");
+    } catch (err) {
+      setAiDraftError(err instanceof Error ? err.message : "پیش‌نویس AI ساخته نشد.");
+    } finally {
+      setAiDraftLoading(false);
+    }
+  }
+
+  async function copyTelegramDraft() {
+    if (!telegramDraft) return;
+    await navigator.clipboard?.writeText(telegramDraft).catch(() => undefined);
   }
 
   function validateForm() {
@@ -356,6 +404,37 @@ export default function CreateTournamentPage() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="gaming-card p-5 border-purple-500/25 bg-purple-900/10">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div>
+                <h3 className="font-black text-neon-purple">🤖 کمک‌ساز AI تورنومنت</h3>
+                <p className="text-xs text-gray-500 mt-1 leading-5">
+                  با توجه به بازی، فرمت، ظرفیت و جایزه، توضیحات، قوانین و متن تبلیغاتی تلگرام را پیشنهاد می‌دهد.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={generateAiDraft}
+                disabled={aiDraftLoading}
+                className="gaming-btn text-xs px-4 py-3 disabled:opacity-50"
+              >
+                {aiDraftLoading ? "در حال ساخت..." : "✨ ساخت قوانین و متن"}
+              </button>
+            </div>
+            {aiDraftError && <div className="text-red-300 text-xs mb-3">{aiDraftError}</div>}
+            {telegramDraft && (
+              <div className="bg-black/25 border border-white/10 rounded-2xl p-4">
+                <div className="flex items-center justify-between gap-3 mb-2">
+                  <span className="text-xs font-black text-cyan-300">متن پیشنهادی تلگرام</span>
+                  <button type="button" onClick={copyTelegramDraft} className="text-[10px] bg-white/5 px-3 py-1.5 rounded-xl text-gray-300">
+                    کپی
+                  </button>
+                </div>
+                <pre className="whitespace-pre-wrap text-[11px] leading-6 text-gray-300 font-sans">{telegramDraft}</pre>
+              </div>
+            )}
           </div>
 
           <div className="gaming-card p-5 border-neon-blue/20">
