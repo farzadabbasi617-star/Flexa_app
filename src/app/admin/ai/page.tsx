@@ -47,6 +47,18 @@ interface RiskReport {
   snapshot?: Record<string, unknown>;
 }
 
+interface DailyReport {
+  headline: string;
+  summary: string;
+  highlights: string[];
+  concerns: string[];
+  recommendedActions: string[];
+  provider: string;
+  cachedProvider?: string | null;
+  model?: string | null;
+  snapshot?: Record<string, number>;
+}
+
 function ProviderBadge({ status }: { status: AIStatus | null }) {
   if (!status) return <span className="text-xs text-gray-500">در حال بررسی...</span>;
   if (status.connected) {
@@ -74,6 +86,8 @@ export default function AIAdminPage() {
   const [assistantResult, setAssistantResult] = useState<AssistantResult | null>(null);
   const [riskReport, setRiskReport] = useState<RiskReport | null>(null);
   const [riskLoading, setRiskLoading] = useState(false);
+  const [dailyReport, setDailyReport] = useState<DailyReport | null>(null);
+  const [dailyLoading, setDailyLoading] = useState(false);
   const [error, setError] = useState("");
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
@@ -151,6 +165,21 @@ export default function AIAdminPage() {
     }
   }
 
+  async function loadDailyReport() {
+    setDailyLoading(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/ai/daily-report", { cache: "no-store" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "گزارش روزانه ساخته نشد");
+      setDailyReport(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "گزارش روزانه ساخته نشد");
+    } finally {
+      setDailyLoading(false);
+    }
+  }
+
   if (loading || !user || !isAdmin) return null;
 
   const systems = [
@@ -199,6 +228,68 @@ export default function AIAdminPage() {
             ))}
           </div>
           {status?.sample && <div className="mt-4 bg-dark-700 rounded-2xl p-4 text-sm text-gray-300 leading-7">نمونه پاسخ: {status.sample}</div>}
+        </section>
+
+        <section className="gaming-card p-6 mb-8 border-cyan-500/20 bg-cyan-500/5">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
+            <div>
+              <h2 className="font-black text-lg text-cyan-200">📋 گزارش روزانه AI</h2>
+              <p className="text-xs text-gray-500 mt-1 leading-6">
+                خلاصه اجرایی ۲۴ ساعت اخیر شامل کاربران جدید، ثبت‌نام‌ها، تراکنش‌ها، تیکت‌ها، اعتراض‌ها و اقدامات پیشنهادی.
+              </p>
+            </div>
+            <button onClick={loadDailyReport} disabled={dailyLoading} className="gaming-btn text-sm disabled:opacity-50">
+              {dailyLoading ? "در حال ساخت..." : "ساخت گزارش روزانه"}
+            </button>
+          </div>
+
+          {dailyReport ? (
+            <div className="space-y-4">
+              <div className="rounded-3xl border border-white/10 bg-black/20 p-5">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-3">
+                  <div>
+                    <div className="text-xl font-black text-cyan-100">{dailyReport.headline}</div>
+                    <div className="text-[10px] text-gray-500 mt-2" dir="ltr">
+                      {dailyReport.provider}{dailyReport.cachedProvider ? ` / ${dailyReport.cachedProvider}` : ""}{dailyReport.model ? ` • ${dailyReport.model}` : ""}
+                    </div>
+                  </div>
+                  {dailyReport.snapshot && (
+                    <div className="grid grid-cols-3 gap-2 text-center text-[10px] min-w-[220px]">
+                      <div className="rounded-2xl bg-white/5 p-2"><b className="block text-cyan-200 text-sm">{dailyReport.snapshot.newUsers || 0}</b>کاربر جدید</div>
+                      <div className="rounded-2xl bg-white/5 p-2"><b className="block text-cyan-200 text-sm">{dailyReport.snapshot.newRegistrations || 0}</b>ثبت‌نام</div>
+                      <div className="rounded-2xl bg-white/5 p-2"><b className="block text-cyan-200 text-sm">{dailyReport.snapshot.openTickets || 0}</b>تیکت باز</div>
+                    </div>
+                  )}
+                </div>
+                <p className="text-sm leading-7 text-gray-200">{dailyReport.summary}</p>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+                <div className="rounded-3xl border border-green-500/20 bg-green-500/10 p-4">
+                  <div className="text-xs font-black text-green-200 mb-3">نکات مثبت</div>
+                  <ul className="space-y-2 text-xs leading-6 text-gray-300 list-disc pr-5">
+                    {dailyReport.highlights.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+                <div className="rounded-3xl border border-yellow-500/20 bg-yellow-500/10 p-4">
+                  <div className="text-xs font-black text-yellow-200 mb-3">موارد نیازمند توجه</div>
+                  <ul className="space-y-2 text-xs leading-6 text-gray-300 list-disc pr-5">
+                    {dailyReport.concerns.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+                <div className="rounded-3xl border border-purple-500/20 bg-purple-500/10 p-4">
+                  <div className="text-xs font-black text-purple-200 mb-3">اقدام‌های پیشنهادی</div>
+                  <ul className="space-y-2 text-xs leading-6 text-gray-300 list-disc pr-5">
+                    {dailyReport.recommendedActions.map((item) => <li key={item}>{item}</li>)}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-white/10 bg-black/20 p-5 text-sm text-gray-500 leading-7">
+              هنوز گزارش روزانه ساخته نشده. روی «ساخت گزارش روزانه» بزن تا AI وضعیت ۲۴ ساعت اخیر را خلاصه کند.
+            </div>
+          )}
         </section>
 
         <section className="gaming-card p-6 mb-8 border-yellow-500/20 bg-yellow-500/5">
