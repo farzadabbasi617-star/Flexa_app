@@ -16,6 +16,7 @@ interface Player {
   rankPoints?: number | null;
   gamentId?: string | null;
   isVerified?: boolean | null;
+  role?: string | null;
 }
 
 type Board = "rating" | "xp" | "wins" | "winrate";
@@ -52,6 +53,14 @@ function getRankTier(rating: number) {
   if (rating >= 1300) return { label: "طلایی", color: "text-yellow-400 bg-yellow-950/40 border-yellow-500/50", icon: "🥇" };
   if (rating >= 1000) return { label: "نقره‌ای", color: "text-gray-300 bg-gray-900/40 border-gray-500/50", icon: "🥈" };
   return { label: "برنزی", color: "text-amber-600 bg-amber-950/40 border-amber-800/50", icon: "🥉" };
+}
+
+function getRoleBadge(role?: string | null) {
+  if (role === "super_admin") return { label: "SUPER ADMIN", color: "text-red-400 bg-red-950/30 border-red-500/20" };
+  if (role === "admin") return { label: "ADMIN", color: "text-orange-400 bg-orange-950/30 border-orange-500/20" };
+  if (role === "judge") return { label: "JUDGE", color: "text-blue-400 bg-blue-950/30 border-blue-500/20" };
+  if (role === "moderator") return { label: "MOD", color: "text-green-400 bg-green-950/30 border-green-500/20" };
+  return null;
 }
 
 function medal(index: number) {
@@ -184,7 +193,7 @@ export default function LeaderboardPage() {
                     <div className="font-black truncate text-xs sm:text-sm">{topThree[1].displayName}</div>
                     <div className="text-[10px] text-gray-500 truncate">@{topThree[1].username}</div>
                     <div className="mt-2 text-gray-300 font-black text-sm tracking-tight num-en">
-                      {scoreFor(topThree[1], board).toLocaleString("fa-IR")} <span className="text-[9px] text-gray-500 font-normal">{scoreUnit(board)}</span>
+                      {scoreFor(topThree[1], board).toLocaleString("en-US")} <span className="text-[9px] text-gray-500 font-normal">{scoreUnit(board)}</span>
                     </div>
                   </Link>
                 )}
@@ -202,7 +211,7 @@ export default function LeaderboardPage() {
                     <div className="font-black truncate text-sm sm:text-base text-yellow-100">{topThree[0].displayName}</div>
                     <div className="text-[10px] text-yellow-500/70 truncate font-semibold">@{topThree[0].username}</div>
                     <div className="mt-2 text-yellow-400 font-black text-lg tracking-tight num-en">
-                      {scoreFor(topThree[0], board).toLocaleString("fa-IR")} <span className="text-[10px] text-yellow-500/50 font-normal">{scoreUnit(board)}</span>
+                      {scoreFor(topThree[0], board).toLocaleString("en-US")} <span className="text-[10px] text-yellow-500/50 font-normal">{scoreUnit(board)}</span>
                     </div>
                   </Link>
                 )}
@@ -220,7 +229,7 @@ export default function LeaderboardPage() {
                     <div className="font-black truncate text-xs sm:text-sm">{topThree[2].displayName}</div>
                     <div className="text-[10px] text-gray-500 truncate">@{topThree[2].username}</div>
                     <div className="mt-2 text-amber-500/90 font-black text-sm tracking-tight num-en">
-                      {scoreFor(topThree[2], board).toLocaleString("fa-IR")} <span className="text-[9px] text-amber-500/50 font-normal">{scoreUnit(board)}</span>
+                      {scoreFor(topThree[2], board).toLocaleString("en-US")} <span className="text-[9px] text-amber-500/50 font-normal">{scoreUnit(board)}</span>
                     </div>
                   </Link>
                 )}
@@ -233,6 +242,7 @@ export default function LeaderboardPage() {
                 const actualIndex = sortedPlayers.findIndex((p) => p.id === player.id);
                 const isTop3 = actualIndex < 3 && !searchQuery;
                 const tier = getRankTier(player.rating);
+                const roleBadge = getRoleBadge(player.role);
 
                 return (
                   <Link 
@@ -247,7 +257,7 @@ export default function LeaderboardPage() {
                     }`}
                   >
                     {/* Rank Number / Medal */}
-                    <div className="w-11 text-center text-lg font-black text-purple-400">
+                    <div className="w-11 text-center text-lg font-black text-purple-400 num-en">
                       {medal(actualIndex)}
                     </div>
                     
@@ -259,15 +269,17 @@ export default function LeaderboardPage() {
                     {/* Info */}
                     <div className="flex-1 min-w-0 text-right">
                       <div className="font-black flex items-center justify-start gap-1.5 text-sm sm:text-base">
-                        {player.displayName}
-                        {player.isVerified && (
-                          <span className="text-emerald-400 text-xs bg-emerald-500/10 px-1.5 py-0.5 rounded-md border border-emerald-500/20">✓ تایید شده</span>
+                        <span>{player.displayName}</span>
+                        {roleBadge && (
+                          <span className={`px-2 py-0.5 rounded-md text-[8px] border font-black tracking-wider ${roleBadge.color}`}>
+                            {roleBadge.label}
+                          </span>
                         )}
                       </div>
-                      <div className="text-xs text-gray-400 mt-0.5 flex items-center justify-start gap-1.5">
+                      <div className="text-xs text-gray-400 mt-1 flex items-center justify-start gap-2">
                         <span className="num-en">@{player.username}</span>
                         <span>•</span>
-                        <span>سطح {player.level || 1}</span>
+                        <span className="flex items-center gap-0.5">سطح <span className="num-en font-bold">{player.level || 1}</span></span>
                         {board === "rating" && (
                           <>
                             <span>•</span>
@@ -279,10 +291,16 @@ export default function LeaderboardPage() {
                       </div>
                     </div>
 
+                    {/* Win/Loss Record */}
+                    <div className="hidden sm:flex flex-col items-center justify-center bg-white/5 border border-white/5 rounded-xl px-2.5 py-1 text-[11px] font-bold text-gray-400">
+                      <span className="text-emerald-400 num-en">{player.wins}W</span>
+                      <span className="text-red-400 num-en">{player.losses}L</span>
+                    </div>
+
                     {/* Score display */}
                     <div className="text-left min-w-[75px]">
                       <div className="font-black text-xl sm:text-2xl num-en tracking-tight text-purple-100">
-                        {scoreFor(player, board).toLocaleString("fa-IR")}
+                        {scoreFor(player, board).toLocaleString("en-US")}
                       </div>
                       <div className="text-[10px] text-gray-500 font-bold">
                         {scoreUnit(board)}
