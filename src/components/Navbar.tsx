@@ -199,7 +199,7 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Mobile Top Navigation Menu - Premium Uniform Icons */}
+          {/* Mobile Top Navigation Menu - Premium Uniform Icons (No Duplicates!) */}
           <div className="lg:hidden flex items-center gap-1.5">
             {navItems.slice(0, 5).map((item) => {
               const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -208,8 +208,8 @@ export default function Navbar() {
                 "/": "/icons/arena_icon.png",
                 "/tournaments": "/icons/honors_icon.png",
                 "/leaderboard": "/icons/rankings_icon.png",
-                "/judging": "/icons/profile_privacy.png",
-                "/teams": "/icons/profile_game_ids.png",
+                "/judging": "/icons/icon-judging.png", // Exclusive custom neon gavel/scale icon!
+                "/teams": "/icons/icon-teams.png",     // Exclusive custom neon guild shield icon!
                 "/admin": "/icons/profile_admin.png",
               };
               const finalIconUrl = customIcons[item.href];
