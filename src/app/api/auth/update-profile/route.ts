@@ -80,6 +80,7 @@ export async function PATCH(request: NextRequest) {
         isVerified: updated.isVerified,
         level: updated.level,
         rankPoints: updated.rankPoints,
+        xp: updated.xp,
         clashRoyaleId: updated.clashRoyaleId,
         clashRoyaleUsername: updated.clashRoyaleUsername,
         codMobileId: updated.codMobileId,

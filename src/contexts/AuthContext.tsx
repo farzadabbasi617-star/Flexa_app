@@ -16,6 +16,7 @@ interface User {
   isVerified: boolean;
   level: number;
   rankPoints: number;
+  xp: number;
   clashRoyaleId: string | null;
   clashRoyaleUsername: string | null;
   codMobileId: string | null;

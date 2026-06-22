@@ -109,6 +109,7 @@ export async function POST(request: NextRequest) {
         isVerified: user.isVerified,
         level: user.level,
         rankPoints: user.rankPoints,
+        xp: user.xp,
         clashRoyaleId: user.clashRoyaleId,
         clashRoyaleUsername: user.clashRoyaleUsername,
         codMobileId: user.codMobileId,
