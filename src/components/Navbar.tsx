@@ -84,22 +84,6 @@ export default function Navbar() {
               </button>
             </div>
 
-            {/* Language Switcher */}
-            <div className="ms-2 flex items-center bg-dark-800 rounded-full p-1 border border-gaming-border">
-              <button
-                onClick={() => setLang("fa")}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === "fa" ? "bg-neon-purple text-white" : "text-gray-400 hover:text-white"}`}
-              >
-                🇮🇷
-              </button>
-              <button
-                onClick={() => setLang("en")}
-                className={`px-3 py-1 rounded-full text-xs font-bold transition-all ${lang === "en" ? "bg-neon-purple text-white" : "text-gray-400 hover:text-white"}`}
-              >
-                🇬🇧
-              </button>
-            </div>
-
             {/* User/Auth */}
             <div className="ms-4 border-s border-gaming-border ps-4">
               {loading ? (
@@ -121,11 +105,8 @@ export default function Navbar() {
                         <p className="text-sm font-bold text-white truncate">{user.displayName}</p>
                       </div>
                       <div className="p-1">
-                        <Link href="/dashboard" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
-                          <span>📊</span> {lang === "fa" ? "داشبورد" : "Dashboard"}
-                        </Link>
                         <Link href="/profile" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
-                          <span>⚙️</span> تنظیمات
+                          <span>👤</span> {lang === "fa" ? "پروفایل من" : "My Profile"}
                         </Link>
                         <Link href="/profile/edit" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                           <span>🎮</span> {t.auth.gameIds}
@@ -229,7 +210,7 @@ export default function Navbar() {
               );
             })}
             {user ? (
-              <Link href="/dashboard" className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${isAdmin ? "bg-gradient-to-br from-neon-pink to-neon-orange" : "bg-gradient-to-br from-neon-purple to-neon-blue"}`}>
+              <Link href="/profile" className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${isAdmin ? "bg-gradient-to-br from-neon-pink to-neon-orange" : "bg-gradient-to-br from-neon-purple to-neon-blue"}`}>
                 {isAdmin ? "👑" : user.displayName.charAt(0).toUpperCase()}
               </Link>
             ) : (

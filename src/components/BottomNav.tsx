@@ -15,7 +15,7 @@ const navItems = [
   { id: "arena", label: "آرنا", icon: "🔥", path: "/" },
   { id: "rankings", label: "رتبه‌ها", icon: "👑", path: "/leaderboard" },
   { id: "honors", label: "تالار افتخارات", icon: "🏆", path: "/honors" },
-  { id: "profile", label: "تنظیمات", icon: "🚀", path: "/profile" },
+  { id: "profile", label: "پروفایل", icon: "🚀", path: "/profile" },
 ];
 
 export default function BottomNav() {
