@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq, or } from "drizzle-orm";
+import { eq, or, ilike } from "drizzle-orm";
 import { verifyPassword, createSession } from "@/lib/auth";
 import { LoginSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
@@ -40,13 +40,14 @@ export async function POST(request: NextRequest) {
 
     const { identifier, password } = validation.data;
 
+    // Use ilike for case-insensitive username and email search
     const [user] = await db
       .select()
       .from(users)
       .where(
         or(
-          eq(users.email, identifier),
-          eq(users.username, identifier),
+          ilike(users.email, identifier),
+          ilike(users.username, identifier),
           eq(users.phoneNumber, identifier)
         )
       );
