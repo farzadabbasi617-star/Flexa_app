@@ -41,6 +41,7 @@ export async function GET(request: NextRequest) {
         codMobileUsername: user.codMobileUsername,
         fortniteId: user.fortniteId,
         fortniteUsername: user.fortniteUsername,
+        metadata: user.metadata,
       },
     });
   } catch {

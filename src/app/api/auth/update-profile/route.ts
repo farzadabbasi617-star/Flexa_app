@@ -86,6 +86,7 @@ export async function PATCH(request: NextRequest) {
         codMobileUsername: updated.codMobileUsername,
         fortniteId: updated.fortniteId,
         fortniteUsername: updated.fortniteUsername,
+        metadata: updated.metadata,
       },
     });
   } catch {

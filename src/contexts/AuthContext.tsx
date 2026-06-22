@@ -22,6 +22,7 @@ interface User {
   codMobileUsername: string | null;
   fortniteId: string | null;
   fortniteUsername: string | null;
+  metadata?: any;
 }
 
 interface AuthContextType {

@@ -115,6 +115,7 @@ export async function POST(request: NextRequest) {
         codMobileUsername: user.codMobileUsername,
         fortniteId: user.fortniteId,
         fortniteUsername: user.fortniteUsername,
+        metadata: user.metadata,
       },
     });
 
