@@ -15,9 +15,22 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Gament — پلتفرم تورنومنت گیمینگ",
+  title: "گیمنت | Gament — پلتفرم هوشمند تورنومنت گیمینگ",
   description:
-    "پلتفرم حرفه‌ای تورنومنت بازی برای کلش رویال، کالاف موبایل و فورتنایت با داوری هوش مصنوعی",
+    "گیمنت (Gament) پلتفرم حرفه‌ای برگزاری و مدیریت تورنومنت‌های آنلاین بازی‌های موبایلی (کالاف دیوتی موبایل، فورتنایت و کلش رویال) همراه با سیستم داوری هوشمند و هوش مصنوعی است.",
+  keywords: [
+    "گیمنت",
+    "gament",
+    "gament app",
+    "تورنومنت گیمینگ",
+    "مسابقات کالاف دیوتی موبایل",
+    "مسابقات فورتنایت",
+    "مسابقات کلش رویال",
+    "داوری هوشمند بازی",
+    "لیگ گیمینگ",
+    "بازی آنلاین موبایل",
+    "رقابت‌های گیمینگ"
+  ],
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -29,6 +42,31 @@ export const metadata: Metadata = {
   },
   other: {
     "mobile-web-app-capable": "yes",
+  },
+  alternates: {
+    canonical: "https://gament.app",
+  },
+  openGraph: {
+    title: "گیمنت | Gament — پلتفرم هوشمند تورنومنت گیمینگ",
+    description: "گیمنت (Gament) پلتفرم حرفه‌ای برگزاری و مدیریت تورنومنت‌های آنلاین بازی‌های موبایلی با سیستم داوری هوشمند و هوش مصنوعی است.",
+    url: "https://gament.app",
+    siteName: "Gament",
+    images: [
+      {
+        url: "/icons/arena_icon.png",
+        width: 512,
+        height: 512,
+        alt: "Gament - گیمنت",
+      },
+    ],
+    locale: "fa_IR",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "گیمنت | Gament — پلتفرم هوشمند تورنومنت گیمینگ",
+    description: "گیمنت (Gament) پلتفرم حرفه‌ای برگزاری و مدیریت تورنومنت‌های آنلاین بازی‌های موبایلی با سیستم داوری هوشمند و هوش مصنوعی است.",
+    images: ["/icons/arena_icon.png"],
   },
 };
 
