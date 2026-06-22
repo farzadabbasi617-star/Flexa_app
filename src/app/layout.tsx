@@ -65,7 +65,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "گیمنت | Gament — پلتفرم هوشمند تورنومنت گیمینگ",
-    description: "گیمنت (Gament) پلتفرم حرفه‌ای برگزاری و مدیریت تورنومنت‌های آنلاین بازی‌های موبایلی با سیستم داوری هوشمند و هوش مصنوعی است.",
+    description: "گیمنت (Gament) pلتفرم حرفه‌ای برگزاری و مدیریت تورنومنت‌های آنلاین بازی‌های موبایلی با سیستم داوری هوشمند و هوش مصنوعی است.",
     images: ["/icons/arena_icon.png"],
   },
 };
@@ -76,6 +76,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <link rel="apple-touch-icon" href="/icons/arena_icon.png" />
         <link rel="icon" href="/icons/arena_icon.png" />
+        {/* Load Telegram WebApp Javascript library securely */}
+        <script src="https://telegram.org/js/telegram-web-app.js" async></script>
       </head>
       <body className="text-white antialiased font-gaming min-h-screen">
         <QueryProvider>

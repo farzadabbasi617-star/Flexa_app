@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, ReactNode, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 interface User {
@@ -73,6 +73,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const result = await refetchSession();
     setUser(result.data ?? null);
   }, [refetchSession]);
+
+  // Telegram Mini App seamless auto-login hook
+  useEffect(() => {
+    if (typeof window !== "undefined" && !isSessionLoading && !sessionData && !user) {
+      const tg = (window as any).Telegram?.WebApp;
+      if (tg && tg.initData) {
+        console.log("Telegram Mini App detected. Attempting secure auto-login...");
+        fetch("/api/auth/telegram-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+          body: JSON.stringify({ initData: tg.initData }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success && data.user) {
+              console.log("Gament seamless Telegram auto-login successful!");
+              setUser(data.user);
+              queryClient.setQueryData(["auth-session"], data.user);
+              refetchSession();
+            }
+          })
+          .catch((err) => {
+            console.error("Telegram auto-login failed:", err);
+          });
+      }
+    }
+  }, [sessionData, user, isSessionLoading, queryClient, refetchSession]);
 
   async function login(identifier: string, password: string) {
     try {
