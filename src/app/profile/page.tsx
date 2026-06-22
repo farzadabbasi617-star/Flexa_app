@@ -285,9 +285,30 @@ export default function ProfilePage() {
               </div>
             </div>
 
+            {/* Custom Avatar URL Field (Added for custom designs/uploads!) */}
+            <div>
+              <label className="block text-[10px] font-black text-gray-500 mb-2">مسیر یا آدرس آواتار سفارشی</label>
+              <div className="flex gap-2">
+                <input
+                  value={selectedAvatar}
+                  onChange={(e) => setSelectedAvatar(e.target.value)}
+                  className="flex-1 bg-black/25 border border-white/10 rounded-2xl px-4 py-3 text-xs outline-none focus:border-purple-400 text-left"
+                  placeholder="مثال: /icons/profile_icon.png یا آدرس فایل سفارشی"
+                  dir="ltr"
+                />
+                <button
+                  onClick={() => saveProfile(selectedAvatar)}
+                  disabled={profileSaving || !selectedAvatar.trim()}
+                  className="px-4 rounded-2xl bg-cyan-600 disabled:opacity-50 text-xs font-black shrink-0"
+                >
+                  ثبت آواتار
+                </button>
+              </div>
+            </div>
+
             <div>
               <div className="flex items-center justify-between mb-2">
-                <label className="block text-[10px] font-black text-gray-500">انتخاب آواتار</label>
+                <label className="block text-[10px] font-black text-gray-500">انتخاب آواتار از طرح‌های پیش‌فرض</label>
                 <span className="text-[9px] text-gray-600">برای انتخاب کلیک کن</span>
               </div>
               <div className="grid grid-cols-5 gap-2">

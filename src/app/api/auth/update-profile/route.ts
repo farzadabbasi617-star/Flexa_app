@@ -37,7 +37,13 @@ export async function PATCH(request: NextRequest) {
     const updateData: Record<string, string | null> = {};
 
     if (displayName !== undefined) updateData.displayName = String(displayName).trim().slice(0, 100);
-    if (avatarUrl !== undefined) updateData.avatarUrl = String(avatarUrl || "").startsWith("/icons/") ? String(avatarUrl) : null;
+    
+    // Support relative paths (starting with /) or absolute URLs (starting with http/https) for custom avatars!
+    if (avatarUrl !== undefined) {
+      const url = String(avatarUrl || "").trim();
+      updateData.avatarUrl = (url.startsWith("/") || url.startsWith("http://") || url.startsWith("https://")) ? url : null;
+    }
+    
     if (clashRoyaleId !== undefined) updateData.clashRoyaleId = clashRoyaleId || null;
     if (clashRoyaleUsername !== undefined) updateData.clashRoyaleUsername = clashRoyaleUsername || null;
     if (codMobileId !== undefined) updateData.codMobileId = codMobileId || null;

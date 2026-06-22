@@ -17,7 +17,7 @@ const GAMES = [
     id: "cod_mobile",
     name: "COD MOBILE",
     faName: "کالاف موبایل",
-    icon: "🎯",
+    icon: "/icons/icon-cod_mobile.png",
     accent: "#ff8c00",
     bg: "radial-gradient(circle at 72% 35%, rgba(255,140,0,.46), transparent 18%), radial-gradient(circle at 18% 18%, rgba(255,255,255,.10), transparent 20%), linear-gradient(135deg, #090a10 0%, #151720 48%, #3a220d 100%)",
   },
@@ -25,7 +25,7 @@ const GAMES = [
     id: "fortnite",
     name: "FORTNITE",
     faName: "فورتنایت",
-    icon: "🏗️",
+    icon: "/icons/icon-fortnite.png",
     accent: "#bc00ff",
     bg: "radial-gradient(circle at 75% 25%, rgba(188,0,255,.42), transparent 18%), radial-gradient(circle at 22% 70%, rgba(0,210,255,.18), transparent 24%), linear-gradient(135deg, #090a10 0%, #151022 52%, #28103a 100%)",
   },
@@ -33,7 +33,7 @@ const GAMES = [
     id: "clash_royale",
     name: "CLASH ROYALE",
     faName: "کلش رویال",
-    icon: "👑",
+    icon: "/icons/icon-clash_royale.png",
     accent: "#00d2ff",
     bg: "radial-gradient(circle at 74% 32%, rgba(0,210,255,.38), transparent 18%), radial-gradient(circle at 24% 68%, rgba(255,230,0,.14), transparent 22%), linear-gradient(135deg, #080a12 0%, #101827 52%, #09283a 100%)",
   },
@@ -139,45 +139,37 @@ export default function LuxuryHomePage() {
                 const gameImage = imageMap.bySlug[`game-card-${game.id}`] || imageMap.byCategory[game.id];
                 return (
                 <Link key={game.id} href={`/tournaments?game=${game.id}`} className="block group active:scale-[.98] transition-transform">
-                  <article className="game-card glass-panel rounded-3xl sm:rounded-[36px] overflow-hidden relative h-32 sm:h-40 border border-white/5 transition-all group-hover:border-purple-400/30">
+                  <article className="game-card glass-panel rounded-3xl sm:rounded-[36px] overflow-hidden relative h-32 sm:h-40 border border-white/5 transition-all group-hover:border-purple-400/30 flex items-center justify-between px-6 sm:px-8">
                     <div className="absolute inset-0 transition-transform duration-700 group-hover:scale-110" style={{ background: game.bg }} />
-                    {gameImage && <img src={gameImage.url} alt={gameImage.altText || gameImage.title} className="absolute inset-0 w-full h-full object-cover opacity-80 brightness-110 contrast-110 transition-transform duration-700 group-hover:scale-110" />}
-                    <div className="absolute inset-0 bg-gradient-to-l from-black/60 via-black/20 to-transparent" />
-                    <div className="absolute inset-x-0 bottom-0 h-16 sm:h-20 bg-gradient-to-t from-black/70 to-transparent" />
-                    <div className="absolute top-3 left-4 sm:top-5 sm:left-6 text-[9px] sm:text-xs font-black text-white/30 en-font tracking-[0.2em] sm:tracking-[0.24em]">
-                      GAMENT ROOM
+                    {gameImage && <img src={gameImage.url} alt={gameImage.altText || gameImage.title} className="absolute inset-0 w-full h-full object-cover opacity-30 brightness-110 contrast-110 transition-transform duration-700 group-hover:scale-110" />}
+                    <div className="absolute inset-0 bg-gradient-to-l from-black/75 via-black/30 to-black/5" />
+                    
+                    {/* Left Side: Game Logo Container (Fully uniform, centered, and glowing!) */}
+                    <div className="relative z-10 w-16 h-16 sm:w-20 sm:h-20 bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl p-2.5 flex items-center justify-center shadow-2xl transition-all group-hover:border-purple-500/30 group-hover:shadow-[0_0_20px_rgba(168,85,247,0.2)] shrink-0">
+                      {imageMap.bySlug[`icon-${game.id}`] ? (
+                        <img 
+                          src={imageMap.bySlug[`icon-${game.id}`].url} 
+                          alt={game.name} 
+                          className="w-full h-full object-contain" 
+                        />
+                      ) : (
+                        <img 
+                          src={game.icon} 
+                          alt={game.name} 
+                          className="w-full h-full object-contain" 
+                        />
+                      )}
                     </div>
-                    <div
-                      className="absolute left-4 bottom-4 sm:left-6 sm:bottom-6 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl opacity-90 blur-[1px]"
-                      style={{ background: `radial-gradient(circle, ${game.accent}, transparent 68%)` }}
-                    />
 
-                    <div className="absolute inset-y-0 right-6 sm:right-8 flex flex-col justify-center text-right">
-                      <div className="text-3xl sm:text-4xl mb-1 sm:mb-2 drop-shadow-[0_0_18px_rgba(255,255,255,.15)]">
-                    {imageMap.bySlug[`icon-${game.id}`] ? (
-                      <img 
-                        src={imageMap.bySlug[`icon-${game.id}`].url} 
-                        alt={game.name} 
-                        className="w-10 h-10 sm:w-12 sm:h-12 object-contain" 
-                      />
-                    ) : (
-                      <img 
-                        src={`/icons/icon-${game.id}.png`} 
-                        alt={game.name} 
-                        className="w-10 h-10 sm:w-12 sm:h-12 object-contain" 
-                        onError={(e) => {
-                          const target = e.target as HTMLElement;
-                          target.style.display = 'none';
-                          const emoji = document.createElement('span');
-                          emoji.innerText = game.icon;
-                          emoji.className = 'text-3xl sm:text-4xl';
-                          target.parentNode?.appendChild(emoji);
-                        }}
-                      />
-                    )}
-                  </div>
-                      <h4 className="text-xl sm:text-2xl font-black en-font italic tracking-tight">{game.name}</h4>
-                      <p className="mt-1 text-[9px] sm:text-xs font-black text-gray-400 tracking-wider">
+                    {/* Right Side: Game Title & Details */}
+                    <div className="relative z-10 flex flex-col justify-center text-right">
+                      <span className="text-[9px] sm:text-xs font-black text-white/30 en-font tracking-[0.2em] sm:tracking-[0.24em] mb-1 sm:mb-1.5 block">
+                        GAMENT ROOM
+                      </span>
+                      <h4 className="text-2xl sm:text-3xl font-black en-font italic tracking-tight text-white group-hover:text-purple-300 transition-colors leading-none">
+                        {game.name}
+                      </h4>
+                      <p className="mt-2 text-[9px] sm:text-xs font-black text-gray-400 tracking-wider">
                         مشاهده روم‌های فعال • {game.faName}
                       </p>
                     </div>

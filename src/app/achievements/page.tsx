@@ -233,6 +233,11 @@ export default function AchievementsPage() {
             {filteredAchievements.length > 0 ? (
               filteredAchievements.map((achievement) => {
                 const rank = getRank(achievement.points);
+                // Determine whether to use individual custom achievement icon or rank default icon
+                const achievementIconUrl = achievement.icon && (achievement.icon.startsWith("/") || achievement.icon.startsWith("http"))
+                  ? achievement.icon
+                  : rank.icon;
+
                 return (
                   <div
                     key={achievement.id}
@@ -256,26 +261,26 @@ export default function AchievementsPage() {
 
                     <div className="flex items-center gap-4">
                       <div
-                        className={`w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden ${
+                        className={`w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden shrink-0 ${
                           achievement.unlocked
                             ? "bg-gradient-to-br from-neon-purple to-neon-blue shadow-lg"
                             : "bg-dark-600"
                         }`}
                       >
                         <img
-                          src={rank.icon}
-                          alt={rank.fa}
+                          src={achievementIconUrl}
+                          alt={lang === "fa" ? achievement.nameFA : achievement.name}
                           className={`w-full h-full object-cover ${
                             achievement.unlocked ? "opacity-100" : "opacity-30 grayscale"
                           }`}
                         />
                       </div>
 
-                      <div className="flex-1">
-                        <h3 className="font-bold">
+                      <div className="flex-1 min-w-0 text-right">
+                        <h3 className="font-bold truncate">
                           {lang === "fa" ? achievement.nameFA : achievement.name}
                         </h3>
-                        <p className="text-sm text-gray-400">
+                        <p className="text-xs text-gray-400 truncate">
                           {lang === "fa" ? achievement.descriptionFA : achievement.description}
                         </p>
 
@@ -283,8 +288,8 @@ export default function AchievementsPage() {
                           <div className="flex items-center justify-between text-[10px] text-gray-500 mb-1">
                             <span>{lang === "fa" ? "پیشرفت" : "Progress"}</span>
                             <span>
-                              {(achievement.progress || 0).toLocaleString("fa-IR")} /{" "}
-                              {achievement.requirement.toLocaleString("fa-IR")}
+                              {(achievement.progress || 0).toLocaleString("en-US")} /{" "}
+                              {achievement.requirement.toLocaleString("en-US")}
                             </span>
                           </div>
                           <div className="h-1.5 bg-dark-700 rounded-full overflow-hidden">
@@ -299,14 +304,14 @@ export default function AchievementsPage() {
                           </div>
                         </div>
 
-                        <div className="flex items-center gap-2 mt-3">
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-neon-purple/20 text-neon-purple">
-                            {achievement.points} {t.achievementsPage?.points || "pts"}
-                          </span>
+                        <div className="flex items-center justify-end gap-2 mt-3">
                           <span className="text-xs text-gray-500">
                             {CATEGORY_LABELS[lang === "fa" ? "fa" : "en"][
                               achievement.category as keyof typeof CATEGORY_LABELS.en
                             ]}
+                          </span>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-neon-purple/20 text-neon-purple font-bold num-en">
+                            {achievement.points} pts
                           </span>
                         </div>
                       </div>
