@@ -17,15 +17,29 @@ interface Player {
   gamentId?: string | null;
   isVerified?: boolean | null;
   role?: string | null;
+  clashRoyaleId?: string | null;
+  clashRoyaleUsername?: string | null;
+  codMobileId?: string | null;
+  codMobileUsername?: string | null;
+  fortniteId?: string | null;
+  fortniteUsername?: string | null;
 }
 
 type Board = "rating" | "xp" | "wins" | "winrate";
+type GameFilter = "all" | "clash_royale" | "cod_mobile" | "fortnite";
 
 const BOARDS: Array<{ id: Board; label: string; icon: string }> = [
   { id: "rating", label: "امتیاز رنکینگ", icon: "⭐" },
   { id: "xp", label: "سطح و تجربه (XP)", icon: "⚡" },
   { id: "wins", label: "تعداد بردها", icon: "🏆" },
   { id: "winrate", label: "درصد برد", icon: "📈" },
+];
+
+const GAMES: Array<{ id: GameFilter; label: string; icon: string }> = [
+  { id: "all", label: "همه بازی‌ها", icon: "🎮" },
+  { id: "cod_mobile", label: "کالاف دیوتی", icon: "🔫" },
+  { id: "clash_royale", label: "کلش رویال", icon: "👑" },
+  { id: "fortnite", label: "فورتنایت", icon: "⛏️" },
 ];
 
 function getWinRate(player: Player) {
@@ -74,6 +88,7 @@ export default function LeaderboardPage() {
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [board, setBoard] = useState<Board>("rating");
+  const [selectedGame, setSelectedGame] = useState<GameFilter>("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   const fetchPlayers = useCallback(async () => {
@@ -96,16 +111,26 @@ export default function LeaderboardPage() {
     return [...players].sort((a, b) => scoreFor(b, board) - scoreFor(a, board));
   }, [players, board]);
 
+  const gameFilteredPlayers = useMemo(() => {
+    if (selectedGame === "all") return sortedPlayers;
+    return sortedPlayers.filter((p) => {
+      if (selectedGame === "clash_royale") return !!p.clashRoyaleId;
+      if (selectedGame === "cod_mobile") return !!p.codMobileId;
+      if (selectedGame === "fortnite") return !!p.fortniteId;
+      return true;
+    });
+  }, [sortedPlayers, selectedGame]);
+
   const filteredPlayers = useMemo(() => {
-    if (!searchQuery.trim()) return sortedPlayers;
+    if (!searchQuery.trim()) return gameFilteredPlayers;
     const query = searchQuery.toLowerCase().trim();
-    return sortedPlayers.filter(
+    return gameFilteredPlayers.filter(
       (p) =>
         p.displayName.toLowerCase().includes(query) ||
         p.username.toLowerCase().includes(query) ||
         (p.gamentId && p.gamentId.toLowerCase().includes(query))
     );
-  }, [sortedPlayers, searchQuery]);
+  }, [gameFilteredPlayers, searchQuery]);
 
   const topThree = useMemo(() => {
     return filteredPlayers.slice(0, 3);
@@ -128,11 +153,29 @@ export default function LeaderboardPage() {
           <p className="text-[10px] font-bold text-purple-400 tracking-[0.3em] uppercase opacity-70 mt-2">رتبه‌بندی قهرمانان گیمنت</p>
         </header>
 
+        {/* Game Filters */}
+        <div className="mb-4 text-xs font-bold text-gray-400 text-right pr-1">انتخاب بازی:</div>
+        <div className="flex gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide" dir="rtl">
+          {GAMES.map((game) => (
+            <button
+              key={game.id}
+              onClick={() => setSelectedGame(game.id)}
+              className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-black border transition-all active:scale-[0.98] ${
+                selectedGame === game.id 
+                  ? "bg-cyan-600 text-white border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,.3)]" 
+                  : "bg-[#111114] border-white/5 text-gray-400 hover:border-white/10"
+              }`}
+            >
+              {game.icon} {game.label}
+            </button>
+          ))}
+        </div>
+
         {/* Search Input */}
         <div className="mb-6 relative">
           <input
             type="text"
-            placeholder="جستجوی بازیکن با نام، نام کاربری یا شناسه گیمنت..."
+            placeholder="جستجوی بازیکن..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-[#111114] border border-white/10 rounded-2xl px-5 py-4 pr-12 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none transition-all text-right"
@@ -244,6 +287,9 @@ export default function LeaderboardPage() {
                 const tier = getRankTier(player.rating);
                 const roleBadge = getRoleBadge(player.role);
 
+                // Find In-Game Name for selected game
+                const ign = selectedGame === "clash_royale" ? player.clashRoyaleUsername : selectedGame === "cod_mobile" ? player.codMobileUsername : selectedGame === "fortnite" ? player.fortniteUsername : null;
+
                 return (
                   <Link 
                     key={player.id} 
@@ -268,11 +314,16 @@ export default function LeaderboardPage() {
 
                     {/* Info */}
                     <div className="flex-1 min-w-0 text-right">
-                      <div className="font-black flex items-center justify-start gap-1.5 text-sm sm:text-base">
+                      <div className="font-black flex items-center justify-start gap-2 text-sm sm:text-base">
                         <span>{player.displayName}</span>
                         {roleBadge && (
                           <span className={`px-2 py-0.5 rounded-md text-[8px] border font-black tracking-wider ${roleBadge.color}`}>
                             {roleBadge.label}
+                          </span>
+                        )}
+                        {ign && (
+                          <span className="text-[10px] text-cyan-400 bg-cyan-950/20 px-2 py-0.5 rounded-md border border-cyan-500/10 num-en font-bold">
+                            🎮 {ign}
                           </span>
                         )}
                       </div>

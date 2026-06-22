@@ -37,6 +37,12 @@ export async function GET(request: NextRequest) {
         rankPoints: users.rankPoints,
         role: users.role,
         isVerified: users.isVerified,
+        clashRoyaleId: users.clashRoyaleId,
+        clashRoyaleUsername: users.clashRoyaleUsername,
+        codMobileId: users.codMobileId,
+        codMobileUsername: users.codMobileUsername,
+        fortniteId: users.fortniteId,
+        fortniteUsername: users.fortniteUsername,
       })
       .from(players)
       .leftJoin(users, eq(players.visibleUserId, users.id))
