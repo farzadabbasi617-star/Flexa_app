@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions } from "@/db/schema";
+import { matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions, honors } from "@/db/schema";
 import { getTelegramChannelChatId, sendTelegramMessage } from "@/lib/telegram";
+import { fetchAIResponse } from "@/lib/ai-provider-manager";
+import { gamentSystemPrompt } from "@/lib/ai-prompts";
+import { safeParseAIJson } from "@/lib/ai-utils";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -76,7 +79,7 @@ async function sendReminders() {
       await sendTelegramMessage(
         recipient.telegramId,
         `⏰ <b>یادآوری تورنومنت</b>\n\n🏆 ${html(tournament.name)}\n🎮 ${html(gameLabel(tournament.game))}\n\nشروع تا حدود <b>${bucket === 1440 ? "۲۴ ساعت" : `${bucket} دقیقه`}</b> دیگر.\n\nبرای جزئیات و قوانین وارد Gament شو.`,
-        { inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${tournament.id}` }]] }
+        { inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${process.env.APP_URL || "https://gament.app"}/tournaments/${tournament.id}` }]] }
       );
       await markSent(key, "reminder", tournament.id, recipient.telegramId);
       sent += 1;
@@ -97,7 +100,7 @@ async function sendCapacityAlerts() {
     await sendTelegramMessage(
       getTelegramChannelChatId(),
       `⚠️ <b>ظرفیت رو به اتمام!</b>\n\n🏆 ${html(tournament.name)}\n🎮 ${html(gameLabel(tournament.game))}\n👥 ثبت‌نام: <b>${value}/${tournament.maxPlayers}</b>\nفقط <b>${left}</b> جای خالی باقی مانده.`,
-      { inline_keyboard: [[{ text: "ثبت‌نام", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${tournament.id}` }]] }
+      { inline_keyboard: [[{ text: "ثبت‌نام", url: `${process.env.APP_URL || "https://gament.app"}/tournaments/${tournament.id}` }]] }
     );
     await markSent(key, "capacity", tournament.id);
     sent += 1;
@@ -119,7 +122,7 @@ async function sendLobbyNotices() {
       await sendTelegramMessage(
         recipient.telegramId,
         `🏟 <b>اطلاعات لابی آماده شد</b>\n\n🏆 ${html(tournament.name)}\nRoom ID: <code>${html(tournament.roomId)}</code>\nPassword: <code>${html(tournament.roomPassword || "بدون رمز")}</code>\n\n${html(tournament.lobbyNotes || "لطفاً به‌موقع وارد لابی شوید.")}`,
-        { inline_keyboard: [[{ text: "مشاهده لابی", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${tournament.id}/lobby` }]] }
+        { inline_keyboard: [[{ text: "مشاهده لابی", url: `${process.env.APP_URL || "https://gament.app"}/tournaments/${tournament.id}/lobby` }]] }
       );
       await markSent(key, "lobby", tournament.id, recipient.telegramId);
       sent += 1;
@@ -147,6 +150,60 @@ async function runHourlyClassifiedScrape() {
   return { ran: true as const, results, totalNew, intervalHours };
 }
 
+// Automatically generate highly engaging, SEO-optimized gaming news daily!
+async function generateDailyGamingNews() {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
+  const key = `daily-gaming-news:${today}`;
+  if (await hasSent(key)) return { generated: false, reason: "already_today" };
+
+  try {
+    const prompt = `Generate a highly engaging, SEO-optimized Persian news article for Gament (گیمنت).
+    The news must be about recent updates, leaks, meta changes, or esports details in one of these three games:
+    - Clash Royale (کلش رویال)
+    - Call of Duty Mobile (کالاف دیوتی موبایل)
+    - Fortnite (فورتنایت)
+    
+    Incorporate Persian gaming SEO keywords seamlessly: "گیمنت", "gament", "تورنومنت گیمینگ", "کالاف دیوتی موبایل", "کلش رویال", "فورتنایت".
+    The description must be highly detailed and professional (2-3 complete paragraphs).
+    
+    Return ONLY a JSON object:
+    {
+      "title": "A short, exciting, SEO-friendly Persian headline",
+      "description": "The detailed news content in Persian",
+      "game": "clash_royale" | "cod_mobile" | "fortnite",
+      "icon": "📰" | "🔥" | "👑" | "⚡"
+    }`;
+
+    const systemPrompt = gamentSystemPrompt("honors", "Respond ONLY with valid JSON. No markdown.");
+    const ai = await fetchAIResponse(prompt, systemPrompt);
+    if (!ai) return { generated: false, reason: "ai_provider_failed" };
+
+    const parsed = safeParseAIJson<{ title: string; description: string; game: string; icon?: string }>(ai.content);
+    if (!parsed || !parsed.title || !parsed.description) {
+      return { generated: false, reason: "failed_to_parse_ai_json" };
+    }
+
+    // Insert as approved news into honors table
+    await db.insert(honors).values({
+      type: "news",
+      title: parsed.title.slice(0, 255),
+      description: parsed.description,
+      icon: parsed.icon || "📰",
+      game: parsed.game,
+      status: "approved",
+      publishedAt: new Date(),
+      source: "ai",
+    });
+
+    await markSent(key, "daily_gaming_news");
+    logger.info({ title: parsed.title, game: parsed.game }, "Successfully auto-generated daily gaming news for Hall of Fame");
+    return { generated: true, title: parsed.title };
+  } catch (err) {
+    logger.error({ err }, "Failed to auto-generate daily gaming news");
+    return { generated: false, error: String(err) };
+  }
+}
+
 async function sendDailyAdminReport() {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
   const key = `daily-report:${today}`;
@@ -167,7 +224,7 @@ async function sendDailyAdminReport() {
   for (const id of adminIds) {
     const numericId = Number(id);
     if (!Number.isFinite(numericId)) continue;
-    await sendTelegramMessage(numericId, text, { inline_keyboard: [[{ text: "پنل ادمین", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/admin` }]] });
+    await sendTelegramMessage(numericId, text, { inline_keyboard: [[{ text: "پنل ادمین", url: `${process.env.APP_URL || "https://gament.app"}/admin` }]] });
     sent += 1;
   }
   await markSent(key, "daily_report");
@@ -226,7 +283,7 @@ async function sendMatchAssignmentNotifications() {
       await sendTelegramMessage(
         telegramId,
         `⚔️ <b>حریف تو مشخص شد!</b>\n\n🏆 ${html(match.tournamentName)}\n🎮 ${html(gameLabel(match.tournamentGame))}\n🆚 حریف: <b>${html(names[opponentId])}</b>\n🔁 دور ${match.round} — مسابقه ${match.matchNumber}${startText}\n\nآماده باش و به‌موقع وارد لابی شو.`,
-        { inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${match.tournamentId}` }]] }
+        { inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://gament.app"}/tournaments/${match.tournamentId}` }]] }
       );
       await markSent(key, "match_assigned", match.tournamentId, telegramId);
       sent += 1;
@@ -267,7 +324,7 @@ async function sendMatchScheduleNotifications() {
       await sendTelegramMessage(
         telegramId,
         `⏰ <b>مسابقه شروع می‌شود!</b>\n\n🏆 ${html(match.tournamentName)}\n🎮 ${html(gameLabel(match.tournamentGame))}\n\nمسابقه حدود <b>${minutesLeft} دقیقه</b> دیگر شروع می‌شود.`,
-        { inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${match.tournamentId}` }]] }
+        { inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://gament.app"}/tournaments/${match.tournamentId}` }]] }
       );
       await markSent(key, "match_scheduled", match.tournamentId, telegramId);
       sent += 1;
@@ -317,7 +374,7 @@ async function sendMatchResultNotifications() {
       }
 
       await sendTelegramMessage(telegramId, message, {
-        inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${match.tournamentId}` }]],
+        inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://gament.app"}/tournaments/${match.tournamentId}` }]],
       });
       await markSent(key, `match_${match.status}`, match.tournamentId, telegramId);
       sent += 1;
@@ -349,7 +406,7 @@ async function publishCompletedResults() {
     await sendTelegramMessage(
       getTelegramChannelChatId(),
       `🏆 <b>نتیجه نهایی تورنومنت</b>\n\n🔥 ${html(tournament.name)}\n🎮 ${html(gameLabel(tournament.game))}\n\n${lines.join("\n")}\n\nتبریک به قهرمان‌ها!`,
-      { inline_keyboard: [[{ text: "مشاهده در Gament", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${tournament.id}` }]] }
+      { inline_keyboard: [[{ text: "مشاهده در Gament", url: `${process.env.APP_URL || "https://gament.app"}/tournaments/${tournament.id}` }]] }
     );
     await markSent(key, "result", tournament.id);
     published += 1;
@@ -370,6 +427,10 @@ export async function GET(request: NextRequest) {
     const classifiedScrape = await runHourlyClassifiedScrape();
     const classifiedCleanup = await cleanupClassifiedAds();
     const dailyReports = await sendDailyAdminReport();
+    
+    // Automatically trigger daily gaming news generation!
+    const dailyGamingNews = await generateDailyGamingNews();
+
     return NextResponse.json({
       ok: true,
       reminders,
@@ -382,6 +443,7 @@ export async function GET(request: NextRequest) {
       classifiedScrape,
       classifiedCleanup,
       dailyReports,
+      dailyGamingNews,
     });
   } catch (err) {
     logger.error({ err }, "Telegram cron failed");

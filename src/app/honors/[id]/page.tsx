@@ -74,15 +74,17 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="min-h-screen bg-[#050508] text-white pb-28">
-      <div className="relative min-h-[260px] overflow-hidden">
+      <div className="relative min-h-[300px] overflow-hidden">
         {honor?.image ? (
           <img src={honor.image} alt={honor.title} className="absolute inset-0 w-full h-full object-cover opacity-80" />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-purple-950 via-[#050508] to-cyan-950" />
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-[#050508] via-[#050508]/65 to-black/20" />
-        <div className="relative max-w-[560px] mx-auto px-5 pt-8">
-          <Link href="/honors" className="inline-flex text-xs text-purple-200 bg-white/5 border border-white/10 rounded-full px-4 py-2 mb-12">
+        
+        {/* Added pb-16 to ensure title never overlaps with the content card on multiline wrapping! */}
+        <div className="relative max-w-[560px] mx-auto px-5 pt-8 pb-16">
+          <Link href="/honors" className="inline-flex text-xs text-purple-200 bg-white/5 border border-white/10 rounded-full px-4 py-2 mb-10">
             ← بازگشت به تالار افتخارات
           </Link>
           <div className="text-6xl mb-4">{honor?.icon || "🏆"}</div>
@@ -90,11 +92,12 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
             {honor ? TYPE_LABELS[honor.type] || honor.type : "افتخار"}
             {honor?.game && <span>• {GAME_LABELS[honor.game] || honor.game}</span>}
           </div>
-          <h1 className="text-4xl font-black leading-tight">{loading ? "در حال بارگذاری..." : honor?.title || "افتخار پیدا نشد"}</h1>
+          <h1 className="text-3xl sm:text-4xl font-black leading-tight">{loading ? "در حال بارگذاری..." : honor?.title || "افتخار پیدا نشد"}</h1>
         </div>
       </div>
 
-      <main className="max-w-[560px] mx-auto px-5 -mt-4 relative z-10">
+      {/* Adjusted margin to -mt-8 to pull the glass panel card beautifully over the gradient header */}
+      <main className="max-w-[560px] mx-auto px-5 -mt-8 relative z-10">
         {error ? (
           <div className="glass-panel rounded-3xl border border-red-500/20 p-6 text-red-300">{error}</div>
         ) : honor ? (
