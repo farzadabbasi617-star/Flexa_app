@@ -35,16 +35,14 @@ interface DashboardData {
   recentActivity: Array<{ type: string; icon: string; title: string; description: string; link: string | null; time: string }>;
 }
 
+// Exclusive Gament premium avatars (uploaded directly by the platform owner)
 const AVATAR_OPTIONS = [
-  { label: "شوالیه", url: "/icons/profile_icon.png" },
-  { label: "گیمنت", url: "/icons/arena_icon.png" },
-  { label: "تنظیمات", url: "/icons/settings_icon.png" },
-  { label: "رتبه‌ها", url: "/icons/rankings_icon.png" },
-  { label: "افتخارات", url: "/icons/honors_icon.png" },
-  { label: "کیف پول", url: "/icons/wallet_icon.png" },
-  { label: "کلش", url: "/icons/icon-clash_royale.png" },
-  { label: "کالاف", url: "/icons/icon-cod_mobile.png" },
-  { label: "فورتنایت", url: "/icons/icon-fortnite.png" },
+  { label: "لرد خون‌آشام", url: "/avatars/avatar_1.jpg" },
+  { label: "دراکولا جوان", url: "/avatars/avatar_2.jpg" },
+  { label: "ملکه رز سرخ", url: "/avatars/avatar_3.jpg" },
+  { label: "امپراتور طلایی", url: "/avatars/avatar_4.jpg" },
+  { label: "شوالیه پیش‌فرض", url: "/icons/profile_icon.png" },
+  { label: "نشان گیمنت", url: "/icons/arena_icon.png" },
 ];
 
 function statusFa(status: string | null | undefined) {
@@ -183,7 +181,6 @@ export default function ProfilePage() {
       if (!res.ok) throw new Error(json.error || "ذخیره پروفایل انجام نشد.");
       setProfileMessage("پروفایل با موفقیت ذخیره شد.");
       await refreshUser();
-      // Reload dashboard stats to match updated profile name
       loadDashboard();
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : "ذخیره پروفایل انجام نشد.");
@@ -269,11 +266,11 @@ export default function ProfilePage() {
         {/* Header */}
         <header className="pt-10 pb-4 text-right">
           <div className="inline-flex items-center gap-2 text-[10px] font-black text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-full px-3 py-1 mb-3">
-            ⚙️ پروفایل و داشبورد کاربری
+            👑 پروفایل و داشبورد کاربری گیمنت
           </div>
           <h1 className="text-3xl font-black">پروفایل من</h1>
           <p className="text-xs text-gray-500 mt-1 leading-6">
-            ویرایش مشخصات، کیف پول، آمار بازی‌ها و دسترسی‌های سریع
+            آواتارهای انحصاری، دارایی‌ها، آمار بازی‌ها و دسترسی‌های سریع
           </p>
         </header>
 
@@ -311,7 +308,7 @@ export default function ProfilePage() {
             </div>
           </div>
 
-          <div className="space-y-4 mb-5">
+          <div className="space-y-4">
             <div>
               <label className="block text-[10px] font-black text-gray-500 mb-1.5">نام نمایشی</label>
               <div className="flex gap-2">
@@ -333,31 +330,12 @@ export default function ProfilePage() {
             </div>
 
             <div>
-              <label className="block text-[10px] font-black text-gray-500 mb-1.5">مسیر یا آدرس آواتار سفارشی</label>
-              <div className="flex gap-2">
-                <input
-                  value={selectedAvatar}
-                  onChange={(e) => setSelectedAvatar(e.target.value)}
-                  className="flex-1 bg-black/25 border border-white/10 rounded-2xl px-4 py-3 text-xs outline-none focus:border-purple-400 text-left"
-                  placeholder="مثال: /avatars/my-photo.png"
-                  dir="ltr"
-                />
-                <button
-                  onClick={() => saveProfile(selectedAvatar)}
-                  disabled={profileSaving || !selectedAvatar.trim()}
-                  className="px-4 rounded-2xl bg-cyan-600 disabled:opacity-50 text-xs font-black shrink-0"
-                >
-                  ثبت آواتار
-                </button>
+              <div className="flex items-center justify-between mb-2.5">
+                <label className="block text-[10px] font-black text-purple-300 tracking-wider">🌟 انتخاب آواتار انحصاری گیمنت</label>
+                <span className="text-[9px] text-gray-500">جهت اعمال تغییر کلیک کنید</span>
               </div>
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <label className="block text-[10px] font-black text-gray-500">انتخاب از طرح‌های آماده</label>
-              </div>
-              <div className="grid grid-cols-5 gap-2">
-                {AVATAR_OPTIONS.slice(0, 5).map((avatar) => {
+              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                {AVATAR_OPTIONS.map((avatar) => {
                   const active = selectedAvatar === avatar.url;
                   return (
                     <button
@@ -365,27 +343,34 @@ export default function ProfilePage() {
                       type="button"
                       onClick={() => chooseAvatar(avatar.url)}
                       disabled={profileSaving}
-                      className={`rounded-2xl p-1.5 border transition-all ${active ? "border-purple-400 bg-purple-500/15" : "border-white/10 bg-black/20 hover:border-white/30"}`}
+                      className={`rounded-2xl p-1 border transition-all aspect-square flex items-center justify-center relative ${
+                        active 
+                          ? "border-yellow-500 bg-yellow-500/10 shadow-[0_0_15px_rgba(234,179,8,0.25)] scale-[1.04]" 
+                          : "border-white/10 bg-black/20 hover:border-white/30"
+                      }`}
                       title={avatar.label}
                     >
-                      <img src={avatar.url} alt={avatar.label} className="w-full aspect-square rounded-xl object-contain" />
+                      <img src={avatar.url} alt={avatar.label} className="w-full h-full rounded-xl object-cover" />
+                      {active && (
+                        <div className="absolute top-0.5 right-0.5 bg-yellow-500 text-[7px] text-black px-1 rounded font-black leading-none">✓</div>
+                      )}
                     </button>
                   );
                 })}
               </div>
             </div>
 
-            {profileMessage && <div className="text-green-300 text-xs">{profileMessage}</div>}
-            {profileError && <div className="text-red-300 text-xs">{profileError}</div>}
+            {profileMessage && <div className="text-green-300 text-xs mt-2">{profileMessage}</div>}
+            {profileError && <div className="text-red-300 text-xs mt-2">{profileError}</div>}
           </div>
         </section>
 
         {/* Section 2: Unified Esports Stats */}
         <section className="grid grid-cols-2 gap-3 mb-6" dir="rtl">
           {[
-            { label: "رتبه رنکینگ", value: data?.stats.rating ?? 1000, color: "text-cyan-400", sub: "امتیاز GAMENT" },
-            { label: "تعداد بردها", value: data?.stats.wins ?? 0, color: "text-emerald-400", sub: `${data?.stats.losses ?? 0} باخت` },
-            { label: "Win Rate (درصد برد)", value: `${data?.stats.winRate ?? 0}%`, color: "text-purple-400", sub: "عملکرد رقابتی" },
+            { label: "رتبه رنکینگ", value: (data?.stats.rating ?? 1000).toLocaleString("en-US"), color: "text-cyan-400", sub: "امتیاز GAMENT" },
+            { label: "تعداد بردها", value: (data?.stats.wins ?? 0).toLocaleString("en-US"), color: "text-emerald-400", sub: `${(data?.stats.losses ?? 0).toLocaleString("en-US")} باخت` },
+            { label: "Win Rate (درصد برد)", value: `${(data?.stats.winRate ?? 0).toLocaleString("en-US")}%`, color: "text-purple-400", sub: "عملکرد رقابتی" },
             { label: "موجودی کیف پول", value: `${(data?.wallet.balanceToman ?? 0).toLocaleString("en-US")} تومان`, color: "text-yellow-400", sub: `${(Number(data?.wallet.balanceRial ?? 0) / 10).toLocaleString("en-US")} ریال` },
           ].map((stat, i) => (
             <div key={i} className="bg-[#111114] border border-white/5 rounded-3xl p-4 text-right">
@@ -415,10 +400,10 @@ export default function ProfilePage() {
         {/* Section 3: Action Cards Counters */}
         <section className="grid grid-cols-4 gap-2 mb-6" dir="rtl">
           {[
-            { icon: "🏆", label: "تورنومنت من", value: data?.stats.myTournaments ?? 0, href: "/tournaments" },
-            { icon: "⚔️", label: "مسابقه بعدی", value: data?.stats.upcomingMatches ?? 0, href: nextMatch ? `/tournaments/${nextMatch.tournamentId}` : "/tournaments" },
-            { icon: "🔔", label: "اعلان جدید", value: data?.stats.unreadNotifications ?? 0, href: "/notifications" },
-            { icon: "🎧", label: "تیکت پشتیبانی", value: data?.stats.openTickets ?? 0, href: "/support" },
+            { icon: "🏆", label: "تورنومنت من", value: (data?.stats.myTournaments ?? 0).toLocaleString("en-US"), href: "/tournaments" },
+            { icon: "⚔️", label: "مسابقه بعدی", value: (data?.stats.upcomingMatches ?? 0).toLocaleString("en-US"), href: nextMatch ? `/tournaments/${nextMatch.tournamentId}` : "/tournaments" },
+            { icon: "🔔", label: "اعلان جدید", value: (data?.stats.unreadNotifications ?? 0).toLocaleString("en-US"), href: "/notifications" },
+            { icon: "🎧", label: "تیکت پشتیبانی", value: (data?.stats.openTickets ?? 0).toLocaleString("en-US"), href: "/support" },
           ].map((card, index) => (
             <Link key={index} href={card.href} className="glass-panel p-3.5 rounded-2xl text-center border border-white/5 active:scale-95 transition-transform flex flex-col items-center justify-center">
               <div className="text-xl mb-1">{card.icon}</div>

@@ -6,6 +6,15 @@ import { validateSession } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
+// Strict list of allowed exclusive Gament avatars to protect exclusivity (and future purchases/sales)
+const ALLOWED_AVATARS = [
+  "/avatars/avatar_1.jpg",
+  "/avatars/avatar_2.jpg",
+  "/avatars/avatar_3.jpg",
+  "/avatars/avatar_4.jpg",
+  "/icons/profile_icon.png",
+  "/icons/arena_icon.png",
+];
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -38,10 +47,10 @@ export async function PATCH(request: NextRequest) {
 
     if (displayName !== undefined) updateData.displayName = String(displayName).trim().slice(0, 100);
     
-    // Support relative paths (starting with /) or absolute URLs (starting with http/https) for custom avatars!
+    // Strict backend enforcement of premium avatars
     if (avatarUrl !== undefined) {
       const url = String(avatarUrl || "").trim();
-      updateData.avatarUrl = (url.startsWith("/") || url.startsWith("http://") || url.startsWith("https://")) ? url : null;
+      updateData.avatarUrl = ALLOWED_AVATARS.includes(url) ? url : "/icons/profile_icon.png";
     }
     
     if (clashRoyaleId !== undefined) updateData.clashRoyaleId = clashRoyaleId || null;
