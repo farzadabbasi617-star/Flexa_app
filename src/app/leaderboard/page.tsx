@@ -36,10 +36,10 @@ const BOARDS: Array<{ id: Board; label: string; icon: string }> = [
 ];
 
 const GAMES: Array<{ id: GameFilter; label: string; icon: string }> = [
-  { id: "all", label: "همه بازی‌ها", icon: "🎮" },
-  { id: "cod_mobile", label: "کالاف دیوتی", icon: "🔫" },
-  { id: "clash_royale", label: "کلش رویال", icon: "👑" },
-  { id: "fortnite", label: "فورتنایت", icon: "⛏️" },
+  { id: "all", label: "همه بازی‌ها", icon: "/icons/arena_icon.png" },
+  { id: "cod_mobile", label: "کالاف دیوتی", icon: "/icons/icon-cod_mobile.png" },
+  { id: "clash_royale", label: "کلش رویال", icon: "/icons/icon-clash_royale.png" },
+  { id: "fortnite", label: "فورتنایت", icon: "/icons/icon-fortnite.png" },
 ];
 
 function getWinRate(player: Player) {
@@ -154,19 +154,20 @@ export default function LeaderboardPage() {
         </header>
 
         {/* Game Filters */}
-        <div className="mb-4 text-xs font-bold text-gray-400 text-right pr-1">انتخاب بازی:</div>
+        <div className="mb-2.5 text-[11px] font-bold text-gray-400 text-right pr-1">انتخاب بازی:</div>
         <div className="flex gap-2 overflow-x-auto pb-3 mb-6 scrollbar-hide" dir="rtl">
           {GAMES.map((game) => (
             <button
               key={game.id}
               onClick={() => setSelectedGame(game.id)}
-              className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-black border transition-all active:scale-[0.98] ${
+              className={`whitespace-nowrap px-4 py-2.5 rounded-xl text-xs font-black border transition-all active:scale-[0.98] flex items-center gap-2 shrink-0 ${
                 selectedGame === game.id 
                   ? "bg-cyan-600 text-white border-cyan-500 shadow-[0_0_15px_rgba(6,182,212,.3)]" 
                   : "bg-[#111114] border-white/5 text-gray-400 hover:border-white/10"
               }`}
             >
-              {game.icon} {game.label}
+              <img src={game.icon} alt={game.label} className="w-4 h-4 object-contain shrink-0" />
+              <span>{game.label}</span>
             </button>
           ))}
         </div>
@@ -280,7 +281,7 @@ export default function LeaderboardPage() {
             )}
 
             {/* Players List */}
-            <div className="space-y-2.5" dir="rtl">
+            <div className="space-y-3.5" dir="rtl">
               {filteredPlayers.map((player, idx) => {
                 const actualIndex = sortedPlayers.findIndex((p) => p.id === player.id);
                 const isTop3 = actualIndex < 3 && !searchQuery;
@@ -294,7 +295,7 @@ export default function LeaderboardPage() {
                   <Link 
                     key={player.id} 
                     href={`/players/${player.id}`} 
-                    className={`glass-panel active:bg-white/5 p-4 sm:p-5 rounded-3xl flex items-center gap-4 border transition-all ${
+                    className={`glass-panel active:bg-white/5 p-4 sm:p-5 rounded-3xl flex items-center justify-between gap-4 border transition-all ${
                       isTop3 
                         ? actualIndex === 0 
                           ? "border-yellow-500/20 bg-yellow-500/5" 
@@ -302,59 +303,72 @@ export default function LeaderboardPage() {
                         : "border-white/5 hover:border-white/10"
                     }`}
                   >
-                    {/* Rank Number / Medal */}
-                    <div className="w-11 text-center text-lg font-black text-purple-400 num-en">
-                      {medal(actualIndex)}
-                    </div>
-                    
-                    {/* Avatar */}
-                    <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 grid place-items-center font-black text-lg ring-4 ring-[#050508] shadow-lg">
-                      {player.displayName.charAt(0).toUpperCase()}
-                    </div>
-
-                    {/* Info */}
-                    <div className="flex-1 min-w-0 text-right">
-                      <div className="font-black flex items-center justify-start gap-2 text-sm sm:text-base">
-                        <span>{player.displayName}</span>
-                        {roleBadge && (
-                          <span className={`px-2 py-0.5 rounded-md text-[8px] border font-black tracking-wider ${roleBadge.color}`}>
-                            {roleBadge.label}
-                          </span>
-                        )}
-                        {ign && (
-                          <span className="text-[10px] text-cyan-400 bg-cyan-950/20 px-2 py-0.5 rounded-md border border-cyan-500/10 num-en font-bold">
-                            🎮 {ign}
-                          </span>
-                        )}
+                    {/* Right side: Rank position + Avatar + Info */}
+                    <div className="flex items-center gap-3.5 flex-1 min-w-0">
+                      {/* Rank Position */}
+                      <div className="w-9 text-center text-base sm:text-lg font-black text-purple-400 num-en shrink-0">
+                        {medal(actualIndex)}
                       </div>
-                      <div className="text-xs text-gray-400 mt-1 flex items-center justify-start gap-2">
-                        <span className="num-en">@{player.username}</span>
-                        <span>•</span>
-                        <span className="flex items-center gap-0.5">سطح <span className="num-en font-bold">{player.level || 1}</span></span>
-                        {board === "rating" && (
-                          <>
-                            <span>•</span>
-                            <span className={`px-1.5 py-0.2 rounded-md text-[9px] border font-bold ${tier.color}`}>
-                              {tier.icon} {tier.label}
+                      
+                      {/* Avatar */}
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 grid place-items-center font-black text-lg ring-4 ring-[#050508] shadow-lg shrink-0">
+                        {player.displayName.charAt(0).toUpperCase()}
+                      </div>
+
+                      {/* Info Container */}
+                      <div className="flex-1 min-w-0 flex flex-col gap-1 text-right">
+                        {/* Row 1: Name + Role + IGN */}
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className="font-black text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">
+                            {player.displayName}
+                          </span>
+                          {roleBadge && (
+                            <span className={`px-1.5 py-0.5 rounded-md text-[8px] border font-black tracking-wider shrink-0 ${roleBadge.color}`}>
+                              {roleBadge.label}
                             </span>
-                          </>
+                          )}
+                          {ign && (
+                            <span className="text-[9px] text-cyan-400 bg-cyan-950/20 px-1.5 py-0.5 rounded-md border border-cyan-500/10 num-en font-bold shrink-0">
+                              🎮 {ign}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Row 2: Username & Level */}
+                        <div className="text-[11px] text-gray-400 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <span className="num-en truncate max-w-[110px] sm:max-w-none">@{player.username}</span>
+                          <span className="opacity-40">•</span>
+                          <span className="shrink-0">سطح <span className="num-en font-bold">{player.level || 1}</span></span>
+                        </div>
+
+                        {/* Row 3: Tier Badge (On its own row to prevent horizontal overlap) */}
+                        {board === "rating" && (
+                          <div className="mt-0.5">
+                            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] border font-bold ${tier.color}`}>
+                              <span>{tier.icon}</span>
+                              <span>{tier.label}</span>
+                            </span>
+                          </div>
                         )}
                       </div>
                     </div>
 
-                    {/* Win/Loss Record */}
-                    <div className="hidden sm:flex flex-col items-center justify-center bg-white/5 border border-white/5 rounded-xl px-2.5 py-1 text-[11px] font-bold text-gray-400">
-                      <span className="text-emerald-400 num-en">{player.wins}W</span>
-                      <span className="text-red-400 num-en">{player.losses}L</span>
-                    </div>
-
-                    {/* Score display */}
-                    <div className="text-left min-w-[75px]">
-                      <div className="font-black text-xl sm:text-2xl num-en tracking-tight text-purple-100">
-                        {scoreFor(player, board).toLocaleString("en-US")}
+                    {/* Left side: Win/Loss Record + Score */}
+                    <div className="flex items-center gap-3 shrink-0">
+                      {/* Win/Loss Record (Esports pill) */}
+                      <div className="hidden xs:flex flex-col items-center justify-center bg-white/5 border border-white/5 rounded-xl px-2.5 py-1 text-[10px] font-bold text-gray-400">
+                        <span className="text-emerald-400 num-en leading-none">{player.wins}W</span>
+                        <span className="text-red-400 num-en leading-none mt-1">{player.losses}L</span>
                       </div>
-                      <div className="text-[10px] text-gray-500 font-bold">
-                        {scoreUnit(board)}
+
+                      {/* Score display */}
+                      <div className="text-left min-w-[75px] flex flex-col items-end justify-center">
+                        <div className="font-black text-xl sm:text-2xl num-en tracking-tight text-purple-100 leading-none">
+                          {scoreFor(player, board).toLocaleString("en-US")}
+                        </div>
+                        <div className="text-[10px] text-gray-500 font-bold mt-1">
+                          {scoreUnit(board)}
+                        </div>
                       </div>
                     </div>
                   </Link>
