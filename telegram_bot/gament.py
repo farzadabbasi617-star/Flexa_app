@@ -18,7 +18,7 @@ GAME_META: dict[str, dict[str, str]] = {
         "fa": "کالاف موبایل",
         "icon": "🎯",
         "account_label": "UID / Username کالاف موبایل",
-        "account_prompt": "UID یا Username کالاف موبایل را وارد کن. بهتر است همان چیزی باشد که در پروفایل Flexa ثبت می‌کنی.",
+        "account_prompt": "UID یا Username کالاف موبایل را وارد کن. بهتر است همان چیزی باشد که در پروفایل Gament ثبت می‌کنی.",
     },
     "fortnite": {
         "bot_name": "FORTNITE",
@@ -26,7 +26,7 @@ GAME_META: dict[str, dict[str, str]] = {
         "fa": "فورتنایت",
         "icon": "🏗️",
         "account_label": "Epic Games ID / Username فورتنایت",
-        "account_prompt": "Epic Games ID یا Username فورتنایت را وارد کن. این شناسه باید با پروفایل Flexa هماهنگ باشد.",
+        "account_prompt": "Epic Games ID یا Username فورتنایت را وارد کن. این شناسه باید با پروفایل Gament هماهنگ باشد.",
     },
     "clash_royale": {
         "bot_name": "CLASH ROYALE",
@@ -116,12 +116,12 @@ def profile_url() -> str:
     return f"{settings.app_url}/profile"
 
 
-def normalize_flexa_id(value: str) -> str:
+def normalize_gament_id(value: str) -> str:
     return value.strip().upper().replace(" ", "")
 
 
-def is_valid_flexa_id(value: str) -> bool:
-    normalized = normalize_flexa_id(value)
+def is_valid_gament_id(value: str) -> bool:
+    normalized = normalize_gament_id(value)
     if not normalized.startswith("FLX-"):
         return False
     suffix = normalized[4:]
@@ -129,7 +129,7 @@ def is_valid_flexa_id(value: str) -> bool:
 
 
 async def sync_pre_registration(data: dict[str, Any], telegram_user: Any) -> tuple[bool, str]:
-    """Push a Telegram pre-registration into the Flexa web app.
+    """Push a Telegram pre-registration into the Gament web app.
 
     Returns (ok, message). The bot still keeps a local SQLite copy even if this
     sync fails, so temporary web-app downtime does not lose leads.
@@ -143,7 +143,7 @@ async def sync_pre_registration(data: dict[str, Any], telegram_user: Any) -> tup
         "telegramUsername": getattr(telegram_user, "username", None),
         "telegramFirstName": getattr(telegram_user, "first_name", None),
         "telegramLastName": getattr(telegram_user, "last_name", None),
-        "flexaId": data.get("flexa_id") or None,
+        "gamentId": data.get("gament_id") or None,
         "fullName": data.get("full_name") or "",
         "phoneNumber": data.get("phone") or "",
         "game": normalize_game_id(data.get("game")) or data.get("game") or "",
@@ -164,7 +164,7 @@ async def sync_pre_registration(data: dict[str, Any], telegram_user: Any) -> tup
                 "Accept": "application/json",
                 "Content-Type": "application/json",
                 "Authorization": f"Bearer {settings.telegram_integration_secret}",
-                "User-Agent": "FlexaTelegramBot/1.0",
+                "User-Agent": "GamentTelegramBot/1.0",
             },
         )
         try:
@@ -192,7 +192,7 @@ async def fetch_tournaments(game: str | None = None, limit: int = 20) -> list[di
             url,
             headers={
                 "Accept": "application/json",
-                "User-Agent": "FlexaTelegramBot/1.0",
+                "User-Agent": "GamentTelegramBot/1.0",
             },
         )
         with urllib.request.urlopen(req, timeout=15) as response:
@@ -238,15 +238,15 @@ def format_tournament_card(tournament: dict[str, Any], index: int) -> str:
 
 
 def format_tournaments_message(tournaments: list[dict[str, Any]], game: str | None = None) -> str:
-    title = "🏟 <b>روم‌های فعال Flexa</b>"
+    title = "🏟 <b>روم‌های فعال Gament</b>"
     if game:
         title += f" — {esc(game_title(game, bilingual=False))}"
     if not tournaments:
-        return title + "\n\nفعلاً روم فعالی پیدا نشد. از وب‌اپ فلکسا هم می‌توانی آخرین وضعیت را ببینی."
+        return title + "\n\nفعلاً روم فعالی پیدا نشد. از وب‌اپ گیمنت هم می‌توانی آخرین وضعیت را ببینی."
 
     parts = [title, ""]
     for index, tournament in enumerate(tournaments[:10], start=1):
         parts.append(format_tournament_card(tournament, index))
         parts.append("")
-    parts.append("برای ثبت‌نام قطعی، پرداخت ورودی احتمالی و مشاهده لابی، وارد وب‌اپ فلکسا شو.")
+    parts.append("برای ثبت‌نام قطعی، پرداخت ورودی احتمالی و مشاهده لابی، وارد وب‌اپ گیمنت شو.")
     return "\n".join(parts).strip()

@@ -11,13 +11,13 @@ import { TERMS_VERSION } from "@/lib/terms";
 
 export const dynamic = "force-dynamic";
 
-async function generateUniqueFlexaId() {
+async function generateUniqueGamentId() {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const candidate = `FLX-${crypto.randomInt(1000, 10000)}`;
     const [existing] = await db
       .select({ id: users.id })
       .from(users)
-      .where(eq(users.flexaId, candidate))
+      .where(eq(users.gamentId, candidate))
       .limit(1);
 
     if (!existing) return candidate;
@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
     // 4. Hash password.
     const hashedPassword = await hashPassword(password);
-    const flexaId = await generateUniqueFlexaId();
+    const gamentId = await generateUniqueGamentId();
 
     // 5. Create user + player profile + empty wallet atomically.
     const user = await db.transaction(async (tx) => {
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
         .insert(users)
         .values({
           phoneNumber,
-          flexaId,
+          gamentId,
           username,
           passwordHash: hashedPassword,
           displayName,
@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
           phoneVerifiedAt: user.phoneVerifiedAt,
           username: user.username,
           displayName: user.displayName,
-          flexaId: user.flexaId,
+          gamentId: user.gamentId,
           role: user.role,
           avatarUrl: user.avatarUrl,
           isVerified: user.isVerified,

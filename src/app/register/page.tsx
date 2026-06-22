@@ -46,7 +46,7 @@ export default function RegisterPage() {
     }
 
     if (!form.termsAccepted) {
-      setError("برای ثبت‌نام، پذیرش قوانین و مقررات فلکسا الزامی است.");
+      setError("برای ثبت‌نام، پذیرش قوانین و مقررات گیمنت الزامی است.");
       return;
     }
 
@@ -80,7 +80,7 @@ export default function RegisterPage() {
             <div className="text-5xl mb-4">🎮</div>
             <h1 className="text-2xl font-bold neon-text-purple">{t.auth.registerTitle}</h1>
             <p className="text-gray-400 mt-1">
-              {lang === "fa" ? "حساب فلکسا بسازید و وارد آرنا شوید" : "Create your Flexa account and enter the arena"}
+              {lang === "fa" ? "حساب گیمنت بسازید و وارد آرنا شوید" : "Create your Gament account and enter the arena"}
             </p>
           </div>
 
@@ -196,7 +196,7 @@ export default function RegisterPage() {
               <span className="text-xs text-gray-300 leading-7">
                 با ثبت‌نام تأیید می‌کنم که
                 <Link href="/rules" target="_blank" className="text-neon-blue font-black mx-1 hover:underline">
-                  قوانین، مقررات و شرایط استفاده فلکسا
+                  قوانین، مقررات و شرایط استفاده گیمنت
                 </Link>
                 را کامل مطالعه کرده‌ام و همه بندهای آن، از جمله ماهیت مهارتی مسابقات، هزینه خدمات، شرایط جوایز، داوری، امنیت و پیگیری‌های قانونی را می‌پذیرم.
               </span>

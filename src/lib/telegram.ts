@@ -16,14 +16,14 @@ export interface TelegramTournamentPost {
   prize3rd?: string | null;
 }
 
-const DEFAULT_APP_URL = "https://flexa-app-1.onrender.com";
+const DEFAULT_APP_URL = "https://gament-1.onrender.com";
 
 function appUrl() {
   return (process.env.APP_URL || DEFAULT_APP_URL).replace(/\/$/, "");
 }
 
 export function getTelegramChannelUrl() {
-  return (process.env.TELEGRAM_CHANNEL_URL || process.env.CHANNEL_URL || "https://t.me/Flexa_games").trim();
+  return (process.env.TELEGRAM_CHANNEL_URL || process.env.CHANNEL_URL || "https://t.me/Gament_games").trim();
 }
 
 export function getTelegramChannelChatId() {
@@ -33,7 +33,7 @@ export function getTelegramChannelChatId() {
   const channelUrl = getTelegramChannelUrl();
   const match = channelUrl.match(/t\.me\/([A-Za-z0-9_]+)/i);
   if (match?.[1]) return `@${match[1]}`;
-  return "@Flexa_games";
+  return "@Gament_games";
 }
 
 function html(value: unknown) {
@@ -69,7 +69,7 @@ export function formatTournamentChannelPost(tournament: TelegramTournamentPost) 
   const description = tournament.description?.trim();
 
   return [
-    "🏆 <b>تورنومنت جدید Flexa</b>",
+    "🏆 <b>تورنومنت جدید Gament</b>",
     "",
     `🔥 <b>${html(tournament.name)}</b>`,
     `🎮 بازی: <b>${html(gameLabel(tournament.game))}</b>`,
@@ -81,7 +81,7 @@ export function formatTournamentChannelPost(tournament: TelegramTournamentPost) 
     description ? "" : "",
     description ? html(description.slice(0, 500)) : "",
     "",
-    "برای ثبت‌نام و مشاهده قوانین وارد Flexa شو 👇",
+    "برای ثبت‌نام و مشاهده قوانین وارد Gament شو 👇",
   ].filter(Boolean).join("\n");
 }
 
@@ -125,7 +125,7 @@ export async function publishTournamentToTelegramChannel(tournament: TelegramTou
     inline_keyboard: [
       [
         { text: "🎮 ثبت‌نام در تورنومنت", web_app: { url: url } },
-        { text: "⚡ ورود به Flexa", web_app: { url: appUrl() } },
+        { text: "⚡ ورود به Gament", web_app: { url: appUrl() } },
       ],
     ],
   };

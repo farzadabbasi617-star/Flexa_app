@@ -4,7 +4,7 @@ import { ticketMessages, tickets, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { fetchAIResponse } from "@/lib/ai-provider-manager";
-import { flexaSystemPrompt } from "@/lib/ai-prompts";
+import { gamentSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
@@ -46,7 +46,7 @@ function localAnalyze(subject: string, transcript: string): SupportAIInsight {
   if (/تشکر|پیشنهاد|سوال ساده/.test(text)) priority = "low";
 
   const summary = `این تیکت درباره «${CATEGORY_LABELS[category]}» است. موضوع: ${subject}. آخرین پیام‌ها نیاز به بررسی وضعیت کاربر و سوابق مرتبط دارند.`;
-  const suggestedReply = `سلام، پیام شما دریافت شد. لطفاً برای بررسی دقیق‌تر ${category === "wallet" ? "شماره/زمان تراکنش و مبلغ" : category === "judgment" ? "لینک/نام تورنومنت، نام حریف و اسکرین‌شات نتیجه" : category === "tournament" ? "نام تورنومنت و زمان ثبت‌نام" : "جزئیات کامل مشکل و اسکرین‌شات در صورت وجود"} را ارسال کنید. تیم Flexa موضوع را بررسی می‌کند.`;
+  const suggestedReply = `سلام، پیام شما دریافت شد. لطفاً برای بررسی دقیق‌تر ${category === "wallet" ? "شماره/زمان تراکنش و مبلغ" : category === "judgment" ? "لینک/نام تورنومنت، نام حریف و اسکرین‌شات نتیجه" : category === "tournament" ? "نام تورنومنت و زمان ثبت‌نام" : "جزئیات کامل مشکل و اسکرین‌شات در صورت وجود"} را ارسال کنید. تیم Gament موضوع را بررسی می‌کند.`;
   const requiredInfo = category === "wallet"
     ? ["مبلغ", "زمان تراکنش", "شماره پیگیری یا اسکرین‌شات پرداخت"]
     : category === "judgment"
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
       .slice(-6000);
 
     const fallback = localAnalyze(ticket.subject, transcript);
-    const prompt = `این تیکت پشتیبانی Flexa را تحلیل کن.
+    const prompt = `این تیکت پشتیبانی Gament را تحلیل کن.
 اطلاعات کاربر: ${ticket.displayName || ticket.username || "نامشخص"} - ${ticket.phoneNumber || "بدون موبایل"}
 موضوع: ${ticket.subject}
 وضعیت: ${ticket.status}
@@ -131,7 +131,7 @@ ${transcript}
   "requiredInfo": ["اطلاعات لازم برای ادامه بررسی"]
 }`;
 
-    const systemPrompt = flexaSystemPrompt("support", "فقط JSON معتبر بدون markdown برگردان.");
+    const systemPrompt = gamentSystemPrompt("support", "فقط JSON معتبر بدون markdown برگردان.");
     const ai = await fetchAIResponse(prompt, systemPrompt);
     const parsed = ai ? safeParseAIJson<Partial<SupportAIInsight>>(ai.content) : null;
     const insight = normalizeInsight(parsed, fallback);

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { requireRole } from "@/lib/auth";
 import { fetchAIResponse } from "@/lib/ai-provider-manager";
-import { flexaSystemPrompt } from "@/lib/ai-prompts";
+import { gamentSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
@@ -42,7 +42,7 @@ const FORMAT_LABELS: Record<string, string> = {
 function localDraft(input: z.infer<typeof DraftSchema>): DraftResult {
   const game = GAME_LABELS[input.game];
   const format = FORMAT_LABELS[input.format];
-  const name = input.name?.trim() || `تورنومنت ${game} فلکسا`;
+  const name = input.name?.trim() || `تورنومنت ${game} گیمنت`;
   const evidenceRule = "ارسال اسکرین‌شات واضح از نتیجه برای ثبت/اعتراض الزامی است.";
 
   const gameRules: Record<string, string[]> = {
@@ -70,7 +70,7 @@ function localDraft(input: z.infer<typeof DraftSchema>): DraftResult {
     `ظرفیت: ${input.maxPlayers} بازیکن`,
     ...gameRules[input.game],
     evidenceRule,
-    "نتیجه‌های مشکوک توسط داوری هوشمند Flexa و در صورت نیاز توسط داور انسانی بررسی می‌شوند.",
+    "نتیجه‌های مشکوک توسط داوری هوشمند Gament و در صورت نیاز توسط داور انسانی بررسی می‌شوند.",
     "تصمیم نهایی داور/مدیریت تورنومنت لازم‌الاجراست.",
   ]
     .map((rule, index) => `${index + 1}. ${rule}`)
@@ -87,7 +87,7 @@ function localDraft(input: z.infer<typeof DraftSchema>): DraftResult {
     `💳 ورودی: ${input.entryFee || "رایگان"}`,
     input.prizePool ? `🎁 جایزه: ${input.prizePool}` : "🎁 جایزه: طبق اعلام مدیریت",
     "",
-    "ثبت‌نام از طریق Flexa فعال است. قبل از شروع، آیدی بازی را در پروفایل ثبت کن.",
+    "ثبت‌نام از طریق Gament فعال است. قبل از شروع، آیدی بازی را در پروفایل ثبت کن.",
   ].join("\n");
 
   return { description, rules, telegramPost };
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
   "telegramPost": "متن تبلیغاتی کوتاه برای کانال تلگرام"
 }`;
 
-    const systemPrompt = flexaSystemPrompt("tournamentDraft", "فقط JSON معتبر بدون markdown برگردان.");
+    const systemPrompt = gamentSystemPrompt("tournamentDraft", "فقط JSON معتبر بدون markdown برگردان.");
     const ai = await fetchAIResponse(prompt, systemPrompt);
     const parsed = ai ? safeParseAIJson<Partial<DraftResult>>(ai.content) : null;
     const draft = normalizeDraft(parsed, fallback);

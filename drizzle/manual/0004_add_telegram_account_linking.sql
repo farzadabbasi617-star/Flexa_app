@@ -1,5 +1,5 @@
 -- Telegram account linking: /link in the bot creates a short-lived code;
--- logged-in Flexa users enter that code in the web app profile to link accounts.
+-- logged-in Gament users enter that code in the web app profile to link accounts.
 
 CREATE TABLE IF NOT EXISTS "telegram_accounts" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

@@ -74,7 +74,7 @@ export async function POST(request: NextRequest) {
         phoneVerifiedAt: user.phoneVerifiedAt,
         username: user.username,
         displayName: user.displayName,
-        flexaId: user.flexaId,
+        gamentId: user.gamentId,
         role: user.role,
         avatarUrl: user.avatarUrl,
         isVerified: user.isVerified,

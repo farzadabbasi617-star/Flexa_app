@@ -1,5 +1,5 @@
 /**
- * Flexa AI Engine
+ * Gament AI Engine
  * Handles AI-powered judging, moderation, and assistance
  */
 
@@ -85,7 +85,7 @@ const SPAM_PATTERNS = [
 export async function analyzeMatchWithAI(player1Score: number, player2Score: number, player1Rating: number, player2Rating: number, player1History: { wins: number; losses: number }, player2History: { wins: number; losses: number }, hasEvidence: boolean = false): Promise<AIJudgmentResult> {
   const prompt = `Analyze this match result and provide a verdict:\n    Game: Mobile Gaming Tournament\n    Player 1: Score ${player1Score}, Rating ${player1Rating}, History ${player1History.wins}W/${player1History.losses}L\n    Player 2: Score ${player2Score}, Rating ${player2Rating}, History ${player2History.wins}W/${player2History.losses}L\n    Evidence Provided: ${hasEvidence ? "Yes" : "No"}\n\n    Please return a JSON object with:\n    {\n      "verdict": "player1_wins" | "player2_wins" | "draw" | "rematch" | "needs_review",\n      "confidence": number (0-100),\n      "reasoning": "Detailed explanation in Persian",\n      "suspicionLevel": number (0-100),\n      "recommendations": ["string"]\n    }`;
 
-  const systemPrompt = `You are the Flexa AI Head Judge. Your task is to analyze match scores and player data to ensure fair play.\n    Look for:\n    - Anomalies: High scores with low ratings.\n    - Consistency: Does the result match the players skill levels?\n    - Evidence: How much does the presence (or absence) of evidence affect certainty?\n    Respond ONLY with valid JSON.`;
+  const systemPrompt = `You are the Gament AI Head Judge. Your task is to analyze match scores and player data to ensure fair play.\n    Look for:\n    - Anomalies: High scores with low ratings.\n    - Consistency: Does the result match the players skill levels?\n    - Evidence: How much does the presence (or absence) of evidence affect certainty?\n    Respond ONLY with valid JSON.`;
 
   const response = await askOpenRouter(prompt, systemPrompt);
 
@@ -386,11 +386,11 @@ export async function generateRealAssistantResponse(
   const name = context.userName || (isFA ? "کاربر" : "User");
   
   const systemPrompt = isFA 
-    ? `شما "فلکسا" (Flexa) هستید، یک دستیار هوشمند برای پلتفرم برگزاری تورنمنت بازی‌های موبایل (کلش رویال، کالاف دیوتی موبایل و فورتنایت). 
+    ? `شما "گیمنت" (Gament) هستید، یک دستیار هوشمند برای پلتفرم برگزاری تورنمنت بازی‌های موبایل (کلش رویال، کالاف دیوتی موبایل و فورتنایت). 
        نام کاربر: ${name}.
        وظیفه شما راهنمایی کاربران در مورد قوانین، نحوه ثبت‌نام، جوایز و سیستم داوری است.
        پاسخ‌ها را صمیمی، کوتاه و به زبان فارسی بنویسید.`
-    : `You are "Flexa", an AI assistant for a mobile gaming tournament platform (Clash Royale, COD Mobile, Fortnite).
+    : `You are "Gament", an AI assistant for a mobile gaming tournament platform (Clash Royale, COD Mobile, Fortnite).
        User name: ${name}.
        Your job is to guide users about rules, registration, prizes, and judging.
        Keep responses friendly, brief, and in English.`;
@@ -464,8 +464,8 @@ export function generateAssistantResponse(
   if (q.includes("judge") || q.includes("داوری") || q.includes("dispute") || q.includes("اعتراض")) {
     return {
       response: isFA
-        ? `⚖️ سیستم داوری Flexa:\n\n🤖 **داوری AI**: نتایج رو تحلیل میکنه و رأی میده\n👨‍⚖️ **داوری انسانی**: داور نتیجه نهایی رو تأیید میکنه\n\nاگه با نتیجه مخالفی، میتونی اعتراض ثبت کنی و مدارک (اسکرین‌شات) ارسال کنی.`
-        : `⚖️ Flexa Judging System:\n\n🤖 **AI Judging**: Analyzes results and provides verdict\n👨‍⚖️ **Human Judging**: Judge confirms final result\n\nIf you disagree, you can file a dispute with evidence (screenshots).`,
+        ? `⚖️ سیستم داوری Gament:\n\n🤖 **داوری AI**: نتایج رو تحلیل میکنه و رأی میده\n👨‍⚖️ **داوری انسانی**: داور نتیجه نهایی رو تأیید میکنه\n\nاگه با نتیجه مخالفی، میتونی اعتراض ثبت کنی و مدارک (اسکرین‌شات) ارسال کنی.`
+        : `⚖️ Gament Judging System:\n\n🤖 **AI Judging**: Analyzes results and provides verdict\n👨‍⚖️ **Human Judging**: Judge confirms final result\n\nIf you disagree, you can file a dispute with evidence (screenshots).`,
       suggestions: isFA
         ? ["چطور اعتراض کنم؟", "مدارک چی باید باشه؟", "زمان بررسی اعتراض"]
         : ["How to dispute?", "What evidence needed?", "Dispute review time"],
@@ -475,8 +475,8 @@ export function generateAssistantResponse(
   // Help / General
   return {
     response: isFA
-      ? `سلام ${name}! 👋 من دستیار هوشمند Flexa هستم.\n\nمیتونم کمکت کنم در مورد:\n🏆 تورنومنت‌ها\n💰 جوایز\n🎮 آیدی بازی‌ها\n⚖️ داوری\n\nسوالت رو بپرس!`
-      : `Hi ${name}! 👋 I'm the Flexa AI Assistant.\n\nI can help you with:\n🏆 Tournaments\n💰 Prizes\n🎮 Game IDs\n⚖️ Judging\n\nAsk me anything!`,
+      ? `سلام ${name}! 👋 من دستیار هوشمند Gament هستم.\n\nمیتونم کمکت کنم در مورد:\n🏆 تورنومنت‌ها\n💰 جوایز\n🎮 آیدی بازی‌ها\n⚖️ داوری\n\nسوالت رو بپرس!`
+      : `Hi ${name}! 👋 I'm the Gament AI Assistant.\n\nI can help you with:\n🏆 Tournaments\n💰 Prizes\n🎮 Game IDs\n⚖️ Judging\n\nAsk me anything!`,
     suggestions: isFA
       ? ["چطور تورنومنت بسازم؟", "قوانین سایت", "تماس با پشتیبانی"]
       : ["How to create tournament?", "Site rules", "Contact support"],

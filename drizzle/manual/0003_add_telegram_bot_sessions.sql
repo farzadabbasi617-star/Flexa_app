@@ -1,5 +1,5 @@
 -- Telegram webhook integration: stores short-lived conversation state for users
--- talking to the Flexa bot via the Next.js webhook route.
+-- talking to the Gament bot via the Next.js webhook route.
 
 CREATE TABLE IF NOT EXISTS "telegram_bot_sessions" (
   "id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,

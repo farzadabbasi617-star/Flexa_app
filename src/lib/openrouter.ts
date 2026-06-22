@@ -1,8 +1,8 @@
 /**
- * OpenRouter Client for Flexa AI
+ * OpenRouter Client for Gament AI
  */
 
-export async function askOpenRouter(prompt: string, systemPrompt: string = "You are Flexa AI.") {
+export async function askOpenRouter(prompt: string, systemPrompt: string = "You are Gament AI.") {
   const apiKey = process.env.OPENROUTER_API_KEY;
   
   if (!apiKey) {
@@ -16,8 +16,8 @@ export async function askOpenRouter(prompt: string, systemPrompt: string = "You 
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
-        "HTTP-Referer": "https://flexa-app.com", // Optional, for OpenRouter analytics
-        "X-Title": "Flexa App", // Optional, for OpenRouter analytics
+        "HTTP-Referer": "https://gament.com", // Optional, for OpenRouter analytics
+        "X-Title": "Gament App", // Optional, for OpenRouter analytics
       },
       body: JSON.stringify({
         "model": "google/gemini-2.0-flash-exp:free",

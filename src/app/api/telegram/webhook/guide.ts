@@ -40,7 +40,7 @@ export function getGameIdGuide(gameId: string): { title: string; steps: string[]
           "4. فیلد «Display Name» یا «Epic ID» را ببین.",
           "5. نام کاربری Epic توست، مثل: <code>EpicPlayer123</code>",
           "",
-          "⚠️ دقت کن این نام کاربری را در بخش پروفایل Flexa وارد کنی.",
+          "⚠️ دقت کن این نام کاربری را در بخش پروفایل Gament وارد کنی.",
         ],
       };
     default:

@@ -7,7 +7,7 @@ import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface DashboardData {
-  user: { id: string; displayName: string; username: string | null; flexaId: string; level: number; xp: number; rankPoints: number };
+  user: { id: string; displayName: string; username: string | null; gamentId: string; level: number; xp: number; rankPoints: number };
   player: { id: string; rating: number; wins: number; losses: number } | null;
   stats: {
     rating: number;
@@ -112,9 +112,9 @@ export default function DashboardPage() {
           
           <div className="relative flex flex-col lg:flex-row lg:items-center justify-between gap-8">
             <div>
-              <div className="text-xs font-black tracking-[2px] text-purple-400 mb-1">FLEXA DASHBOARD</div>
+              <div className="text-xs font-black tracking-[2px] text-purple-400 mb-1">GAMENT DASHBOARD</div>
               <h1 className="text-4xl font-black">سلام، {user.displayName} 👋</h1>
-              <p className="text-sm text-gray-400 mt-1">شناسه شما: <span className="font-mono text-purple-400">{user.flexaId}</span></p>
+              <p className="text-sm text-gray-400 mt-1">شناسه شما: <span className="font-mono text-purple-400">{user.gamentId}</span></p>
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full lg:w-auto">

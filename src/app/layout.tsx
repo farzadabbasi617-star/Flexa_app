@@ -15,14 +15,14 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "Flexa — پلتفرم تورنومنت گیمینگ",
+  title: "Gament — پلتفرم تورنومنت گیمینگ",
   description:
     "پلتفرم حرفه‌ای تورنومنت بازی برای کلش رویال، کالاف موبایل و فورتنایت با داوری هوش مصنوعی",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Flexa",
+    title: "Gament",
   },
   formatDetection: {
     telephone: false,

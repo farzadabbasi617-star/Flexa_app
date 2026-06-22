@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     const user = auth.user!;
     const account = await db.transaction(async (tx) => {
-      // Keep Telegram account <-> Flexa account one-to-one.
+      // Keep Telegram account <-> Gament account one-to-one.
       await tx
         .delete(telegramAccounts)
         .where(or(eq(telegramAccounts.userId, user.id), eq(telegramAccounts.telegramId, linkCode.telegramId)));
@@ -98,7 +98,7 @@ export async function POST(request: NextRequest) {
 
       await tx
         .update(telegramPreRegistrations)
-        .set({ linkedUserId: user.id, flexaId: user.flexaId, updatedAt: new Date() })
+        .set({ linkedUserId: user.id, gamentId: user.gamentId, updatedAt: new Date() })
         .where(eq(telegramPreRegistrations.telegramId, linkCode.telegramId));
 
       return created;
@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
 
     await sendTelegramMessage(
       linkCode.telegramId,
-      `✅ حساب تلگرام شما با موفقیت به حساب Flexa لینک شد.\n\n👤 ${user.displayName}\n🆔 <code>${user.flexaId}</code>\n🎁 +50 XP`
+      `✅ حساب تلگرام شما با موفقیت به حساب Gament لینک شد.\n\n👤 ${user.displayName}\n🆔 <code>${user.gamentId}</code>\n🎁 +50 XP`
     ).catch((err) => logger.warn({ err, telegramId: linkCode.telegramId }, "Failed to notify linked Telegram user"));
 
     return NextResponse.json({ ok: true, linked: true, account });
@@ -162,7 +162,7 @@ export async function DELETE(request: NextRequest) {
     });
 
     if (account?.telegramId) {
-      await sendTelegramMessage(account.telegramId, "🔓 اتصال حساب تلگرام از حساب Flexa شما حذف شد.").catch(() => undefined);
+      await sendTelegramMessage(account.telegramId, "🔓 اتصال حساب تلگرام از حساب Gament شما حذف شد.").catch(() => undefined);
     }
 
     return NextResponse.json({ ok: true, linked: false });

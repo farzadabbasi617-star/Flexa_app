@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { validateAdmin } from "@/lib/auth";
 import { fetchAIResponse } from "@/lib/ai-provider-manager";
-import { flexaSystemPrompt } from "@/lib/ai-prompts";
+import { gamentSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
@@ -41,7 +41,7 @@ function localDraft(body: Record<string, unknown>): HonorDraft {
   const typeLabel = TYPE_LABELS[type] || "افتخار";
   const username = text(body.username, 100);
   const game = text(body.game, 50);
-  const gameLabel = GAME_LABELS[game] || game || "Flexa";
+  const gameLabel = GAME_LABELS[game] || game || "Gament";
   const prize = text(body.prize, 120);
   const level = text(body.level, 20);
 
@@ -49,7 +49,7 @@ function localDraft(body: Record<string, unknown>): HonorDraft {
     ? text(body.title, 255)
     : username
     ? `${username}؛ ${typeLabel} جدید ${gameLabel}`
-    : `${typeLabel} جدید در Flexa`;
+    : `${typeLabel} جدید در Gament`;
 
   const details = [
     username ? `بازیکن @${username}` : null,
@@ -60,7 +60,7 @@ function localDraft(body: Record<string, unknown>): HonorDraft {
 
   const description = body.description
     ? text(body.description, 2000)
-    : `${details || "یک رویداد جدید"} در تالار افتخارات Flexa ثبت شد. این افتخار پس از بررسی مدیریت منتشر می‌شود.`;
+    : `${details || "یک رویداد جدید"} در تالار افتخارات Gament ثبت شد. این افتخار پس از بررسی مدیریت منتشر می‌شود.`;
 
   const telegramPost = [
     `🏆 ${title}`,
@@ -70,7 +70,7 @@ function localDraft(body: Record<string, unknown>): HonorDraft {
     game ? `🎮 بازی: ${gameLabel}` : "",
     prize ? `🎁 جایزه: ${prize}` : "",
     "",
-    "تالار افتخارات Flexa را دنبال کن.",
+    "تالار افتخارات Gament را دنبال کن.",
   ].filter(Boolean).join("\n");
 
   return { title, description, telegramPost };
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const fallback = localDraft(body);
 
-    const prompt = `برای تالار افتخارات Flexa یک متن جذاب بساز.
+    const prompt = `برای تالار افتخارات Gament یک متن جذاب بساز.
 نوع: ${TYPE_LABELS[text(body.type, 30)] || text(body.type, 30) || "خبر"}
 بازی: ${GAME_LABELS[text(body.game, 50)] || text(body.game, 50) || "نامشخص"}
 بازیکن: ${text(body.username, 100) || "نامشخص"}
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
   "telegramPost": "متن کوتاه مناسب انتشار در کانال تلگرام"
 }`;
 
-    const systemPrompt = flexaSystemPrompt("honors", "فقط JSON معتبر بدون markdown بده.");
+    const systemPrompt = gamentSystemPrompt("honors", "فقط JSON معتبر بدون markdown بده.");
     const ai = await fetchAIResponse(prompt, systemPrompt);
     const parsed = ai ? safeParseAIJson<Partial<HonorDraft>>(ai.content) : null;
     const draft = normalizeDraft(parsed, fallback);

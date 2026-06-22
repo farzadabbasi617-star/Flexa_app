@@ -75,8 +75,8 @@ async function sendReminders() {
       if (await hasSent(key)) continue;
       await sendTelegramMessage(
         recipient.telegramId,
-        `⏰ <b>یادآوری تورنومنت</b>\n\n🏆 ${html(tournament.name)}\n🎮 ${html(gameLabel(tournament.game))}\n\nشروع تا حدود <b>${bucket === 1440 ? "۲۴ ساعت" : `${bucket} دقیقه`}</b> دیگر.\n\nبرای جزئیات و قوانین وارد Flexa شو.`,
-        { inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/tournaments/${tournament.id}` }]] }
+        `⏰ <b>یادآوری تورنومنت</b>\n\n🏆 ${html(tournament.name)}\n🎮 ${html(gameLabel(tournament.game))}\n\nشروع تا حدود <b>${bucket === 1440 ? "۲۴ ساعت" : `${bucket} دقیقه`}</b> دیگر.\n\nبرای جزئیات و قوانین وارد Gament شو.`,
+        { inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${tournament.id}` }]] }
       );
       await markSent(key, "reminder", tournament.id, recipient.telegramId);
       sent += 1;
@@ -97,7 +97,7 @@ async function sendCapacityAlerts() {
     await sendTelegramMessage(
       getTelegramChannelChatId(),
       `⚠️ <b>ظرفیت رو به اتمام!</b>\n\n🏆 ${html(tournament.name)}\n🎮 ${html(gameLabel(tournament.game))}\n👥 ثبت‌نام: <b>${value}/${tournament.maxPlayers}</b>\nفقط <b>${left}</b> جای خالی باقی مانده.`,
-      { inline_keyboard: [[{ text: "ثبت‌نام", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/tournaments/${tournament.id}` }]] }
+      { inline_keyboard: [[{ text: "ثبت‌نام", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${tournament.id}` }]] }
     );
     await markSent(key, "capacity", tournament.id);
     sent += 1;
@@ -119,7 +119,7 @@ async function sendLobbyNotices() {
       await sendTelegramMessage(
         recipient.telegramId,
         `🏟 <b>اطلاعات لابی آماده شد</b>\n\n🏆 ${html(tournament.name)}\nRoom ID: <code>${html(tournament.roomId)}</code>\nPassword: <code>${html(tournament.roomPassword || "بدون رمز")}</code>\n\n${html(tournament.lobbyNotes || "لطفاً به‌موقع وارد لابی شوید.")}`,
-        { inline_keyboard: [[{ text: "مشاهده لابی", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/tournaments/${tournament.id}/lobby` }]] }
+        { inline_keyboard: [[{ text: "مشاهده لابی", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${tournament.id}/lobby` }]] }
       );
       await markSent(key, "lobby", tournament.id, recipient.telegramId);
       sent += 1;
@@ -162,12 +162,12 @@ async function sendDailyAdminReport() {
   const txRows = await db.select({ amount: transactions.amount }).from(transactions).where(eq(transactions.type, "entry_fee"));
   const revenueToman = txRows.reduce((sum, row) => sum + Number((BigInt(row.amount || "0") / BigInt(10)).toString()), 0);
 
-  const text = `📊 <b>گزارش روزانه Flexa</b>\n\nپیش‌ثبت‌نام‌های تلگرام: <b>${preRegs.value}</b>\nتورنومنت‌های فعال: <b>${activeTournaments.value}</b>\nمسابقات تکمیل‌شده: <b>${completedMatches.value}</b>\nتیکت‌های باز: <b>${openTickets.value}</b>\nدرآمد ورودی‌ها: <b>${revenueToman.toLocaleString("fa-IR")} تومان</b>`;
+  const text = `📊 <b>گزارش روزانه Gament</b>\n\nپیش‌ثبت‌نام‌های تلگرام: <b>${preRegs.value}</b>\nتورنومنت‌های فعال: <b>${activeTournaments.value}</b>\nمسابقات تکمیل‌شده: <b>${completedMatches.value}</b>\nتیکت‌های باز: <b>${openTickets.value}</b>\nدرآمد ورودی‌ها: <b>${revenueToman.toLocaleString("fa-IR")} تومان</b>`;
   let sent = 0;
   for (const id of adminIds) {
     const numericId = Number(id);
     if (!Number.isFinite(numericId)) continue;
-    await sendTelegramMessage(numericId, text, { inline_keyboard: [[{ text: "پنل ادمین", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/admin` }]] });
+    await sendTelegramMessage(numericId, text, { inline_keyboard: [[{ text: "پنل ادمین", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/admin` }]] });
     sent += 1;
   }
   await markSent(key, "daily_report");
@@ -226,7 +226,7 @@ async function sendMatchAssignmentNotifications() {
       await sendTelegramMessage(
         telegramId,
         `⚔️ <b>حریف تو مشخص شد!</b>\n\n🏆 ${html(match.tournamentName)}\n🎮 ${html(gameLabel(match.tournamentGame))}\n🆚 حریف: <b>${html(names[opponentId])}</b>\n🔁 دور ${match.round} — مسابقه ${match.matchNumber}${startText}\n\nآماده باش و به‌موقع وارد لابی شو.`,
-        { inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/tournaments/${match.tournamentId}` }]] }
+        { inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${match.tournamentId}` }]] }
       );
       await markSent(key, "match_assigned", match.tournamentId, telegramId);
       sent += 1;
@@ -267,7 +267,7 @@ async function sendMatchScheduleNotifications() {
       await sendTelegramMessage(
         telegramId,
         `⏰ <b>مسابقه شروع می‌شود!</b>\n\n🏆 ${html(match.tournamentName)}\n🎮 ${html(gameLabel(match.tournamentGame))}\n\nمسابقه حدود <b>${minutesLeft} دقیقه</b> دیگر شروع می‌شود.`,
-        { inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/tournaments/${match.tournamentId}` }]] }
+        { inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${match.tournamentId}` }]] }
       );
       await markSent(key, "match_scheduled", match.tournamentId, telegramId);
       sent += 1;
@@ -317,7 +317,7 @@ async function sendMatchResultNotifications() {
       }
 
       await sendTelegramMessage(telegramId, message, {
-        inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/tournaments/${match.tournamentId}` }]],
+        inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${match.tournamentId}` }]],
       });
       await markSent(key, `match_${match.status}`, match.tournamentId, telegramId);
       sent += 1;
@@ -349,7 +349,7 @@ async function publishCompletedResults() {
     await sendTelegramMessage(
       getTelegramChannelChatId(),
       `🏆 <b>نتیجه نهایی تورنومنت</b>\n\n🔥 ${html(tournament.name)}\n🎮 ${html(gameLabel(tournament.game))}\n\n${lines.join("\n")}\n\nتبریک به قهرمان‌ها!`,
-      { inline_keyboard: [[{ text: "مشاهده در Flexa", url: `${process.env.APP_URL || "https://flexa-app-1.onrender.com"}/tournaments/${tournament.id}` }]] }
+      { inline_keyboard: [[{ text: "مشاهده در Gament", url: `${process.env.APP_URL || "https://gament-1.onrender.com"}/tournaments/${tournament.id}` }]] }
     );
     await markSent(key, "result", tournament.id);
     published += 1;

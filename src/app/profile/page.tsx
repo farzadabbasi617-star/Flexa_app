@@ -15,7 +15,7 @@ interface TelegramLinkAccount {
 
 const AVATAR_OPTIONS = [
   { label: "شوالیه", url: "/icons/profile_icon.png" },
-  { label: "فلکسا", url: "/icons/arena_icon.png" },
+  { label: "گیمنت", url: "/icons/arena_icon.png" },
   { label: "تنظیمات", url: "/icons/settings_icon.png" },
   { label: "رتبه‌ها", url: "/icons/rankings_icon.png" },
   { label: "افتخارات", url: "/icons/honors_icon.png" },
@@ -319,8 +319,8 @@ export default function ProfilePage() {
               <div className="text-sm font-black" dir="ltr">@{user.username}</div>
             </div>
             <div className="bg-black/20 border border-white/10 rounded-3xl p-4">
-              <div className="text-[9px] font-black text-gray-500 mb-1">Flexa ID</div>
-              <div className="text-sm font-black text-purple-300 en-font" dir="ltr">{user.flexaId || "N/A"}</div>
+              <div className="text-[9px] font-black text-gray-500 mb-1">Gament ID</div>
+              <div className="text-sm font-black text-purple-300 en-font" dir="ltr">{user.gamentId || "N/A"}</div>
             </div>
           </div>
 
@@ -370,10 +370,10 @@ export default function ProfilePage() {
             <div className="text-right">
               <h3 className="text-sm font-black">🔗 اتصال تلگرام</h3>
               <p className="text-[10px] text-gray-500 mt-1 leading-5">
-                در ربات <span dir="ltr" className="text-cyan-300">@FlexaTournamentBot</span> دستور <code className="text-cyan-300">/link</code> را بزن و کد ۶ رقمی را اینجا وارد کن.
+                در ربات <span dir="ltr" className="text-cyan-300">@GamentTournamentBot</span> دستور <code className="text-cyan-300">/link</code> را بزن و کد ۶ رقمی را اینجا وارد کن.
               </p>
             </div>
-            <Link href="https://t.me/FlexaTournamentBot" className="text-[10px] bg-cyan-500/15 text-cyan-200 px-3 py-2 rounded-2xl border border-cyan-500/20 whitespace-nowrap">
+            <Link href="https://t.me/GamentTournamentBot" className="text-[10px] bg-cyan-500/15 text-cyan-200 px-3 py-2 rounded-2xl border border-cyan-500/20 whitespace-nowrap">
               ربات
             </Link>
           </div>

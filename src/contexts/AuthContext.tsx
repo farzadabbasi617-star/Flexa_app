@@ -10,7 +10,7 @@ interface User {
   phoneVerifiedAt: string | null;
   username: string;
   displayName: string;
-  flexaId: string;
+  gamentId: string;
   role: string;
   avatarUrl: string | null;
   isVerified: boolean;

@@ -59,7 +59,7 @@ export async function PATCH(request: NextRequest) {
         phoneVerifiedAt: updated.phoneVerifiedAt,
         username: updated.username,
         displayName: updated.displayName,
-        flexaId: updated.flexaId,
+        gamentId: updated.gamentId,
         role: updated.role,
         avatarUrl: updated.avatarUrl,
         isVerified: updated.isVerified,

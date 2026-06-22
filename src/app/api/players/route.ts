@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
         wins: players.wins,
         losses: players.losses,
         createdAt: players.createdAt,
-        flexaId: users.flexaId,
+        gamentId: users.gamentId,
         xp: users.xp,
         level: users.level,
         rankPoints: users.rankPoints,

@@ -1,7 +1,7 @@
 import { fetchAIResponse } from "./ai-provider-manager";
 import { analyzeMatch, generateAssistantResponse, AIJudgmentResult } from "./ai-engine";
 import { safeParseAIJson } from "./ai-utils";
-import { flexaSystemPrompt } from "./ai-prompts";
+import { gamentSystemPrompt } from "./ai-prompts";
 
 export interface AssistantAIResponse {
   response: string;
@@ -20,11 +20,11 @@ export async function generateRealAssistantResponse(
   const isFA = context.lang === "fa";
   const name = context.userName || (isFA ? "کاربر" : "User");
 
-  const systemPrompt = flexaSystemPrompt(
+  const systemPrompt = gamentSystemPrompt(
     "assistant",
     isFA
       ? `نام کاربر: ${name}. فقط فارسی پاسخ بده. پاسخ کوتاه، کاربردی و صمیمی باشد.`
-      : `User name: ${name}. The user explicitly wants English; answer briefly in English while following Flexa safety rules.`
+      : `User name: ${name}. The user explicitly wants English; answer briefly in English while following Gament safety rules.`
   );
 
   const aiResult = await fetchAIResponse(query, systemPrompt);
@@ -77,7 +77,7 @@ export async function analyzeMatchWithAI(
       "recommendations": ["string"]
     }`;
 
-  const systemPrompt = flexaSystemPrompt(
+  const systemPrompt = gamentSystemPrompt(
     "judging",
     "Respond ONLY with valid JSON matching the requested schema. No markdown. No extra text."
   );

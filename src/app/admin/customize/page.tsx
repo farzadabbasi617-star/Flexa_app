@@ -114,12 +114,12 @@ export default function AdminCustomizePage() {
     bg_color: "#0a0a0f",
     card_color: "#16162a",
     // Logo
-    logo_text: "Flexa",
+    logo_text: "Gament",
     logo_icon: "⚡",
     logo_font_size: "24",
     // Hero
-    hero_title_fa: "فلکسا",
-    hero_title_en: "Flexa",
+    hero_title_fa: "گیمنت",
+    hero_title_en: "Gament",
     hero_subtitle_fa: "گیمینگ",
     hero_subtitle_en: "Gaming",
     hero_image_url: "",

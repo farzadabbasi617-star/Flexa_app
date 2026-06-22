@@ -25,7 +25,7 @@ interface TeamDetail {
     userId: string;
     displayName: string | null;
     username: string | null;
-    flexaId: string | null;
+    gamentId: string | null;
     rankPoints: number | null;
     level: number | null;
     avatarUrl: string | null;
@@ -186,7 +186,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
                 </div>
                 <div className="flex-1 min-w-0">
                   <span className="font-bold">{member.displayName || member.username || "کاربر"}</span>
-                  <div className="text-xs text-gray-500 mt-1">{member.flexaId || "—"} • Level {member.level || 1}</div>
+                  <div className="text-xs text-gray-500 mt-1">{member.gamentId || "—"} • Level {member.level || 1}</div>
                 </div>
                 {canManage && member.userId !== data.team.ownerId ? (
                   <div className="flex items-center gap-2">

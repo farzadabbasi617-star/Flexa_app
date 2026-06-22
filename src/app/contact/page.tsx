@@ -23,8 +23,8 @@ export default function ContactPage() {
               <span className="text-2xl mt-0.5">✉️</span>
               <div>
                 <div className="font-bold mb-1">ایمیل پشتیبانی</div>
-                <a href="mailto:support@flexa.app" className="text-purple-400 hover:underline">
-                  support@flexa.app
+                <a href="mailto:support@gament.app" className="text-purple-400 hover:underline">
+                  support@gament.app
                 </a>
               </div>
             </div>
@@ -35,8 +35,8 @@ export default function ContactPage() {
               <span className="text-2xl mt-0.5">📱</span>
               <div>
                 <div className="font-bold mb-1">تلگرام</div>
-                <a href="https://t.me/Flexa_games" target="_blank" className="text-purple-400 hover:underline">
-                  @Flexa_games
+                <a href="https://t.me/Gament_games" target="_blank" className="text-purple-400 hover:underline">
+                  @Gament_games
                 </a>
               </div>
             </div>
@@ -47,8 +47,8 @@ export default function ContactPage() {
               <span className="text-2xl mt-0.5">📷</span>
               <div>
                 <div className="font-bold mb-1">اینستاگرام</div>
-                <a href="https://instagram.com/flexa_app" target="_blank" className="text-purple-400 hover:underline">
-                  @flexa_app
+                <a href="https://instagram.com/gament" target="_blank" className="text-purple-400 hover:underline">
+                  @gament
                 </a>
               </div>
             </div>

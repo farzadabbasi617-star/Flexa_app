@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
 
   const openrouterKey = normalizeAIEnvValue(process.env.OPENROUTER_API_KEY);
   const groqKey = normalizeAIEnvValue(process.env.GROQ_API_KEY);
-  const test = await fetchAIResponse("در یک جمله بگو Flexa AI فعال است.", "فقط فارسی و خیلی کوتاه پاسخ بده.");
+  const test = await fetchAIResponse("در یک جمله بگو Gament AI فعال است.", "فقط فارسی و خیلی کوتاه پاسخ بده.");
 
   return NextResponse.json({
     configured: {

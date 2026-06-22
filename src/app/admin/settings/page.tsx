@@ -13,8 +13,8 @@ export default function AdminSettingsPage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [settings, setSettings] = useState({
-    site_title_fa: "فلکسا",
-    site_title_en: "Flexa",
+    site_title_fa: "گیمنت",
+    site_title_en: "Gament",
     site_subtitle_fa: "پلتفرم تورنومنت گیمینگ",
     site_subtitle_en: "Gaming Tournament Platform",
     contact_email: "",

@@ -21,7 +21,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         wins: players.wins,
         losses: players.losses,
         createdAt: players.createdAt,
-        flexaId: users.flexaId,
+        gamentId: users.gamentId,
         level: users.level,
         rankPoints: users.rankPoints,
         role: users.role,

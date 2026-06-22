@@ -68,7 +68,7 @@ export default function HonorsPage() {
       <div className="relative pt-8 pb-10 px-6 bg-gradient-to-b from-purple-950/40 via-[#050508] to-[#050508]">
         <div className="max-w-[480px] mx-auto text-center">
           <div className="inline-block px-5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs tracking-[2px] mb-4">
-            FLEXA ELITE
+            GAMENT ELITE
           </div>
           <h1 className="text-6xl font-black tracking-[-3px] mb-2">تالار افتخارات</h1>
           <p className="text-white/60">قهرمانان، قهرمانی‌ها و درخشش‌ها</p>

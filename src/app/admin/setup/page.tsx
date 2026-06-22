@@ -43,7 +43,7 @@ export default function AdminSetupPage() {
           <div className="text-6xl mb-5">👑</div>
           <h1 className="text-2xl font-black neon-text-purple mb-3">راه‌اندازی مدیر اصلی</h1>
           <p className="text-gray-400 text-sm leading-7 mb-6">
-            اگر هنوز مدیر اصلی برای Flexa ساخته نشده باشد، با این دکمه حساب فعلی به مدیر اصلی تبدیل می‌شود. بعداً مدیر اصلی می‌تواند از بخش کاربران، ادمین انتخاب کند.
+            اگر هنوز مدیر اصلی برای Gament ساخته نشده باشد، با این دکمه حساب فعلی به مدیر اصلی تبدیل می‌شود. بعداً مدیر اصلی می‌تواند از بخش کاربران، ادمین انتخاب کند.
           </p>
 
           {loading ? (

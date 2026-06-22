@@ -23,11 +23,11 @@ if (!databaseUrl) {
 const noVerify = process.env.DB_SSL_NO_VERIFY === "true";
 
 const globalForDb = globalThis as typeof globalThis & {
-  __flexaPool?: Pool;
+  __gamentPool?: Pool;
 };
 
 export const pool =
-  globalForDb.__flexaPool ??
+  globalForDb.__gamentPool ??
   new Pool({
     connectionString: databaseUrl,
     ssl: { rejectUnauthorized: !noVerify },
@@ -37,7 +37,7 @@ export const pool =
   });
 
 if (process.env.NODE_ENV !== "production") {
-  globalForDb.__flexaPool = pool;
+  globalForDb.__gamentPool = pool;
 }
 
 export const db = drizzle(pool);

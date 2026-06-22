@@ -12,10 +12,10 @@ export default function RulesPage() {
         <div className="text-center mb-10">
           <div className="text-5xl mb-4">📜</div>
           <h1 className="text-3xl sm:text-4xl font-black mb-3">
-            <span className="neon-text-purple">قوانین، مقررات و شرایط استفاده فلکسا</span>
+            <span className="neon-text-purple">قوانین، مقررات و شرایط استفاده گیمنت</span>
           </h1>
           <p className="text-gray-400 leading-8 max-w-2xl mx-auto">
-            این سند، چارچوب استفاده از پلتفرم فلکسا، شرکت در تورنومنت‌ها، پرداخت‌ها، جوایز، داوری، امنیت و مسئولیت کاربران را مشخص می‌کند. ثبت‌نام یا استفاده از خدمات فلکسا به منزله پذیرش کامل این مقررات است.
+            این سند، چارچوب استفاده از پلتفرم گیمنت، شرکت در تورنومنت‌ها، پرداخت‌ها، جوایز، داوری، امنیت و مسئولیت کاربران را مشخص می‌کند. ثبت‌نام یا استفاده از خدمات گیمنت به منزله پذیرش کامل این مقررات است.
           </p>
           <div className="mt-5 flex flex-wrap justify-center gap-3 text-xs text-gray-500">
             <span className="px-3 py-1 rounded-full bg-white/5 border border-white/10">نسخه: {TERMS_VERSION}</span>

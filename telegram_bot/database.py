@@ -51,10 +51,10 @@ def save_registration(telegram_id: int, data: dict[str, Any]) -> None:
     query = """
         INSERT INTO telegram_pre_registrations 
         (telegram_id, telegram_username, telegram_first_name, telegram_last_name, 
-         flexa_id, full_name, phone_number, game, platform, gamer_tag, city, team_name, status, updated_at)
+         gament_id, full_name, phone_number, game, platform, gamer_tag, city, team_name, status, updated_at)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'new', %s)
         ON CONFLICT (telegram_id) DO UPDATE SET
-            flexa_id = EXCLUDED.flexa_id,
+            gament_id = EXCLUDED.gament_id,
             full_name = EXCLUDED.full_name,
             phone_number = EXCLUDED.phone_number,
             game = EXCLUDED.game,
@@ -72,7 +72,7 @@ def save_registration(telegram_id: int, data: dict[str, Any]) -> None:
                 data.get("username"),
                 data.get("first_name"),
                 data.get("last_name"),
-                data.get("flexa_id") or None,
+                data.get("gament_id") or None,
                 data["full_name"],
                 data["phone"],
                 data["game"],
@@ -110,8 +110,8 @@ def get_stats() -> dict[str, Any]:
             cur.execute("SELECT COUNT(*) as c FROM telegram_pre_registrations WHERE status='new'")
             total = cur.fetchone()['c']
             
-            cur.execute("SELECT COUNT(*) as c FROM telegram_pre_registrations WHERE status='new' AND flexa_id IS NOT NULL AND flexa_id != ''")
-            with_flexa_id = cur.fetchone()['c']
+            cur.execute("SELECT COUNT(*) as c FROM telegram_pre_registrations WHERE status='new' AND gament_id IS NOT NULL AND gament_id != ''")
+            with_gament_id = cur.fetchone()['c']
             
             cur.execute("SELECT game, COUNT(*) as c FROM telegram_pre_registrations WHERE status='new' GROUP BY game ORDER BY c DESC")
             by_game = cur.fetchall()
@@ -121,7 +121,7 @@ def get_stats() -> dict[str, Any]:
             
     return {
         "total": total,
-        "with_flexa_id": with_flexa_id,
+        "with_gament_id": with_gament_id,
         "by_game": [dict(row) for row in by_game],
         "by_platform": [dict(row) for row in by_platform],
     }
@@ -164,7 +164,7 @@ def get_active_telegram_ids() -> list[int]:
 def export_registrations_csv(output_dir: Path | None = None) -> Path:
     output_dir = output_dir or (Path(os.getcwd()) / "exports")
     output_dir.mkdir(parents=True, exist_ok=True)
-    filename = f"flexa_telegram_registrations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+    filename = f"gament_telegram_registrations_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
     path = output_dir / filename
 
     with get_conn() as conn:

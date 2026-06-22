@@ -13,7 +13,7 @@ export default function AboutPage() {
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-2">
             <span className="text-3xl">🏢</span>
-            <h1 className="text-3xl font-black">درباره فلکسا</h1>
+            <h1 className="text-3xl font-black">درباره گیمنت</h1>
           </div>
           <p className="text-sm text-white/60">پلتفرم حرفه‌ای تورنومنت گیمینگ</p>
         </div>
@@ -22,7 +22,7 @@ export default function AboutPage() {
           <section>
             <h2 className="font-bold text-lg mb-3 text-purple-300">داستان ما</h2>
             <p>
-              فلکسا در سال ۱۴۰۳ با هدف ایجاد بستری عادلانه، امن و هوشمند برای رقابت گیمرهای ایرانی راه‌اندازی شد. ما معتقدیم که هر بازیکنی باید بتواند مهارت خود را در محیطی حرفه‌ای و بدون نگرانی از تقلب به نمایش بگذارد.
+              گیمنت در سال ۱۴۰۳ با هدف ایجاد بستری عادلانه، امن و هوشمند برای رقابت گیمرهای ایرانی راه‌اندازی شد. ما معتقدیم که هر بازیکنی باید بتواند مهارت خود را در محیطی حرفه‌ای و بدون نگرانی از تقلب به نمایش بگذارد.
             </p>
           </section>
 
@@ -45,7 +45,7 @@ export default function AboutPage() {
         </div>
 
         <div className="mt-12 text-center text-xs text-white/40">
-          فلکسا — جایی که مهارت حرف اول را می‌زند
+          گیمنت — جایی که مهارت حرف اول را می‌زند
         </div>
       </div>
       </main>

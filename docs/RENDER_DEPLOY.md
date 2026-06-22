@@ -1,4 +1,4 @@
-# راهنمای Deploy پروژه Flexa روی Render
+# راهنمای Deploy پروژه Gament روی Render
 
 > این فایل عمداً هیچ کلید یا رمز واقعی ندارد. Secretها را فقط داخل داشبورد Render وارد کنید و داخل GitHub کامیت نکنید.
 
@@ -48,8 +48,8 @@ NODE_ENV=production
 BOT_TOKEN=telegram_bot_token_from_botfather
 TELEGRAM_WEBHOOK_SECRET=your_long_random_webhook_secret
 TELEGRAM_ADMIN_IDS=your_numeric_telegram_id
-TELEGRAM_CHANNEL_URL=https://t.me/Flexa_games
-TELEGRAM_CHANNEL_ID=@Flexa_games
+TELEGRAM_CHANNEL_URL=https://t.me/Gament_games
+TELEGRAM_CHANNEL_ID=@Gament_games
 # Optional legacy Python-worker integration:
 TELEGRAM_INTEGRATION_SECRET=your_long_random_secret
 ```
@@ -103,7 +103,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0006_add_telegram_marketing_and_waitlist.
 بعد از Deploy، webhook را با BotFather/API تلگرام ست کنید:
 
 ```txt
-https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://flexa-app-1.onrender.com/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
+https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://gament-1.onrender.com/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
 ```
 
 ## 4) Redeploy

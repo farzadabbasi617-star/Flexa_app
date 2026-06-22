@@ -31,7 +31,7 @@ function normalizeGame(value: string) {
   return GAME_ALIASES[normalized] || GAME_ALIASES[normalized.replace(/_/g, " ")] || normalized;
 }
 
-function normalizeFlexaId(value?: string | null) {
+function normalizeGamentId(value?: string | null) {
   const normalized = normalizeDigits(value || "").trim().toUpperCase().replace(/\s+/g, "");
   return normalized || null;
 }
@@ -44,7 +44,7 @@ function safeText(value?: string | null, max = 255) {
 function getProvidedSecret(request: NextRequest) {
   const auth = request.headers.get("authorization") || "";
   if (auth.toLowerCase().startsWith("bearer ")) return auth.slice(7).trim();
-  return request.headers.get("x-flexa-telegram-secret")?.trim() || "";
+  return request.headers.get("x-gament-telegram-secret")?.trim() || "";
 }
 
 function timingSafeEqualText(a: string, b: string) {
@@ -73,7 +73,7 @@ const TelegramPreRegistrationSchema = z.object({
   telegramUsername: z.string().max(100).optional().nullable(),
   telegramFirstName: z.string().max(100).optional().nullable(),
   telegramLastName: z.string().max(100).optional().nullable(),
-  flexaId: z.string().max(20).optional().nullable(),
+  gamentId: z.string().max(20).optional().nullable(),
   fullName: z.string().trim().min(2).max(100),
   phoneNumber: z.string().trim().min(8).max(30),
   game: z.string().trim().min(2).max(50),
@@ -98,11 +98,11 @@ export async function POST(request: NextRequest) {
 
     const payload = validation.data;
     const phoneNumber = normalizePhoneNumber(payload.phoneNumber);
-    const flexaId = normalizeFlexaId(payload.flexaId);
+    const gamentId = normalizeGamentId(payload.gamentId);
     const game = normalizeGame(payload.game);
 
     const linkConditions = [];
-    if (flexaId) linkConditions.push(eq(users.flexaId, flexaId));
+    if (gamentId) linkConditions.push(eq(users.gamentId, gamentId));
     if (/^09\d{9}$/.test(phoneNumber)) linkConditions.push(eq(users.phoneNumber, phoneNumber));
 
     let linkedUserId: string | null = null;
@@ -121,7 +121,7 @@ export async function POST(request: NextRequest) {
       telegramFirstName: safeText(payload.telegramFirstName, 100),
       telegramLastName: safeText(payload.telegramLastName, 100),
       linkedUserId,
-      flexaId,
+      gamentId,
       fullName: safeText(payload.fullName, 100) || payload.fullName,
       phoneNumber,
       game,

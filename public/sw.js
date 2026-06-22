@@ -1,4 +1,4 @@
-const CACHE_NAME = 'flexa-v1';
+const CACHE_NAME = 'gament-v1';
 
 const STATIC_ASSETS = [
   '/',

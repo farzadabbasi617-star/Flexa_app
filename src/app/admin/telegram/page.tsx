@@ -69,7 +69,7 @@ export default function AdminTelegramPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
-            <h1 className="text-3xl font-black">⚡ داشبورد تلگرام Flexa</h1>
+            <h1 className="text-3xl font-black">⚡ داشبورد تلگرام Gament</h1>
             <p className="text-gray-400 text-sm mt-2">آنالیتیکس ربات، کمپین‌ها، کوپن‌ها و تبدیل کاربران تلگرام</p>
           </div>
           <div className="flex gap-2">

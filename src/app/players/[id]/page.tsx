@@ -16,7 +16,7 @@ interface PlayerProfileData {
     losses: number;
     totalMatches: number;
     winRate: number;
-    flexaId: string | null;
+    gamentId: string | null;
     level: number | null;
     rankPoints: number | null;
     role: string | null;
@@ -77,7 +77,7 @@ export default function PlayerProfilePage({ params }: { params: Promise<{ id: st
                 {p.isVerified && <span className="text-neon-green">✓</span>}
                 {p.role === "admin" || p.role === "super_admin" ? <span className="px-2 py-1 rounded-full bg-fuchsia-500/10 text-fuchsia-300 text-xs">ادمین</span> : null}
               </div>
-              <p className="text-gray-500" dir="ltr">@{p.username} • {p.flexaId || "No Flexa ID"}</p>
+              <p className="text-gray-500" dir="ltr">@{p.username} • {p.gamentId || "No Gament ID"}</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
                 <div className="bg-dark-700 rounded-2xl p-4"><div className="text-2xl font-black text-neon-blue">{p.rating}</div><div className="text-xs text-gray-500">Rating</div></div>
                 <div className="bg-dark-700 rounded-2xl p-4"><div className="text-2xl font-black text-neon-green">{p.wins}</div><div className="text-xs text-gray-500">برد</div></div>

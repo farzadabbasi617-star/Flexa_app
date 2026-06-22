@@ -375,7 +375,7 @@ export default function CreateTournamentPage() {
             <input
               type="text"
               className={`gaming-input ${fieldErrors.name ? "border-red-500/70" : ""}`}
-              placeholder={`مثال: جام ${selectedGame.name} فلکسا`}
+              placeholder={`مثال: جام ${selectedGame.name} گیمنت`}
               value={form.name}
               onChange={(e) => {
                 setFieldErrors((prev) => ({ ...prev, name: "" }));

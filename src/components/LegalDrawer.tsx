@@ -10,7 +10,7 @@ const sections = [
     content: (
       <>
         <p className="mb-3">
-          فلکسا (Flexa) یک پلتفرم حرفه‌ای تورنومنت گیمینگ است که با تمرکز بر بازی‌های محبوب موبایل و PC، تجربه‌ای عادلانه، سریع و هوشمند را برای گیمرها فراهم می‌کند.
+          گیمنت (Gament) یک پلتفرم حرفه‌ای تورنومنت گیمینگ است که با تمرکز بر بازی‌های محبوب موبایل و PC، تجربه‌ای عادلانه، سریع و هوشمند را برای گیمرها فراهم می‌کند.
         </p>
         <p>
           ما با استفاده از هوش مصنوعی برای داوری، سیستم کیف پول امن و جوایز واقعی، بستری ایجاد کرده‌ایم که بازیکنان بتوانند با خیال راحت در مسابقات شرکت کنند و مهارت خود را به نمایش بگذارند.
@@ -28,11 +28,11 @@ const sections = [
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-3">
             <span className="text-purple-400">✉️</span>
-            <span>support@flexa.app</span>
+            <span>support@gament.app</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-purple-400">📱</span>
-            <span>تلگرام: @flexa_support</span>
+            <span>تلگرام: @gament_support</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-purple-400">💬</span>
@@ -101,7 +101,7 @@ const sections = [
     icon: "💰",
     content: (
       <>
-        <p className="mb-3">کیف پول فلکسا امکان مدیریت موجودی و جوایز را فراهم می‌کند:</p>
+        <p className="mb-3">کیف پول گیمنت امکان مدیریت موجودی و جوایز را فراهم می‌کند:</p>
         <ul className="list-disc pr-5 space-y-1 text-sm">
           <li>شارژ کیف پول از طریق درگاه‌های امن</li>
           <li>برداشت جوایز به حساب بانکی (حداقل ۵۰٬۰۰۰ تومان)</li>

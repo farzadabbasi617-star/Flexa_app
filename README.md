@@ -1,6 +1,6 @@
-# Flexa ⚡️ | پلتفرم هوشمند مسابقات گیمینگ
+# Gament ⚡️ | پلتفرم هوشمند مسابقات گیمینگ
 
-**فلکسا (Flexa)** یک وب‌اپلیکیشن پیشرفته (PWA) برای برگزاری و مدیریت تورنمنت‌های بازی‌های موبایلی (کالاف دیوتی موبایل، فورتنایت و کلش رویال) است که با تمرکز بر **داوری هوشمند** و **تجربه کاربری لوکس** طراحی شده است.
+**گیمنت (Gament)** یک وب‌اپلیکیشن پیشرفته (PWA) برای برگزاری و مدیریت تورنمنت‌های بازی‌های موبایلی (کالاف دیوتی موبایل، فورتنایت و کلش رویال) است که با تمرکز بر **داوری هوشمند** و **تجربه کاربری لوکس** طراحی شده است.
 
 ---
 
@@ -24,7 +24,7 @@
 
 ### ۴. احراز هویت و امنیت (Security)
 *   **ثبت‌نام با موبایل + رمز عبور**: شماره موبایل در ثبت‌نام ذخیره می‌شود؛ تأیید OTP از طریق **FarazSMS** پس از تهیه پنل پیامک فعال خواهد شد.
-*   **شناسه فلکسا (Flexa ID)**: تولید شناسه منحصر‌به‌فرد برای هر کاربر (مثلاً `FLX-1234`) جهت ردیابی در مسابقات.
+*   **شناسه گیمنت (Gament ID)**: تولید شناسه منحصر‌به‌فرد برای هر کاربر (مثلاً `FLX-1234`) جهت ردیابی در مسابقات.
 *   **هشینگ پیشرفته**: استفاده از الگوریتم **Argon2** برای محافظت از رمزهای عبور و ذخیره‌سازی هش‌شده توکن نشست‌ها.
 
 ### ۵. تعامل و پشتیبانی
@@ -63,7 +63,7 @@ src/
 
 ---
 
-## 🤖 اتصال ربات تلگرام Flexa
+## 🤖 اتصال ربات تلگرام Gament
 
 دو حالت برای ربات وجود دارد:
 
@@ -77,8 +77,8 @@ src/
 BOT_TOKEN="telegram_bot_token_from_botfather"
 TELEGRAM_WEBHOOK_SECRET="your_long_random_webhook_secret"
 TELEGRAM_ADMIN_IDS="your_numeric_telegram_id"
-TELEGRAM_CHANNEL_URL="https://t.me/Flexa_games"
-TELEGRAM_CHANNEL_ID="@Flexa_games"
+TELEGRAM_CHANNEL_URL="https://t.me/Gament_games"
+TELEGRAM_CHANNEL_ID="@Gament_games"
 ```
 
 Migrationهای لازم:
@@ -96,7 +96,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0006_add_telegram_marketing_and_waitlist.
 بعد از Deploy، webhook تلگرام را ست کنید:
 
 ```text
-https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://flexa-app-1.onrender.com/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
+https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://gament-1.onrender.com/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
 ```
 
 پیش‌ثبت‌نام‌ها داخل پنل ادمین، تب «تلگرام»، نمایش داده می‌شوند.
@@ -106,14 +106,14 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://flexa-app-1.onren
 - `/start` منوی اصلی با لینک وب‌اپ و کانال
 - `/rooms` نمایش روم‌های فعال
 - `/register` پیش‌ثبت‌نام مستقیم در پنل سایت
-- `/link` ساخت کد یک‌بارمصرف برای اتصال قطعی حساب تلگرام به حساب Flexa
+- `/link` ساخت کد یک‌بارمصرف برای اتصال قطعی حساب تلگرام به حساب Gament
 - `/profile` نمایش پروفایل/وضعیت لینک حساب
-- `/channel` لینک کانال `Flexa_games`
+- `/channel` لینک کانال `Gament_games`
 - `/players` برای ادمین: آخرین پیش‌ثبت‌نام‌ها
 - `/announce` برای ادمین: ارسال اطلاعیه عمومی
 - `/announce_game` برای ادمین: ارسال اطلاعیه هدفمند بر اساس بازی
 - `/post_latest` برای ادمین: انتشار دستی آخرین تورنومنت فعال در کانال
-- دکمه Mini App برای باز کردن Flexa داخل تلگرام
+- دکمه Mini App برای باز کردن Gament داخل تلگرام
 - `/wallet` نمایش کیف پول و تراکنش‌های اخیر؛ ثبت‌نام پولی از تلگرام با کسر کیف پول
 - `/achievements` نمایش دستاوردها و پیشرفت
 - `/my_tournaments` مشاهده تورنومنت‌های من، لابی، چک‌این و لغو ثبت‌نام
@@ -127,14 +127,14 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://flexa-app-1.onren
 - `/support` ساخت تیکت پشتیبانی از تلگرام
 - `/invite` لینک دعوت اختصاصی
 - `/missions` مأموریت‌های رشد/گیمیفیکیشن
-- `/leaderboard` لیدربورد Flexa
-- `/ai` دستیار هوشمند Flexa داخل تلگرام
+- `/leaderboard` لیدربورد Gament
+- `/ai` دستیار هوشمند Gament داخل تلگرام
 - `/manage` مدیریت سریع تورنومنت برای ادمین
 - `/judge` پنل داوری تلگرام
 - `/health` مانیتور سلامت برای ادمین
 - `/export_telegram` خروجی CSV تلگرام برای ادمین
 - `/poll` ارسال نظرسنجی در کانال
-- انتشار خودکار تورنومنت جدید در کانال `@Flexa_games`
+- انتشار خودکار تورنومنت جدید در کانال `@Gament_games`
 - یادآوری مسابقات، ارسال لابی و انتشار نتایج با Cron endpoint
 - اطلاع خودکار به ادمین‌ها هنگام پیش‌ثبت‌نام جدید
 
@@ -144,8 +144,8 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://flexa-app-1.onren
 
 ۱. **کلون کردن پروژه**:
 ```bash
-git clone https://github.com/farzadabbasi617-star/Flexa_app.git
-cd Flexa_app
+git clone https://github.com/farzadabbasi617-star/gament.git
+cd gament
 ```
 
 ۲. **نصب وابستگی‌ها**:
@@ -180,7 +180,7 @@ npm run dev
 
 - [x] سیستم داوری هوشمند و سوئیچ خودکار بین مدل‌ها.
 - [x] طراحی رابط کاربری لوکس شیشه‌ای (Luxury Glass UI).
-- [x] ثبت‌نام با موبایل و تولید Flexa ID.
+- [x] ثبت‌نام با موبایل و تولید Gament ID.
 - [ ] فعال‌سازی نهایی OTP بعد از تهیه پنل پیامک.
 - [x] کیف پول اتمیک و سیستم تراکنش‌های ریالی.
 - [x] چت جهانی تحت نظارت AI و سیستم تیکتینگ.

@@ -72,11 +72,11 @@ export default function LuxuryHomePage() {
             <div className="flex items-center gap-3 text-right">
               <img 
                 src="/icons/arena_icon.png" 
-                alt="Flexa Logo" 
+                alt="Gament Logo" 
                 className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-[0_0_15px_rgba(188,0,255,0.5)]" 
               />
               <div>
-                <h1 className="text-3xl sm:text-4xl font-black italic tracking-tighter en-font leading-none">FLEXA</h1>
+                <h1 className="text-3xl sm:text-4xl font-black italic tracking-tighter en-font leading-none">GAMENT</h1>
                 <p className="mt-2 text-xs font-black text-purple-300/90 tracking-[0.28em] uppercase">
                   Elite Esports Hub
                 </p>
@@ -145,7 +145,7 @@ export default function LuxuryHomePage() {
                     <div className="absolute inset-0 bg-gradient-to-l from-black/60 via-black/20 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 h-16 sm:h-20 bg-gradient-to-t from-black/70 to-transparent" />
                     <div className="absolute top-3 left-4 sm:top-5 sm:left-6 text-[9px] sm:text-xs font-black text-white/30 en-font tracking-[0.2em] sm:tracking-[0.24em]">
-                      FLEXA ROOM
+                      GAMENT ROOM
                     </div>
                     <div
                       className="absolute left-4 bottom-4 sm:left-6 sm:bottom-6 w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl opacity-90 blur-[1px]"
@@ -197,7 +197,7 @@ export default function LuxuryHomePage() {
               <div className="text-right">
                 <h5 className="text-sm font-black mb-1">داوری هوشمند آماده است</h5>
                 <p className="text-xs text-gray-500 font-bold leading-5 hidden sm:block">
-                  بررسی نتایج و گزارش‌ها با موتور AI فلکسا
+                  بررسی نتایج و گزارش‌ها با موتور AI گیمنت
                 </p>
               </div>
             </div>

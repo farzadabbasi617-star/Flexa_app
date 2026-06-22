@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
         id: user.id,
         displayName: user.displayName,
         username: user.username,
-        flexaId: user.flexaId,
+        gamentId: user.gamentId,
         level: user.level,
         xp: user.xp,
         rankPoints: user.rankPoints,

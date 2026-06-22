@@ -44,16 +44,16 @@ def _bool(value: str | None, default: bool = False) -> bool:
 
 
 DEFAULT_RULES = """
-📜 قوانین خلاصه فلکسا
+📜 قوانین خلاصه گیمنت
 
-1) Flexa پلتفرم مدیریت، ثبت‌نام، اطلاع‌رسانی، داوری و پشتیبانی تورنومنت‌های گیمینگ است.
+1) Gament پلتفرم مدیریت، ثبت‌نام، اطلاع‌رسانی، داوری و پشتیبانی تورنومنت‌های گیمینگ است.
 2) مسابقات بر پایه مهارت برگزار می‌شوند؛ هرگونه شرط‌بندی، تبانی مالی، خرید/فروش نتیجه یا قمار ممنوع است.
-3) اطلاعات ثبت‌شده شامل شماره تماس، Flexa ID و آیدی بازی باید صحیح و متعلق به خود بازیکن باشد.
+3) اطلاعات ثبت‌شده شامل شماره تماس، Gament ID و آیدی بازی باید صحیح و متعلق به خود بازیکن باشد.
 4) آیدی بازی در روز مسابقه باید با آیدی ثبت‌شده در پروفایل/ربات مطابقت داشته باشد.
 5) استفاده از چیت، هک، اسکریپت، باگ، اکانت اشتراکی، جعل اسکرین‌شات یا هر ابزار غیرمجاز باعث حذف می‌شود.
-6) نتیجه مسابقه باید طبق قوانین همان روم و با مدارک قابل بررسی ثبت شود؛ داوری انسانی/هوشمند فلکسا ملاک تصمیم نهایی است.
+6) نتیجه مسابقه باید طبق قوانین همان روم و با مدارک قابل بررسی ثبت شود؛ داوری انسانی/هوشمند گیمنت ملاک تصمیم نهایی است.
 7) بی‌احترامی، تهدید، نشر اطلاعات شخصی، اسپم و تبلیغات بدون مجوز در چت یا مسابقه ممنوع است.
-8) برای ثبت‌نام رسمی، پرداخت ورودی احتمالی، مشاهده لابی و دریافت جایزه باید حساب وب‌اپ فلکسا تکمیل باشد.
+8) برای ثبت‌نام رسمی، پرداخت ورودی احتمالی، مشاهده لابی و دریافت جایزه باید حساب وب‌اپ گیمنت تکمیل باشد.
 """.strip()
 
 
@@ -69,19 +69,19 @@ class Settings:
     db_path: Path
     rules_text: str
     payment_info: str
-    flexa_id_required: bool
+    gament_id_required: bool
     support_url: str
     channel_url: str
     telegram_integration_secret: str
 
 
-_raw_app_url = os.getenv("APP_URL", "https://flexa-app-1.onrender.com").strip().rstrip("/")
+_raw_app_url = os.getenv("APP_URL", "https://gament-1.onrender.com").strip().rstrip("/")
 
 settings = Settings(
     bot_token=os.getenv("BOT_TOKEN", "").strip(),
     admin_ids=_split_int_csv(os.getenv("ADMIN_IDS")),
-    tournament_title=os.getenv("TOURNAMENT_TITLE", "Flexa — پلتفرم تورنومنت گیمینگ").strip(),
-    brand_name=os.getenv("BRAND_NAME", "Flexa").strip(),
+    tournament_title=os.getenv("TOURNAMENT_TITLE", "Gament — پلتفرم تورنومنت گیمینگ").strip(),
+    brand_name=os.getenv("BRAND_NAME", "Gament").strip(),
     app_url=_raw_app_url,
     games=_split_csv(
         os.getenv("GAMES"),
@@ -91,10 +91,10 @@ settings = Settings(
         os.getenv("PLATFORMS"),
         ["Mobile", "PC", "Console", "PS5", "PS4", "Xbox", "Nintendo Switch", "Other"],
     ),
-    db_path=Path(os.getenv("DB_PATH", "flexa_telegram_bot.db")).expanduser(),
+    db_path=Path(os.getenv("DB_PATH", "gament_telegram_bot.db")).expanduser(),
     rules_text=(os.getenv("RULES_TEXT") or DEFAULT_RULES).strip(),
     payment_info=(os.getenv("PAYMENT_INFO") or "").strip(),
-    flexa_id_required=_bool(os.getenv("FLEXA_ID_REQUIRED"), default=False),
+    gament_id_required=_bool(os.getenv("GAMENT_ID_REQUIRED"), default=False),
     support_url=(os.getenv("SUPPORT_URL") or f"{_raw_app_url}/profile").strip(),
     channel_url=(os.getenv("CHANNEL_URL") or "").strip(),
     telegram_integration_secret=(os.getenv("TELEGRAM_INTEGRATION_SECRET") or "").strip(),

@@ -14,7 +14,7 @@ interface Player {
   xp?: number | null;
   level?: number | null;
   rankPoints?: number | null;
-  flexaId?: string | null;
+  gamentId?: string | null;
   isVerified?: boolean | null;
 }
 
@@ -83,7 +83,7 @@ export default function LeaderboardPage() {
       <div className="relative z-10 max-w-[720px] mx-auto px-6 pb-32">
         <header className="pt-12 pb-8">
           <h1 className="text-5xl sm:text-6xl font-black italic tracking-tighter en-font opacity-95 drop-shadow-2xl">RANKINGS</h1>
-          <p className="text-[10px] font-bold text-purple-400 tracking-[0.3em] uppercase opacity-70 mt-2">قهرمانان فلکسا</p>
+          <p className="text-[10px] font-bold text-purple-400 tracking-[0.3em] uppercase opacity-70 mt-2">قهرمانان گیمنت</p>
         </header>
 
         <div className="flex gap-2 overflow-x-auto pb-3 mb-8 scrollbar-hide">

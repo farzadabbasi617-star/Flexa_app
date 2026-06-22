@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://flexa.app/sitemap.xml
+Sitemap: https://gament.app/sitemap.xml

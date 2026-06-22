@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# Flexa Telegram Migration Runner
+# Gament Telegram Migration Runner
 # Applies the manual Telegram-related SQL migrations in the correct order.
 # Usage:
 #   chmod +x apply-telegram-migrations.sh
@@ -48,7 +48,7 @@ fi
 # Apply migrations
 # ─────────────────────────────────────────────────────────────
 
-echo "🚀 Applying Flexa Telegram migrations..."
+echo "🚀 Applying Gament Telegram migrations..."
 echo "   Database: ${DATABASE_URL%%@*}@..."
 echo "   Directory: $MIGRATIONS_DIR"
 echo ""
@@ -63,11 +63,11 @@ for migration in "${MIGRATIONS[@]}"; do
 
   echo "▶️  Running $migration ..."
 
-  if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file" > /tmp/flexa-migration-$migration.log 2>&1; then
+  if psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$file" > /tmp/gament-migration-$migration.log 2>&1; then
     echo "   ✅ $migration applied successfully."
   else
     echo "   ❌ $migration failed. See log below:"
-    cat "/tmp/flexa-migration-$migration.log"
+    cat "/tmp/gament-migration-$migration.log"
     exit 1
   fi
 

@@ -12,7 +12,7 @@ export const translations = {
     // Home Page
     home: {
       badge: "Live Tournament Platform",
-      title1: "Flexa",
+      title1: "Gament",
       title2: "Gaming",
       subtitle: "Professional tournament platform for",
       and: "&",
@@ -372,7 +372,7 @@ export const translations = {
     // Home Page
     home: {
       badge: "پلتفرم تورنومنت زنده",
-      title1: "فلکسا",
+      title1: "گیمنت",
       title2: "گیمینگ",
       subtitle: "پلتفرم حرفه‌ای تورنومنت برای",
       and: "و",

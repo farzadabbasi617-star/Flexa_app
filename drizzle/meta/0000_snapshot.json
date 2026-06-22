@@ -686,8 +686,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "flexa_id": {
-          "name": "flexa_id",
+        "gament_id": {
+          "name": "gament_id",
           "type": "varchar(20)",
           "primaryKey": false,
           "notNull": true
@@ -846,11 +846,11 @@
           "method": "btree",
           "with": {}
         },
-        "users_flexa_id_idx": {
-          "name": "users_flexa_id_idx",
+        "users_gament_id_idx": {
+          "name": "users_gament_id_idx",
           "columns": [
             {
-              "expression": "flexa_id",
+              "expression": "gament_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -886,11 +886,11 @@
             "email"
           ]
         },
-        "users_flexa_id_unique": {
-          "name": "users_flexa_id_unique",
+        "users_gament_id_unique": {
+          "name": "users_gament_id_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "flexa_id"
+            "gament_id"
           ]
         }
       },

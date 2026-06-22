@@ -43,7 +43,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         userId: users.id,
         displayName: users.displayName,
         username: users.username,
-        flexaId: users.flexaId,
+        gamentId: users.gamentId,
         rankPoints: users.rankPoints,
         level: users.level,
         avatarUrl: users.avatarUrl,

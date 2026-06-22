@@ -25,7 +25,7 @@ function isAuthorized(request: NextRequest) {
   const secret = normalizeAIEnvValue(process.env.HONORS_AI_SECRET || process.env.TELEGRAM_INTEGRATION_SECRET);
   if (!secret || secret.length < 12) return false;
   const auth = request.headers.get("authorization") || "";
-  const headerSecret = request.headers.get("x-flexa-ai-secret") || "";
+  const headerSecret = request.headers.get("x-gament-ai-secret") || "";
   return auth === `Bearer ${secret}` || headerSecret === secret;
 }
 

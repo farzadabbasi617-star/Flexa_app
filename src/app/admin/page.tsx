@@ -177,7 +177,7 @@ export default function AdminPage() {
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-neon-pink to-neon-orange flex items-center justify-center text-4xl shadow-[0_0_40px_rgba(255,0,110,.25)] animate-float-slow">👑</div>
               <div>
-                <h1 className="text-2xl sm:text-4xl font-black">مرکز فرماندهی فلکسا</h1>
+                <h1 className="text-2xl sm:text-4xl font-black">مرکز فرماندهی گیمنت</h1>
                 <p className="text-gray-400 mt-2 text-sm">دسترسی کامل به کاربران، تورنومنت‌ها، مسابقات، داوری‌ها، اعتراضات، پیام‌ها و ظاهر اپ</p>
               </div>
             </div>
@@ -241,7 +241,7 @@ export default function AdminPage() {
               { href: "/admin/wallets", icon: "💳", title: "کیف پول کاربران", desc: "مشاهده موجودی کاربران و اصلاح دستی با لاگ مدیریتی" },
               { href: "/admin/finance", icon: "📈", title: "گزارش مالی", desc: "گزارش تراکنش‌ها، موجودی‌ها، ورودی‌ها، خروجی‌ها و CSV" },
               { href: "/admin/prizes", icon: "🏆", title: "پرداخت جایزه", desc: "واریز جایزه تورنومنت به کیف پول برنده‌ها" },
-              { href: "#telegram", icon: "⚡", title: "پیش‌ثبت‌نام تلگرام", desc: "مشاهده لیدهای ربات، Flexa ID، آیدی بازی، شماره تماس و وضعیت پیگیری" },
+              { href: "#telegram", icon: "⚡", title: "پیش‌ثبت‌نام تلگرام", desc: "مشاهده لیدهای ربات، Gament ID، آیدی بازی، شماره تماس و وضعیت پیگیری" },
               { href: "/admin/notifications", icon: "🔔", title: "اعلان سیستمی", desc: "ارسال اعلان به همه کاربران یا کاربر مشخص" },
               { href: "/admin/support", icon: "🎧", title: "پشتیبانی و تیکت", desc: "مشاهده تیکت‌ها، پاسخ رسمی و تغییر وضعیت" },
               { href: "/admin/audit", icon: "🧾", title: "لاگ فعالیت مدیران", desc: "ردیابی تغییرات حساس، حذف‌ها، ویرایش‌ها و عملیات مالی" },
@@ -302,7 +302,7 @@ export default function AdminPage() {
         {activeTab === "telegram" && (
           <DataGrid
             rows={filtered}
-            columns={["fullName", "phoneNumber", "flexaId", "linkedDisplayName", "game", "platform", "gamerTag", "telegramUsername", "city", "teamName", "status", "updatedAt"]}
+            columns={["fullName", "phoneNumber", "gamentId", "linkedDisplayName", "game", "platform", "gamerTag", "telegramUsername", "city", "teamName", "status", "updatedAt"]}
             renderCell={(key, value) => key === "status" ? <StatusPill value={String(value)} /> : fmt(value)}
             actions={(row) => (
               <div className="flex gap-2 items-center">

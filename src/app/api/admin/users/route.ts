@@ -14,10 +14,10 @@ export const dynamic = "force-dynamic";
 const ROLES = ["player", "judge", "moderator", "admin", "super_admin"] as const;
 type Role = (typeof ROLES)[number];
 
-async function generateUniqueFlexaId() {
+async function generateUniqueGamentId() {
   for (let attempt = 0; attempt < 10; attempt += 1) {
     const candidate = `FLX-${crypto.randomInt(1000, 10000)}`;
-    const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.flexaId, candidate)).limit(1);
+    const [existing] = await db.select({ id: users.id }).from(users).where(eq(users.gamentId, candidate)).limit(1);
     if (!existing) return candidate;
   }
   return `FLX-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
     if (email && existing.some((u) => u.email === email)) return NextResponse.json({ error: "ایمیل قبلاً ثبت شده" }, { status: 409 });
 
     const passwordHash = await hashPassword(password);
-    const flexaId = await generateUniqueFlexaId();
+    const gamentId = await generateUniqueGamentId();
 
     const created = await db.transaction(async (tx) => {
       const [u] = await tx
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
           email,
           displayName,
           passwordHash,
-          flexaId,
+          gamentId,
           role: requestedRole,
           isVerified: true,
           phoneVerifiedAt: new Date(),

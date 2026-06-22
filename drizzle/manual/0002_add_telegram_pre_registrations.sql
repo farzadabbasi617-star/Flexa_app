@@ -1,4 +1,4 @@
--- Telegram bot integration: pre-registrations collected by the official Flexa Telegram bot.
+-- Telegram bot integration: pre-registrations collected by the official Gament Telegram bot.
 -- Apply on the production database before enabling TELEGRAM_INTEGRATION_SECRET.
 
 CREATE TABLE IF NOT EXISTS "telegram_pre_registrations" (
@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS "telegram_pre_registrations" (
   "telegram_first_name" varchar(100),
   "telegram_last_name" varchar(100),
   "linked_user_id" uuid REFERENCES "users"("id"),
-  "flexa_id" varchar(20),
+  "gament_id" varchar(20),
   "full_name" varchar(100) NOT NULL,
   "phone_number" varchar(20) NOT NULL,
   "game" varchar(50) NOT NULL,
@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS "telegram_pre_registrations" (
 );
 
 CREATE INDEX IF NOT EXISTS "telegram_pre_reg_telegram_id_idx" ON "telegram_pre_registrations" ("telegram_id");
-CREATE INDEX IF NOT EXISTS "telegram_pre_reg_flexa_id_idx" ON "telegram_pre_registrations" ("flexa_id");
+CREATE INDEX IF NOT EXISTS "telegram_pre_reg_gament_id_idx" ON "telegram_pre_registrations" ("gament_id");
 CREATE INDEX IF NOT EXISTS "telegram_pre_reg_phone_idx" ON "telegram_pre_registrations" ("phone_number");
 CREATE INDEX IF NOT EXISTS "telegram_pre_reg_game_idx" ON "telegram_pre_registrations" ("game");
 CREATE INDEX IF NOT EXISTS "telegram_pre_reg_status_idx" ON "telegram_pre_registrations" ("status");

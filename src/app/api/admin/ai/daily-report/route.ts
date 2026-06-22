@@ -13,7 +13,7 @@ import {
 } from "@/db/schema";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { fetchAIResponse } from "@/lib/ai-provider-manager";
-import { flexaSystemPrompt } from "@/lib/ai-prompts";
+import { gamentSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { eq, gte, sql } from "drizzle-orm";
@@ -75,7 +75,7 @@ function localReport(snapshot: Record<string, number>): DailyReport {
   if (recommendedActions.length === 0) recommendedActions.push("مانیتورینگ روزانه ادامه پیدا کند و برای رشد، تورنمنت/کمپین جدید برنامه‌ریزی شود.");
 
   return {
-    headline: "گزارش روزانه Flexa آماده است",
+    headline: "گزارش روزانه Gament آماده است",
     summary: `در ۲۴ ساعت اخیر ${snapshot.newUsers} کاربر جدید، ${snapshot.newRegistrations} ثبت‌نام تورنمنت، ${snapshot.completedTransactions} تراکنش تکمیل‌شده و ${snapshot.openTickets} تیکت باز ثبت/مشاهده شده است.`,
     highlights,
     concerns,
@@ -117,7 +117,7 @@ export async function GET(request: NextRequest) {
     };
 
     const fallback = localReport(snapshot);
-    const prompt = `گزارش روزانه مدیریتی Flexa را براساس این داده‌ها بساز:
+    const prompt = `گزارش روزانه مدیریتی Gament را براساس این داده‌ها بساز:
 ${JSON.stringify(snapshot, null, 2)}
 
 فقط JSON معتبر بده:
@@ -129,7 +129,7 @@ ${JSON.stringify(snapshot, null, 2)}
   "recommendedActions": ["اقدام‌های پیشنهادی مشخص"]
 }`;
 
-    const systemPrompt = flexaSystemPrompt("dailyReport", "فقط JSON معتبر بدون markdown برگردان.");
+    const systemPrompt = gamentSystemPrompt("dailyReport", "فقط JSON معتبر بدون markdown برگردان.");
     const ai = await fetchAIResponse(prompt, systemPrompt);
     const parsed = ai ? safeParseAIJson<Partial<DailyReport>>(ai.content) : null;
     const report = normalizeReport(parsed, fallback);

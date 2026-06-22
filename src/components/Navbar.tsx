@@ -44,7 +44,7 @@ export default function Navbar() {
               <span className="text-2xl">⚡</span>
             </div>
             <span className="text-2xl font-black tracking-tighter text-white">
-              فلکسا<span className="text-neon-purple"> گیمینگ</span>
+              گیمنت<span className="text-neon-purple"> گیمینگ</span>
             </span>
           </Link>
 

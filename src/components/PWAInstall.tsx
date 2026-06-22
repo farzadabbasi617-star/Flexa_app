@@ -37,7 +37,7 @@ export default function PWAInstall() {
     }
 
     // Check if already dismissed
-    const wasDismissed = localStorage.getItem("flexa-pwa-dismissed");
+    const wasDismissed = localStorage.getItem("gament-pwa-dismissed");
     if (wasDismissed) {
       const dismissTime = parseInt(wasDismissed);
       // Show again after 3 days
@@ -97,7 +97,7 @@ export default function PWAInstall() {
   function handleDismiss() {
     setShowBanner(false);
     setDismissed(true);
-    localStorage.setItem("flexa-pwa-dismissed", Date.now().toString());
+    localStorage.setItem("gament-pwa-dismissed", Date.now().toString());
   }
 
   // Don't show if installed or dismissed
@@ -121,12 +121,12 @@ export default function PWAInstall() {
                 {/* Content */}
                 <div className="flex-1 min-w-0">
                   <h3 className="font-bold text-white text-base">
-                    {lang === "fa" ? "نصب اپلیکیشن Flexa" : "Install Flexa App"}
+                    {lang === "fa" ? "نصب اپلیکیشن Gament" : "Install Gament App"}
                   </h3>
                   <p className="text-gray-400 text-sm mt-0.5">
                     {lang === "fa"
-                      ? "برای دسترسی سریع‌تر، Flexa رو روی گوشیت نصب کن"
-                      : "Install Flexa on your phone for faster access"}
+                      ? "برای دسترسی سریع‌تر، Gament رو روی گوشیت نصب کن"
+                      : "Install Gament on your phone for faster access"}
                   </p>
 
                   {/* Benefits */}

@@ -1,32 +1,32 @@
-# Flexa Telegram Bot ⚡
+# Gament Telegram Bot ⚡
 
-ربات تلگرام شخصی‌سازی‌شده برای وب‌اپ **Flexa — پلتفرم تورنومنت گیمینگ**.
+ربات تلگرام شخصی‌سازی‌شده برای وب‌اپ **Gament — پلتفرم تورنومنت گیمینگ**.
 
 این ربات مکمل وب‌اپ است؛ یعنی:
 
-- روم‌های فعال را از API وب‌اپ Flexa می‌خواند.
+- روم‌های فعال را از API وب‌اپ Gament می‌خواند.
 - بازیکن‌ها را برای تورنومنت‌ها به‌صورت تلگرامی پیش‌ثبت‌نام می‌کند.
-- Flexa ID، آیدی بازی، شماره تماس، پلتفرم و تیم/کلن را جمع‌آوری می‌کند.
+- Gament ID، آیدی بازی، شماره تماس، پلتفرم و تیم/کلن را جمع‌آوری می‌کند.
 - لینک ثبت‌نام رسمی، پروفایل و ساخت حساب در وب‌اپ را نمایش می‌دهد.
 - ادمین می‌تواند خروجی CSV، آمار، قرعه‌کشی ساده و اطلاعیه داشته باشد.
 
-> ثبت‌نام قطعی، پرداخت ورودی احتمالی، مشاهده لابی، کیف پول و داوری نهایی همچنان داخل وب‌اپ Flexa انجام می‌شود.
+> ثبت‌نام قطعی، پرداخت ورودی احتمالی، مشاهده لابی، کیف پول و داوری نهایی همچنان داخل وب‌اپ Gament انجام می‌شود.
 
 ---
 
-## هماهنگی با سایت فعلی Flexa
+## هماهنگی با سایت فعلی Gament
 
 بر اساس سایت و ریپازیتوری شما، ربات برای این موارد تنظیم شده است:
 
-- برند: `Flexa`
-- آدرس وب‌اپ: `https://flexa-app-1.onrender.com`
+- برند: `Gament`
+- آدرس وب‌اپ: `https://gament-1.onrender.com`
 - بازی‌ها:
   - 🎯 COD MOBILE / کالاف موبایل
   - 🏗️ FORTNITE / فورتنایت
   - 👑 CLASH ROYALE / کلش رویال
 - لینک روم‌ها: `/tournaments`
 - API روم‌ها: `/api/tournaments?limit=20`
-- حساب کاربری و شناسه: `Flexa ID` مثل `FLX-1234`
+- حساب کاربری و شناسه: `Gament ID` مثل `FLX-1234`
 - تاکید روی داوری هوشمند، قوانین ضدتقلب، ثبت آیدی صحیح بازی و ثبت‌نام رسمی از وب‌اپ
 
 ---
@@ -40,7 +40,7 @@
 - `/rooms clash_royale` روم‌های کلش رویال
 - `/register` پیش‌ثبت‌نام تلگرامی
 - `/status` وضعیت پیش‌ثبت‌نام
-- `/rules` قوانین خلاصه Flexa
+- `/rules` قوانین خلاصه Gament
 - `/links` لینک‌های مهم
 - `/unregister` لغو پیش‌ثبت‌نام تلگرامی
 
@@ -86,14 +86,14 @@ cp .env.example .env
 ```env
 BOT_TOKEN=توکن_ربات_از_BotFather
 ADMIN_IDS=آیدی_عددی_تلگرام_شما
-APP_URL=https://flexa-app-1.onrender.com
+APP_URL=https://gament-1.onrender.com
 TELEGRAM_INTEGRATION_SECRET=همان_کلیدی_که_در_وب‌اپ_می‌گذارید
 ```
 
-اگر خواستید Flexa ID برای پیش‌ثبت‌نام اجباری باشد:
+اگر خواستید Gament ID برای پیش‌ثبت‌نام اجباری باشد:
 
 ```env
-FLEXA_ID_REQUIRED=true
+GAMENT_ID_REQUIRED=true
 ```
 
 ### 4) نصب وابستگی‌ها
@@ -118,12 +118,12 @@ python bot.py
 
 ## دیتابیس و خروجی
 
-- دیتابیس پیش‌فرض: `flexa_telegram_bot.db`
+- دیتابیس پیش‌فرض: `gament_telegram_bot.db`
 - خروجی CSV در پوشه `exports/` ساخته می‌شود.
 - خروجی شامل این ستون‌هاست:
   - Telegram ID
   - Username
-  - Flexa ID
+  - Gament ID
   - نام نمایشی/نام کامل
   - شماره تماس
   - بازی
@@ -137,7 +137,7 @@ python bot.py
 
 ## نکته مهم درباره اتصال عمیق به وب‌اپ
 
-در نسخه فعلی، ربات اطلاعات پیش‌ثبت‌نام را هم در SQLite خودش نگه می‌دارد و هم، در صورت تنظیم `TELEGRAM_INTEGRATION_SECRET`، به وب‌اپ Flexa ارسال می‌کند.
+در نسخه فعلی، ربات اطلاعات پیش‌ثبت‌نام را هم در SQLite خودش نگه می‌دارد و هم، در صورت تنظیم `TELEGRAM_INTEGRATION_SECRET`، به وب‌اپ Gament ارسال می‌کند.
 
 API امن وب‌اپ:
 
@@ -148,7 +148,7 @@ POST /api/integrations/telegram/pre-registrations
 برای فعال‌سازی Sync، همین مقدار Secret را در هر دو پروژه تنظیم کنید:
 
 ```env
-# در Flexa_app و tournament_bot
+# در gament و tournament_bot
 TELEGRAM_INTEGRATION_SECRET=یک_کلید_طولانی_و_تصادفی
 ```
 
@@ -160,7 +160,7 @@ TELEGRAM_INTEGRATION_SECRET=یک_کلید_طولانی_و_تصادفی
 
 ```ini
 [Unit]
-Description=Flexa Telegram Bot
+Description=Gament Telegram Bot
 After=network.target
 
 [Service]
@@ -178,9 +178,9 @@ WantedBy=multi-user.target
 
 ```bash
 sudo systemctl daemon-reload
-sudo systemctl enable flexa-telegram-bot
-sudo systemctl start flexa-telegram-bot
-sudo systemctl status flexa-telegram-bot
+sudo systemctl enable gament-telegram-bot
+sudo systemctl start gament-telegram-bot
+sudo systemctl status gament-telegram-bot
 ```
 
 ---
@@ -190,4 +190,4 @@ sudo systemctl status flexa-telegram-bot
 - فایل `.env` را عمومی نکنید؛ توکن ربات داخل آن است.
 - `ADMIN_IDS` را حتماً تنظیم کنید.
 - اطلاعیه `/announce` فقط به کاربرانی ارسال می‌شود که خودشان در ربات پیش‌ثبت‌نام کرده‌اند.
-- پرداخت و کیف پول را از داخل وب‌اپ رسمی Flexa مدیریت کنید، نه داخل ربات.
+- پرداخت و کیف پول را از داخل وب‌اپ رسمی Gament مدیریت کنید، نه داخل ربات.

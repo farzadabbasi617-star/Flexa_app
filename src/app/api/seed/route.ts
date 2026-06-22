@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
         passwordHash: "hashed_password",
         displayName: name,
         phoneNumber: `09${Math.floor(100000000 + Math.random() * 900000000)}`,
-        flexaId: `FLX-S-${i}-${Math.floor(Math.random() * 1000)}`,
+        gamentId: `FLX-S-${i}-${Math.floor(Math.random() * 1000)}`,
       })))
       .returning();
 

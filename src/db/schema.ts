@@ -76,7 +76,7 @@ export const users = pgTable("users", {
   username: varchar("username", { length: 100 }).unique(),
   email: varchar("email", { length: 255 }).unique(),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
-  flexaId: varchar("flexa_id", { length: 20 }).notNull().unique(),
+  gamentId: varchar("gament_id", { length: 20 }).notNull().unique(),
   displayName: varchar("display_name", { length: 100 }).notNull(),
   bio: text("bio"),
   avatarUrl: varchar("avatar_url", { length: 500 }),
@@ -101,7 +101,7 @@ export const users = pgTable("users", {
 }, (table) => ({
   phoneIdx: index("users_phone_idx").on(table.phoneNumber),
   rankIdx: index("users_rank_points_idx").on(table.rankPoints),
-  flexaIdIdx: index("users_flexa_id_idx").on(table.flexaId),
+  gamentIdIdx: index("users_gament_id_idx").on(table.gamentId),
 }));
 
 // Sessions
@@ -270,7 +270,7 @@ export const registrations = pgTable("registrations", {
 }));
 
 // Telegram pre-registrations
-// Leads/users collected by the official Flexa Telegram bot before the user
+// Leads/users collected by the official Gament Telegram bot before the user
 // completes official tournament registration inside the web app.
 export const telegramPreRegistrations = pgTable("telegram_pre_registrations", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -279,7 +279,7 @@ export const telegramPreRegistrations = pgTable("telegram_pre_registrations", {
   telegramFirstName: varchar("telegram_first_name", { length: 100 }),
   telegramLastName: varchar("telegram_last_name", { length: 100 }),
   linkedUserId: uuid("linked_user_id").references(() => users.id),
-  flexaId: varchar("flexa_id", { length: 20 }),
+  gamentId: varchar("gament_id", { length: 20 }),
   fullName: varchar("full_name", { length: 100 }).notNull(),
   phoneNumber: varchar("phone_number", { length: 20 }).notNull(),
   game: varchar("game", { length: 50 }).notNull(),
@@ -294,7 +294,7 @@ export const telegramPreRegistrations = pgTable("telegram_pre_registrations", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   telegramIdIdx: index("telegram_pre_reg_telegram_id_idx").on(table.telegramId),
-  flexaIdIdx: index("telegram_pre_reg_flexa_id_idx").on(table.flexaId),
+  gamentIdIdx: index("telegram_pre_reg_gament_id_idx").on(table.gamentId),
   phoneIdx: index("telegram_pre_reg_phone_idx").on(table.phoneNumber),
   gameIdx: index("telegram_pre_reg_game_idx").on(table.game),
   statusIdx: index("telegram_pre_reg_status_idx").on(table.status),
@@ -314,7 +314,7 @@ export const telegramBotSessions = pgTable("telegram_bot_sessions", {
   updatedAtIdx: index("telegram_bot_sessions_updated_at_idx").on(table.updatedAt),
 }));
 
-// Telegram accounts linked to Flexa users
+// Telegram accounts linked to Gament users
 export const telegramAccounts = pgTable("telegram_accounts", {
   id: uuid("id").defaultRandom().primaryKey(),
   telegramId: varchar("telegram_id", { length: 32 }).notNull().unique(),

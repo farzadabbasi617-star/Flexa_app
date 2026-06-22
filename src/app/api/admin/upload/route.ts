@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
     const form = await request.formData();
     const file = form.get("file");
-    const folder = String(form.get("folder") || "flexa").replace(/[^a-zA-Z0-9_/-]/g, "").slice(0, 80) || "flexa";
+    const folder = String(form.get("folder") || "gament").replace(/[^a-zA-Z0-9_/-]/g, "").slice(0, 80) || "gament";
 
     if (!(file instanceof File)) return NextResponse.json({ error: "file required" }, { status: 400 });
     if (!file.type.startsWith("image/")) return NextResponse.json({ error: "فقط تصویر مجاز است" }, { status: 400 });

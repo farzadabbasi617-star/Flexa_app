@@ -162,7 +162,7 @@ export default function SupportPage() {
       <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8 pb-32">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-black neon-text-purple">🎧 پشتیبانی فلکسا</h1>
+            <h1 className="text-3xl font-black neon-text-purple">🎧 پشتیبانی گیمنت</h1>
             <p className="text-gray-500 text-sm mt-2">تیکت بساز، مشکل رو توضیح بده و پاسخ مدیریت رو پیگیری کن.</p>
           </div>
           <button onClick={() => setShowNew((v) => !v)} className="gaming-btn">+ تیکت جدید</button>

@@ -75,7 +75,7 @@ CREATE INDEX IF NOT EXISTS "telegram_channel_posts_chat_idx" ON "telegram_channe
 
 -- Useful default coupons. Safe to run repeatedly.
 INSERT INTO "coupons" ("code", "title", "discount_percent", "max_uses", "is_active") VALUES
-  ('FLEXA50', 'Launch 50% discount', 50, 500, true),
-  ('FLEXA20', 'Launch 20% discount', 20, 1000, true),
+  ('GAMENT50', 'Launch 50% discount', 50, 500, true),
+  ('GAMENT20', 'Launch 20% discount', 20, 1000, true),
   ('WELCOME', 'Welcome 10% discount', 10, 1000, true)
 ON CONFLICT ("code") DO NOTHING;

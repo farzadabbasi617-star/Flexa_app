@@ -26,7 +26,7 @@ from telegram.ext import (
 )
 
 import database as db
-import flexa as fx
+import gament as fx
 from config import settings
 
 
@@ -38,7 +38,7 @@ from config import settings
     FULL_NAME,
     GAMER_TAG,
     PHONE,
-    FLEXA_ID,
+    GAMENT_ID,
     CITY,
     TEAM,
     CONFIRM,
@@ -76,7 +76,7 @@ def storage_game_name(value: str | None) -> str | None:
 
 def main_menu_keyboard() -> InlineKeyboardMarkup:
     rows: list[list[InlineKeyboardButton]] = [
-        [InlineKeyboardButton("⚡ ورود به وب‌اپ Flexa", url=settings.app_url)],
+        [InlineKeyboardButton("⚡ ورود به وب‌اپ Gament", url=settings.app_url)],
         [
             InlineKeyboardButton("🏟 روم‌های فعال", callback_data="menu:rooms"),
             InlineKeyboardButton("🎮 پیش‌ثبت‌نام تلگرامی", callback_data="menu:register"),
@@ -86,7 +86,7 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
             InlineKeyboardButton("👤 وضعیت من", callback_data="menu:status"),
         ],
         [
-            InlineKeyboardButton("👤 پروفایل Flexa", url=fx.profile_url()),
+            InlineKeyboardButton("👤 پروفایل Gament", url=fx.profile_url()),
             InlineKeyboardButton("🆕 ساخت حساب", url=fx.signup_url()),
         ],
         [
@@ -95,7 +95,7 @@ def main_menu_keyboard() -> InlineKeyboardMarkup:
         ],
     ]
     if settings.channel_url:
-        rows.insert(1, [InlineKeyboardButton("📣 کانال/اطلاعیه‌های Flexa", url=settings.channel_url)])
+        rows.insert(1, [InlineKeyboardButton("📣 کانال/اطلاعیه‌های Gament", url=settings.channel_url)])
     return InlineKeyboardMarkup(rows)
 
 
@@ -105,7 +105,7 @@ def after_registration_keyboard(game: str | None = None) -> InlineKeyboardMarkup
             [InlineKeyboardButton("🏆 تکمیل ثبت‌نام رسمی در وب‌اپ", url=fx.tournaments_url(game))],
             [
                 InlineKeyboardButton("🏟 روم‌های فعال", callback_data="menu:rooms"),
-                InlineKeyboardButton("👤 پروفایل Flexa", url=fx.profile_url()),
+                InlineKeyboardButton("👤 پروفایل Gament", url=fx.profile_url()),
             ],
             [
                 InlineKeyboardButton("📜 قوانین", callback_data="menu:rules"),
@@ -144,7 +144,7 @@ def rooms_keyboard(tournaments: list[dict[str, Any]], game: str | None = None) -
     ]
     for tournament in tournaments[:5]:
         tournament_id = tournament.get("id")
-        name = str(tournament.get("name") or "روم Flexa")[:32]
+        name = str(tournament.get("name") or "روم Gament")[:32]
         if tournament_id:
             rows.append([InlineKeyboardButton(f"ثبت‌نام/جزئیات: {name}", url=fx.tournament_detail_url(str(tournament_id)))])
     rows.append([InlineKeyboardButton("🎮 پیش‌ثبت‌نام تلگرامی", callback_data="menu:register")])
@@ -190,28 +190,28 @@ def is_valid_phone(phone: str) -> bool:
 def player_display_name(player: dict[str, Any]) -> str:
     full_name = player.get("full_name") or "بدون نام"
     gamer_tag = player.get("gamer_tag") or "-"
-    flexa_id = player.get("flexa_id")
+    gament_id = player.get("gament_id")
     username = player.get("username")
-    flexa_part = f" | {flexa_id}" if flexa_id else ""
+    gament_part = f" | {gament_id}" if gament_id else ""
     username_part = f" @{username}" if username else ""
-    return f"{full_name} ({gamer_tag}{flexa_part}){username_part}"
+    return f"{full_name} ({gamer_tag}{gament_part}){username_part}"
 
 
 def registration_summary(data: dict[str, Any], include_private: bool = True) -> str:
     game = data.get("game") or ""
     account_label = fx.game_account_label(game)
     lines = [
-        "⚡ <b>خلاصه پیش‌ثبت‌نام Flexa</b>",
+        "⚡ <b>خلاصه پیش‌ثبت‌نام Gament</b>",
         "",
         f"🎮 بازی: <b>{e(fx.game_title(game))}</b>",
         f"🕹 دستگاه/پلتفرم: <b>{e(data.get('platform'))}</b>",
         f"👤 نام نمایشی/نام کامل: <b>{e(data.get('full_name'))}</b>",
         f"🏷 {e(account_label)}: <b>{e(data.get('gamer_tag'))}</b>",
     ]
-    if data.get("flexa_id"):
-        lines.append(f"🆔 Flexa ID: <code>{e(data.get('flexa_id'))}</code>")
+    if data.get("gament_id"):
+        lines.append(f"🆔 Gament ID: <code>{e(data.get('gament_id'))}</code>")
     else:
-        lines.append("🆔 Flexa ID: <b>ثبت نشده</b>")
+        lines.append("🆔 Gament ID: <b>ثبت نشده</b>")
     if include_private:
         lines.append(f"📞 شماره تماس: <b>{e(data.get('phone'))}</b>")
     if data.get("city"):
@@ -255,20 +255,20 @@ async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 سلام 👋
 به <b>{e(settings.tournament_title)}</b> خوش آمدی.
 
-اینجا دستیار تلگرام Flexa است:
+اینجا دستیار تلگرام Gament است:
 • مشاهده روم‌های فعال
 • پیش‌ثبت‌نام و جمع‌آوری اطلاعات بازیکن
 • راهنمای ساخت حساب و تکمیل پروفایل
 • دریافت قوانین و اطلاعیه‌ها
 
-ثبت‌نام قطعی تورنومنت، پرداخت ورودی احتمالی، مشاهده لابی و داوری نهایی از داخل وب‌اپ Flexa انجام می‌شود.
+ثبت‌نام قطعی تورنومنت، پرداخت ورودی احتمالی، مشاهده لابی و داوری نهایی از داخل وب‌اپ Gament انجام می‌شود.
     """.strip()
     await update.effective_message.reply_text(text, reply_markup=main_menu_keyboard())
 
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     text = f"""
-ℹ️ <b>راهنمای دستیار Flexa</b>
+ℹ️ <b>راهنمای دستیار Gament</b>
 
 /start — نمایش منوی اصلی
 /rooms — مشاهده روم‌های فعال وب‌اپ
@@ -278,7 +278,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 /register — شروع پیش‌ثبت‌نام تلگرامی
 /status — مشاهده وضعیت پیش‌ثبت‌نام شما
 /rules — مشاهده قوانین خلاصه
-/links — لینک‌های مهم Flexa
+/links — لینک‌های مهم Gament
 /unregister — لغو پیش‌ثبت‌نام تلگرامی
 /cancel — لغو عملیات فعلی
 
@@ -289,14 +289,14 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 async def links_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     rows = [
-        [InlineKeyboardButton("⚡ وب‌اپ Flexa", url=settings.app_url)],
+        [InlineKeyboardButton("⚡ وب‌اپ Gament", url=settings.app_url)],
         [InlineKeyboardButton("🏟 تورنومنت‌ها و روم‌ها", url=fx.tournaments_url())],
         [InlineKeyboardButton("🆕 ساخت حساب", url=fx.signup_url())],
         [InlineKeyboardButton("👤 پروفایل", url=fx.profile_url())],
     ]
     if settings.channel_url:
-        rows.append([InlineKeyboardButton("📣 کانال Flexa", url=settings.channel_url)])
-    await update.effective_message.reply_text("🔗 لینک‌های مهم Flexa:", reply_markup=InlineKeyboardMarkup(rows))
+        rows.append([InlineKeyboardButton("📣 کانال Gament", url=settings.channel_url)])
+    await update.effective_message.reply_text("🔗 لینک‌های مهم Gament:", reply_markup=InlineKeyboardMarkup(rows))
 
 
 async def rules_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -320,7 +320,7 @@ async def send_rooms(chat_id: int, context: ContextTypes.DEFAULT_TYPE, game: str
     except Exception:
         await context.bot.send_message(
             chat_id=chat_id,
-            text="اتصال به وب‌اپ Flexa برای دریافت روم‌ها انجام نشد. می‌توانی مستقیم از لینک زیر بررسی کنی:",
+            text="اتصال به وب‌اپ Gament برای دریافت روم‌ها انجام نشد. می‌توانی مستقیم از لینک زیر بررسی کنی:",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏟 مشاهده روم‌ها", url=fx.tournaments_url(game))]]),
         )
 
@@ -374,9 +374,9 @@ async def start_registration(update: Update, context: ContextTypes.DEFAULT_TYPE)
         db.upsert_user(update.effective_user)
     context.user_data["registration"] = {}
     text = (
-        "🎮 <b>پیش‌ثبت‌نام تلگرامی Flexa</b>\n\n"
+        "🎮 <b>پیش‌ثبت‌نام تلگرامی Gament</b>\n\n"
         "بازی موردنظر را انتخاب کن. اگر قبلاً پیش‌ثبت‌نام کرده باشی، اطلاعات جدید جایگزین می‌شود.\n\n"
-        "نکته: ثبت‌نام قطعی، پرداخت ورودی و مشاهده لابی از طریق وب‌اپ Flexa انجام می‌شود."
+        "نکته: ثبت‌نام قطعی، پرداخت ورودی و مشاهده لابی از طریق وب‌اپ Gament انجام می‌شود."
     )
     keyboard = list_keyboard(settings.games, "reg:game")
 
@@ -430,7 +430,7 @@ async def choose_platform(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return CUSTOM_PLATFORM
     context.user_data["registration"]["platform"] = platform
     await query.edit_message_text(
-        f"پلتفرم انتخاب شد: <b>{e(platform)}</b>\n\nنام نمایشی Flexa یا نام و نام‌خانوادگی خودت را بنویس:"
+        f"پلتفرم انتخاب شد: <b>{e(platform)}</b>\n\nنام نمایشی Gament یا نام و نام‌خانوادگی خودت را بنویس:"
     )
     return FULL_NAME
 
@@ -444,7 +444,7 @@ async def custom_platform(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         return CUSTOM_PLATFORM
     context.user_data["registration"]["platform"] = text
     await update.message.reply_text(
-        f"پلتفرم ثبت شد: <b>{e(text)}</b>\n\nنام نمایشی Flexa یا نام و نام‌خانوادگی خودت را بنویس:"
+        f"پلتفرم ثبت شد: <b>{e(text)}</b>\n\nنام نمایشی Gament یا نام و نام‌خانوادگی خودت را بنویس:"
     )
     return FULL_NAME
 
@@ -496,36 +496,36 @@ async def phone(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
         return PHONE
 
     context.user_data["registration"]["phone"] = phone_value
-    flexa_text = (
-        "اگر در وب‌اپ Flexa حساب داری، Flexa ID خودت را وارد کن؛ مثلاً <code>FLX-1234</code>.\n"
+    gament_text = (
+        "اگر در وب‌اپ Gament حساب داری، Gament ID خودت را وارد کن؛ مثلاً <code>FLX-1234</code>.\n"
         "اگر هنوز حساب نداری، «رد کردن» را بزن و بعداً از لینک ساخت حساب تکمیلش کن:\n"
         f"{e(fx.signup_url())}"
     )
-    if settings.flexa_id_required:
-        flexa_text = (
-            "برای ادامه، Flexa ID الزامی است. وارد وب‌اپ شو، حساب بساز/وارد شو و Flexa ID مثل <code>FLX-1234</code> را اینجا بنویس:\n"
+    if settings.gament_id_required:
+        gament_text = (
+            "برای ادامه، Gament ID الزامی است. وارد وب‌اپ شو، حساب بساز/وارد شو و Gament ID مثل <code>FLX-1234</code> را اینجا بنویس:\n"
             f"{e(fx.signup_url())}"
         )
-    await update.message.reply_text(flexa_text, reply_markup=skip_keyboard() if not settings.flexa_id_required else ReplyKeyboardRemove())
-    return FLEXA_ID
+    await update.message.reply_text(gament_text, reply_markup=skip_keyboard() if not settings.gament_id_required else ReplyKeyboardRemove())
+    return GAMENT_ID
 
 
-async def flexa_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+async def gament_id(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     text = normalize_digits(update.message.text.strip())
     if text == CANCEL_TEXT:
         return await cancel_flow(update, context)
-    if text == SKIP_TEXT and not settings.flexa_id_required:
-        context.user_data["registration"]["flexa_id"] = ""
+    if text == SKIP_TEXT and not settings.gament_id_required:
+        context.user_data["registration"]["gament_id"] = ""
     else:
-        normalized = fx.normalize_flexa_id(text)
-        if not fx.is_valid_flexa_id(normalized):
+        normalized = fx.normalize_gament_id(text)
+        if not fx.is_valid_gament_id(normalized):
             await update.message.reply_text(
-                "Flexa ID معتبر نیست. نمونه درست: <code>FLX-1234</code>\n"
-                + ("اگر هنوز حساب نداری، «رد کردن» را بزن." if not settings.flexa_id_required else "لطفاً Flexa ID صحیح را وارد کن."),
-                reply_markup=skip_keyboard() if not settings.flexa_id_required else None,
+                "Gament ID معتبر نیست. نمونه درست: <code>FLX-1234</code>\n"
+                + ("اگر هنوز حساب نداری، «رد کردن» را بزن." if not settings.gament_id_required else "لطفاً Gament ID صحیح را وارد کن."),
+                reply_markup=skip_keyboard() if not settings.gament_id_required else None,
             )
-            return FLEXA_ID
-        context.user_data["registration"]["flexa_id"] = normalized
+            return GAMENT_ID
+        context.user_data["registration"]["gament_id"] = normalized
 
     await update.message.reply_text(
         "شهر محل سکونت را بنویس. اگر لازم نیست، «رد کردن» را بزن:",
@@ -581,8 +581,8 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
 
     data = context.user_data.get("registration") or {}
     required = ["game", "platform", "full_name", "gamer_tag", "phone"]
-    if settings.flexa_id_required:
-        required.append("flexa_id")
+    if settings.gament_id_required:
+        required.append("gament_id")
     if not all(data.get(key) for key in required):
         await query.edit_message_text("بخشی از اطلاعات ناقص است. لطفاً پیش‌ثبت‌نام را دوباره شروع کنید.", reply_markup=main_menu_keyboard())
         return ConversationHandler.END
@@ -591,7 +591,7 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
     sync_ok, sync_message = await fx.sync_pre_registration(data, update.effective_user)
     context.user_data.pop("registration", None)
 
-    sync_note = "\n\n⚡ اطلاعات شما با پنل وب‌اپ Flexa همگام شد." if sync_ok else "\n\n⚠️ پیش‌ثبت‌نام در ربات ذخیره شد، اما همگام‌سازی با پنل وب‌اپ فعلاً انجام نشد. ادمین می‌تواند از خروجی CSV ربات هم استفاده کند."
+    sync_note = "\n\n⚡ اطلاعات شما با پنل وب‌اپ Gament همگام شد." if sync_ok else "\n\n⚠️ پیش‌ثبت‌نام در ربات ذخیره شد، اما همگام‌سازی با پنل وب‌اپ فعلاً انجام نشد. ادمین می‌تواند از خروجی CSV ربات هم استفاده کند."
 
     await query.edit_message_text(
         "✅ پیش‌ثبت‌نام تلگرامی شما با موفقیت ثبت شد.\n\n"
@@ -602,7 +602,7 @@ async def confirm_registration(update: Update, context: ContextTypes.DEFAULT_TYP
     )
 
     admin_text = (
-        "🆕 <b>پیش‌ثبت‌نام جدید/به‌روزرسانی Flexa</b>\n"
+        "🆕 <b>پیش‌ثبت‌نام جدید/به‌روزرسانی Gament</b>\n"
         f"کاربر تلگرام: {e(update.effective_user.full_name)}"
         + (f" (@{e(update.effective_user.username)})" if update.effective_user.username else "")
         + f"\nآیدی تلگرام: <code>{update.effective_user.id}</code>"
@@ -639,7 +639,7 @@ async def admin_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         await update.effective_message.reply_text("شما دسترسی ادمین ندارید.")
         return
     text = """
-🛠 <b>پنل ادمین Flexa Telegram</b>
+🛠 <b>پنل ادمین Gament Telegram</b>
 
 /stats — آمار پیش‌ثبت‌نام‌ها
 /players — نمایش ۲۰ پیش‌ثبت‌نام آخر
@@ -660,10 +660,10 @@ async def stats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         return
     stats = db.get_stats()
     lines = [
-        "📊 <b>آمار پیش‌ثبت‌نام تلگرامی Flexa</b>",
+        "📊 <b>آمار پیش‌ثبت‌نام تلگرامی Gament</b>",
         "",
         f"کل پیش‌ثبت‌نام‌های فعال: <b>{stats['total']}</b>",
-        f"دارای Flexa ID: <b>{stats.get('with_flexa_id', 0)}</b>",
+        f"دارای Gament ID: <b>{stats.get('with_gament_id', 0)}</b>",
     ]
     lines.append("\n🎮 بر اساس بازی:")
     if stats["by_game"]:
@@ -689,9 +689,9 @@ async def players_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> Non
         return
     lines = ["👥 <b>آخرین پیش‌ثبت‌نام‌ها</b>" + (f" — {e(fx.game_title(game, bilingual=False))}" if game else ""), ""]
     for idx, player in enumerate(players, start=1):
-        flexa_id = f" | {e(player['flexa_id'])}" if player.get("flexa_id") else ""
+        gament_id = f" | {e(player['gament_id'])}" if player.get("gament_id") else ""
         lines.append(
-            f"{idx}) {e(player['full_name'])} | {e(fx.game_title(player['game'], bilingual=False))} | {e(player['platform'])} | {e(player['gamer_tag'])}{flexa_id}"
+            f"{idx}) {e(player['full_name'])} | {e(fx.game_title(player['game'], bilingual=False))} | {e(player['platform'])} | {e(player['gamer_tag'])}{gament_id}"
             + (f" | @{e(player['username'])}" if player.get("username") else "")
         )
     await update.effective_message.reply_text("\n".join(lines))
@@ -703,7 +703,7 @@ async def export_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
         return
     path = db.export_registrations_csv()
     with path.open("rb") as f:
-        await update.effective_message.reply_document(document=f, filename=path.name, caption="خروجی پیش‌ثبت‌نام‌های Flexa")
+        await update.effective_message.reply_document(document=f, filename=path.name, caption="خروجی پیش‌ثبت‌نام‌های Gament")
 
 
 async def draw_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -748,7 +748,7 @@ async def announce_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
     sent = 0
     failed = 0
-    message = f"📢 <b>اطلاعیه Flexa</b>\n\n{e(text)}\n\n🏟 روم‌ها: {e(fx.tournaments_url())}"
+    message = f"📢 <b>اطلاعیه Gament</b>\n\n{e(text)}\n\n🏟 روم‌ها: {e(fx.tournaments_url())}"
     for user_id in user_ids:
         try:
             await context.bot.send_message(chat_id=user_id, text=message)
@@ -782,7 +782,7 @@ def build_application() -> Application:
             FULL_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, full_name)],
             GAMER_TAG: [MessageHandler(filters.TEXT & ~filters.COMMAND, gamer_tag)],
             PHONE: [MessageHandler((filters.CONTACT | filters.TEXT) & ~filters.COMMAND, phone)],
-            FLEXA_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, flexa_id)],
+            GAMENT_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, gament_id)],
             CITY: [MessageHandler(filters.TEXT & ~filters.COMMAND, city)],
             TEAM: [MessageHandler(filters.TEXT & ~filters.COMMAND, team)],
             CONFIRM: [CallbackQueryHandler(confirm_registration, pattern=r"^reg:(confirm|restart|abort)$")],
@@ -793,7 +793,7 @@ def build_application() -> Application:
             MessageHandler(filters.Regex(f"^{CANCEL_TEXT}$"), cancel_flow),
         ],
         allow_reentry=True,
-        name="flexa_registration_conversation",
+        name="gament_registration_conversation",
     )
 
     application.add_handler(registration_conv)

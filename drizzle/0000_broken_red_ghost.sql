@@ -96,7 +96,7 @@ CREATE TABLE "users" (
 	"username" varchar(100),
 	"email" varchar(255),
 	"password_hash" varchar(255) NOT NULL,
-	"flexa_id" varchar(20) NOT NULL,
+	"gament_id" varchar(20) NOT NULL,
 	"display_name" varchar(100) NOT NULL,
 	"bio" text,
 	"avatar_url" varchar(500),
@@ -118,7 +118,7 @@ CREATE TABLE "users" (
 	CONSTRAINT "users_phone_number_unique" UNIQUE("phone_number"),
 	CONSTRAINT "users_username_unique" UNIQUE("username"),
 	CONSTRAINT "users_email_unique" UNIQUE("email"),
-	CONSTRAINT "users_flexa_id_unique" UNIQUE("flexa_id")
+	CONSTRAINT "users_gament_id_unique" UNIQUE("gament_id")
 );
 --> statement-breakpoint
 CREATE TABLE "verification_tokens" (
@@ -151,6 +151,6 @@ CREATE INDEX "transactions_wallet_id_idx" ON "transactions" USING btree ("wallet
 CREATE INDEX "transactions_reference_id_idx" ON "transactions" USING btree ("reference_id");--> statement-breakpoint
 CREATE INDEX "users_phone_idx" ON "users" USING btree ("phone_number");--> statement-breakpoint
 CREATE INDEX "users_rank_points_idx" ON "users" USING btree ("rank_points");--> statement-breakpoint
-CREATE INDEX "users_flexa_id_idx" ON "users" USING btree ("flexa_id");--> statement-breakpoint
+CREATE INDEX "users_gament_id_idx" ON "users" USING btree ("gament_id");--> statement-breakpoint
 CREATE INDEX "verif_phone_idx" ON "verification_tokens" USING btree ("identifier");--> statement-breakpoint
 CREATE INDEX "wallets_user_id_idx" ON "wallets" USING btree ("user_id");

@@ -146,7 +146,7 @@ export default function AdminImagesPage() {
     try {
       const uploadForm = new FormData();
       uploadForm.append("file", file);
-      uploadForm.append("folder", "flexa-admin");
+      uploadForm.append("folder", "gament-admin");
       const res = await fetch("/api/admin/upload", {
         method: "POST",
         headers: { "X-Requested-With": "XMLHttpRequest" },

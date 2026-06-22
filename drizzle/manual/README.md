@@ -18,9 +18,9 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | File | What it does |
 |------|--------------|
 | `0001_add_rate_limits.sql` | Adds the `rate_limits` table used by the distributed (DB-backed) rate limiter in `src/lib/rate-limit.ts`. |
-| `0002_add_telegram_pre_registrations.sql` | Adds the `telegram_pre_registrations` table used by the Flexa Telegram bot integration and admin console. |
+| `0002_add_telegram_pre_registrations.sql` | Adds the `telegram_pre_registrations` table used by the Gament Telegram bot integration and admin console. |
 | `0003_add_telegram_bot_sessions.sql` | Adds the `telegram_bot_sessions` table used by the free Telegram webhook running inside the Next.js web service. |
-| `0004_add_telegram_account_linking.sql` | Adds `telegram_accounts` and `telegram_link_codes` for linking Telegram accounts to Flexa users with one-time codes. |
+| `0004_add_telegram_account_linking.sql` | Adds `telegram_accounts` and `telegram_link_codes` for linking Telegram accounts to Gament users with one-time codes. |
 | `0005_add_telegram_growth_and_notifications.sql` | Adds referral tracking and notification de-duplication for reminders, lobby notices and channel result posts. |
 | `0006_add_telegram_marketing_and_waitlist.sql` | Adds campaign analytics, real coupons/redemptions, tournament waiting list and Telegram channel post tracking. |
 | `0007_add_classified_ads.sql` | Adds `classified_ads` and `classified_scrape_logs` tables for monitoring Divar/Sheypoor gaming ads. |

@@ -91,8 +91,8 @@ async function callProviderModel(
         "Content-Type": "application/json",
         ...(provider.id === "openrouter"
           ? {
-              "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://flexa-app-1.onrender.com",
-              "X-Title": "Flexa App",
+              "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://gament-1.onrender.com",
+              "X-Title": "Gament App",
             }
           : {}),
       },
