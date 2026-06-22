@@ -51,7 +51,8 @@ export async function generateRealAssistantResponse(
 }
 
 /**
- * Real AI Judging System using Multi-Provider Auto-Switch
+ * Real AI Judging System using Multi-Provider Auto-Switch.
+ * Supports image screenshot analysis (multimodal) if evidenceUrl is provided!
  */
 export async function analyzeMatchWithAI(
   player1Score: number,
@@ -60,19 +61,28 @@ export async function analyzeMatchWithAI(
   player2Rating: number,
   player1History: { wins: number; losses: number },
   player2History: { wins: number; losses: number },
-  hasEvidence: boolean = false
+  hasEvidence: boolean = false,
+  evidenceUrl?: string | null
 ): Promise<AIJudgmentResult> {
-  const prompt = `Analyze this match result and provide a verdict:
+  let prompt = `Analyze this match result and provide a verdict:
     Game: Mobile Gaming Tournament
     Player 1: Score ${player1Score}, Rating ${player1Rating}, History ${player1History.wins}W/${player1History.losses}L
     Player 2: Score ${player2Score}, Rating ${player2Rating}, History ${player2History.wins}W/${player2History.losses}L
-    Evidence Provided: ${hasEvidence ? "Yes" : "No"}
+    Evidence Provided: ${hasEvidence ? "Yes" : "No"}`;
 
-    Return ONLY a JSON object:
+  if (evidenceUrl) {
+    prompt += `\n    An attached end-game screenshot has been provided. 
+    PLEASE inspect the image carefully:
+    1. Extract the scores and the winner's name/tag from the screenshot.
+    2. Verify if the screenshot matches the submitted Gament scores (P1: ${player1Score} vs P2: ${player2Score}).
+    3. If there is a mismatch, a fake/invalid screenshot, or a dispute, flag it by increasing 'suspicionLevel' and setting verdict to 'needs_review'.`;
+  }
+
+  prompt += `\n\n    Return ONLY a JSON object:
     {
       "verdict": "player1_wins" | "player2_wins" | "draw" | "rematch" | "needs_review",
       "confidence": number,
-      "reasoning": "Explanation in Persian",
+      "reasoning": "Explanation in Persian analyzing the match stats and verifying the details seen in the screenshot image",
       "suspicionLevel": number,
       "recommendations": ["string"]
     }`;
@@ -82,7 +92,7 @@ export async function analyzeMatchWithAI(
     "Respond ONLY with valid JSON matching the requested schema. No markdown. No extra text."
   );
 
-  const aiResult = await fetchAIResponse(prompt, systemPrompt);
+  const aiResult = await fetchAIResponse(prompt, systemPrompt, evidenceUrl || undefined);
 
   if (!aiResult) {
     return analyzeMatch(player1Score, player2Score, player1Rating, player2Rating, player1History, player2History, hasEvidence);

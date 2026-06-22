@@ -45,10 +45,10 @@ const PROVIDERS: Array<{
     apiKeyEnv: "OPENROUTER_API_KEY",
     modelEnv: "OPENROUTER_MODEL",
     defaultModels: [
-      "google/gemini-2.0-flash-exp:free",
-      "meta-llama/llama-3.3-70b-instruct:free",
+      "google/gemini-2.5-flash",
       "google/gemini-2.0-flash-001",
       "google/gemini-flash-1.5",
+      "meta-llama/llama-3.3-70b-instruct:free",
     ],
   },
   {
@@ -75,14 +75,23 @@ async function callProviderModel(
   provider: (typeof PROVIDERS)[number],
   model: string,
   prompt: string,
-  systemPrompt: string
+  systemPrompt: string,
+  imageUrl?: string
 ): Promise<AIProviderResult | null> {
   const apiKey = normalizeAIEnvValue(process.env[provider.apiKeyEnv]);
   if (!isUsableAISecret(apiKey)) return null;
 
-  const { signal, cancel } = timeoutSignal(18_000);
+  const { signal, cancel } = timeoutSignal(22_000); // 22 seconds for multimodal processing
 
   try {
+    // Construct OpenAI/OpenRouter compliant multimodal content block if imageUrl is present
+    const userContent = imageUrl && provider.id === "openrouter"
+      ? [
+          { type: "text", text: prompt },
+          { type: "image_url", image_url: { url: imageUrl } }
+        ]
+      : prompt;
+
     const response = await fetch(provider.url, {
       method: "POST",
       signal,
@@ -91,7 +100,7 @@ async function callProviderModel(
         "Content-Type": "application/json",
         ...(provider.id === "openrouter"
           ? {
-              "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://gament-1.onrender.com",
+              "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://gament.app",
               "X-Title": "Gament App",
             }
           : {}),
@@ -102,7 +111,7 @@ async function callProviderModel(
         max_tokens: 800,
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: prompt },
+          { role: "user", content: userContent },
         ],
       }),
     });
@@ -136,11 +145,12 @@ async function callProviderModel(
 async function callProvider(
   provider: (typeof PROVIDERS)[number],
   prompt: string,
-  systemPrompt: string
+  systemPrompt: string,
+  imageUrl?: string
 ): Promise<AIProviderResult | null> {
   if (!isUsableAISecret(normalizeAIEnvValue(process.env[provider.apiKeyEnv]))) return null;
   for (const model of modelsFor(provider)) {
-    const result = await callProviderModel(provider, model, prompt, systemPrompt);
+    const result = await callProviderModel(provider, model, prompt, systemPrompt, imageUrl);
     if (result) return result;
   }
   return null;
@@ -148,16 +158,21 @@ async function callProvider(
 
 /**
  * Multi-provider AI call with OpenRouter as primary and Groq as failover.
+ * Supports an optional imageUrl parameter for multimodal analysis (like verifying match screenshots!).
  */
-export async function fetchAIResponse(prompt: string, systemPrompt: string): Promise<AIProviderResult | null> {
-  const cacheKey = `ai_${Buffer.from(`${systemPrompt}\n${prompt}`).toString("base64url")}`;
+export async function fetchAIResponse(
+  prompt: string, 
+  systemPrompt: string, 
+  imageUrl?: string
+): Promise<AIProviderResult | null> {
+  const cacheKey = `ai_${Buffer.from(`${systemPrompt}\n${prompt}\n${imageUrl || ""}`).toString("base64url")}`;
   const cached = aiCache.get(cacheKey) as { content: string; provider: AIProvider; model?: string } | null;
   if (cached?.content) {
     return { content: cached.content, provider: "cache", cachedProvider: cached.provider, model: cached.model };
   }
 
   for (const provider of PROVIDERS) {
-    const result = await callProvider(provider, prompt, systemPrompt);
+    const result = await callProvider(provider, prompt, systemPrompt, imageUrl);
     if (result) {
       aiCache.set(cacheKey, { content: result.content, provider: result.provider, model: result.model }, 3600);
       return result;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { judgments, matches, players, matchEvidence } from "@/db/schema";
-import { eq, count } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { analyzeMatchWithAI } from "@/lib/ai-service";
 import { requireRole } from "@/lib/auth";
 import { evaluateUserAchievements } from "@/lib/achievement-service";
@@ -56,16 +56,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check for evidence
-    const [evidenceCount] = await db
-      .select({ count: count() })
+    // Get actual evidence URL to feed into multimodal AI
+    const evidenceList = await db
+      .select({ fileUrl: matchEvidence.fileUrl })
       .from(matchEvidence)
-      .where(eq(matchEvidence.matchId, matchId));
+      .where(eq(matchEvidence.matchId, matchId))
+      .limit(1);
     
-    const hasEvidence = evidenceCount.count > 0;
+    const hasEvidence = evidenceList.length > 0;
+    const evidenceUrl = hasEvidence ? evidenceList[0].fileUrl : null;
 
     // Run real multi-provider AI analysis (OpenRouter primary, Groq failover)
-    // with a deterministic local fallback inside analyzeMatchWithAI.
+    // feeds the image URL into GPT-4o/Gemini directly to inspect the screenshot!
     const aiResult = await analyzeMatchWithAI(
       match.player1Score || 0,
       match.player2Score || 0,
@@ -73,7 +75,8 @@ export async function POST(request: NextRequest) {
       p2Rating,
       { wins: p1Wins, losses: p1Losses },
       { wins: p2Wins, losses: p2Losses },
-      hasEvidence
+      hasEvidence,
+      evidenceUrl
     );
 
     // Store judgment
