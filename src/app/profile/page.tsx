@@ -103,6 +103,12 @@ export default function ProfilePage() {
   const [telegramMessage, setTelegramMessage] = useState("");
   const [telegramError, setTelegramError] = useState("");
 
+  // Interactive Quests System State (Option 3)
+  const [claimedQuests, setClaimedQuests] = useState<string[]>([]);
+  const [claimLoading, setClaimLoading] = useState<string | null>(null);
+  const [questSuccessMsg, setQuestSuccessMsg] = useState("");
+  const [questErrorMsg, setQuestErrorMsg] = useState("");
+
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
   const loadDashboard = useCallback(async () => {
@@ -142,6 +148,8 @@ export default function ProfilePage() {
     if (user) {
       setDisplayName(user.displayName || user.username || "");
       setSelectedAvatar(user.avatarUrl || "/icons/profile_icon.png");
+      const metadata = (user.metadata as Record<string, any>) || {};
+      setClaimedQuests(metadata.claimedQuests || []);
       loadDashboard();
       loadTelegramLink();
     }
@@ -247,6 +255,32 @@ export default function ProfilePage() {
       setTelegramError(err instanceof Error ? err.message : "حذف اتصال انجام نشد.");
     }
     setTelegramLoading(false);
+  }
+
+  // Interactive Quest Claim Reward API call
+  async function handleClaimQuest(questId: string) {
+    setClaimLoading(questId);
+    setQuestSuccessMsg("");
+    setQuestErrorMsg("");
+    try {
+      const res = await fetch("/api/quests/claim", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ questId }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "خطا در ثبت مأموریت");
+      
+      setQuestSuccessMsg(json.message);
+      setClaimedQuests(json.claimedQuests || []);
+      
+      // Update local state instantly and sync from backend
+      await refreshUser();
+      loadDashboard();
+    } catch (err) {
+      setQuestErrorMsg(err instanceof Error ? err.message : "ثبت مأموریت انجام نشد.");
+    }
+    setClaimLoading(null);
   }
 
   const nextMatch = useMemo(() => data?.matches.find((m) => m.status !== "completed") || null, [data]);
@@ -472,53 +506,91 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* Option 3: Daily Quests & Onboarding Checklist */}
+        {/* Option 3: Daily Quests & Onboarding Checklist (Fully interactive and claimed quests saved in DB!) */}
         <section className="glass-panel rounded-[34px] border border-white/10 p-5 mb-6" dir="rtl">
           <div className="text-right mb-4">
             <h3 className="text-sm font-black text-white flex items-center gap-1.5">
               <span>🎯</span>
               <span>مأموریت‌ها و چالش‌های کاربری</span>
             </h3>
-            <p className="text-[10px] text-gray-500 mt-1">با انجام مأموریت‌ها XP دریافت کرده و سریع‌تر لول‌آپ شوید!</p>
+            <p className="text-[10px] text-gray-500 mt-1">با انجام مأموریت‌ها و دریافت جوایز، سریع‌تر لول‌آپ شوید!</p>
           </div>
 
           <div className="space-y-2.5">
-            {quests.map((quest) => (
-              <div 
-                key={quest.id} 
-                className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
-                  quest.completed 
-                    ? "bg-emerald-500/5 border-emerald-500/20" 
-                    : "bg-black/20 border-white/5 hover:border-white/10"
-                }`}
-              >
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-lg ${quest.completed ? "bg-emerald-500/10 text-emerald-400" : "bg-white/5 text-gray-400"}`}>
-                    {quest.completed ? "✓" : quest.icon}
-                  </div>
-                  <div className="text-right min-w-0 flex-1">
-                    <div className={`text-xs font-black truncate ${quest.completed ? "text-emerald-300" : "text-gray-200"}`}>
-                      {quest.title}
-                    </div>
-                    <div className="text-[9px] text-gray-500 mt-1 truncate">{quest.desc}</div>
-                  </div>
-                </div>
+            {quests.map((quest) => {
+              const isClaimed = claimedQuests.includes(quest.id);
+              const isClaimable = quest.completed && !isClaimed;
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${quest.completed ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/10" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/10"}`}>
-                    +{quest.xp} XP
-                  </span>
-                  {quest.completed ? (
-                    <span className="text-[10px] font-black text-emerald-400 shrink-0">کامل شده</span>
-                  ) : (
-                    <Link href={quest.id === "game_ids" ? "/profile/edit" : quest.id === "telegram_link" ? "#telegram" : "/tournaments"} className="text-[9px] bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1 rounded-lg font-black transition-all shrink-0">
-                      شروع
-                    </Link>
-                  )}
+              return (
+                <div 
+                  key={quest.id} 
+                  className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
+                    isClaimed 
+                      ? "bg-emerald-500/5 border-emerald-500/15 opacity-75" 
+                      : isClaimable
+                      ? "bg-yellow-500/5 border-yellow-500/25 shadow-[0_0_10px_rgba(234,179,8,0.05)]"
+                      : "bg-black/20 border-white/5 hover:border-white/10"
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-lg ${
+                      isClaimed 
+                        ? "bg-emerald-500/10 text-emerald-400" 
+                        : isClaimable
+                        ? "bg-yellow-500/10 text-yellow-400"
+                        : "bg-white/5 text-gray-400"
+                    }`}>
+                      {isClaimed ? "✓" : quest.icon}
+                    </div>
+                    <div className="text-right min-w-0 flex-1">
+                      <div className={`text-xs font-black truncate ${
+                        isClaimed 
+                          ? "text-emerald-400 line-through" 
+                          : isClaimable
+                          ? "text-yellow-300 font-bold"
+                          : "text-gray-200"
+                      }`}>
+                        {quest.title}
+                      </div>
+                      <div className="text-[9px] text-gray-500 mt-1 truncate">{quest.desc}</div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
+                      isClaimed 
+                        ? "bg-emerald-500/10 text-emerald-400/70 border border-emerald-500/10" 
+                        : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/10 animate-pulse"
+                    }`}>
+                      +{quest.xp} XP
+                    </span>
+                    
+                    {isClaimed ? (
+                      <span className="text-[10px] font-black text-emerald-500 shrink-0">دریافت شده</span>
+                    ) : isClaimable ? (
+                      <button 
+                        onClick={() => handleClaimQuest(quest.id)}
+                        disabled={claimLoading !== null}
+                        className="text-[10px] bg-gradient-to-r from-yellow-500 to-amber-600 hover:from-yellow-400 hover:to-amber-500 text-black px-2.5 py-1 rounded-lg font-black transition-all shrink-0 shadow-lg shadow-yellow-500/15 animate-bounce"
+                      >
+                        {claimLoading === quest.id ? "..." : "دریافت جایزه"}
+                      </button>
+                    ) : (
+                      <Link 
+                        href={quest.id === "game_ids" ? "/profile/edit" : quest.id === "telegram_link" ? "#telegram" : "/tournaments"} 
+                        className="text-[9px] bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1 rounded-lg font-black transition-all shrink-0"
+                      >
+                        شروع
+                      </Link>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+
+          {questSuccessMsg && <div className="text-green-300 text-xs mt-3 text-right font-bold">✅ {questSuccessMsg}</div>}
+          {questErrorMsg && <div className="text-red-300 text-xs mt-3 text-right font-bold">❌ {questErrorMsg}</div>}
         </section>
 
         {/* Section 2: Unified Esports Stats */}

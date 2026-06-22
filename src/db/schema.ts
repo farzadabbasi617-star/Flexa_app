@@ -98,6 +98,7 @@ export const users = pgTable("users", {
   termsVersion: varchar("terms_version", { length: 50 }),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   lastLoginAt: timestamp("last_login_at"),
+  metadata: jsonb("metadata"),
 }, (table) => ({
   phoneIdx: index("users_phone_idx").on(table.phoneNumber),
   rankIdx: index("users_rank_points_idx").on(table.rankPoints),
