@@ -72,6 +72,14 @@ function transactionLabel(type: string) {
   return map[type] || type;
 }
 
+function getRankTier(rating: number) {
+  if (rating >= 2000) return { label: "افسانه‌ای", color: "text-purple-400 bg-purple-950/40 border-purple-500/50", icon: "🔮" };
+  if (rating >= 1600) return { label: "الماس", color: "text-cyan-400 bg-cyan-950/40 border-cyan-500/50", icon: "💎" };
+  if (rating >= 1300) return { label: "طلایی", color: "text-yellow-400 bg-yellow-950/40 border-yellow-500/50", icon: "🥇" };
+  if (rating >= 1000) return { label: "نقره‌ای", color: "text-gray-300 bg-gray-900/40 border-gray-500/50", icon: "🥈" };
+  return { label: "برنزی", color: "text-amber-600 bg-amber-950/40 border-amber-800/50", icon: "🥉" };
+}
+
 export default function ProfilePage() {
   const { user, loading, logout, refreshUser } = useAuth();
   const router = useRouter();
@@ -244,6 +252,60 @@ export default function ProfilePage() {
   const nextMatch = useMemo(() => data?.matches.find((m) => m.status !== "completed") || null, [data]);
   const activeTournament = useMemo(() => data?.tournaments.find((t) => t.status === "registration" || t.status === "in_progress") || null, [data]);
 
+  const hasGameIds = user?.clashRoyaleId || user?.codMobileId || user?.fortniteId;
+  const tier = useMemo(() => getRankTier(data?.stats.rating ?? 1000), [data]);
+
+  // Exact XP progression calculation matching Gament leveling formula
+  const xpInfo = useMemo(() => {
+    if (!user) return { currentLevelBaseXP: 0, nextLevelTargetXP: 100, levelXP: 0, levelMaxXP: 100, progressPercent: 0 };
+    const lvl = user.level || 1;
+    const currentLevelBaseXP = Math.pow(lvl - 1, 2) * 100;
+    const nextLevelTargetXP = Math.pow(lvl, 2) * 100;
+    const levelXP = (user.xp || 0) - currentLevelBaseXP;
+    const levelMaxXP = nextLevelTargetXP - currentLevelBaseXP;
+    const progressPercent = Math.max(0, Math.min(100, (levelXP / levelMaxXP) * 100));
+    return { currentLevelBaseXP, nextLevelTargetXP, levelXP, levelMaxXP, progressPercent };
+  }, [user]);
+
+  // Client-side interactive and dynamic Quest Checklist (Option 3)
+  const quests = useMemo(() => {
+    if (!user || !data) return [];
+    return [
+      {
+        id: "game_ids",
+        title: "ثبت شناسه‌های بازی",
+        desc: "ثبت حداقل یک آیدی بازی (کالاف، کلش یا فورتنایت)",
+        xp: 50,
+        completed: Boolean(hasGameIds),
+        icon: "🎮",
+      },
+      {
+        id: "telegram_link",
+        title: "اتصال به ربات تلگرام",
+        desc: "لینک کردن موفق حساب تلگرام به گیمنت",
+        xp: 50,
+        completed: Boolean(telegramAccount),
+        icon: "🔗",
+      },
+      {
+        id: "join_tournament",
+        title: "اولین رقابت",
+        desc: "ثبت‌نام در حداقل یک تورنومنت گیمنت",
+        xp: 100,
+        completed: Boolean(data.stats.myTournaments > 0),
+        icon: "⚔️",
+      },
+      {
+        id: "level_5",
+        title: "کهنه‌کار نوپا",
+        desc: "رسیدن به سطح کاربری ۵ در پلتفرم",
+        xp: 150,
+        completed: Boolean(user.level >= 5),
+        icon: "⚡",
+      },
+    ];
+  }, [user, data, hasGameIds, telegramAccount]);
+
   if (loading || busy || !user) {
     return (
       <div className="min-h-screen bg-[#050508] text-white flex items-center justify-center">
@@ -251,8 +313,6 @@ export default function ProfilePage() {
       </div>
     );
   }
-
-  const hasGameIds = user.clashRoyaleId || user.codMobileId || user.fortniteId;
 
   return (
     <div className="min-h-screen bg-[#050508] text-white relative overflow-x-hidden">
@@ -270,7 +330,7 @@ export default function ProfilePage() {
           </div>
           <h1 className="text-3xl font-black">پروفایل من</h1>
           <p className="text-xs text-gray-500 mt-1 leading-6">
-            آواتارهای انحصاری، دارایی‌ها، آمار بازی‌ها و دسترسی‌های سریع
+            کارت شناسایی الکترونیکی، آواتارها، آمار زنده و سیستم ماموریت‌ها
           </p>
         </header>
 
@@ -281,42 +341,89 @@ export default function ProfilePage() {
           </div>
         )}
 
-        {/* Section 1: Hero Edit Profile */}
-        <section className="glass-panel rounded-[38px] p-6 border border-purple-500/20 bg-gradient-to-br from-[#1a0033]/70 to-[#0a0a0c] mb-6">
-          <div className="flex items-center justify-between gap-4 mb-6">
-            <div className="text-right">
-              <h2 className="text-xl font-black">{user.displayName} 👋</h2>
-              <p className="text-[11px] text-gray-400 mt-1">
-                نام کاربری: <span className="font-mono">@{user.username}</span>
-              </p>
-              <p className="text-[11px] text-purple-300 mt-1 en-font">
-                ID: {user.gamentId}
-              </p>
-            </div>
-            <div className="relative">
-              <div className="p-1 rounded-full bg-gradient-to-tr from-[#bc00ff] to-[#00d2ff] shadow-[0_0_30px_rgba(188,0,255,0.35)]">
-                <img
-                  src={selectedAvatar}
-                  alt="Avatar"
-                  className="w-20 h-20 rounded-full border-4 border-[#050508] object-cover bg-black/40"
-                  onError={(e) => ((e.target as HTMLImageElement).src = "/icons/profile_icon.png")}
-                />
+        {/* Option 2: Esports Gamer ID Card */}
+        <section className="mb-6 relative group">
+          {/* Subtle backglow */}
+          <div className="absolute inset-0 bg-gradient-to-tr from-purple-600/15 to-cyan-500/15 rounded-[38px] blur-xl opacity-60 transition-opacity group-hover:opacity-100" />
+          
+          <div className="relative glass-panel rounded-[38px] border border-purple-500/30 overflow-hidden bg-gradient-to-br from-[#1c1140]/90 via-[#0a071f]/95 to-[#050508]/100 p-6 shadow-2xl">
+            {/* Holographic Watermark lines */}
+            <div className="absolute inset-0 opacity-[0.02] pointer-events-none bg-[linear-gradient(45deg,#fff_25%,transparent_25%,transparent_50%,#fff_50%,#fff_75%,transparent_75%,transparent)] bg-[length:40px_40px]" />
+            <div className="absolute -top-12 -left-12 w-40 h-40 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute -bottom-16 -right-16 w-48 h-48 bg-purple-500/15 rounded-full blur-3xl pointer-events-none" />
+
+            {/* Top Bar of the Card */}
+            <div className="flex justify-between items-start mb-6">
+              <div className="text-right">
+                <div className="text-[9px] font-black text-purple-400 tracking-[0.2em] uppercase leading-none">GAMENT ATHLETE LICENSE</div>
+                <div className="text-[10px] text-gray-500 font-bold mt-1 leading-none">کارت هویت رسمی بازیکن</div>
               </div>
-              <div className="absolute -bottom-1 -right-1 bg-purple-600 border-4 border-[#050508] w-8 h-8 rounded-full flex items-center justify-center text-[10px] font-black num-en">
-                {user.level || 1}
+              <img src="/icons/arena_icon.png" alt="Gament Logo" className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(188,0,255,0.4)]" />
+            </div>
+
+            {/* Body of the Card */}
+            <div className="flex items-center justify-between gap-4 mb-4">
+              <div className="flex-1 min-w-0 text-right">
+                <h2 className="text-2xl sm:text-3xl font-black text-white truncate leading-none mb-2">{user.displayName}</h2>
+                <div className="text-xs text-gray-400 font-bold num-en">@{user.username}</div>
+                
+                <div className="flex items-center gap-1.5 justify-end mt-3.5">
+                  <span className="text-[10px] text-purple-300 font-black en-font tracking-wide bg-purple-500/10 px-2 py-0.5 rounded-md border border-purple-500/20 num-en">
+                    {user.gamentId}
+                  </span>
+                  <span className={`px-2 py-0.5 rounded-md text-[9px] border font-black flex items-center gap-1 shrink-0 ${tier.color}`}>
+                    <span>{tier.icon}</span>
+                    <span>{tier.label}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Avatar Box with level badge */}
+              <div className="relative shrink-0">
+                <div className="p-0.5 rounded-full bg-gradient-to-tr from-[#bc00ff] to-[#00d2ff] shadow-[0_0_20px_rgba(188,0,255,0.35)]">
+                  <img
+                    src={selectedAvatar}
+                    alt="Avatar"
+                    className="w-18 h-18 sm:w-20 sm:h-20 rounded-full border-4 border-[#09071f] object-cover bg-black/40"
+                    onError={(e) => ((e.target as HTMLImageElement).src = "/icons/profile_icon.png")}
+                  />
+                </div>
+                <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-purple-600 to-fuchsia-600 border-2 border-[#09071f] w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black num-en shadow-md">
+                  {user.level || 1}
+                </div>
+              </div>
+            </div>
+
+            {/* Bottom Bar: Level progress & License Info */}
+            <div className="mt-6 pt-4 border-t border-white/5 flex flex-col gap-2">
+              <div className="flex justify-between items-center text-[9px] text-gray-500 font-bold">
+                <span className="num-en">LEVEL {user.level || 1} PROGRESS</span>
+                <span className="num-en text-purple-300">{user.xp || 0} / {xpInfo.nextLevelTargetXP} XP</span>
+              </div>
+              <div className="h-2 bg-black/40 border border-white/5 rounded-full overflow-hidden p-0.5">
+                <div 
+                  className="h-full rounded-full bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-500 shadow-[0_0_10px_rgba(188,0,255,0.5)] transition-all duration-500"
+                  style={{ width: `${xpInfo.progressPercent}%` }}
+                />
               </div>
             </div>
           </div>
+        </section>
 
+        {/* Section 1: Hero Edit Profile */}
+        <section className="glass-panel rounded-[38px] p-6 border border-white/5 mb-6">
+          <div className="text-right mb-4">
+            <h2 className="text-sm font-black text-gray-400">👤 تنظیمات مشخصات و آواتار</h2>
+          </div>
           <div className="space-y-4">
             <div>
-              <label className="block text-[10px] font-black text-gray-500 mb-1.5">نام نمایشی</label>
+              <label className="block text-[10px] font-black text-gray-500 mb-1.5">نام نمایشی جدید</label>
               <div className="flex gap-2">
                 <input
                   value={displayName}
                   onChange={(e) => setDisplayName(e.target.value)}
                   className="flex-1 bg-black/25 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-purple-400"
-                  placeholder="نام نمایشی جدید"
+                  placeholder="نام نمایشی"
                   maxLength={100}
                 />
                 <button
@@ -332,7 +439,7 @@ export default function ProfilePage() {
             <div>
               <div className="flex items-center justify-between mb-2.5">
                 <label className="block text-[10px] font-black text-purple-300 tracking-wider">🌟 انتخاب آواتار انحصاری گیمنت</label>
-                <span className="text-[9px] text-gray-500">جهت اعمال تغییر کلیک کنید</span>
+                <span className="text-[9px] text-gray-500">جهت اعمال کلیک کنید</span>
               </div>
               <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                 {AVATAR_OPTIONS.map((avatar) => {
@@ -365,6 +472,55 @@ export default function ProfilePage() {
           </div>
         </section>
 
+        {/* Option 3: Daily Quests & Onboarding Checklist */}
+        <section className="glass-panel rounded-[34px] border border-white/10 p-5 mb-6" dir="rtl">
+          <div className="text-right mb-4">
+            <h3 className="text-sm font-black text-white flex items-center gap-1.5">
+              <span>🎯</span>
+              <span>مأموریت‌ها و چالش‌های کاربری</span>
+            </h3>
+            <p className="text-[10px] text-gray-500 mt-1">با انجام مأموریت‌ها XP دریافت کرده و سریع‌تر لول‌آپ شوید!</p>
+          </div>
+
+          <div className="space-y-2.5">
+            {quests.map((quest) => (
+              <div 
+                key={quest.id} 
+                className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
+                  quest.completed 
+                    ? "bg-emerald-500/5 border-emerald-500/20" 
+                    : "bg-black/20 border-white/5 hover:border-white/10"
+                }`}
+              >
+                <div className="flex items-center gap-3 min-w-0 flex-1">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-lg ${quest.completed ? "bg-emerald-500/10 text-emerald-400" : "bg-white/5 text-gray-400"}`}>
+                    {quest.completed ? "✓" : quest.icon}
+                  </div>
+                  <div className="text-right min-w-0 flex-1">
+                    <div className={`text-xs font-black truncate ${quest.completed ? "text-emerald-300" : "text-gray-200"}`}>
+                      {quest.title}
+                    </div>
+                    <div className="text-[9px] text-gray-500 mt-1 truncate">{quest.desc}</div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${quest.completed ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/10" : "bg-yellow-500/10 text-yellow-400 border border-yellow-500/10"}`}>
+                    +{quest.xp} XP
+                  </span>
+                  {quest.completed ? (
+                    <span className="text-[10px] font-black text-emerald-400 shrink-0">کامل شده</span>
+                  ) : (
+                    <Link href={quest.id === "game_ids" ? "/profile/edit" : quest.id === "telegram_link" ? "#telegram" : "/tournaments"} className="text-[9px] bg-purple-600 hover:bg-purple-500 text-white px-2.5 py-1 rounded-lg font-black transition-all shrink-0">
+                      شروع
+                    </Link>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Section 2: Unified Esports Stats */}
         <section className="grid grid-cols-2 gap-3 mb-6" dir="rtl">
           {[
@@ -380,22 +536,6 @@ export default function ProfilePage() {
             </div>
           ))}
         </section>
-
-        {/* Missing Game IDs Warning */}
-        {!hasGameIds && (
-          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-6 flex items-center justify-between gap-3 animate-pulse" dir="rtl">
-            <div className="flex items-center gap-3">
-              <span className="text-2xl">⚠️</span>
-              <div className="text-right">
-                <p className="font-bold text-amber-400 text-xs">آیدی بازی‌ها ثبت نشده است!</p>
-                <p className="text-[10px] text-gray-400 mt-0.5">جهت واریز جوایز، شناسه‌های بازی خود را وارد کنید.</p>
-              </div>
-            </div>
-            <Link href="/profile/edit" className="text-[10px] bg-amber-500/20 text-amber-300 px-3 py-1.5 rounded-xl border border-amber-500/30 whitespace-nowrap">
-              ثبت آیدی
-            </Link>
-          </div>
-        )}
 
         {/* Section 3: Action Cards Counters */}
         <section className="grid grid-cols-4 gap-2 mb-6" dir="rtl">
@@ -473,7 +613,7 @@ export default function ProfilePage() {
         </section>
 
         {/* Section 6: Telegram Connection */}
-        <section className="glass-panel p-5 rounded-[34px] border border-cyan-500/20 bg-gradient-to-br from-cyan-900/10 to-purple-900/10 mb-6" dir="rtl">
+        <section id="telegram" className="glass-panel p-5 rounded-[34px] border border-cyan-500/20 bg-gradient-to-br from-cyan-900/10 to-purple-900/10 mb-6" dir="rtl">
           <div className="flex items-center justify-between gap-3 mb-4">
             <div className="text-right">
               <h3 className="text-sm font-black">🔗 اتصال بات تلگرام</h3>
@@ -598,6 +738,14 @@ export default function ProfilePage() {
         .num-en { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
         .en-font { font-family: Impact, "Arial Black", system-ui, sans-serif; letter-spacing: -0.04em; }
         .settings-tile { min-height: 54px; transition: transform .15s ease, border-color .15s ease; }
+        
+        @keyframes float-slow {
+          0%, 100% { transform: translateY(0); }
+          50% { transform: translateY(-6px); }
+        }
+        .animate-float-slow {
+          animation: float-slow 4s ease-in-out infinite;
+        }
       `}</style>
     </div>
   );
