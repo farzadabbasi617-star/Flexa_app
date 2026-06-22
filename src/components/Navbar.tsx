@@ -199,18 +199,46 @@ export default function Navbar() {
             </div>
           </div>
 
-          {/* Mobile Nav */}
+          {/* Mobile Top Navigation Menu - Premium Uniform Icons */}
           <div className="lg:hidden flex items-center gap-1.5">
-            {navItems.slice(0, 4).map((item) => {
+            {navItems.slice(0, 5).map((item) => {
               const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              
+              const customIcons: Record<string, string> = {
+                "/": "/icons/arena_icon.png",
+                "/tournaments": "/icons/honors_icon.png",
+                "/leaderboard": "/icons/rankings_icon.png",
+                "/judging": "/icons/profile_privacy.png",
+                "/teams": "/icons/profile_game_ids.png",
+                "/admin": "/icons/profile_admin.png",
+              };
+              const finalIconUrl = customIcons[item.href];
+
               return (
-                <Link key={item.href} href={item.href} className={`text-lg p-2 rounded-xl transition-all ${isActive ? "bg-neon-purple text-white" : "text-gray-400 hover:bg-dark-800"}`} title={item.label}>
-                  {item.icon}
+                <Link 
+                  key={item.href} 
+                  href={item.href} 
+                  className={`p-1.5 rounded-xl transition-all flex items-center justify-center border ${
+                    isActive 
+                      ? "bg-neon-purple/20 border-neon-purple/30 shadow-[0_0_10px_rgba(168,85,247,0.15)] text-white" 
+                      : "border-transparent text-gray-400 hover:bg-dark-800"
+                  }`} 
+                  title={item.label}
+                >
+                  {finalIconUrl ? (
+                    <img 
+                      src={finalIconUrl} 
+                      alt={item.label} 
+                      className={`w-6 h-6 object-contain ${isActive ? "drop-shadow-[0_0_8px_#bc00ff]" : "opacity-60"}`} 
+                    />
+                  ) : (
+                    <span className="text-lg">{item.icon}</span>
+                  )}
                 </Link>
               );
             })}
             {user ? (
-              <Link href="/profile" className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${isAdmin ? "bg-gradient-to-br from-neon-pink to-neon-orange" : "bg-gradient-to-br from-neon-purple to-neon-blue"}`}>
+              <Link href="/profile" className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${isAdmin ? "bg-gradient-to-br from-neon-pink to-neon-orange shadow-[0_0_15px_rgba(244,63,94,0.3)]" : "bg-gradient-to-br from-neon-purple to-neon-blue shadow-[0_0_15px_rgba(188,0,255,0.3)]"}`}>
                 {isAdmin ? "👑" : user.displayName.charAt(0).toUpperCase()}
               </Link>
             ) : (

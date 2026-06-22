@@ -24,9 +24,9 @@ interface Tournament {
 }
 
 const GAME_META: Record<string, { fa: string; en: string; icon: string; accent: string }> = {
-  clash_royale: { fa: "کلش رویال", en: "Clash Royale", icon: "⚔️", accent: "from-cyan-500 to-blue-700" },
-  cod_mobile: { fa: "کالاف موبایل", en: "COD Mobile", icon: "🎯", accent: "from-orange-500 to-red-700" },
-  fortnite: { fa: "فورتنایت", en: "Fortnite", icon: "🏗️", accent: "from-purple-500 to-pink-700" },
+  clash_royale: { fa: "کلش رویال", en: "Clash Royale", icon: "/icons/icon-clash_royale.png", accent: "from-cyan-500 to-blue-700" },
+  cod_mobile: { fa: "کالاف موبایل", en: "COD Mobile", icon: "/icons/icon-cod_mobile.png", accent: "from-orange-500 to-red-700" },
+  fortnite: { fa: "فورتنایت", en: "Fortnite", icon: "/icons/icon-fortnite.png", accent: "from-purple-500 to-pink-700" },
 };
 
 const DEFAULT_MODE_LABEL: Record<string, string> = {
@@ -69,7 +69,7 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
   }, [fetchTournaments]);
 
   const games = [
-    { id: "all", name: L("همه", "All"), icon: "🎮" },
+    { id: "all", name: L("همه", "All"), icon: "/icons/arena_icon.png" },
     ...Object.entries(GAME_META).map(([id, meta]) => ({ id, name: L(meta.fa, meta.en), icon: meta.icon })),
   ];
 
@@ -93,18 +93,20 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
 
   return (
     <>
-      <div className="flex gap-2 mb-8 overflow-x-auto pb-3 snap-x scrollbar-hide">
+      {/* Game Selection Pills */}
+      <div className="flex gap-2 mb-8 overflow-x-auto pb-3 snap-x scrollbar-hide" dir="rtl">
         {games.map((g) => (
           <button
             key={g.id}
             onClick={() => setActiveFilter(g.id)}
-            className={`snap-start whitespace-nowrap px-5 py-2.5 rounded-2xl text-sm font-black transition-all border active:scale-[0.985] ${
+            className={`snap-start whitespace-nowrap px-4 py-2.5 rounded-2xl text-xs font-black border transition-all active:scale-[0.985] flex items-center gap-2 shrink-0 ${
               activeFilter === g.id
-                ? "bg-purple-600/90 text-white border-purple-500 shadow-[0_0_20px_rgba(168,85,247,.35)]"
-                : "bg-[#111114] text-gray-400 border-white/10 hover:border-white/25 active:bg-[#18181c]"
+                ? "bg-purple-600 text-white border-purple-500 shadow-[0_0_15px_rgba(168,85,247,.35)]"
+                : "bg-[#111114] text-gray-400 border-white/5 hover:border-white/10 active:bg-[#18181c]"
             }`}
           >
-            {g.icon} {g.name}
+            <img src={g.icon} alt={g.name} className="w-4 h-4 object-contain shrink-0" />
+            <span>{g.name}</span>
           </button>
         ))}
       </div>
@@ -136,14 +138,15 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
 
             return (
               <section key={gameId} className="relative">
-                <div className="flex items-center justify-between gap-4 mb-5">
+                <div className="flex items-center justify-between gap-4 mb-5" dir="rtl">
                   <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-2xl bg-gradient-to-br ${meta.accent} grid place-items-center text-2xl shadow-[0_0_28px_rgba(168,85,247,.18)]`}>
-                      {meta.icon}
+                    {/* Uniform Square Game Logo inside glowing container */}
+                    <div className="w-12 h-12 rounded-2xl bg-[#111114] border border-white/10 flex items-center justify-center p-2 sm:p-2.5 shadow-[0_0_20px_rgba(168,85,247,0.12)] shrink-0">
+                      <img src={meta.icon} alt={L(meta.fa, meta.en)} className="w-full h-full object-contain" />
                     </div>
-                    <div>
-                      <h2 className="text-2xl font-black text-white">{L(meta.fa, meta.en)}</h2>
-                      <p className="text-xs text-gray-500 mt-1">اسکرول افقی تورنومنت‌ها بر اساس مود بازی</p>
+                    <div className="text-right">
+                      <h2 className="text-xl sm:text-2xl font-black text-white">{L(meta.fa, meta.en)}</h2>
+                      <p className="text-[10px] sm:text-xs text-gray-500 mt-1">اسکرول افقی تورنومنت‌ها بر اساس مود بازی</p>
                     </div>
                   </div>
                   <Link href={`/tournaments?game=${gameId}`} className="text-xs font-black text-purple-300 whitespace-nowrap">
@@ -153,13 +156,13 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
 
                 <div className="space-y-8">
                   {modes.map(([mode, list]) => (
-                    <div key={`${gameId}-${mode}`} className="glass-panel p-5 rounded-3xl border border-white/10">
+                    <div key={`${gameId}-${mode}`} className="glass-panel p-5 rounded-3xl border border-white/5" dir="rtl">
                       <div className="flex items-center justify-between gap-3 mb-5">
-                        <div>
-                          <h3 className="font-black text-lg text-white">{mode}</h3>
+                        <div className="text-right">
+                          <h3 className="font-black text-base sm:text-lg text-white">{mode}</h3>
                           <p className="text-xs text-gray-500 mt-0.5">{list.length.toLocaleString("fa-IR")} روم فعال</p>
                         </div>
-                        <span className="text-[10px] px-3 py-1 rounded-full bg-white/5 text-gray-400 border border-white/10">
+                        <span className="text-[9px] px-2.5 py-1 rounded-full bg-white/5 text-gray-400 border border-white/5 font-semibold">
                           اسکرول افقی
                         </span>
                       </div>
@@ -205,12 +208,13 @@ export default function TournamentsPage() {
     <div className="min-h-screen bg-dark-900">
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold">
-              🏆 <span className="neon-text-purple">{L("تورنومنت‌ها", "Tournaments")}</span>
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6" dir="rtl">
+          <div className="text-right">
+            <h1 className="text-2xl sm:text-3xl font-black flex items-center gap-2.5 justify-start">
+              <img src="/icons/honors_icon.png" alt="Tournaments" className="w-8 h-8 object-contain drop-shadow-[0_0_8px_#bc00ff] shrink-0" />
+              <span className="bg-gradient-to-l from-purple-400 to-cyan-300 bg-clip-text text-transparent">{L("تورنومنت‌ها", "Tournaments")}</span>
             </h1>
-            <p className="text-gray-400 mt-1 text-sm">
+            <p className="text-gray-400 mt-1.5 text-xs">
               {L("هر بازی در مودهای خودش، با اسکرول افقی تورنومنت‌ها", "Browse tournaments by game and mode")}
             </p>
           </div>
@@ -221,10 +225,10 @@ export default function TournamentsPage() {
           )}
         </div>
         {user && walletBalanceToman !== null && (
-          <div className="gaming-card p-4 mb-6 flex items-center justify-between gap-3 border-neon-blue/20">
-            <div>
+          <div className="gaming-card p-4 mb-6 flex items-center justify-between gap-3 border-neon-blue/20" dir="rtl">
+            <div className="text-right">
               <div className="text-xs text-gray-500 mb-1">موجودی کیف پول</div>
-              <div className="font-black text-neon-blue">{walletBalanceToman.toLocaleString("fa-IR")} تومان</div>
+              <div className="font-black text-neon-blue num-en">{walletBalanceToman.toLocaleString("en-US")} تومان</div>
             </div>
             <Link href="/wallet" className="gaming-btn text-xs">شارژ / تراکنش‌ها</Link>
           </div>
