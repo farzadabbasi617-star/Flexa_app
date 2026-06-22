@@ -17,6 +17,7 @@ interface Player {
   gamentId?: string | null;
   isVerified?: boolean | null;
   role?: string | null;
+  avatarUrl?: string | null;
   clashRoyaleId?: string | null;
   clashRoyaleUsername?: string | null;
   codMobileId?: string | null;
@@ -228,13 +229,18 @@ export default function LeaderboardPage() {
                 {topThree[1] && (
                   <Link 
                     href={`/players/${topThree[1].id}`} 
-                    className="glass-panel p-4 rounded-3xl text-center active:scale-[0.985] transition-all border border-white/5 hover:border-white/20 relative"
+                    className="glass-panel p-4 rounded-3xl text-center active:scale-[0.985] transition-all border border-white/5 hover:border-white/20 relative animate-float-slow"
                   >
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">{medal(1)}</div>
-                    <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-gray-400 to-gray-600 grid place-items-center text-xl font-black mb-3 ring-4 ring-[#050508] mt-2">
-                      {topThree[1].displayName.charAt(0).toUpperCase()}
+                    {/* User Profile Avatar */}
+                    <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-gray-400 to-gray-600 overflow-hidden ring-4 ring-[#050508] mt-2 flex items-center justify-center">
+                      {topThree[1].avatarUrl ? (
+                        <img src={topThree[1].avatarUrl} alt={topThree[1].displayName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xl font-black">{topThree[1].displayName.charAt(0).toUpperCase()}</span>
+                      )}
                     </div>
-                    <div className="font-black truncate text-xs sm:text-sm">{topThree[1].displayName}</div>
+                    <div className="font-black truncate text-xs sm:text-sm mt-3">{topThree[1].displayName}</div>
                     <div className="text-[10px] text-gray-500 truncate">@{topThree[1].username}</div>
                     <div className="mt-2 text-gray-300 font-black text-sm tracking-tight num-en">
                       {scoreFor(topThree[1], board).toLocaleString("en-US")} <span className="text-[9px] text-gray-500 font-normal">{scoreUnit(board)}</span>
@@ -246,13 +252,18 @@ export default function LeaderboardPage() {
                 {topThree[0] && (
                   <Link 
                     href={`/players/${topThree[0].id}`} 
-                    className="glass-panel p-5 rounded-3xl text-center active:scale-[0.985] transition-all border border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,.1)] scale-[1.05] relative z-10"
+                    className="glass-panel p-5 rounded-3xl text-center active:scale-[0.985] transition-all border border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,.1)] scale-[1.05] relative z-10 animate-float-slow"
                   >
                     <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl">{medal(0)}</div>
-                    <div className="w-18 h-18 mx-auto rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 grid place-items-center text-3xl font-black mb-3 ring-4 ring-[#050508] mt-2 shadow-[0_0_15px_rgba(234,179,8,.3)]">
-                      {topThree[0].displayName.charAt(0).toUpperCase()}
+                    {/* User Profile Avatar */}
+                    <div className="w-18 h-18 mx-auto rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 overflow-hidden ring-4 ring-[#050508] mt-2 shadow-[0_0_15px_rgba(234,179,8,.3)] flex items-center justify-center">
+                      {topThree[0].avatarUrl ? (
+                        <img src={topThree[0].avatarUrl} alt={topThree[0].displayName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-3xl font-black">{topThree[0].displayName.charAt(0).toUpperCase()}</span>
+                      )}
                     </div>
-                    <div className="font-black truncate text-sm sm:text-base text-yellow-100">{topThree[0].displayName}</div>
+                    <div className="font-black truncate text-sm sm:text-base text-yellow-100 mt-3">{topThree[0].displayName}</div>
                     <div className="text-[10px] text-yellow-500/70 truncate font-semibold">@{topThree[0].username}</div>
                     <div className="mt-2 text-yellow-400 font-black text-lg tracking-tight num-en">
                       {scoreFor(topThree[0], board).toLocaleString("en-US")} <span className="text-[10px] text-yellow-500/50 font-normal">{scoreUnit(board)}</span>
@@ -264,13 +275,18 @@ export default function LeaderboardPage() {
                 {topThree[2] && (
                   <Link 
                     href={`/players/${topThree[2].id}`} 
-                    className="glass-panel p-4 rounded-3xl text-center active:scale-[0.985] transition-all border border-white/5 hover:border-white/20 relative"
+                    className="glass-panel p-4 rounded-3xl text-center active:scale-[0.985] transition-all border border-white/5 hover:border-white/20 relative animate-float-slow"
                   >
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">{medal(2)}</div>
-                    <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-amber-700 to-amber-900 grid place-items-center text-xl font-black mb-3 ring-4 ring-[#050508] mt-2">
-                      {topThree[2].displayName.charAt(0).toUpperCase()}
+                    {/* User Profile Avatar */}
+                    <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-amber-700 to-amber-900 overflow-hidden ring-4 ring-[#050508] mt-2 flex items-center justify-center">
+                      {topThree[2].avatarUrl ? (
+                        <img src={topThree[2].avatarUrl} alt={topThree[2].displayName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xl font-black">{topThree[2].displayName.charAt(0).toUpperCase()}</span>
+                      )}
                     </div>
-                    <div className="font-black truncate text-xs sm:text-sm">{topThree[2].displayName}</div>
+                    <div className="font-black truncate text-xs sm:text-sm mt-3">{topThree[2].displayName}</div>
                     <div className="text-[10px] text-gray-500 truncate">@{topThree[2].username}</div>
                     <div className="mt-2 text-amber-500/90 font-black text-sm tracking-tight num-en">
                       {scoreFor(topThree[2], board).toLocaleString("en-US")} <span className="text-[9px] text-amber-500/50 font-normal">{scoreUnit(board)}</span>
@@ -310,9 +326,13 @@ export default function LeaderboardPage() {
                         {medal(actualIndex)}
                       </div>
                       
-                      {/* Avatar */}
-                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 grid place-items-center font-black text-lg ring-4 ring-[#050508] shadow-lg shrink-0">
-                        {player.displayName.charAt(0).toUpperCase()}
+                      {/* Avatar Image of user instead of first letter of their name */}
+                      <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 overflow-hidden ring-4 ring-[#050508] shadow-lg shrink-0 flex items-center justify-center">
+                        {player.avatarUrl ? (
+                          <img src={player.avatarUrl} alt={player.displayName} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="font-black text-lg">{player.displayName.charAt(0).toUpperCase()}</span>
+                        )}
                       </div>
 
                       {/* Info Container */}

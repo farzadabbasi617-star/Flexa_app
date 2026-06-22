@@ -25,7 +25,8 @@ export async function GET(request: NextRequest) {
         username: players.username,
         displayName: players.displayName,
         email: players.email,
-        avatarUrl: players.avatarUrl,
+        // Fetch users.avatarUrl instead of players.avatarUrl to keep active profile avatars synced instantly!
+        avatarUrl: users.avatarUrl,
         gameId: players.gameId,
         rating: players.rating,
         wins: players.wins,

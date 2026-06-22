@@ -76,7 +76,7 @@ export default function LuxuryHomePage() {
                 className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-[0_0_15px_rgba(188,0,255,0.5)]" 
               />
               <div>
-                <h1 className="text-3xl sm:text-4xl font-black italic tracking-tighter en-font leading-none">GAMENT</h1>
+                <h1 className="text-3xl sm:text-4xl font-black italic tracking-tighter en-font leading-none glitch-text">GAMENT</h1>
                 <p className="mt-2 text-xs font-black text-purple-300/90 tracking-[0.28em] uppercase">
                   Elite Esports Hub
                 </p>
@@ -236,6 +236,31 @@ export default function LuxuryHomePage() {
             linear-gradient(rgba(255,255,255,.18) 1px, transparent 1px);
           background-size: 180px 100%, 100% 26px;
           mix-blend-mode: screen;
+        }
+
+        /* Cyberpunk Glitch & Lag Effect for GAMENT Text */
+        @keyframes glitch {
+          0%, 100% {
+            text-shadow: 1.5px 0 0 rgba(244, 63, 94, 0.75), -1.5px 0 0 rgba(6, 182, 212, 0.75);
+            transform: translate(0);
+          }
+          10% {
+            text-shadow: -1.5px 0.5px 0 rgba(244, 63, 94, 0.75), 1.5px -0.5px 0 rgba(6, 182, 212, 0.75);
+            transform: translate(-0.5px, -0.2px);
+          }
+          20% {
+            text-shadow: 2px -1px 0 rgba(244, 63, 94, 0.75), -2px 1px 0 rgba(6, 182, 212, 0.75);
+            transform: translate(0.5px, 0.2px);
+          }
+          30%, 100% {
+            text-shadow: none;
+            transform: translate(0);
+          }
+        }
+
+        .glitch-text {
+          animation: glitch 2s infinite steps(2);
+          position: relative;
         }
       `}</style>
     </main>
