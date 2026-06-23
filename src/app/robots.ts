@@ -1,8 +1,6 @@
 import { MetadataRoute } from 'next';
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = 'https://gament1.ir';
-
   return {
     rules: [
       {
@@ -75,7 +73,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/api/', '/admin/', '/login', '/register', '/dashboard'],
       },
     ],
-    sitemap: `${baseUrl}/sitemap.xml`,
-    host: baseUrl,
+    sitemap: 'https://gament1.ir/sitemap.xml',
+    host: 'https://gament1.ir',
   };
 }
