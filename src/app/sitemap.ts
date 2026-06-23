@@ -1,12 +1,6 @@
 import { MetadataRoute } from 'next';
 import { db } from '@/db';
-import { 
-  tournaments, 
-  teams, 
-  achievements, 
-  honors, 
-  matches 
-} from '@/db/schema';
+import { tournaments, teams } from '@/db/schema';
 import { eq, or, desc } from 'drizzle-orm';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
@@ -76,11 +70,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     });
 
-    // ==================== تیم‌ها (فقط createdAt دارد) ====================
+    // ==================== تیم‌ها (createdAt دارد) ====================
     const teamList = await db
       .select({ id: teams.id, createdAt: teams.createdAt })
       .from(teams)
-      .limit(120);
+      .limit(100);
 
     teamList.forEach(team => {
       routes.push({
@@ -88,54 +82,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: team.createdAt || now,
         changeFrequency: 'weekly',
         priority: 0.72,
-      });
-    });
-
-    // ==================== دستاوردها (فقط createdAt) ====================
-    const achievementList = await db
-      .select({ id: achievements.id, createdAt: achievements.createdAt })
-      .from(achievements)
-      .limit(80);
-
-    achievementList.forEach(ach => {
-      routes.push({
-        url: `${baseUrl}/achievements/${ach.id}`,
-        lastModified: ach.createdAt || now,
-        changeFrequency: 'weekly',
-        priority: 0.68,
-      });
-    });
-
-    // ==================== افتخارات (فقط createdAt) ====================
-    const honorList = await db
-      .select({ id: honors.id, createdAt: honors.createdAt })
-      .from(honors)
-      .where(eq(honors.status, 'approved'))
-      .limit(70);
-
-    honorList.forEach(honor => {
-      routes.push({
-        url: `${baseUrl}/honors/${honor.id}`,
-        lastModified: honor.createdAt || now,
-        changeFrequency: 'weekly',
-        priority: 0.65,
-      });
-    });
-
-    // ==================== مسابقه‌ها (فقط createdAt) ====================
-    const matchList = await db
-      .select({ id: matches.id, createdAt: matches.createdAt })
-      .from(matches)
-      .where(eq(matches.status, 'completed'))
-      .orderBy(desc(matches.createdAt))
-      .limit(100);
-
-    matchList.forEach(match => {
-      routes.push({
-        url: `${baseUrl}/matches/${match.id}`,
-        lastModified: match.createdAt || now,
-        changeFrequency: 'weekly',
-        priority: 0.58,
       });
     });
 
