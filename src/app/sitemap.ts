@@ -5,10 +5,9 @@ import {
   teams, 
   achievements, 
   honors, 
-  matches,
-  users 
+  matches 
 } from '@/db/schema';
-import { eq, or, desc, and, gt } from 'drizzle-orm';
+import { eq, or, desc } from 'drizzle-orm';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = 'https://gament1.ir';
@@ -16,7 +15,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
 
   const routes: MetadataRoute.Sitemap = [];
 
-  // ==================== صفحات ثابت (با اولویت بالا) ====================
+  // ==================== صفحات ثابت ====================
   const staticPages = [
     { path: '', priority: 1.0, freq: 'daily' as const },
     { path: '/tournaments', priority: 0.95, freq: 'hourly' as const },
@@ -77,39 +76,39 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
     });
 
-    // ==================== تیم‌ها ====================
+    // ==================== تیم‌ها (فقط createdAt دارد) ====================
     const teamList = await db
-      .select({ id: teams.id, updatedAt: teams.updatedAt })
+      .select({ id: teams.id, createdAt: teams.createdAt })
       .from(teams)
       .limit(120);
 
     teamList.forEach(team => {
       routes.push({
         url: `${baseUrl}/teams/${team.id}`,
-        lastModified: team.updatedAt || now,
+        lastModified: team.createdAt || now,
         changeFrequency: 'weekly',
         priority: 0.72,
       });
     });
 
-    // ==================== دستاوردها ====================
+    // ==================== دستاوردها (فقط createdAt) ====================
     const achievementList = await db
-      .select({ id: achievements.id, updatedAt: achievements.updatedAt })
+      .select({ id: achievements.id, createdAt: achievements.createdAt })
       .from(achievements)
       .limit(80);
 
     achievementList.forEach(ach => {
       routes.push({
         url: `${baseUrl}/achievements/${ach.id}`,
-        lastModified: ach.updatedAt || now,
+        lastModified: ach.createdAt || now,
         changeFrequency: 'weekly',
         priority: 0.68,
       });
     });
 
-    // ==================== افتخارات ====================
+    // ==================== افتخارات (فقط createdAt) ====================
     const honorList = await db
-      .select({ id: honors.id, updatedAt: honors.updatedAt })
+      .select({ id: honors.id, createdAt: honors.createdAt })
       .from(honors)
       .where(eq(honors.status, 'approved'))
       .limit(70);
@@ -117,24 +116,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     honorList.forEach(honor => {
       routes.push({
         url: `${baseUrl}/honors/${honor.id}`,
-        lastModified: honor.updatedAt || now,
+        lastModified: honor.createdAt || now,
         changeFrequency: 'weekly',
         priority: 0.65,
       });
     });
 
-    // ==================== مسابقه‌ها ====================
+    // ==================== مسابقه‌ها (فقط createdAt) ====================
     const matchList = await db
-      .select({ id: matches.id, updatedAt: matches.updatedAt })
+      .select({ id: matches.id, createdAt: matches.createdAt })
       .from(matches)
       .where(eq(matches.status, 'completed'))
-      .orderBy(desc(matches.updatedAt))
+      .orderBy(desc(matches.createdAt))
       .limit(100);
 
     matchList.forEach(match => {
       routes.push({
         url: `${baseUrl}/matches/${match.id}`,
-        lastModified: match.updatedAt || now,
+        lastModified: match.createdAt || now,
         changeFrequency: 'weekly',
         priority: 0.58,
       });
