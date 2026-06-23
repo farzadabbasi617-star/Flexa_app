@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { db } from "@/db";
 import { players, users, wallets } from "@/db/schema";
-import { eq, or } from "drizzle-orm";
+import { eq, or, ilike } from "drizzle-orm";
 import { hashPassword, createSession } from "@/lib/auth";
 import { RegisterSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
@@ -55,14 +55,14 @@ export async function POST(request: NextRequest) {
 
     const { email, username, password, displayName, phoneNumber } = validation.data;
 
-    // 3. Uniqueness check.
+    // 3. Uniqueness check using ilike for case-insensitive checks
     const existing = await db
       .select({ id: users.id, email: users.email, username: users.username, phoneNumber: users.phoneNumber })
       .from(users)
       .where(
         email
-          ? or(eq(users.email, email), eq(users.username, username), eq(users.phoneNumber, phoneNumber))
-          : or(eq(users.username, username), eq(users.phoneNumber, phoneNumber))
+          ? or(ilike(users.email, email), ilike(users.username, username), eq(users.phoneNumber, phoneNumber))
+          : or(ilike(users.username, username), eq(users.phoneNumber, phoneNumber))
       );
 
     if (email && existing.some((u) => u.email === email)) {
