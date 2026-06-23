@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://gament.app/sitemap.xml
+Sitemap: https://gament1.ir/sitemap.xml
