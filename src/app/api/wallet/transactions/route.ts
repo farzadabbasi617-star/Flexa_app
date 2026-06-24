@@ -5,10 +5,13 @@ import { desc, eq } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 import { bigIntFromText, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
+import { isValidIranIban, sanitizeIban, sanitizeNationalId, sanitizeShortText, walletBreakdown } from "@/lib/wallet-accounting";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
+
+const MIN_WITHDRAWAL_RIAL = BigInt(500_000); // 50,000 تومان
 
 async function getOrCreateWallet(userId: string) {
   const [existing] = await db.select().from(wallets).where(eq(wallets.userId, userId)).limit(1);
@@ -27,6 +30,13 @@ async function getOrCreateWallet(userId: string) {
   return afterConflict;
 }
 
+function requireTermsAccepted(body: Record<string, unknown>) {
+  if (body.acceptTerms !== true) {
+    return "برای ثبت درخواست شارژ یا برداشت باید قوانین کیف پول را مطالعه و تأیید کنید.";
+  }
+  return null;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;
@@ -36,22 +46,26 @@ export async function GET(request: NextRequest) {
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
     const wallet = await getOrCreateWallet(user.id);
-    const rows = await db
-      .select()
-      .from(transactions)
-      .where(eq(transactions.walletId, wallet.id))
-      .orderBy(desc(transactions.createdAt))
-      .limit(100);
+    const allRows = await db.select().from(transactions).where(eq(transactions.walletId, wallet.id));
+    const recentRows = [...allRows].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 100);
 
     const balanceRial = bigIntFromText(wallet.balance);
+    const breakdown = walletBreakdown(balanceRial, allRows);
+
     return NextResponse.json({
       wallet: {
         id: wallet.id,
-        balanceRial: balanceRial.toString(),
-        balanceToman: rialToTomanNumber(balanceRial),
+        balanceRial: breakdown.totalRial,
+        balanceToman: breakdown.totalToman,
+        usableRial: breakdown.usableRial,
+        usableToman: breakdown.usableToman,
+        withdrawableRial: breakdown.withdrawableRial,
+        withdrawableToman: breakdown.withdrawableToman,
+        nonWithdrawableRial: breakdown.nonWithdrawableRial,
+        nonWithdrawableToman: breakdown.nonWithdrawableToman,
         currency: wallet.currency,
       },
-      transactions: rows.map((tx) => {
+      transactions: recentRows.map((tx) => {
         const amountRial = bigIntFromText(tx.amount);
         return {
           ...tx,
@@ -74,38 +88,101 @@ export async function POST(request: NextRequest) {
     const user = await validateSession(token || "", ip, ua, request);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const limit = await rateLimit(`wallet:deposit:${user.id}`, 3, 10 * 60 * 1000);
+    const body = await request.json();
+    const termsError = requireTermsAccepted(body);
+    if (termsError) return NextResponse.json({ error: termsError }, { status: 400 });
+
+    const action = body.action === "withdrawal" ? "withdrawal" : "deposit";
+
+    if (action === "deposit") {
+      const limit = await rateLimit(`wallet:deposit:${user.id}`, 3, 10 * 60 * 1000);
+      if (!limit.success) {
+        return NextResponse.json(
+          { error: "تعداد درخواست‌های شارژ زیاد است. لطفاً چند دقیقه بعد دوباره امتحان کنید." },
+          { status: 429 }
+        );
+      }
+
+      const amountRial = parseTomanToRial(String(body.amountToman || ""));
+      const amountValidation = validateDepositAmountRial(amountRial);
+      if (!amountValidation.ok) return NextResponse.json({ error: amountValidation.error }, { status: 400 });
+
+      const wallet = await getOrCreateWallet(user.id);
+
+      const [tx] = await db
+        .insert(transactions)
+        .values({
+          walletId: wallet.id,
+          amount: amountRial.toString(),
+          type: "deposit",
+          status: "pending",
+          referenceId: createWalletReference("deposit"),
+          metadata: {
+            kind: "manual_deposit_request",
+            provider: "manual_until_gateway_connected",
+            withdrawable: false,
+            userId: user.id,
+            displayName: user.displayName,
+            note: sanitizeWalletNote(body.note),
+            trackingNumber: sanitizeShortText(body.trackingNumber, 80) || null,
+            requestedIp: ip,
+            userAgent: ua.slice(0, 300),
+          },
+        })
+        .returning();
+
+      return NextResponse.json({
+        success: true,
+        message: "درخواست شارژ ثبت شد و پس از تأیید مدیریت به موجودی قابل استفاده داخل سایت اضافه می‌شود.",
+        transaction: tx,
+      }, { status: 201 });
+    }
+
+    const limit = await rateLimit(`wallet:withdrawal:${user.id}`, 2, 10 * 60 * 1000);
     if (!limit.success) {
       return NextResponse.json(
-        { error: "تعداد درخواست‌های شارژ زیاد است. لطفاً چند دقیقه بعد دوباره امتحان کنید." },
+        { error: "تعداد درخواست‌های برداشت زیاد است. لطفاً چند دقیقه بعد دوباره امتحان کنید." },
         { status: 429 }
       );
     }
 
-    const body = await request.json();
     const amountRial = parseTomanToRial(String(body.amountToman || ""));
-    const amountValidation = validateDepositAmountRial(amountRial);
-    if (!amountValidation.ok) return NextResponse.json({ error: amountValidation.error }, { status: 400 });
+    if (amountRial < MIN_WITHDRAWAL_RIAL) {
+      return NextResponse.json({ error: "حداقل مبلغ برداشت ۵۰٬۰۰۰ تومان است." }, { status: 400 });
+    }
+
+    const iban = sanitizeIban(body.iban);
+    const nationalId = sanitizeNationalId(body.nationalId);
+    const accountOwner = sanitizeShortText(body.accountOwner, 120);
+
+    if (!accountOwner) return NextResponse.json({ error: "نام صاحب حساب را وارد کنید." }, { status: 400 });
+    if (nationalId.length !== 10) return NextResponse.json({ error: "کد ملی معتبر نیست." }, { status: 400 });
+    if (!isValidIranIban(iban)) return NextResponse.json({ error: "شماره شبا باید با فرمت IR و ۲۴ رقم وارد شود." }, { status: 400 });
 
     const wallet = await getOrCreateWallet(user.id);
+    const allRows = await db.select().from(transactions).where(eq(transactions.walletId, wallet.id));
+    const breakdown = walletBreakdown(bigIntFromText(wallet.balance), allRows);
+    const withdrawableRial = bigIntFromText(breakdown.withdrawableRial);
 
-    // IMPORTANT: Until a real payment gateway is connected, users can only
-    // create a pending deposit request. Balance is never increased here.
-    // Admin approval/payment gateway verification is the only place that may
-    // turn this transaction into "completed" and credit the wallet.
+    if (withdrawableRial < amountRial) {
+      return NextResponse.json({ error: "موجودی قابل برداشت کافی نیست." }, { status: 400 });
+    }
+
     const [tx] = await db
       .insert(transactions)
       .values({
         walletId: wallet.id,
         amount: amountRial.toString(),
-        type: "deposit",
+        type: "withdrawal",
         status: "pending",
-        referenceId: createWalletReference("deposit"),
+        referenceId: createWalletReference("withdrawal"),
         metadata: {
-          kind: "manual_deposit_request",
-          provider: "manual_until_gateway_connected",
+          kind: "manual_withdrawal_request",
           userId: user.id,
           displayName: user.displayName,
+          accountOwner,
+          nationalId,
+          iban,
           note: sanitizeWalletNote(body.note),
           requestedIp: ip,
           userAgent: ua.slice(0, 300),
@@ -115,11 +192,11 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: "درخواست شارژ ثبت شد و بعد از تأیید مدیریت/درگاه به موجودی اضافه می‌شود.",
+      message: "درخواست برداشت ثبت شد و پس از بررسی، طی ۲۴ تا ۷۲ ساعت کاری پرداخت می‌شود.",
       transaction: tx,
     }, { status: 201 });
   } catch (err) {
-    logger.error({ err }, "Wallet deposit request failed");
-    return NextResponse.json({ error: "ثبت درخواست شارژ انجام نشد" }, { status: 500 });
+    logger.error({ err }, "Wallet transaction request failed");
+    return NextResponse.json({ error: "ثبت درخواست انجام نشد" }, { status: 500 });
   }
 }

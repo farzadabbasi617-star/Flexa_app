@@ -5,6 +5,8 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { createWalletReference } from "@/lib/wallet-security";
+import { bigIntFromText, rialToTomanNumber } from "@/lib/money";
+import { walletBreakdown } from "@/lib/wallet-accounting";
 
 export const dynamic = "force-dynamic";
 
@@ -23,12 +25,16 @@ function tomanToRial(value: unknown) {
   return BigInt(Math.round(toman)) * BigInt(10);
 }
 
+function metadataObject(metadata: unknown): Record<string, unknown> {
+  return metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata as Record<string, unknown> : {};
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdminPermission(request, "wallets");
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
-    const rows = await db
+    const walletRows = await db
       .select({
         walletId: wallets.id,
         userId: users.id,
@@ -44,19 +50,123 @@ export async function GET(request: NextRequest) {
       .leftJoin(wallets, eq(wallets.userId, users.id))
       .orderBy(desc(users.createdAt));
 
-    return NextResponse.json(
-      rows.map((row) => {
-        const rial = toBigIntSafe(row.balance);
+    const allTransactions = await db.select().from(transactions);
+
+    const walletsPayload = walletRows.map((row) => {
+      const rial = toBigIntSafe(row.balance);
+      const userWalletTxs = row.walletId ? allTransactions.filter((tx) => tx.walletId === row.walletId) : [];
+      const breakdown = walletBreakdown(rial, userWalletTxs);
+      return {
+        ...row,
+        balanceRial: rial.toString(),
+        balanceToman: Number(rial / BigInt(10)),
+        usableToman: breakdown.usableToman,
+        withdrawableToman: breakdown.withdrawableToman,
+        nonWithdrawableToman: breakdown.nonWithdrawableToman,
+      };
+    });
+
+    const userByWallet = new Map(walletRows.filter((row) => row.walletId).map((row) => [row.walletId, row]));
+    const pendingTransactions = allTransactions
+      .filter((tx) => (tx.type === "deposit" || tx.type === "withdrawal") && tx.status === "pending")
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .map((tx) => {
+        const userRow = userByWallet.get(tx.walletId);
+        const amountRial = bigIntFromText(tx.amount);
         return {
-          ...row,
-          balanceRial: rial.toString(),
-          balanceToman: Number(rial / BigInt(10)),
+          id: tx.id,
+          walletId: tx.walletId,
+          userId: userRow?.userId || null,
+          displayName: userRow?.displayName || "—",
+          username: userRow?.username || null,
+          phoneNumber: userRow?.phoneNumber || null,
+          type: tx.type,
+          status: tx.status,
+          amountRial: amountRial.toString(),
+          amountToman: rialToTomanNumber(amountRial),
+          referenceId: tx.referenceId,
+          metadata: tx.metadata,
+          createdAt: tx.createdAt,
         };
-      })
-    );
+      });
+
+    return NextResponse.json({ wallets: walletsPayload, pendingTransactions });
   } catch {
     return NextResponse.json({ error: "Failed to load wallets" }, { status: 500 });
   }
+}
+
+async function handlePendingTransaction(request: NextRequest, authUserId: string, body: Record<string, unknown>) {
+  const transactionId = String(body.transactionId || "");
+  const decision = body.decision === "reject" ? "reject" : "approve";
+  const adminNote = String(body.adminNote || "").slice(0, 300);
+  const paymentTrackingNumber = String(body.paymentTrackingNumber || "").slice(0, 120);
+  if (!transactionId) throw new Error("transactionId required");
+
+  const result = await db.transaction(async (tx) => {
+    const [pending] = await tx.select().from(transactions).where(eq(transactions.id, transactionId)).limit(1);
+    if (!pending) throw new Error("درخواست پیدا نشد");
+    if (pending.status !== "pending") throw new Error("این درخواست قبلاً بررسی شده است");
+    if (pending.type !== "deposit" && pending.type !== "withdrawal") throw new Error("نوع درخواست قابل بررسی نیست");
+
+    const meta = metadataObject(pending.metadata);
+    const nextMeta = {
+      ...meta,
+      reviewedBy: authUserId,
+      reviewedAt: new Date().toISOString(),
+      adminNote: adminNote || null,
+      paymentTrackingNumber: paymentTrackingNumber || null,
+    };
+
+    if (decision === "reject") {
+      const [updatedTx] = await tx
+        .update(transactions)
+        .set({ status: "cancelled", metadata: nextMeta, updatedAt: new Date() })
+        .where(eq(transactions.id, pending.id))
+        .returning();
+      return { transaction: updatedTx, wallet: null };
+    }
+
+    const amountRial = bigIntFromText(pending.amount);
+    const [wallet] = await tx.select().from(wallets).where(eq(wallets.id, pending.walletId)).limit(1);
+    if (!wallet) throw new Error("کیف پول پیدا نشد");
+
+    const [updatedWallet] = await tx
+      .update(wallets)
+      .set({
+        balance: pending.type === "deposit"
+          ? sql`${wallets.balance} + ${amountRial.toString()}::numeric`
+          : sql`${wallets.balance} - ${amountRial.toString()}::numeric`,
+        updatedAt: new Date(),
+      })
+      .where(
+        pending.type === "deposit"
+          ? eq(wallets.id, wallet.id)
+          : and(eq(wallets.id, wallet.id), sql`${wallets.balance} >= ${amountRial.toString()}::numeric`)
+      )
+      .returning();
+
+    if (!updatedWallet) throw new Error("موجودی کافی نیست یا کیف پول بروزرسانی نشد");
+
+    const [updatedTx] = await tx
+      .update(transactions)
+      .set({ status: "completed", metadata: nextMeta, updatedAt: new Date() })
+      .where(eq(transactions.id, pending.id))
+      .returning();
+
+    return { transaction: updatedTx, wallet: updatedWallet };
+  });
+
+  await logAdminAction({
+    adminId: authUserId,
+    action: decision === "approve" ? "wallet_request_approved" : "wallet_request_rejected",
+    entityType: "wallet_transaction",
+    entityId: transactionId,
+    metadata: { decision, adminNote, paymentTrackingNumber },
+    ipAddress: getClientIp(request.headers),
+  });
+
+  return result;
 }
 
 export async function PATCH(request: NextRequest) {
@@ -65,6 +175,12 @@ export async function PATCH(request: NextRequest) {
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
     const body = await request.json();
+
+    if (body.transactionId) {
+      const result = await handlePendingTransaction(request, auth.user.id, body);
+      return NextResponse.json({ success: true, ...result });
+    }
+
     const userId = String(body.userId || "");
     const direction = body.direction === "decrease" ? "decrease" : "increase";
     const reason = String(body.reason || "اصلاح دستی توسط مدیریت").slice(0, 300);
@@ -108,6 +224,7 @@ export async function PATCH(request: NextRequest) {
         metadata: {
           kind: "admin_adjustment",
           direction,
+          withdrawable: false,
           reason,
           adminId: auth.user!.id,
           previousBalance: current.toString(),

@@ -28,6 +28,6 @@ export function validateDepositAmountRial(amountRial: bigint): { ok: true } | { 
   return { ok: true };
 }
 
-export function createWalletReference(prefix: "deposit" | "admin" | "entry" | "refund" | "prize" = "deposit"): string {
+export function createWalletReference(prefix: "deposit" | "withdrawal" | "admin" | "entry" | "refund" | "prize" = "deposit"): string {
   return `${prefix}-${Date.now()}-${crypto.randomUUID()}`;
 }

@@ -13,21 +13,48 @@ interface WalletRow {
   phoneNumber: string;
   role: string;
   balanceToman: number;
+  usableToman: number;
+  withdrawableToman: number;
+  nonWithdrawableToman: number;
   currency: string | null;
   updatedAt: string | null;
+}
+
+interface PendingTransaction {
+  id: string;
+  walletId: string;
+  userId: string | null;
+  displayName: string;
+  username: string | null;
+  phoneNumber: string | null;
+  type: "deposit" | "withdrawal";
+  status: string;
+  amountToman: number;
+  referenceId: string | null;
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+function metaText(tx: PendingTransaction, key: string) {
+  const value = tx.metadata?.[key];
+  return typeof value === "string" ? value : "";
 }
 
 export default function AdminWalletsPage() {
   const { user, loading } = useAuth();
   const router = useRouter();
   const [rows, setRows] = useState<WalletRow[]>([]);
+  const [pendingTransactions, setPendingTransactions] = useState<PendingTransaction[]>([]);
   const [busy, setBusy] = useState(true);
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<WalletRow | null>(null);
   const [amountToman, setAmountToman] = useState("");
   const [direction, setDirection] = useState<"increase" | "decrease">("increase");
   const [reason, setReason] = useState("");
+  const [adminNote, setAdminNote] = useState("");
+  const [paymentTrackingNumber, setPaymentTrackingNumber] = useState("");
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
   const [saving, setSaving] = useState(false);
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
@@ -36,7 +63,13 @@ export default function AdminWalletsPage() {
     try {
       const res = await fetch("/api/admin/wallets", { cache: "no-store" });
       const data = await res.json();
-      setRows(Array.isArray(data) ? data : []);
+      if (Array.isArray(data)) {
+        setRows(data);
+        setPendingTransactions([]);
+      } else {
+        setRows(Array.isArray(data.wallets) ? data.wallets : []);
+        setPendingTransactions(Array.isArray(data.pendingTransactions) ? data.pendingTransactions : []);
+      }
     } finally {
       setBusy(false);
     }
@@ -61,6 +94,7 @@ export default function AdminWalletsPage() {
     if (!selected) return;
     setSaving(true);
     setError("");
+    setMessage("");
     try {
       const res = await fetch("/api/admin/wallets", {
         method: "PATCH",
@@ -69,6 +103,7 @@ export default function AdminWalletsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "ذخیره نشد");
+      setMessage("اصلاح موجودی ثبت شد.");
       setSelected(null);
       setAmountToman("");
       setReason("");
@@ -80,21 +115,104 @@ export default function AdminWalletsPage() {
     }
   }
 
+  async function reviewTransaction(tx: PendingTransaction, decision: "approve" | "reject") {
+    const confirmText = decision === "approve"
+      ? tx.type === "deposit"
+        ? "این شارژ تایید و به موجودی کاربر اضافه شود؟"
+        : "این برداشت تایید شود؟ مطمئن شوید پرداخت بانکی انجام شده است."
+      : "این درخواست رد شود؟";
+    if (!confirm(confirmText)) return;
+
+    setSaving(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/wallets", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ transactionId: tx.id, decision, adminNote, paymentTrackingNumber }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "بررسی درخواست انجام نشد");
+      setMessage(decision === "approve" ? "درخواست تایید شد." : "درخواست رد شد.");
+      setAdminNote("");
+      setPaymentTrackingNumber("");
+      load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "بررسی درخواست انجام نشد");
+    } finally {
+      setSaving(false);
+    }
+  }
+
   if (loading || !user || !isAdmin) return null;
 
   return (
     <div className="min-h-screen bg-dark-900">
       <Navbar />
-      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <button onClick={() => router.push("/admin")} className="text-gray-500 hover:text-white mb-4">← بازگشت</button>
         <h1 className="text-3xl font-black neon-text-purple mb-2">💳 مدیریت کیف پول‌ها</h1>
-        <p className="text-gray-500 text-sm mb-6">افزایش/کاهش دستی موجودی همراه با ثبت تراکنش و لاگ مدیریتی</p>
+        <p className="text-gray-500 text-sm mb-6">مدیریت درخواست‌های شارژ/برداشت، موجودی قابل برداشت و اصلاح دستی</p>
         {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-5 text-sm">{error}</div>}
+        {message && <div className="bg-green-500/10 border border-green-500/30 text-green-300 rounded-xl p-3 mb-5 text-sm">{message}</div>}
+
+        <section className="gaming-card p-5 mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div>
+              <h2 className="font-black text-xl">درخواست‌های در انتظار</h2>
+              <p className="text-xs text-gray-500 mt-1">شارژ بعد از تایید به موجودی اضافه می‌شود؛ برداشت بعد از پرداخت بانکی توسط ادمین تایید شود.</p>
+            </div>
+            <button onClick={load} className="px-4 py-2 rounded-xl bg-dark-700 text-sm font-bold">🔄 بروزرسانی</button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+            <input className="gaming-input" placeholder="یادداشت ادمین (اختیاری)" value={adminNote} onChange={(e) => setAdminNote(e.target.value)} />
+            <input className="gaming-input" placeholder="شماره پیگیری پرداخت برداشت (اختیاری)" value={paymentTrackingNumber} onChange={(e) => setPaymentTrackingNumber(e.target.value)} />
+          </div>
+          {pendingTransactions.length ? (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[980px] text-sm">
+                <thead className="bg-dark-800 text-gray-400"><tr><th className="p-3 text-right">نوع</th><th className="p-3 text-right">کاربر</th><th className="p-3 text-right">مبلغ</th><th className="p-3 text-right">اطلاعات</th><th className="p-3 text-right">زمان</th><th className="p-3 text-right">عملیات</th></tr></thead>
+                <tbody>
+                  {pendingTransactions.map((tx) => (
+                    <tr key={tx.id} className="border-t border-white/5 align-top">
+                      <td className="p-3"><span className={`px-2 py-1 rounded-full text-xs ${tx.type === "deposit" ? "bg-green-500/10 text-green-300" : "bg-orange-500/10 text-orange-300"}`}>{tx.type === "deposit" ? "شارژ" : "برداشت"}</span></td>
+                      <td className="p-3"><div className="font-bold">{tx.displayName}</div><div className="text-xs text-gray-500">@{tx.username || "-"} • {tx.phoneNumber || "—"}</div></td>
+                      <td className="p-3 font-black text-neon-green">{tx.amountToman.toLocaleString("fa-IR")} تومان</td>
+                      <td className="p-3 text-xs text-gray-300 leading-6">
+                        {tx.type === "withdrawal" ? (
+                          <>
+                            <div>صاحب حساب: {metaText(tx, "accountOwner") || "—"}</div>
+                            <div>کد ملی: <span dir="ltr">{metaText(tx, "nationalId") || "—"}</span></div>
+                            <div>شبا: <span dir="ltr">{metaText(tx, "iban") || "—"}</span></div>
+                          </>
+                        ) : (
+                          <>
+                            <div>پیگیری: {metaText(tx, "trackingNumber") || "—"}</div>
+                            <div>توضیح: {metaText(tx, "note") || "—"}</div>
+                          </>
+                        )}
+                      </td>
+                      <td className="p-3 text-xs text-gray-500">{new Date(tx.createdAt).toLocaleString("fa-IR")}</td>
+                      <td className="p-3">
+                        <div className="flex gap-2">
+                          <button disabled={saving} onClick={() => reviewTransaction(tx, "approve")} className="px-3 py-2 rounded-lg bg-green-600/20 text-green-300 text-xs font-bold disabled:opacity-50">تایید</button>
+                          <button disabled={saving} onClick={() => reviewTransaction(tx, "reject")} className="px-3 py-2 rounded-lg bg-red-600/20 text-red-300 text-xs font-bold disabled:opacity-50">رد</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : <div className="text-center text-gray-500 text-sm py-8">درخواست pending وجود ندارد.</div>}
+        </section>
+
         <input className="gaming-input max-w-md mb-5" placeholder="جستجوی کاربر..." value={query} onChange={(e) => setQuery(e.target.value)} />
 
         {selected && (
           <form onSubmit={adjust} className="gaming-card p-5 mb-6 grid grid-cols-1 sm:grid-cols-4 gap-4 animate-slide-up">
-            <div className="sm:col-span-4 text-sm text-gray-300">اصلاح موجودی برای <b>{selected.displayName}</b> — موجودی فعلی: {selected.balanceToman.toLocaleString("fa-IR")} تومان</div>
+            <div className="sm:col-span-4 text-sm text-gray-300">اصلاح موجودی برای <b>{selected.displayName}</b> — موجودی کل: {selected.balanceToman.toLocaleString("fa-IR")} تومان، قابل برداشت: {selected.withdrawableToman.toLocaleString("fa-IR")} تومان</div>
             <select className="gaming-select" value={direction} onChange={(e) => setDirection(e.target.value as "increase" | "decrease")}><option value="increase">افزایش</option><option value="decrease">کاهش</option></select>
             <input className="gaming-input" placeholder="مبلغ تومان" value={amountToman} onChange={(e) => setAmountToman(e.target.value)} />
             <input className="gaming-input sm:col-span-2" placeholder="دلیل اصلاح" value={reason} onChange={(e) => setReason(e.target.value)} />
@@ -106,15 +224,17 @@ export default function AdminWalletsPage() {
         {busy ? <div className="text-center py-20 text-4xl animate-neon-pulse">💳</div> : (
           <div className="gaming-card overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-sm">
-                <thead className="bg-dark-800 text-gray-400"><tr><th className="p-3 text-right">کاربر</th><th className="p-3 text-right">موبایل</th><th className="p-3 text-right">نقش</th><th className="p-3 text-right">موجودی</th><th className="p-3 text-right">عملیات</th></tr></thead>
+              <table className="w-full min-w-[920px] text-sm">
+                <thead className="bg-dark-800 text-gray-400"><tr><th className="p-3 text-right">کاربر</th><th className="p-3 text-right">موبایل</th><th className="p-3 text-right">نقش</th><th className="p-3 text-right">کل</th><th className="p-3 text-right">قابل مصرف</th><th className="p-3 text-right">قابل برداشت</th><th className="p-3 text-right">عملیات</th></tr></thead>
                 <tbody>
                   {filtered.map((row) => (
                     <tr key={row.userId} className="border-t border-white/5 hover:bg-white/[.03]">
                       <td className="p-3"><div className="font-bold">{row.displayName}</div><div className="text-xs text-gray-500">@{row.username || "-"}</div></td>
                       <td className="p-3" dir="ltr">{row.phoneNumber}</td>
                       <td className="p-3">{row.role}</td>
-                      <td className="p-3 font-black text-neon-green">{row.balanceToman.toLocaleString("fa-IR")} تومان</td>
+                      <td className="p-3 font-black text-neon-green">{row.balanceToman.toLocaleString("fa-IR")}</td>
+                      <td className="p-3 font-bold text-neon-blue">{row.usableToman.toLocaleString("fa-IR")}</td>
+                      <td className="p-3 font-bold text-yellow-300">{row.withdrawableToman.toLocaleString("fa-IR")}</td>
                       <td className="p-3"><button onClick={() => setSelected(row)} className="text-neon-blue text-xs font-bold">اصلاح موجودی</button></td>
                     </tr>
                   ))}

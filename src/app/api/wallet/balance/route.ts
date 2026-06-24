@@ -1,19 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { wallets } from "@/db/schema";
+import { transactions, wallets } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
+import { bigIntFromText } from "@/lib/money";
+import { walletBreakdown } from "@/lib/wallet-accounting";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
-
-function parseRialBalance(value: string | null | undefined) {
-  try {
-    return BigInt(value || "0");
-  } catch {
-    return BigInt(0);
-  }
-}
 
 export async function GET(request: NextRequest) {
   try {
@@ -31,18 +25,38 @@ export async function GET(request: NextRequest) {
     }
 
     const [wallet] = await db
-      .select({ balance: wallets.balance, currency: wallets.currency })
+      .select({ id: wallets.id, balance: wallets.balance, currency: wallets.currency })
       .from(wallets)
       .where(eq(wallets.userId, user.id))
       .limit(1);
 
-    const balanceRial = parseRialBalance(wallet?.balance);
-    const balanceToman = balanceRial / BigInt(10);
+    if (!wallet) {
+      return NextResponse.json({
+        balanceRial: "0",
+        balanceToman: 0,
+        usableRial: "0",
+        usableToman: 0,
+        withdrawableRial: "0",
+        withdrawableToman: 0,
+        nonWithdrawableRial: "0",
+        nonWithdrawableToman: 0,
+        currency: "RIAL",
+      });
+    }
+
+    const rows = await db.select().from(transactions).where(eq(transactions.walletId, wallet.id));
+    const breakdown = walletBreakdown(bigIntFromText(wallet.balance), rows);
 
     return NextResponse.json({
-      balanceRial: balanceRial.toString(),
-      balanceToman: Number(balanceToman),
-      currency: wallet?.currency || "RIAL",
+      balanceRial: breakdown.totalRial,
+      balanceToman: breakdown.totalToman,
+      usableRial: breakdown.usableRial,
+      usableToman: breakdown.usableToman,
+      withdrawableRial: breakdown.withdrawableRial,
+      withdrawableToman: breakdown.withdrawableToman,
+      nonWithdrawableRial: breakdown.nonWithdrawableRial,
+      nonWithdrawableToman: breakdown.nonWithdrawableToman,
+      currency: wallet.currency || "RIAL",
     });
   } catch (err) {
     logger.error({ err }, "Wallet balance error");
