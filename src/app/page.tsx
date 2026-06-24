@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import DailyQuests from "@/components/DailyQuests";
 
 interface SiteImage {
   slug: string;
@@ -185,7 +186,7 @@ export default function LuxuryHomePage() {
           </section>
 
           {/* AI Banner */}
-          <section className="glass-panel p-5 sm:p-6 rounded-3xl sm:rounded-[36px] border border-purple-500/20 bg-gradient-to-r from-purple-900/10 to-transparent flex items-center justify-between mb-20 sm:mb-28">
+          <section className="glass-panel p-5 sm:p-6 rounded-3xl sm:rounded-[36px] border border-purple-500/20 bg-gradient-to-r from-purple-900/10 to-transparent flex items-center justify-between mb-10 sm:mb-12">
             <div className="flex items-center gap-3 sm:gap-4">
               <div className="w-10 h-10 sm:w-12 sm:h-12 min-w-10 sm:min-w-12 glass-panel rounded-2xl sm:rounded-3xl flex items-center justify-center text-xl sm:text-2xl border border-purple-500/30 shadow-[0_0_22px_rgba(188,0,255,.22)]">
                 🤖
@@ -199,6 +200,8 @@ export default function LuxuryHomePage() {
             </div>
             <span className="text-sm opacity-25">❮</span>
           </section>
+
+          <DailyQuests />
 
         </div>
       </div>
