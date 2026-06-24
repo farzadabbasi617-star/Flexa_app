@@ -76,9 +76,11 @@ export default function LuxuryHomePage() {
                 className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-[0_0_15px_rgba(188,0,255,0.5)]" 
               />
               <div>
-                <h1 className="text-3xl sm:text-4xl font-black italic tracking-tighter en-font leading-none glitch-text">GAMENT</h1>
-                <p className="mt-2 text-xs font-black text-purple-300/90 tracking-[0.28em] uppercase">
-                  Elite Esports Hub
+                <h1 className="text-2xl sm:text-4xl font-black tracking-tight leading-tight glitch-text">
+                  گیمنت؛ تورنومنت گیمینگ آنلاین
+                </h1>
+                <p className="mt-2 text-xs font-black text-purple-300/90 tracking-[0.18em] uppercase en-font">
+                  GAMENT • Elite Esports Hub
                 </p>
               </div>
             </div>
@@ -98,6 +100,52 @@ export default function LuxuryHomePage() {
         {/* Main content */}
         <div className="px-4 sm:px-6 max-w-7xl mx-auto">
           
+          {/* SEO + Conversion Intro */}
+          <section className="mb-6 sm:mb-8 text-right" dir="rtl">
+            <div className="glass-panel rounded-3xl sm:rounded-[36px] p-5 sm:p-7 border border-purple-400/15 overflow-hidden relative">
+              <div className="absolute -top-12 -left-12 w-40 h-40 rounded-full bg-purple-500/20 blur-3xl" />
+              <div className="absolute -bottom-16 -right-12 w-48 h-48 rounded-full bg-cyan-500/10 blur-3xl" />
+              <div className="relative grid grid-cols-1 lg:grid-cols-[1.2fr_.8fr] gap-6 items-center">
+                <div>
+                  <span className="inline-flex mb-3 px-3 py-1 rounded-full bg-purple-500/15 border border-purple-400/20 text-purple-200 text-[10px] font-black">
+                    رقابت آنلاین، داوری هوشمند، جوایز واقعی
+                  </span>
+                  <h2 className="text-2xl sm:text-4xl font-black leading-tight mb-4">
+                    مسابقات کالاف موبایل، فورتنایت و کلش رویال در یک پلتفرم
+                  </h2>
+                  <p className="text-sm sm:text-base leading-8 text-gray-300 max-w-3xl">
+                    گیمنت پلتفرم ایرانی مدیریت و شرکت در تورنومنت‌های گیمینگ است؛ روم‌های فعال را ببین، قوانین و جوایز را بررسی کن، ثبت‌نام کن و با سیستم داوری قابل پیگیری برای رتبه و جایزه رقابت کن.
+                  </p>
+                  <div className="flex flex-wrap gap-3 mt-6">
+                    <Link href="/tournaments" className="gaming-btn text-sm">
+                      مشاهده تورنومنت‌های فعال
+                    </Link>
+                    <Link href="/register" className="px-5 py-3 rounded-xl bg-white/5 border border-white/10 text-sm font-black hover:bg-white/10 transition">
+                      ساخت حساب رایگان
+                    </Link>
+                    <Link href="/guide/tournaments" className="px-5 py-3 rounded-xl text-purple-200 text-sm font-black hover:bg-purple-500/10 transition">
+                      راهنمای شرکت در مسابقه
+                    </Link>
+                  </div>
+                </div>
+                <div className="grid grid-cols-3 gap-3 text-center">
+                  <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                    <div className="text-2xl mb-2">🏆</div>
+                    <div className="text-xs font-black text-gray-300">تورنومنت‌های آنلاین</div>
+                  </div>
+                  <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                    <div className="text-2xl mb-2">⚖️</div>
+                    <div className="text-xs font-black text-gray-300">داوری هوشمند</div>
+                  </div>
+                  <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
+                    <div className="text-2xl mb-2">📊</div>
+                    <div className="text-xs font-black text-gray-300">رتبه‌بندی بازیکنان</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           {/* Hero Banner */}
           <section className="mb-8 sm:mb-10">
             <Link href="/tournaments" className="block active:scale-[.99] transition-transform">
@@ -204,6 +252,66 @@ export default function LuxuryHomePage() {
                 <h3 className="font-black text-lg mb-2">تورنومنت کلش رویال</h3>
                 <p className="text-xs leading-6 text-gray-400">مسابقات Clash Royale برای بازیکنان رقابتی، ثبت نتیجه و رتبه‌بندی بهتر.</p>
               </Link>
+            </div>
+          </section>
+
+          {/* Trust + How It Works */}
+          <section className="mb-10 sm:mb-12" dir="rtl">
+            <div className="grid grid-cols-1 lg:grid-cols-[.9fr_1.1fr] gap-5">
+              <article className="glass-panel rounded-3xl p-6 border border-white/10 text-right">
+                <h2 className="text-xl sm:text-2xl font-black mb-4">چطور در گیمنت شروع کنم؟</h2>
+                <ol className="space-y-4 text-sm leading-7 text-gray-300 list-decimal list-inside">
+                  <li>از بخش تورنومنت‌ها، بازی مورد علاقه‌ات را انتخاب کن.</li>
+                  <li>ظرفیت، زمان شروع، ورودی، جایزه و قوانین مسابقه را بررسی کن.</li>
+                  <li>حساب بساز، پروفایل بازیکن را کامل کن و در روم مناسب ثبت‌نام کن.</li>
+                  <li>در زمان اعلام‌شده وارد لابی شو، نتیجه را ثبت کن و در رتبه‌بندی بالا برو.</li>
+                </ol>
+                <div className="flex flex-wrap gap-3 mt-6">
+                  <Link href="/guide/tournaments" className="text-sm font-black text-purple-200 hover:text-white">
+                    مطالعه راهنمای کامل ←
+                  </Link>
+                  <Link href="/faq" className="text-sm font-black text-gray-400 hover:text-white">
+                    سوالات متداول
+                  </Link>
+                </div>
+              </article>
+
+              <article className="glass-panel rounded-3xl p-6 border border-white/10 text-right">
+                <h2 className="text-xl sm:text-2xl font-black mb-4">چرا گیمرها به گیمنت نیاز دارند؟</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
+                    <h3 className="font-black mb-2 text-purple-200">مسابقه منظم</h3>
+                    <p className="text-xs leading-6 text-gray-400">اطلاعات هر تورنومنت، زمان شروع، ظرفیت و قوانین در یک صفحه قابل پیگیری است.</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
+                    <h3 className="font-black mb-2 text-cyan-200">داوری قابل اعتماد</h3>
+                    <p className="text-xs leading-6 text-gray-400">ثبت نتیجه، بررسی مدارک و مدیریت اعتراض‌ها شفاف‌تر و حرفه‌ای‌تر انجام می‌شود.</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
+                    <h3 className="font-black mb-2 text-green-200">رشد رتبه بازیکن</h3>
+                    <p className="text-xs leading-6 text-gray-400">آمار بازیکنان، برد و باخت و امتیازها در پروفایل و جدول رتبه‌بندی بهتر دیده می‌شود.</p>
+                  </div>
+                  <div className="rounded-2xl bg-white/5 border border-white/5 p-4">
+                    <h3 className="font-black mb-2 text-orange-200">جامعه رقابتی</h3>
+                    <p className="text-xs leading-6 text-gray-400">گیمنت برای ساختن یک مسیر رقابتی سالم برای گیمرهای ایرانی طراحی شده است.</p>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          {/* Internal SEO Links */}
+          <section className="mb-10 sm:mb-12" dir="rtl">
+            <div className="glass-panel rounded-3xl p-5 sm:p-6 border border-white/10 text-right">
+              <h2 className="text-xl sm:text-2xl font-black mb-4">دسترسی سریع به بخش‌های مهم</h2>
+              <div className="flex flex-wrap gap-3">
+                <Link href="/tournaments" className="px-4 py-2 rounded-full bg-purple-500/15 text-purple-200 text-sm font-black border border-purple-400/20">تورنومنت‌های فعال</Link>
+                <Link href="/leaderboard" className="px-4 py-2 rounded-full bg-white/5 text-gray-300 text-sm font-black border border-white/10">جدول رتبه‌بندی</Link>
+                <Link href="/players" className="px-4 py-2 rounded-full bg-white/5 text-gray-300 text-sm font-black border border-white/10">بازیکنان</Link>
+                <Link href="/teams" className="px-4 py-2 rounded-full bg-white/5 text-gray-300 text-sm font-black border border-white/10">تیم‌های گیمینگ</Link>
+                <Link href="/honors" className="px-4 py-2 rounded-full bg-white/5 text-gray-300 text-sm font-black border border-white/10">تالار افتخارات</Link>
+                <Link href="/rules" className="px-4 py-2 rounded-full bg-white/5 text-gray-300 text-sm font-black border border-white/10">قوانین مسابقات</Link>
+              </div>
             </div>
           </section>
 
