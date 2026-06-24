@@ -93,7 +93,7 @@ interface BotSession {
   data: SessionData;
 }
 
-const APP_URL = (process.env.APP_URL || "https://gament-1.onrender.com").replace(/\/$/, "");
+const APP_URL = (process.env.APP_URL || "https://www.gament1.ir").replace(/\/$/, "");
 const CHANNEL_URL = (process.env.TELEGRAM_CHANNEL_URL || process.env.CHANNEL_URL || "https://t.me/Gament_games").trim();
 const SKIP_TEXT = "رد کردن";
 const CANCEL_TEXT = "لغو";
@@ -1461,7 +1461,7 @@ async function aiCommand(chatId: number, prompt: string, telegramId: string) {
 }
 
 async function inviteCommand(chatId: number, telegramId: string) {
-  const username = process.env.TELEGRAM_BOT_USERNAME || "GamentTournamentBot";
+  const username = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
   const link = `https://t.me/${username}?start=ref_${telegramId}`;
   const [{ value }] = await db.select({ value: count() }).from(telegramReferrals).where(eq(telegramReferrals.referrerTelegramId, telegramId));
   await sendMessage(chatId, `🎁 <b>لینک دعوت اختصاصی شما</b>\n\n${html(link)}\n\nدعوت‌های ثبت‌شده: <b>${value}</b>\n\nاین لینک را برای دوستات بفرست؛ در فاز جایزه، دعوت‌های معتبر امتیاز می‌گیرند.`, {
@@ -1757,7 +1757,7 @@ async function handleJudgeAction(chatId: number, telegramId: string, action: str
   await sendMessage(chatId, `Match ID: <code>${html(match.id)}</code>\nStatus: <b>${html(match.status)}</b>`);
 }
 
-const OUTREACH_MESSAGE_TEMPLATE = `سلام 👋\n\nمن از تیم Gament هستم، پلتفرم برگزاری تورنومنت‌های گیمینگ (Call of Duty Mobile, Clash Royale, Fortnite).\n\nاگر به مسابقات گیمینگ، تورنومنت‌های پولی یا جامعهٔ بازیکنان علاقه‌مند هستی، به ما سر بزن:\n\n🔗 https://gament-1.onrender.com\n\nثبت‌نام اولیه از طریق ربات تلگرام هم امکان‌پذیره: @GamentTournamentBot`;
+const OUTREACH_MESSAGE_TEMPLATE = `سلام 👋\n\nمن از تیم Gament هستم، پلتفرم برگزاری تورنومنت‌های گیمینگ (Call of Duty Mobile, Clash Royale, Fortnite).\n\nاگر به مسابقات گیمینگ، تورنومنت‌های پولی یا جامعهٔ بازیکنان علاقه‌مند هستی، به ما سر بزن:\n\n🔗 https://www.gament1.ir\n\nثبت‌نام اولیه از طریق ربات تلگرام هم امکان‌پذیره: @FlexaTournamentBot`;
 
 async function classifiedAdsCommand(chatId: number, telegramId: string) {
   if (!hasAdminAccess(telegramId)) {

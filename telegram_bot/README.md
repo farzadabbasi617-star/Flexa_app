@@ -19,7 +19,7 @@
 بر اساس سایت و ریپازیتوری شما، ربات برای این موارد تنظیم شده است:
 
 - برند: `Gament`
-- آدرس وب‌اپ: `https://gament-1.onrender.com`
+- آدرس وب‌اپ: `https://www.gament1.ir`
 - بازی‌ها:
   - 🎯 COD MOBILE / کالاف موبایل
   - 🏗️ FORTNITE / فورتنایت
@@ -86,7 +86,7 @@ cp .env.example .env
 ```env
 BOT_TOKEN=توکن_ربات_از_BotFather
 ADMIN_IDS=آیدی_عددی_تلگرام_شما
-APP_URL=https://gament-1.onrender.com
+APP_URL=https://www.gament1.ir
 TELEGRAM_INTEGRATION_SECRET=همان_کلیدی_که_در_وب‌اپ_می‌گذارید
 ```
 

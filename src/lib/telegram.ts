@@ -16,7 +16,7 @@ export interface TelegramTournamentPost {
   prize3rd?: string | null;
 }
 
-const DEFAULT_APP_URL = "https://gament-1.onrender.com";
+const DEFAULT_APP_URL = "https://www.gament1.ir";
 
 function appUrl() {
   return (process.env.APP_URL || DEFAULT_APP_URL).replace(/\/$/, "");

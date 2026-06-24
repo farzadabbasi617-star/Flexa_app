@@ -248,9 +248,9 @@ export default function UserProfileSettingsPage() {
           <div className="flex items-center justify-between gap-3 mb-4">
             <div className="text-right">
               <h2 className="text-sm font-black">🔗 اتصال بات تلگرام</h2>
-              <p className="text-[10px] text-gray-500 mt-1 leading-4">در تلگرام آیدی <span dir="ltr" className="text-cyan-300 font-bold">@GamentTournamentBot</span> را استارت کرده، دستور <code className="text-cyan-300">/link</code> را بزنید و کد دریافت شده را اینجا وارد کنید.</p>
+              <p className="text-[10px] text-gray-500 mt-1 leading-4">در تلگرام آیدی <span dir="ltr" className="text-cyan-300 font-bold">@FlexaTournamentBot</span> را استارت کرده، دستور <code className="text-cyan-300">/link</code> را بزنید و کد دریافت شده را اینجا وارد کنید.</p>
             </div>
-            <Link href="https://t.me/GamentTournamentBot" className="text-[10px] bg-cyan-500/15 text-cyan-200 px-3 py-1.5 rounded-xl border border-cyan-500/20 whitespace-nowrap">ربات تلگرام</Link>
+            <Link href="https://t.me/FlexaTournamentBot" className="text-[10px] bg-cyan-500/15 text-cyan-200 px-3 py-1.5 rounded-xl border border-cyan-500/20 whitespace-nowrap">ربات تلگرام</Link>
           </div>
 
           {telegramAccount ? (

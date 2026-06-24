@@ -98,7 +98,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0010_harden_registration_integrity.sql
 بعد از Deploy، webhook تلگرام را ست کنید:
 
 ```text
-https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://gament-1.onrender.com/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
+https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://www.gament1.ir/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
 ```
 
 پیش‌ثبت‌نام‌ها داخل پنل ادمین، تب «تلگرام»، نمایش داده می‌شوند.

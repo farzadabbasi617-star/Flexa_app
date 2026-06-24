@@ -27,7 +27,7 @@ services:
       - key: TELEGRAM_CHANNEL_ID
         value: '@Gament_games'
       - key: TELEGRAM_BOT_USERNAME
-        value: GamentTournamentBot
+        value: FlexaTournamentBot
       - key: TELEGRAM_CRON_SECRET
         sync: false
       - key: TELEGRAM_REQUIRE_CHANNEL_MEMBERSHIP

@@ -107,7 +107,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0010_harden_registration_integrity.sql
 بعد از Deploy، webhook را با BotFather/API تلگرام ست کنید:
 
 ```txt
-https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://gament-1.onrender.com/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
+https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://www.gament1.ir/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
 ```
 
 ## 4) Redeploy

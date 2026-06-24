@@ -75,7 +75,7 @@ class Settings:
     telegram_integration_secret: str
 
 
-_raw_app_url = os.getenv("APP_URL", "https://gament-1.onrender.com").strip().rstrip("/")
+_raw_app_url = os.getenv("APP_URL", "https://www.gament1.ir").strip().rstrip("/")
 
 settings = Settings(
     bot_token=os.getenv("BOT_TOKEN", "").strip(),
