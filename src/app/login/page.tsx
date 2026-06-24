@@ -35,11 +35,11 @@ export default function LoginPage() {
     <div className="min-h-screen bg-dark-900">
       <Navbar />
 
-      <div className="max-w-md mx-auto px-4 py-16">
+      <div className="max-w-lg mx-auto px-4 py-16">
         <div className="gaming-card p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <AnimatedGamentLogo size="md" showLabel className="mb-5" />
+            <AnimatedGamentLogo size="lg" showLabel className="mb-6" />
             <h1 className="text-2xl font-bold neon-text-purple">{t.auth.loginTitle}</h1>
             <p className="text-gray-400 mt-1">{t.auth.loginSubtitle}</p>
           </div>

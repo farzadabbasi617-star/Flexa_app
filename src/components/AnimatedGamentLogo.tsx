@@ -5,9 +5,9 @@ type AnimatedGamentLogoProps = {
 };
 
 const sizeClasses = {
-  sm: "w-64 h-36",
-  md: "w-80 h-44",
-  lg: "w-[380px] h-[214px] max-w-full",
+  sm: "w-72 h-40 max-w-full",
+  md: "w-[360px] h-[196px] max-w-full",
+  lg: "w-[430px] h-[242px] max-w-full",
 };
 
 export default function AnimatedGamentLogo({ size = "md", showLabel = false, className = "" }: AnimatedGamentLogoProps) {
@@ -23,7 +23,7 @@ export default function AnimatedGamentLogo({ size = "md", showLabel = false, cla
           <span className="gament-spark spark-2" />
           <span className="gament-spark spark-3" />
           <span className="gament-scan" />
-          <img src="/icons/gament-logo-royal-wide.png" alt="Gament | گیمنت" className="gament-logo-img" />
+          <img src="/icons/gament-auth-royal-v2.png?v=20260624-royal" alt="Gament | گیمنت" className="gament-logo-img" />
         </div>
       </div>
 
