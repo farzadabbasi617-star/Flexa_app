@@ -360,11 +360,11 @@ export default function ProfilePage() {
         {/* Header */}
         <header className="pt-10 pb-4 text-right">
           <div className="inline-flex items-center gap-2 text-[10px] font-black text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-full px-3 py-1 mb-3">
-            👑 پروفایل و داشبورد کاربری گیمنت
+            👑 تنظیمات، پروفایل و داشبورد کاربری گیمنت
           </div>
-          <h1 className="text-3xl font-black">پروفایل من</h1>
+          <h1 className="text-3xl font-black">تنظیمات حساب</h1>
           <p className="text-xs text-gray-500 mt-1 leading-6">
-            کارت شناسایی الکترونیکی، آواتارها، آمار زنده و سیستم ماموریت‌ها
+            پروفایل، امنیت، کیف پول، خدمات مالی، آواتارها و آمار زنده حساب
           </p>
         </header>
 
@@ -737,9 +737,34 @@ export default function ProfilePage() {
 
         {/* Section 7: Recent Transactions & Activities */}
         <section className="grid grid-cols-1 gap-4 mb-6" dir="rtl">
-          {/* Recent Transactions */}
-          <div className="glass-panel p-5 rounded-[30px] border border-white/5">
-            <h3 className="font-black text-sm mb-3">💳 آخرین تراکنش‌های کیف پول</h3>
+          {/* Wallet & Financial Services */}
+          <div className="glass-panel p-5 rounded-[30px] border border-purple-500/15 bg-gradient-to-br from-purple-900/15 to-black/10">
+            <div className="flex items-center justify-between gap-3 mb-4">
+              <div className="flex items-center gap-3 text-right">
+                <span className="grid place-items-center w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-700 shadow-[0_0_22px_rgba(188,0,255,.25)] overflow-hidden shrink-0">
+                  <img src="/icons/wallet_icon.png" alt="کیف پول" className="w-full h-full object-contain p-2" />
+                </span>
+                <div>
+                  <h3 className="font-black text-sm">کیف پول و خدمات مالی</h3>
+                  <p className="text-[10px] text-gray-500 mt-1">شارژ، برداشت، جوایز و تاریخچه تراکنش‌ها</p>
+                </div>
+              </div>
+              <Link href="/wallet" className="text-[10px] bg-purple-500/10 text-purple-200 px-3 py-1.5 rounded-xl border border-purple-500/20">
+                مدیریت کیف پول
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 mb-4">
+              <div className="bg-black/20 rounded-2xl px-4 py-3">
+                <div className="text-[10px] text-gray-500 mb-1">موجودی کیف پول</div>
+                <div className="font-black text-yellow-300 num-en">{(data?.wallet.balanceToman ?? 0).toLocaleString("en-US")} تومان</div>
+              </div>
+              <Link href="/wallet" className="bg-black/20 rounded-2xl px-4 py-3 border border-white/5 hover:border-purple-400/30 active:scale-[0.99] transition-transform">
+                <div className="text-[10px] text-gray-500 mb-1">عملیات مالی</div>
+                <div className="font-black text-purple-200">شارژ / برداشت</div>
+              </Link>
+            </div>
+
             {data?.transactions.length ? (
               <div className="space-y-2">
                 {data.transactions.slice(0, 3).map((tx) => (
@@ -748,7 +773,9 @@ export default function ProfilePage() {
                       <div className="font-bold">{transactionLabel(tx.type)}</div>
                       <div className="text-[10px] text-gray-500 mt-1 num-en">{new Date(tx.createdAt).toLocaleDateString("en-US")}</div>
                     </div>
-                    <div className="font-black num-en text-emerald-400">+{tx.amountToman.toLocaleString("en-US")}</div>
+                    <div className={`font-black num-en ${tx.type === "entry_fee" || tx.type === "withdrawal" ? "text-red-400" : "text-emerald-400"}`}>
+                      {tx.type === "entry_fee" || tx.type === "withdrawal" ? "-" : "+"}{tx.amountToman.toLocaleString("en-US")}
+                    </div>
                   </div>
                 ))}
               </div>
