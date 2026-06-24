@@ -43,7 +43,7 @@ export default function BottomNav() {
           const imageIcon = iconMap[`icon-${item.id}`];
           
           const customIcons: Record<string, string> = {
-            arena: "/arena_icon.png",
+            arena: "/icons/gament-icon-96.png",
             rankings: "/icons/rankings_icon.png",
             honors: "/icons/honors_icon.png",
             profile: "/icons/settings_icon.png",

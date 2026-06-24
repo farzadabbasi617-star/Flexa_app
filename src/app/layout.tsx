@@ -76,7 +76,7 @@ export const metadata: Metadata = {
     siteName: SITE_NAME,
     images: [
       {
-        url: absoluteUrl("/icons/arena_icon.png"),
+        url: absoluteUrl("/icons/gament-logo-square.png"),
         width: 512,
         height: 512,
         alt: "Gament - گیمنت",
@@ -89,7 +89,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title,
     description,
-    images: [absoluteUrl("/icons/arena_icon.png")],
+    images: [absoluteUrl("/icons/gament-logo-square.png")],
   },
 };
 
@@ -99,7 +99,7 @@ const organizationJsonLd = {
   name: SITE_NAME,
   alternateName: ["Gament", "گیمنت"],
   url: SITE_URL,
-  logo: absoluteUrl("/icons/arena_icon.png"),
+  logo: absoluteUrl("/icons/gament-logo-square.png"),
 };
 
 const websiteJsonLd = {
@@ -126,8 +126,10 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
-        <link rel="apple-touch-icon" href="/icons/arena_icon.png" />
-        <link rel="icon" href="/icons/arena_icon.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/icons/gament-icon-180.png" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/icons/gament-icon-32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/icons/gament-icon-16.png" />
+        <link rel="icon" href="/icons/gament-icon-192.png" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
