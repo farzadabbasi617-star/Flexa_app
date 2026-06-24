@@ -737,53 +737,6 @@ export default function ProfilePage() {
 
         {/* Section 7: Recent Transactions & Activities */}
         <section className="grid grid-cols-1 gap-4 mb-6" dir="rtl">
-          {/* Wallet & Financial Services */}
-          <div className="glass-panel p-5 rounded-[30px] border border-purple-500/15 bg-gradient-to-br from-purple-900/15 to-black/10">
-            <div className="flex items-center justify-between gap-3 mb-4">
-              <div className="flex items-center gap-3 text-right">
-                <span className="grid place-items-center w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500 to-fuchsia-700 shadow-[0_0_22px_rgba(188,0,255,.25)] overflow-hidden shrink-0">
-                  <img src="/icons/wallet_icon.png" alt="کیف پول" className="w-full h-full object-contain p-2" />
-                </span>
-                <div>
-                  <h3 className="font-black text-sm">کیف پول و خدمات مالی</h3>
-                  <p className="text-[10px] text-gray-500 mt-1">شارژ، برداشت، جوایز و تاریخچه تراکنش‌ها</p>
-                </div>
-              </div>
-              <Link href="/wallet" className="text-[10px] bg-purple-500/10 text-purple-200 px-3 py-1.5 rounded-xl border border-purple-500/20">
-                مدیریت کیف پول
-              </Link>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 mb-4">
-              <div className="bg-black/20 rounded-2xl px-4 py-3">
-                <div className="text-[10px] text-gray-500 mb-1">موجودی کیف پول</div>
-                <div className="font-black text-yellow-300 num-en">{(data?.wallet.balanceToman ?? 0).toLocaleString("en-US")} تومان</div>
-              </div>
-              <Link href="/wallet" className="bg-black/20 rounded-2xl px-4 py-3 border border-white/5 hover:border-purple-400/30 active:scale-[0.99] transition-transform">
-                <div className="text-[10px] text-gray-500 mb-1">عملیات مالی</div>
-                <div className="font-black text-purple-200">شارژ / برداشت</div>
-              </Link>
-            </div>
-
-            {data?.transactions.length ? (
-              <div className="space-y-2">
-                {data.transactions.slice(0, 3).map((tx) => (
-                  <div key={tx.id} className="flex justify-between items-center bg-black/20 rounded-2xl px-4 py-3 text-xs">
-                    <div className="text-right">
-                      <div className="font-bold">{transactionLabel(tx.type)}</div>
-                      <div className="text-[10px] text-gray-500 mt-1 num-en">{new Date(tx.createdAt).toLocaleDateString("en-US")}</div>
-                    </div>
-                    <div className={`font-black num-en ${tx.type === "entry_fee" || tx.type === "withdrawal" ? "text-red-400" : "text-emerald-400"}`}>
-                      {tx.type === "entry_fee" || tx.type === "withdrawal" ? "-" : "+"}{tx.amountToman.toLocaleString("en-US")}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-xs text-gray-500 py-3 text-center">تراکنشی یافت نشد.</p>
-            )}
-          </div>
-
           {/* Recent Activity */}
           <div className="glass-panel p-5 rounded-[30px] border border-white/5">
             <h3 className="font-black text-sm mb-3">🧭 فعالیت‌های اخیر حساب</h3>
@@ -805,8 +758,16 @@ export default function ProfilePage() {
           </div>
         </section>
 
-        {/* Section 8: Pre-Nav actions, Security, and Logout */}
+        {/* Section 8: Settings tabs, Security, and Logout */}
         <section className="grid grid-cols-2 gap-3 mb-8" dir="rtl">
+          <Link href="/wallet" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-purple-500/20 rounded-2xl py-4 hover:border-purple-500/40 active:scale-95 transition-transform">
+            <img src="/icons/wallet_icon.png" alt="کیف پول" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" />
+            <span className="text-xs font-black text-purple-200">کیف پول</span>
+          </Link>
+          <Link href="/profile/descriptions" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-cyan-500/20 rounded-2xl py-4 hover:border-cyan-500/40 active:scale-95 transition-transform">
+            <span>📘</span>
+            <span className="text-xs font-black text-cyan-200">توضیحات</span>
+          </Link>
           <Link href="/profile/security" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-white/10 rounded-2xl py-4 hover:border-white/20 active:scale-95 transition-transform">
             <span>🔐</span>
             <span className="text-xs font-black">امنیت حساب</span>
