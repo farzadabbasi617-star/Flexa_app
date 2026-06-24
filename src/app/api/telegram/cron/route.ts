@@ -3,9 +3,7 @@ import { and, count, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions, honors } from "@/db/schema";
 import { getTelegramChannelChatId, sendTelegramMessage } from "@/lib/telegram";
-import { fetchAIResponse } from "@/lib/ai-provider-manager";
-import { gamentSystemPrompt } from "@/lib/ai-prompts";
-import { safeParseAIJson } from "@/lib/ai-utils";
+import { generateDailyGamingNews } from "@/lib/gaming-news-generator";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -148,60 +146,6 @@ async function runHourlyClassifiedScrape() {
   const totalNew = results.reduce((sum, r) => sum + r.new, 0);
   await markSent(key, "classified_scrape");
   return { ran: true as const, results, totalNew, intervalHours };
-}
-
-// Automatically generate highly engaging, SEO-optimized gaming news daily!
-async function generateDailyGamingNews() {
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
-  const key = `daily-gaming-news:${today}`;
-  if (await hasSent(key)) return { generated: false, reason: "already_today" };
-
-  try {
-    const prompt = `Generate a highly engaging, SEO-optimized Persian news article for Gament (گیمنت).
-    The news must be about recent updates, leaks, meta changes, or esports details in one of these three games:
-    - Clash Royale (کلش رویال)
-    - Call of Duty Mobile (کالاف دیوتی موبایل)
-    - Fortnite (فورتنایت)
-    
-    Incorporate Persian gaming SEO keywords seamlessly: "گیمنت", "gament", "تورنومنت گیمینگ", "کالاف دیوتی موبایل", "کلش رویال", "فورتنایت".
-    The description must be highly detailed and professional (2-3 complete paragraphs).
-    
-    Return ONLY a JSON object:
-    {
-      "title": "A short, exciting, SEO-friendly Persian headline",
-      "description": "The detailed news content in Persian",
-      "game": "clash_royale" | "cod_mobile" | "fortnite",
-      "icon": "📰" | "🔥" | "👑" | "⚡"
-    }`;
-
-    const systemPrompt = gamentSystemPrompt("honors", "Respond ONLY with valid JSON. No markdown.");
-    const ai = await fetchAIResponse(prompt, systemPrompt);
-    if (!ai) return { generated: false, reason: "ai_provider_failed" };
-
-    const parsed = safeParseAIJson<{ title: string; description: string; game: string; icon?: string }>(ai.content);
-    if (!parsed || !parsed.title || !parsed.description) {
-      return { generated: false, reason: "failed_to_parse_ai_json" };
-    }
-
-    // Insert as approved news into honors table
-    await db.insert(honors).values({
-      type: "news",
-      title: parsed.title.slice(0, 255),
-      description: parsed.description,
-      icon: parsed.icon || "📰",
-      game: parsed.game,
-      status: "approved",
-      publishedAt: new Date(),
-      source: "ai",
-    });
-
-    await markSent(key, "daily_gaming_news");
-    logger.info({ title: parsed.title, game: parsed.game }, "Successfully auto-generated daily gaming news for Hall of Fame");
-    return { generated: true, title: parsed.title };
-  } catch (err) {
-    logger.error({ err }, "Failed to auto-generate daily gaming news");
-    return { generated: false, error: String(err) };
-  }
 }
 
 async function sendDailyAdminReport() {
@@ -414,39 +358,42 @@ async function publishCompletedResults() {
   return published;
 }
 
+async function safeCronStep<T>(name: string, fn: () => Promise<T>): Promise<T | { error: string }> {
+  try {
+    return await fn();
+  } catch (err) {
+    logger.error({ err, step: name }, "Telegram cron step failed");
+    return { error: name };
+  }
+}
+
 export async function GET(request: NextRequest) {
   if (!validateCron(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  try {
-    const reminders = await sendReminders();
-    const capacity = await sendCapacityAlerts();
-    const lobby = await sendLobbyNotices();
-    const matchAssigned = await sendMatchAssignmentNotifications();
-    const matchScheduled = await sendMatchScheduleNotifications();
-    const matchResults = await sendMatchResultNotifications();
-    const results = await publishCompletedResults();
-    const classifiedScrape = await runHourlyClassifiedScrape();
-    const classifiedCleanup = await cleanupClassifiedAds();
-    const dailyReports = await sendDailyAdminReport();
-    
-    // Automatically trigger daily gaming news generation!
-    const dailyGamingNews = await generateDailyGamingNews();
 
-    return NextResponse.json({
-      ok: true,
-      reminders,
-      capacity,
-      lobby,
-      matchAssigned,
-      matchScheduled,
-      matchResults,
-      results,
-      classifiedScrape,
-      classifiedCleanup,
-      dailyReports,
-      dailyGamingNews,
-    });
-  } catch (err) {
-    logger.error({ err }, "Telegram cron failed");
-    return NextResponse.json({ error: "Telegram cron failed" }, { status: 500 });
-  }
+  const reminders = await safeCronStep("reminders", sendReminders);
+  const capacity = await safeCronStep("capacity", sendCapacityAlerts);
+  const lobby = await safeCronStep("lobby", sendLobbyNotices);
+  const matchAssigned = await safeCronStep("matchAssigned", sendMatchAssignmentNotifications);
+  const matchScheduled = await safeCronStep("matchScheduled", sendMatchScheduleNotifications);
+  const matchResults = await safeCronStep("matchResults", sendMatchResultNotifications);
+  const results = await safeCronStep("results", publishCompletedResults);
+  const classifiedScrape = await safeCronStep("classifiedScrape", runHourlyClassifiedScrape);
+  const classifiedCleanup = await safeCronStep("classifiedCleanup", cleanupClassifiedAds);
+  const dailyReports = await safeCronStep("dailyReports", sendDailyAdminReport);
+  const dailyGamingNews = await safeCronStep("dailyGamingNews", () => generateDailyGamingNews());
+
+  return NextResponse.json({
+    ok: true,
+    reminders,
+    capacity,
+    lobby,
+    matchAssigned,
+    matchScheduled,
+    matchResults,
+    results,
+    classifiedScrape,
+    classifiedCleanup,
+    dailyReports,
+    dailyGamingNews,
+  });
 }

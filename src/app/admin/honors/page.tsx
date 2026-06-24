@@ -26,6 +26,7 @@ export default function AdminHonorsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<any>({});
   const [aiDraftLoading, setAiDraftLoading] = useState(false);
+  const [autoNewsLoading, setAutoNewsLoading] = useState(false);
   const [telegramDraft, setTelegramDraft] = useState("");
 
   const [newHonor, setNewHonor] = useState({
@@ -86,6 +87,27 @@ export default function AdminHonorsPage() {
       alert(err instanceof Error ? err.message : "ساخت متن انجام نشد");
     } finally {
       setAiDraftLoading(false);
+    }
+  };
+
+
+  const generateAutoNews = async () => {
+    setAutoNewsLoading(true);
+    try {
+      const res = await fetch("/api/admin/honors/auto-news", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ force: true }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "ساخت خبر خودکار انجام نشد");
+      if (data.generated) alert(`خبر خودکار ساخته شد: ${data.title}`);
+      else alert(`خبری ساخته نشد: ${data.reason || "نامشخص"}`);
+      fetchHonors();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "ساخت خبر خودکار انجام نشد");
+    } finally {
+      setAutoNewsLoading(false);
     }
   };
 
@@ -156,7 +178,16 @@ export default function AdminHonorsPage() {
             <h1 className="text-3xl font-black">مدیریت تالار افتخارات</h1>
             <p className="text-sm text-gray-400 mt-1">ایجاد، ویرایش، تأیید و حذف محتوا</p>
           </div>
-          <Link href="/admin" className="text-sm text-purple-400">← بازگشت به پنل</Link>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={generateAutoNews}
+              disabled={autoNewsLoading}
+              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 py-2 rounded-xl text-xs font-black transition-all"
+            >
+              {autoNewsLoading ? "در حال ساخت خبر..." : "📰 ساخت خبر خودکار"}
+            </button>
+            <Link href="/admin" className="text-sm text-purple-400">← بازگشت به پنل</Link>
+          </div>
         </div>
 
         {/* فرم ایجاد */}
