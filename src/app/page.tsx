@@ -72,7 +72,7 @@ export default function LuxuryHomePage() {
           <div className="flex justify-between items-center">
             <div className="flex items-center gap-3 text-right">
               <img 
-                src="/icons/arena_icon.png" 
+                src="/icons/gament-icon-192.png" 
                 alt="Gament Logo" 
                 className="w-10 h-10 sm:w-12 sm:h-12 object-contain drop-shadow-[0_0_15px_rgba(188,0,255,0.5)]" 
               />

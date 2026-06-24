@@ -42,7 +42,7 @@ const AVATAR_OPTIONS = [
   { label: "ملکه رز سرخ", url: "/avatars/avatar_3.jpg" },
   { label: "امپراتور طلایی", url: "/avatars/avatar_4.jpg" },
   { label: "شوالیه پیش‌فرض", url: "/icons/profile_icon.png" },
-  { label: "نشان گیمنت", url: "/icons/arena_icon.png" },
+  { label: "نشان گیمنت", url: "/icons/gament-icon-192.png" },
 ];
 
 function statusFa(status: string | null | undefined) {
@@ -392,7 +392,7 @@ export default function ProfilePage() {
                 <div className="text-[9px] font-black text-purple-400 tracking-[0.2em] uppercase leading-none">GAMENT ATHLETE LICENSE</div>
                 <div className="text-[10px] text-gray-500 font-bold mt-1 leading-none">کارت هویت رسمی بازیکن</div>
               </div>
-              <img src="/icons/arena_icon.png" alt="Gament Logo" className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(188,0,255,0.4)]" />
+              <img src="/icons/gament-icon-192.png" alt="Gament Logo" className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(188,0,255,0.4)]" />
             </div>
 
             {/* Body of the Card */}

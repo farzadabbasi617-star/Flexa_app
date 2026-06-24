@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const SITE_URL = "https://www.gament1.ir";
 export const SITE_NAME = "Gament | گیمنت";
-export const DEFAULT_OG_IMAGE = "/icons/arena_icon.png";
+export const DEFAULT_OG_IMAGE = "/icons/gament-icon-192.png";
 
 export function absoluteUrl(path = "/") {
   if (path.startsWith("http://") || path.startsWith("https://")) return path;

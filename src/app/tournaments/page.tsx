@@ -69,7 +69,7 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
   }, [fetchTournaments]);
 
   const games = [
-    { id: "all", name: L("همه", "All"), icon: "/icons/arena_icon.png" },
+    { id: "all", name: L("همه", "All"), icon: "/icons/gament-icon-192.png" },
     ...Object.entries(GAME_META).map(([id, meta]) => ({ id, name: L(meta.fa, meta.en), icon: meta.icon })),
   ];
 

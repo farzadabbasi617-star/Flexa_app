@@ -13,7 +13,7 @@ const ALLOWED_AVATARS = [
   "/avatars/avatar_3.jpg",
   "/avatars/avatar_4.jpg",
   "/icons/profile_icon.png",
-  "/icons/arena_icon.png",
+  "/icons/gament-icon-192.png",
 ];
 
 export async function PATCH(request: NextRequest) {

@@ -37,7 +37,7 @@ const BOARDS: Array<{ id: Board; label: string; icon: string }> = [
 ];
 
 const GAMES: Array<{ id: GameFilter; label: string; icon: string }> = [
-  { id: "all", label: "همه بازی‌ها", icon: "/icons/arena_icon.png" },
+  { id: "all", label: "همه بازی‌ها", icon: "/icons/gament-icon-192.png" },
   { id: "cod_mobile", label: "کالاف دیوتی", icon: "/icons/icon-cod_mobile.png" },
   { id: "clash_royale", label: "کلش رویال", icon: "/icons/icon-clash_royale.png" },
   { id: "fortnite", label: "فورتنایت", icon: "/icons/icon-fortnite.png" },

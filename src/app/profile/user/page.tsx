@@ -19,7 +19,7 @@ const AVATAR_OPTIONS = [
   { label: "ملکه رز سرخ", url: "/avatars/avatar_3.jpg" },
   { label: "امپراتور طلایی", url: "/avatars/avatar_4.jpg" },
   { label: "شوالیه پیش‌فرض", url: "/icons/profile_icon.png" },
-  { label: "نشان گیمنت", url: "/icons/arena_icon.png" },
+  { label: "نشان گیمنت", url: "/icons/gament-icon-192.png" },
 ];
 
 export default function UserProfileSettingsPage() {
