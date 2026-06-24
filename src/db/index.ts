@@ -4,8 +4,15 @@ import { isLikelyPostgresUrl, normalizeDatabaseUrl } from "@/lib/database-url";
 
 const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
 
+const isNextProductionBuild = process.env.NEXT_PHASE === "phase-production-build";
+
 if (!databaseUrl) {
-  console.error("CRITICAL ERROR: DATABASE_URL is missing in environment variables!");
+  // Route modules can be imported during `next build` even when no database is
+  // needed. Keep builds/CI noise-free; runtime health/API calls will still fail
+  // clearly if DATABASE_URL is missing.
+  if (!isNextProductionBuild) {
+    console.error("CRITICAL ERROR: DATABASE_URL is missing in environment variables!");
+  }
 } else if (!isLikelyPostgresUrl(databaseUrl)) {
   console.error("CRITICAL ERROR: DATABASE_URL must start with postgresql://");
 }

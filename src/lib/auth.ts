@@ -96,6 +96,24 @@ export async function validateSession(token: string, currentIp: string, currentU
         logger.warn({ ip: currentIp }, 'CSRF attempt detected: Missing X-Requested-With header');
         return null;
       }
+
+      // Defense in depth: browsers attach Origin on same-origin mutating
+      // fetch/form requests. If it is present and does not match our host,
+      // reject even if a client managed to send the custom header.
+      const origin = request.headers.get('origin');
+      const host = request.headers.get('host');
+      if (origin && host) {
+        try {
+          const originHost = new URL(origin).host;
+          if (originHost !== host) {
+            logger.warn({ ip: currentIp, origin, host }, 'CSRF attempt detected: Origin mismatch');
+            return null;
+          }
+        } catch {
+          logger.warn({ ip: currentIp, origin }, 'CSRF attempt detected: Invalid Origin header');
+          return null;
+        }
+      }
     }
 
     const tokenHash = hashSessionToken(token);

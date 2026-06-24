@@ -45,6 +45,8 @@ DATABASE_URL=postgresql://USER:PASSWORD@HOST/DATABASE?sslmode=require
 OPENROUTER_API_KEY=your_openrouter_key
 GROQ_API_KEY=your_groq_key
 NODE_ENV=production
+ADMIN_SETUP_SECRET=your_long_random_bootstrap_secret
+OTP_TOKEN_PEPPER=your_different_long_random_otp_hash_pepper
 BOT_TOKEN=telegram_bot_token_from_botfather
 TELEGRAM_WEBHOOK_SECRET=your_long_random_webhook_secret
 TELEGRAM_ADMIN_IDS=your_numeric_telegram_id
@@ -96,6 +98,8 @@ psql "$DATABASE_URL" -f drizzle/manual/0003_add_telegram_bot_sessions.sql
 psql "$DATABASE_URL" -f drizzle/manual/0004_add_telegram_account_linking.sql
 psql "$DATABASE_URL" -f drizzle/manual/0005_add_telegram_growth_and_notifications.sql
 psql "$DATABASE_URL" -f drizzle/manual/0006_add_telegram_marketing_and_waitlist.sql
+psql "$DATABASE_URL" -f drizzle/manual/0009_sync_core_schema.sql
+psql "$DATABASE_URL" -f drizzle/manual/0010_harden_registration_integrity.sql
 ```
 
 یا محتوای همین فایل‌ها را در SQL Editor دیتابیس paste و اجرا کنید.

@@ -1,6 +1,4 @@
 import { MetadataRoute } from 'next';
-import { db } from '@/db';
-import { tournaments, teams, players, honors } from '@/db/schema';
 import { eq, or, desc } from 'drizzle-orm';
 
 import { SITE_URL } from '@/lib/seo';
@@ -50,7 +48,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     });
   });
 
+  // During local builds/CI without DATABASE_URL, return a clean static sitemap
+  // instead of importing the DB module and producing noisy connection errors.
+  if (!process.env.DATABASE_URL) return routes;
+
   try {
+    const [{ db }, { tournaments, teams, players, honors }] = await Promise.all([
+      import('@/db'),
+      import('@/db/schema'),
+    ]);
+
     // ==================== تورنمنت‌ها ====================
     const activeTournaments = await db
       .select({ id: tournaments.id, updatedAt: tournaments.updatedAt })

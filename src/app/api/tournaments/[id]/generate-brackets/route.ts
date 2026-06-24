@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { tournaments, registrations, matches } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { disputes, judgments, matchEvidence, matches, registrations, tournaments } from "@/db/schema";
+import { eq, inArray, sql } from "drizzle-orm";
 import { requireRole } from "@/lib/auth";
 import { generateSingleEliminationMatches, shuffle } from "@/lib/brackets";
 import logger from "@/lib/logger";
+import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 
 export const dynamic = "force-dynamic";
-
 
 export async function POST(
   request: NextRequest,
@@ -18,47 +18,80 @@ export async function POST(
   if (!auth.user) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
+
   const { id } = await params;
+
   try {
-    // Get tournament
-    const [tournament] = await db
-      .select()
-      .from(tournaments)
-      .where(eq(tournaments.id, id));
+    const inserted = await db.transaction(async (tx) => {
+      // Serialize bracket generation for this tournament, so two admin clicks
+      // cannot interleave delete/insert/update operations.
+      await tx.execute(sql`SELECT id FROM tournaments WHERE id = ${id} FOR UPDATE`);
 
-    if (!tournament) {
-      return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
-    }
+      const [tournament] = await tx
+        .select({ id: tournaments.id, status: tournaments.status })
+        .from(tournaments)
+        .where(eq(tournaments.id, id));
 
-    // Get registered players
-    const regs = await db
-      .select({ playerId: registrations.playerId })
-      .from(registrations)
-      .where(eq(registrations.tournamentId, id));
+      if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
+      if (tournament.status === "completed") throw new Error("TOURNAMENT_COMPLETED");
 
-    if (regs.length < 2) {
-      return NextResponse.json({ error: "Need at least 2 players" }, { status: 400 });
-    }
+      const regs = await tx
+        .select({ playerId: registrations.playerId })
+        .from(registrations)
+        .where(eq(registrations.tournamentId, id));
 
-    // Shuffle players, then build the bracket with the shared pure helper.
-    const playerIds = shuffle(regs.map((r) => r.playerId));
-    const newMatches = generateSingleEliminationMatches(playerIds).map((m) => ({
-      ...m,
-      tournamentId: id,
-    }));
+      if (regs.length < 2) throw new Error("NOT_ENOUGH_PLAYERS");
 
-    // Delete existing matches and insert new ones
-    await db.delete(matches).where(eq(matches.tournamentId, id));
-    const inserted = await db.insert(matches).values(newMatches).returning();
+      const playerIds = shuffle(regs.map((r) => r.playerId));
+      const newMatches = generateSingleEliminationMatches(playerIds).map((m) => ({
+        ...m,
+        tournamentId: id,
+      }));
 
-    // Update tournament status
-    await db
-      .update(tournaments)
-      .set({ status: "in_progress", updatedAt: new Date() })
-      .where(eq(tournaments.id, id));
+      const oldMatches = await tx.select({ id: matches.id }).from(matches).where(eq(matches.tournamentId, id));
+      const oldMatchIds = oldMatches.map((m) => m.id);
+
+      if (oldMatchIds.length > 0) {
+        // FK-safe cleanup. Without this, deleting matches that already have
+        // judgments/evidence/disputes can fail or leave inconsistent state.
+        await tx.delete(judgments).where(inArray(judgments.matchId, oldMatchIds));
+        await tx.delete(disputes).where(inArray(disputes.matchId, oldMatchIds));
+        await tx.delete(matchEvidence).where(inArray(matchEvidence.matchId, oldMatchIds));
+      }
+
+      await tx.delete(matches).where(eq(matches.tournamentId, id));
+      const rows = await tx.insert(matches).values(newMatches).returning();
+
+      await tx
+        .update(tournaments)
+        .set({ status: "in_progress", updatedAt: new Date() })
+        .where(eq(tournaments.id, id));
+
+      return rows;
+    });
+
+    await logAdminAction({
+      adminId: auth.user.id,
+      action: "generate_brackets",
+      entityType: "tournament",
+      entityId: id,
+      metadata: { matchesCreated: inserted.length },
+      ipAddress: getClientIp(request.headers),
+    });
 
     return NextResponse.json(inserted, { status: 201 });
   } catch (e) {
+    const message = e instanceof Error ? e.message : "UNKNOWN";
+    if (message === "TOURNAMENT_NOT_FOUND") {
+      return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
+    }
+    if (message === "NOT_ENOUGH_PLAYERS") {
+      return NextResponse.json({ error: "Need at least 2 players" }, { status: 400 });
+    }
+    if (message === "TOURNAMENT_COMPLETED") {
+      return NextResponse.json({ error: "Completed tournaments cannot be regenerated" }, { status: 409 });
+    }
+
     logger.error({ err: e }, "Failed to generate brackets");
     return NextResponse.json({ error: "Failed to generate brackets" }, { status: 500 });
   }

@@ -25,6 +25,8 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | `0006_add_telegram_marketing_and_waitlist.sql` | Adds campaign analytics, real coupons/redemptions, tournament waiting list and Telegram channel post tracking. |
 | `0007_add_classified_ads.sql` | Adds `classified_ads` and `classified_scrape_logs` tables for monitoring Divar/Sheypoor gaming ads. |
 | `0008_add_honors.sql` | Adds the persistent `honors` table for the Hall of Fame public page, admin approval flow and AI honor suggestions. |
+| `0009_sync_core_schema.sql` | Adds missing core tables/columns for databases created from the early partial migration. |
+| `0010_harden_registration_integrity.sql` | Adds unique indexes that prevent duplicate tournament registrations per player/user under concurrent requests. |
 
 > Note: the rate limiter **fails open** — if this table is missing or the DB
 > errors, requests are still allowed (and the issue is logged), so forgetting

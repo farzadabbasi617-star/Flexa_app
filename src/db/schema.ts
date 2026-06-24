@@ -9,6 +9,7 @@ import {
   jsonb,
   pgEnum,
   index,
+  uniqueIndex,
   numeric,
 } from "drizzle-orm/pg-core";
 
@@ -268,6 +269,8 @@ export const registrations = pgTable("registrations", {
 }, (table) => ({
   tournamentIdx: index("registrations_tournament_id_idx").on(table.tournamentId),
   playerIdIdx: index("registrations_player_id_idx").on(table.playerId),
+  tournamentPlayerUnique: uniqueIndex("registrations_tournament_player_unique").on(table.tournamentId, table.playerId),
+  tournamentUserUnique: uniqueIndex("registrations_tournament_user_unique").on(table.tournamentId, table.visibleUserId),
 }));
 
 // Telegram pre-registrations

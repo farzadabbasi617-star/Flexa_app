@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { transactions, wallets } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 import { bigIntFromText, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
@@ -159,36 +159,52 @@ export async function POST(request: NextRequest) {
     if (nationalId.length !== 10) return NextResponse.json({ error: "کد ملی معتبر نیست." }, { status: 400 });
     if (!isValidIranIban(iban)) return NextResponse.json({ error: "شماره شبا باید با فرمت IR و ۲۴ رقم وارد شود." }, { status: 400 });
 
-    const wallet = await getOrCreateWallet(user.id);
-    const allRows = await db.select().from(transactions).where(eq(transactions.walletId, wallet.id));
-    const breakdown = walletBreakdown(bigIntFromText(wallet.balance), allRows);
-    const withdrawableRial = bigIntFromText(breakdown.withdrawableRial);
+    const tx = await db.transaction(async (dbTx) => {
+      await dbTx
+        .insert(wallets)
+        .values({ userId: user.id, balance: "0", currency: "RIAL" })
+        .onConflictDoNothing({ target: wallets.userId });
 
-    if (withdrawableRial < amountRial) {
-      return NextResponse.json({ error: "موجودی قابل برداشت کافی نیست." }, { status: 400 });
-    }
+      // Lock this wallet while we calculate withdrawable balance and create the
+      // pending withdrawal. Without the lock, two concurrent requests could both
+      // pass the same availability check before either pending row is visible.
+      await dbTx.execute(sql`SELECT id FROM wallets WHERE user_id = ${user.id} FOR UPDATE`);
 
-    const [tx] = await db
-      .insert(transactions)
-      .values({
-        walletId: wallet.id,
-        amount: amountRial.toString(),
-        type: "withdrawal",
-        status: "pending",
-        referenceId: createWalletReference("withdrawal"),
-        metadata: {
-          kind: "manual_withdrawal_request",
-          userId: user.id,
-          displayName: user.displayName,
-          accountOwner,
-          nationalId,
-          iban,
-          note: sanitizeWalletNote(body.note),
-          requestedIp: ip,
-          userAgent: ua.slice(0, 300),
-        },
-      })
-      .returning();
+      const [wallet] = await dbTx.select().from(wallets).where(eq(wallets.userId, user.id)).limit(1);
+      if (!wallet) throw new Error("WALLET_CREATE_FAILED");
+
+      const allRows = await dbTx.select().from(transactions).where(eq(transactions.walletId, wallet.id));
+      const breakdown = walletBreakdown(bigIntFromText(wallet.balance), allRows);
+      const withdrawableRial = bigIntFromText(breakdown.withdrawableRial);
+
+      if (withdrawableRial < amountRial) {
+        throw new Error("INSUFFICIENT_WITHDRAWABLE_BALANCE");
+      }
+
+      const [created] = await dbTx
+        .insert(transactions)
+        .values({
+          walletId: wallet.id,
+          amount: amountRial.toString(),
+          type: "withdrawal",
+          status: "pending",
+          referenceId: createWalletReference("withdrawal"),
+          metadata: {
+            kind: "manual_withdrawal_request",
+            userId: user.id,
+            displayName: user.displayName,
+            accountOwner,
+            nationalId,
+            iban,
+            note: sanitizeWalletNote(body.note),
+            requestedIp: ip,
+            userAgent: ua.slice(0, 300),
+          },
+        })
+        .returning();
+
+      return created;
+    });
 
     return NextResponse.json({
       success: true,
@@ -196,6 +212,10 @@ export async function POST(request: NextRequest) {
       transaction: tx,
     }, { status: 201 });
   } catch (err) {
+    if (err instanceof Error && err.message === "INSUFFICIENT_WITHDRAWABLE_BALANCE") {
+      return NextResponse.json({ error: "موجودی قابل برداشت کافی نیست." }, { status: 400 });
+    }
+
     logger.error({ err }, "Wallet transaction request failed");
     return NextResponse.json({ error: "ثبت درخواست انجام نشد" }, { status: 500 });
   }

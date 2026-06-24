@@ -89,6 +89,8 @@ psql "$DATABASE_URL" -f drizzle/manual/0003_add_telegram_bot_sessions.sql
 psql "$DATABASE_URL" -f drizzle/manual/0004_add_telegram_account_linking.sql
 psql "$DATABASE_URL" -f drizzle/manual/0005_add_telegram_growth_and_notifications.sql
 psql "$DATABASE_URL" -f drizzle/manual/0006_add_telegram_marketing_and_waitlist.sql
+psql "$DATABASE_URL" -f drizzle/manual/0009_sync_core_schema.sql
+psql "$DATABASE_URL" -f drizzle/manual/0010_harden_registration_integrity.sql
 ```
 
 یا محتوای فایل‌ها را داخل SQL Editor دیتابیس/Neon اجرا کنید.
@@ -159,6 +161,9 @@ npm install
 DATABASE_URL="your_postgresql_url"
 OPENROUTER_API_KEY="your_key"
 GROQ_API_KEY="your_key"
+# در production برای راه‌اندازی امن اولین مدیر اصلی لازم است
+ADMIN_SETUP_SECRET="your_long_random_bootstrap_secret"
+OTP_TOKEN_PEPPER="your_different_long_random_otp_hash_pepper"
 # فعلاً اختیاری است؛ ورود با رمز عبور کار می‌کند و OTP بعداً فعال می‌شود
 FARAZSMS_API_KEY="your_key"
 FARAZSMS_PATTERN_CODE="your_code"

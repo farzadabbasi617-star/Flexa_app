@@ -3,6 +3,17 @@ import { verificationTokens, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 
+function hashOtpToken(phoneNumber: string, token: string) {
+  // Bind the OTP hash to its identifier so the same numeric code for two phone
+  // numbers does not produce the same DB value. A server-side pepper can be
+  // provided, but we also work safely without one.
+  const pepper = process.env.OTP_TOKEN_PEPPER || process.env.ADMIN_SETUP_SECRET || "gament-otp-v1";
+  return crypto
+    .createHmac("sha256", pepper)
+    .update(`${phoneNumber}:${token}`)
+    .digest("hex");
+}
+
 export const AuthService = {
   /**
    * Send SMS via FarazSMS Pattern API
@@ -47,20 +58,27 @@ export const AuthService = {
   },
 
   /**
-   * Generate a 6-digit OTP for Mobile and send it
+   * Generate a 6-digit OTP for Mobile and send it.
+   *
+   * The plaintext code is never stored in the database. It is returned so a
+   * future route can display it in local development if needed; production
+   * callers should ignore the return value and rely on SMS delivery.
    */
   async generateVerificationToken(phoneNumber: string) {
     const token = crypto.randomInt(100000, 999999).toString();
+    const tokenHash = hashOtpToken(phoneNumber, token);
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
 
-    // Save to DB
+    // Keep only the latest live OTP for this phone number. This reduces replay
+    // and confusion when a user requests multiple SMS codes.
+    await db.delete(verificationTokens).where(eq(verificationTokens.identifier, phoneNumber));
+
     await db.insert(verificationTokens).values({
       identifier: phoneNumber,
-      token,
+      token: tokenHash,
       expiresAt,
     });
 
-    // Send the actual SMS
     await this.sendSmsViaFaraz(phoneNumber, token);
 
     return token;
@@ -70,25 +88,24 @@ export const AuthService = {
    * Verify the token and update user's phone verification status
    */
   async verifyIdentifier(phoneNumber: string, token: string) {
+    const tokenHash = hashOtpToken(phoneNumber, token);
     const [record] = await db.select()
       .from(verificationTokens)
       .where(and(
         eq(verificationTokens.identifier, phoneNumber),
-        eq(verificationTokens.token, token)
+        eq(verificationTokens.token, tokenHash)
       ));
 
     if (!record || record.expiresAt < new Date()) {
       throw new Error("کد تایید نامعتبر یا منقضی شده است");
     }
 
-    // Mark phone as verified in users table
     await db.update(users)
       .set({ phoneVerifiedAt: new Date(), isVerified: true })
       .where(eq(users.phoneNumber, phoneNumber));
 
-    // Clean up used token
     await db.delete(verificationTokens).where(eq(verificationTokens.id, record.id));
-    
+
     return true;
   }
 };

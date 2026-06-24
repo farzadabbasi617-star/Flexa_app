@@ -3,7 +3,6 @@ import { db } from "@/db";
 import { registrations, players, tournaments, transactions, wallets } from "@/db/schema";
 import { and, eq, count, sql } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
-import { bigIntFromText, formatTomanFromRial } from "@/lib/money";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
 import { evaluateUserAchievements } from "@/lib/achievement-service";
 import logger from "@/lib/logger";
@@ -15,6 +14,11 @@ const registrationSchema = z.object({
   tournamentId: z.string().uuid(),
   playerId: z.string().uuid(),
 });
+
+function isPgUniqueViolation(error: unknown) {
+  const maybe = error as { code?: string; cause?: { code?: string } };
+  return maybe?.code === "23505" || maybe?.cause?.code === "23505";
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -45,6 +49,11 @@ export async function POST(request: NextRequest) {
       if (!player) throw new Error("PLAYER_NOT_FOUND");
       if (!isAdmin && player.ownerId !== user.id) throw new Error("PLAYER_FORBIDDEN");
 
+      // Lock the tournament row for the rest of this transaction. This makes
+      // capacity checks and paid registrations serial for the same tournament
+      // and prevents overbooking under concurrent requests.
+      await tx.execute(sql`SELECT id FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`);
+
       const [tournament] = await tx
         .select({
           id: tournaments.id,
@@ -59,11 +68,19 @@ export async function POST(request: NextRequest) {
       if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
       if (tournament.status !== "registration") throw new Error("REGISTRATION_CLOSED");
 
+      const ownerId = player.ownerId ?? user.id;
+
       const [existing] = await tx
         .select({ id: registrations.id })
         .from(registrations)
         .where(and(eq(registrations.tournamentId, tournamentId), eq(registrations.playerId, playerId)));
       if (existing) throw new Error("DUPLICATE_REGISTRATION");
+
+      const [existingUserRegistration] = await tx
+        .select({ id: registrations.id })
+        .from(registrations)
+        .where(and(eq(registrations.tournamentId, tournamentId), eq(registrations.visibleUserId, ownerId)));
+      if (existingUserRegistration) throw new Error("DUPLICATE_REGISTRATION");
 
       const [{ value: registeredCount }] = await tx
         .select({ value: count() })
@@ -71,8 +88,6 @@ export async function POST(request: NextRequest) {
         .where(eq(registrations.tournamentId, tournamentId));
 
       if (registeredCount >= tournament.maxPlayers) throw new Error("TOURNAMENT_FULL");
-
-      const ownerId = player.ownerId ?? user.id;
       const entryFeeRial = getEntryFeeRial(tournament.entryFee);
       let paymentTransactionId: string | null = null;
 
@@ -133,7 +148,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "UNKNOWN";
+    const message = isPgUniqueViolation(err) ? "DUPLICATE_REGISTRATION" : err instanceof Error ? err.message : "UNKNOWN";
 
     const errors: Record<string, { text: string; status: number }> = {
       PLAYER_NOT_FOUND: { text: "پروفایل بازیکن پیدا نشد.", status: 404 },
