@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
+import AnimatedGamentLogo from "@/components/AnimatedGamentLogo";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -38,7 +39,7 @@ export default function LoginPage() {
         <div className="gaming-card p-8">
           {/* Header */}
           <div className="text-center mb-8">
-            <div className="text-5xl mb-4">🎮</div>
+            <AnimatedGamentLogo size="md" showLabel className="mb-5" />
             <h1 className="text-2xl font-bold neon-text-purple">{t.auth.loginTitle}</h1>
             <p className="text-gray-400 mt-1">{t.auth.loginSubtitle}</p>
           </div>
