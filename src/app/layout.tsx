@@ -5,6 +5,7 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { QueryProvider } from "@/components/QueryProvider";
 import { LayoutWrapper } from "@/components/LayoutWrapper";
+import { SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo";
 
 export const viewport: Viewport = {
   themeColor: "#a855f7",
@@ -14,22 +15,33 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
+const title = "گیمنت | Gament — پلتفرم هوشمند تورنومنت گیمینگ";
+const description =
+  "گیمنت (Gament) پلتفرم حرفه‌ای برگزاری و مدیریت تورنومنت‌های آنلاین کالاف دیوتی موبایل، فورتنایت و کلش رویال با داوری هوشمند، جدول رتبه‌بندی و جوایز واقعی است.";
+
 export const metadata: Metadata = {
-  title: "گیمنت | Gament — پلتفرم هوشمند تورنومنت گیمینگ",
-  description:
-    "گیمنت (Gament) پلتفرم حرفه‌ای برگزاری و مدیریت تورنومنت‌های آنلاین بازی‌های موبایلی (کالاف دیوتی موبایل، فورتنایت و کلش رویال) همراه با سیستم داوری هوشمند و هوش مصنوعی است.",
+  metadataBase: new URL(SITE_URL),
+  applicationName: SITE_NAME,
+  title: {
+    default: title,
+    template: "%s | گیمنت",
+  },
+  description,
   keywords: [
     "گیمنت",
     "gament",
-    "gament app",
+    "gament1",
     "تورنومنت گیمینگ",
+    "مسابقات بازی آنلاین",
     "مسابقات کالاف دیوتی موبایل",
+    "تورنومنت کالاف موبایل",
     "مسابقات فورتنایت",
+    "تورنومنت فورتنایت",
     "مسابقات کلش رویال",
+    "تورنومنت کلش رویال",
     "داوری هوشمند بازی",
-    "لیگ گیمینگ",
-    "بازی آنلاین موبایل",
-    "رقابت‌های گیمینگ"
+    "لیگ گیمینگ ایران",
+    "رقابت‌های گیمینگ",
   ],
   manifest: "/manifest.json",
   appleWebApp: {
@@ -44,16 +56,27 @@ export const metadata: Metadata = {
     "mobile-web-app-capable": "yes",
   },
   alternates: {
-    canonical: "https://gament.app",
+    canonical: SITE_URL,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+      "max-video-preview": -1,
+    },
   },
   openGraph: {
-    title: "گیمنت | Gament — پلتفرم هوشمند تورنومنت گیمینگ",
-    description: "گیمنت (Gament) پلتفرم حرفه‌ای برگزاری و مدیریت تورنومنت‌های آنلاین بازی‌های موبایلی با سیستم داوری هوشمند و هوش مصنوعی است.",
-    url: "https://gament.app",
-    siteName: "Gament",
+    title,
+    description,
+    url: SITE_URL,
+    siteName: SITE_NAME,
     images: [
       {
-        url: "/icons/arena_icon.png",
+        url: absoluteUrl("/icons/arena_icon.png"),
         width: 512,
         height: 512,
         alt: "Gament - گیمنت",
@@ -64,10 +87,39 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "گیمنت | Gament — پلتفرم هوشمند تورنومنت گیمینگ",
-    description: "گیمنت (Gament) pلتفرم حرفه‌ای برگزاری و مدیریت تورنومنت‌های آنلاین بازی‌های موبایلی با سیستم داوری هوشمند و هوش مصنوعی است.",
-    images: ["/icons/arena_icon.png"],
+    title,
+    description,
+    images: [absoluteUrl("/icons/arena_icon.png")],
   },
+};
+
+const organizationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "Organization",
+  name: SITE_NAME,
+  alternateName: ["Gament", "گیمنت"],
+  url: SITE_URL,
+  logo: absoluteUrl("/icons/arena_icon.png"),
+};
+
+const websiteJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebSite",
+  name: SITE_NAME,
+  alternateName: ["Gament", "گیمنت"],
+  url: SITE_URL,
+  inLanguage: "fa-IR",
+};
+
+const webApplicationJsonLd = {
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  name: SITE_NAME,
+  url: SITE_URL,
+  applicationCategory: "GameApplication",
+  operatingSystem: "Web, Android, iOS",
+  inLanguage: "fa-IR",
+  description,
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -76,6 +128,18 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <head>
         <link rel="apple-touch-icon" href="/icons/arena_icon.png" />
         <link rel="icon" href="/icons/arena_icon.png" />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
+        />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(webApplicationJsonLd) }}
+        />
         {/* Load Telegram WebApp Javascript library securely */}
         <script src="https://telegram.org/js/telegram-web-app.js" async></script>
       </head>

@@ -100,7 +100,7 @@ async function callProviderModel(
         "Content-Type": "application/json",
         ...(provider.id === "openrouter"
           ? {
-              "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://gament.app",
+              "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://www.gament1.ir",
               "X-Title": "Gament App",
             }
           : {}),

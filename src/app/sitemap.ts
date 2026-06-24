@@ -1,10 +1,12 @@
 import { MetadataRoute } from 'next';
 import { db } from '@/db';
-import { tournaments, teams } from '@/db/schema';
+import { tournaments, teams, players, honors } from '@/db/schema';
 import { eq, or, desc } from 'drizzle-orm';
 
+import { SITE_URL } from '@/lib/seo';
+
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = 'https://gament1.ir';
+  const baseUrl = SITE_URL;
   const now = new Date();
 
   const routes: MetadataRoute.Sitemap = [];
@@ -19,13 +21,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/achievements', priority: 0.78, freq: 'weekly' as const },
     { path: '/honors', priority: 0.75, freq: 'weekly' as const },
     { path: '/players', priority: 0.72, freq: 'weekly' as const },
-    { path: '/profile', priority: 0.7, freq: 'weekly' as const },
-    { path: '/wallet', priority: 0.65, freq: 'weekly' as const },
     { path: '/about', priority: 0.6, freq: 'monthly' as const },
     { path: '/faq', priority: 0.6, freq: 'monthly' as const },
     { path: '/rules', priority: 0.55, freq: 'monthly' as const },
     { path: '/contact', priority: 0.5, freq: 'monthly' as const },
-    { path: '/guide', priority: 0.5, freq: 'monthly' as const },
+    { path: '/support', priority: 0.45, freq: 'monthly' as const },
+    { path: '/guide/tournaments', priority: 0.5, freq: 'monthly' as const },
+    { path: '/guide/wallet', priority: 0.45, freq: 'monthly' as const },
   ];
 
   staticPages.forEach(page => {
@@ -82,6 +84,39 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
         lastModified: team.createdAt || now,
         changeFrequency: 'weekly',
         priority: 0.72,
+      });
+    });
+
+    // ==================== بازیکنان عمومی ====================
+    const playerList = await db
+      .select({ id: players.id, createdAt: players.createdAt })
+      .from(players)
+      .orderBy(desc(players.createdAt))
+      .limit(200);
+
+    playerList.forEach(player => {
+      routes.push({
+        url: `${baseUrl}/players/${player.id}`,
+        lastModified: player.createdAt || now,
+        changeFrequency: 'weekly',
+        priority: 0.62,
+      });
+    });
+
+    // ==================== تالار افتخارات / اخبار منتشرشده ====================
+    const honorList = await db
+      .select({ id: honors.id, updatedAt: honors.updatedAt })
+      .from(honors)
+      .where(eq(honors.status, 'published'))
+      .orderBy(desc(honors.updatedAt))
+      .limit(100);
+
+    honorList.forEach(honor => {
+      routes.push({
+        url: `${baseUrl}/honors/${honor.id}`,
+        lastModified: honor.updatedAt || now,
+        changeFrequency: 'weekly',
+        priority: 0.66,
       });
     });
 

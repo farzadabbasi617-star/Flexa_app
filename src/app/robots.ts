@@ -1,79 +1,13 @@
 import { MetadataRoute } from 'next';
+import { SITE_URL } from '@/lib/seo';
 
 export default function robots(): MetadataRoute.Robots {
   return {
-    rules: [
-      {
-        userAgent: '*',
-        allow: [
-          '/',
-          '/tournaments',
-          '/tournaments/*',
-          '/leaderboard',
-          '/teams',
-          '/teams/*',
-          '/achievements',
-          '/achievements/*',
-          '/honors',
-          '/honors/*',
-          '/players',
-          '/profile/*',
-          '/matches/*',
-          '/about',
-          '/faq',
-          '/rules',
-          '/contact',
-          '/guide',
-        ],
-        disallow: [
-          '/api/',
-          '/admin/',
-          '/_next/',
-          '/login',
-          '/register',
-          '/dashboard',
-          '/settings',
-          '/payment',
-          '/wallet',
-          '/judging',
-          '/support',
-          '/notifications',
-          '/admin/*',
-          '/api/*',
-        ],
-      },
-      {
-        userAgent: 'Googlebot',
-        allow: [
-          '/',
-          '/tournaments',
-          '/tournaments/*',
-          '/leaderboard',
-          '/teams',
-          '/achievements',
-          '/honors',
-          '/players',
-          '/profile/*',
-        ],
-        disallow: [
-          '/api/',
-          '/admin/',
-          '/login',
-          '/register',
-          '/dashboard',
-          '/settings',
-          '/payment',
-          '/wallet',
-          '/judging',
-        ],
-      },
-      {
-        userAgent: 'Bingbot',
-        allow: '/',
-        disallow: ['/api/', '/admin/', '/login', '/register', '/dashboard'],
-      },
-    ],
-    sitemap: 'https://gament1.ir/sitemap.xml',
-    host: 'https://gament1.ir',
+    rules: {
+      userAgent: '*',
+      allow: '/',
+    },
+    sitemap: `${SITE_URL}/sitemap.xml`,
+    host: SITE_URL,
   };
 }

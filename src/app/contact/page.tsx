@@ -23,8 +23,8 @@ export default function ContactPage() {
               <span className="text-2xl mt-0.5">✉️</span>
               <div>
                 <div className="font-bold mb-1">ایمیل پشتیبانی</div>
-                <a href="mailto:support@gament.app" className="text-purple-400 hover:underline">
-                  support@gament.app
+                <a href="mailto:support@gament1.ir" className="text-purple-400 hover:underline">
+                  support@gament1.ir
                 </a>
               </div>
             </div>

@@ -28,7 +28,7 @@ const sections = [
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-3">
             <span className="text-purple-400">✉️</span>
-            <span>support@gament.app</span>
+            <span>support@gament1.ir</span>
           </div>
           <div className="flex items-center gap-3">
             <span className="text-purple-400">📱</span>
