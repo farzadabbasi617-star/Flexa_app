@@ -180,6 +180,33 @@ export default function LuxuryHomePage() {
             </div>
           </section>
 
+          {/* SEO Game Landing Links */}
+          <section className="mb-10 sm:mb-12" dir="rtl">
+            <div className="flex items-center justify-between mr-2 mb-4 sm:mb-6">
+              <h2 className="text-base sm:text-lg font-black text-white">
+                مسابقات محبوب گیمنت
+              </h2>
+              <Link href="/tournaments" className="text-xs font-black text-purple-300">
+                مشاهده همه تورنومنت‌ها
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Link href="/games/call-of-duty-mobile" className="glass-panel rounded-3xl p-5 border border-orange-400/10 hover:border-orange-400/30 transition-all block">
+                <h3 className="font-black text-lg mb-2">تورنومنت کالاف موبایل</h3>
+                <p className="text-xs leading-6 text-gray-400">مسابقات آنلاین COD Mobile با ثبت‌نام سریع، داوری منصفانه و جوایز واقعی.</p>
+              </Link>
+              <Link href="/games/fortnite" className="glass-panel rounded-3xl p-5 border border-purple-400/10 hover:border-purple-400/30 transition-all block">
+                <h3 className="font-black text-lg mb-2">تورنومنت فورتنایت</h3>
+                <p className="text-xs leading-6 text-gray-400">رقابت‌های فورتنایت با قوانین مشخص، زمان‌بندی منظم و صفحه اختصاصی مسابقه.</p>
+              </Link>
+              <Link href="/games/clash-royale" className="glass-panel rounded-3xl p-5 border border-cyan-400/10 hover:border-cyan-400/30 transition-all block">
+                <h3 className="font-black text-lg mb-2">تورنومنت کلش رویال</h3>
+                <p className="text-xs leading-6 text-gray-400">مسابقات Clash Royale برای بازیکنان رقابتی، ثبت نتیجه و رتبه‌بندی بهتر.</p>
+              </Link>
+            </div>
+          </section>
+
           {/* AI Banner */}
           <section className="glass-panel p-5 sm:p-6 rounded-3xl sm:rounded-[36px] border border-purple-500/20 bg-gradient-to-r from-purple-900/10 to-transparent flex items-center justify-between mb-20 sm:mb-28">
             <div className="flex items-center gap-3 sm:gap-4">

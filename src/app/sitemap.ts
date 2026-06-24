@@ -4,6 +4,7 @@ import { tournaments, teams, players, honors } from '@/db/schema';
 import { eq, or, desc } from 'drizzle-orm';
 
 import { SITE_URL } from '@/lib/seo';
+import { gameLandings } from '@/lib/game-landing';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = SITE_URL;
@@ -15,6 +16,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages = [
     { path: '', priority: 1.0, freq: 'daily' as const },
     { path: '/tournaments', priority: 0.95, freq: 'hourly' as const },
+    { path: '/games', priority: 0.88, freq: 'weekly' as const },
     { path: '/leaderboard', priority: 0.92, freq: 'daily' as const },
     { path: '/judging', priority: 0.88, freq: 'daily' as const },
     { path: '/teams', priority: 0.82, freq: 'weekly' as const },
@@ -36,6 +38,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: page.freq,
       priority: page.priority,
+    });
+  });
+
+  gameLandings.forEach(game => {
+    routes.push({
+      url: `${baseUrl}/games/${game.slug}`,
+      lastModified: now,
+      changeFrequency: 'weekly',
+      priority: 0.86,
     });
   });
 
