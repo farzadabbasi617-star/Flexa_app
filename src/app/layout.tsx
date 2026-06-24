@@ -15,7 +15,7 @@ export const viewport: Viewport = {
   userScalable: false,
 };
 
-const title = "56417003 | گیمنت | Gament — پلتفرم هوشمند تورنومنت گیمینگ";
+const title = "گیمنت | Gament — پلتفرم هوشمند تورنومنت گیمینگ";
 const description =
   "گیمنت (Gament) پلتفرم حرفه‌ای برگزاری و مدیریت تورنومنت‌های آنلاین کالاف دیوتی موبایل، فورتنایت و کلش رویال با داوری هوشمند، جدول رتبه‌بندی و جوایز واقعی است.";
 
@@ -126,6 +126,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
+        <meta name="enamad" content="56417003" />
         <link rel="apple-touch-icon" href="/icons/arena_icon.png" />
         <link rel="icon" href="/icons/arena_icon.png" />
         <script
