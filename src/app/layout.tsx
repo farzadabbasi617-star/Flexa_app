@@ -126,7 +126,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="fa" dir="rtl" suppressHydrationWarning>
       <head>
-        <meta name="enamad" content="56417003" />
         <link rel="apple-touch-icon" href="/icons/arena_icon.png" />
         <link rel="icon" href="/icons/arena_icon.png" />
         <script
