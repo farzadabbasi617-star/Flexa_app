@@ -15,6 +15,10 @@ function iconForType(type: string) {
   return "📰";
 }
 
+function metadataObject(metadata: unknown): Record<string, any> {
+  return metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata as Record<string, any> : {};
+}
+
 function relativeTime(date: Date | string | null | undefined) {
   if (!date) return "به‌تازگی";
   const diffMs = Date.now() - new Date(date).getTime();
@@ -49,6 +53,11 @@ export async function GET() {
         level: row.level || undefined,
         highlight: row.highlight,
         image: row.imageUrl || undefined,
+        imageAlt: metadataObject(row.metadata).imageAlt || row.title,
+        summary: metadataObject(row.metadata).summary || undefined,
+        seoKeywords: metadataObject(row.metadata).seoKeywords || [],
+        readTimeMinutes: metadataObject(row.metadata).readTimeMinutes || undefined,
+        sources: metadataObject(row.metadata).sources || [],
         game: row.game || undefined,
         publishedAt: row.publishedAt,
       }))

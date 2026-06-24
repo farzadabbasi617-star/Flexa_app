@@ -18,6 +18,10 @@ interface Honor {
   level?: number;
   highlight?: boolean;
   image?: string;
+  imageAlt?: string;
+  summary?: string;
+  seoKeywords?: string[];
+  readTimeMinutes?: number;
   game?: string;
 }
 
@@ -138,7 +142,7 @@ export default function HonorsPage() {
         )}
 
         {/* Compact Visual Cards */}
-        <div className="space-y-3">
+        <div className="space-y-4">
           {loading ? (
             <div className="text-center py-12 text-white/50">در حال بارگذاری...</div>
           ) : filteredHonors.length > 0 ? (
@@ -146,36 +150,41 @@ export default function HonorsPage() {
               <Link
                 key={honor.id}
                 href={`/honors/${honor.id}`}
-                className="block glass-panel rounded-3xl overflow-hidden border border-white/10 active:scale-[0.985] transition-all"
+                className="block glass-panel rounded-[28px] overflow-hidden border border-white/10 active:scale-[0.985] transition-all hover:border-purple-400/30"
               >
-                <div className="flex">
-                  {/* Image Side */}
-                  <div className="w-24 h-24 flex-shrink-0 relative">
-                    {honor.image ? (
-                      <img src={honor.image} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full bg-gradient-to-br from-purple-700 to-cyan-600 flex items-center justify-center text-5xl">
-                        {honor.icon}
-                      </div>
-                    )}
+                <div className="relative h-36 overflow-hidden">
+                  {honor.image ? (
+                    <img src={honor.image} alt={honor.imageAlt || honor.title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                  ) : (
+                    <div className="absolute inset-0 bg-gradient-to-br from-purple-700 to-cyan-600 flex items-center justify-center text-6xl">{honor.icon}</div>
+                  )}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                  <div className="absolute top-3 right-3 flex items-center gap-2">
+                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-black/45 border border-white/10 backdrop-blur-md">
+                      {honor.type === "news" ? "خبر گیمنت" : "افتخار"}
+                    </span>
+                    {honor.game && <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-purple-600/40 border border-purple-300/20 backdrop-blur-md">{GAME_FILTERS.find((g) => g.id === honor.game)?.label || honor.game}</span>}
                   </div>
+                  <div className="absolute bottom-3 left-3 text-[10px] text-white/70 bg-black/35 px-2 py-1 rounded-full backdrop-blur-md">
+                    {honor.readTimeMinutes ? `${honor.readTimeMinutes} دقیقه مطالعه • ` : ""}{honor.time}
+                  </div>
+                </div>
 
-                  {/* Content Side */}
-                  <div className="flex-1 p-4 pr-5 flex flex-col justify-center">
-                    <div className="font-black text-lg leading-tight mb-1 pr-2">{honor.title}</div>
-                    
-                    <div className="text-xs text-white/60 mb-2 line-clamp-1">
-                      {honor.description}
+                <div className="p-4 text-right" dir="rtl">
+                  <h2 className="font-black text-lg leading-7 mb-2 line-clamp-2">{honor.title}</h2>
+                  <p className="text-xs text-white/65 leading-6 mb-3 line-clamp-2">{honor.summary || honor.description}</p>
+                  {honor.seoKeywords?.length ? (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                      {honor.seoKeywords.slice(0, 3).map((tag) => <span key={tag} className="text-[9px] px-2 py-1 rounded-full bg-white/5 text-purple-200 border border-white/10">#{tag}</span>)}
                     </div>
-
-                    <div className="flex items-center justify-between text-xs">
-                      <div className="text-purple-400">
-                        {honor.username && `@${honor.username}`}
-                        {honor.level && ` • سطح ${honor.level}`}
-                        {honor.prize && ` • ${honor.prize}`}
-                      </div>
-                      <div className="text-white/40">{honor.time}</div>
+                  ) : null}
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="text-purple-400 truncate">
+                      {honor.username && `@${honor.username}`}
+                      {honor.level && ` • سطح ${honor.level}`}
+                      {honor.prize && ` • ${honor.prize}`}
                     </div>
+                    <div className="text-white/40 shrink-0">ادامه خبر ←</div>
                   </div>
                 </div>
               </Link>
