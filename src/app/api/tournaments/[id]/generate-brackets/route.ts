@@ -6,6 +6,7 @@ import { requireRole } from "@/lib/auth";
 import { generateSingleEliminationMatches, shuffle } from "@/lib/brackets";
 import logger from "@/lib/logger";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
+import { notifyTournamentParticipantsOnTelegram } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ export async function POST(
       await tx.execute(sql`SELECT id FROM tournaments WHERE id = ${id} FOR UPDATE`);
 
       const [tournament] = await tx
-        .select({ id: tournaments.id, status: tournaments.status })
+        .select({ id: tournaments.id, name: tournaments.name, status: tournaments.status })
         .from(tournaments)
         .where(eq(tournaments.id, id));
 
@@ -67,7 +68,7 @@ export async function POST(
         .set({ status: "in_progress", updatedAt: new Date() })
         .where(eq(tournaments.id, id));
 
-      return rows;
+      return { rows, tournamentName: tournament.name };
     });
 
     await logAdminAction({
@@ -75,11 +76,21 @@ export async function POST(
       action: "generate_brackets",
       entityType: "tournament",
       entityId: id,
-      metadata: { matchesCreated: inserted.length },
+      metadata: { matchesCreated: inserted.rows.length },
       ipAddress: getClientIp(request.headers),
     });
 
-    return NextResponse.json(inserted, { status: 201 });
+    await notifyTournamentParticipantsOnTelegram(
+      id,
+      `🔥 <b>براکت تورنومنت ساخته شد</b>
+
+🏆 ${inserted.tournamentName}
+
+مسابقات شروع شده‌اند. وارد Gament شو و رقیب/زمان بازی را ببین.`,
+      { inline_keyboard: [[{ text: "مشاهده براکت", url: `${process.env.APP_URL || "https://www.gament1.ir"}/tournaments/${id}/lobby` }]] }
+    ).catch(() => undefined);
+
+    return NextResponse.json(inserted.rows, { status: 201 });
   } catch (e) {
     const message = e instanceof Error ? e.message : "UNKNOWN";
     if (message === "TOURNAMENT_NOT_FOUND") {

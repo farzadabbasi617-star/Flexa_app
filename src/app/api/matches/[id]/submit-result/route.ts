@@ -5,6 +5,7 @@ import { eq, inArray } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
+import { notifyLinkedUserOnTelegram } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -109,12 +110,23 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         });
       }
 
-      return { updated, tournamentName: match.tournamentName, nextStatus };
+      return { updated, tournamentName: match.tournamentName, nextStatus, participantUserIds: participantPlayers.map((p) => p.ownerId).filter(Boolean) as string[] };
     });
 
     if (result.nextStatus === "awaiting_judgment") {
       await notifyAdmins(id, result.tournamentName).catch(() => undefined);
     }
+    await Promise.all(
+      result.participantUserIds.map((userId) => notifyLinkedUserOnTelegram(
+        userId,
+        `🎮 <b>نتیجه مسابقه ثبت شد</b>
+
+🏆 ${result.tournamentName || "تورنومنت"}
+نتیجه: <b>${p1Score} - ${p2Score}</b>
+وضعیت: <b>${result.nextStatus === "completed" ? "تکمیل‌شده" : "در انتظار داوری"}</b>`,
+        { inline_keyboard: [[{ text: "مشاهده مسابقه", url: `${process.env.APP_URL || "https://www.gament1.ir"}/tournaments/${result.updated.tournamentId}/lobby` }]] }
+      ).catch(() => undefined))
+    );
 
     return NextResponse.json({ success: true, match: result.updated });
   } catch (err) {

@@ -1,6 +1,6 @@
 import logger from "@/lib/logger";
 import { db } from "@/db";
-import { telegramAccounts } from "@/db/schema";
+import { registrations, telegramAccounts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 
 export interface TelegramTournamentPost {
@@ -218,4 +218,27 @@ export async function publishHonorToTelegramChannel(honor: {
     disable_web_page_preview: true,
     reply_markup: replyMarkup,
   });
+}
+
+
+export async function notifyTournamentParticipantsOnTelegram(tournamentId: string, text: string, replyMarkup?: Record<string, unknown>) {
+  try {
+    const rows = await db
+      .select({ telegramId: telegramAccounts.telegramId })
+      .from(registrations)
+      .innerJoin(telegramAccounts, eq(registrations.visibleUserId, telegramAccounts.userId))
+      .where(eq(registrations.tournamentId, tournamentId));
+
+    let sent = 0;
+    for (const row of rows) {
+      const chatId = Number(row.telegramId);
+      if (!Number.isFinite(chatId)) continue;
+      const result = await sendTelegramMessage(chatId, text, replyMarkup);
+      if (result.ok) sent += 1;
+    }
+    return { ok: true, sent, total: rows.length };
+  } catch (err) {
+    logger.warn({ err, tournamentId }, "Failed to notify tournament participants on Telegram");
+    return { ok: false, sent: 0, total: 0 };
+  }
 }

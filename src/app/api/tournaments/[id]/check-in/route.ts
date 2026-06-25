@@ -4,6 +4,7 @@ import { notifications, registrations, tournaments, users } from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 import logger from "@/lib/logger";
+import { notifyLinkedUserOnTelegram } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +52,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       .returning();
 
     await notifyAdmins(id, tournament.name, user.displayName).catch(() => undefined);
+    await notifyLinkedUserOnTelegram(
+      user.id,
+      `✅ <b>چک‌این شما ثبت شد</b>
+
+🏆 ${tournament.name}
+
+به محض آماده شدن اطلاعات لابی/روم، از همین ربات اطلاع می‌گیری.`,
+      { inline_keyboard: [[{ text: "مشاهده لابی", url: `${process.env.APP_URL || "https://www.gament1.ir"}/tournaments/${id}/lobby` }]] }
+    ).catch(() => undefined);
     return NextResponse.json({ success: true, registration: updated });
   } catch (err) {
     logger.error({ err }, "Tournament check-in failed");

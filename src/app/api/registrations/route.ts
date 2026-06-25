@@ -5,6 +5,8 @@ import { and, eq, count, sql } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
 import { evaluateUserAchievements } from "@/lib/achievement-service";
+import { notifyLinkedUserOnTelegram } from "@/lib/telegram";
+import { formatTomanFromRial, bigIntFromText } from "@/lib/money";
 import logger from "@/lib/logger";
 import { z } from "zod";
 
@@ -141,10 +143,21 @@ export async function POST(request: NextRequest) {
         .values({ tournamentId, playerId, visibleUserId: ownerId })
         .returning();
 
-      return { registration: reg, entryFeeRial: entryFeeRial.toString(), paymentTransactionId };
+      return { registration: reg, entryFeeRial: entryFeeRial.toString(), paymentTransactionId, tournamentName: tournament.name, playerName: player.displayName };
     });
 
     await evaluateUserAchievements(result.registration.visibleUserId).catch(() => undefined);
+    await notifyLinkedUserOnTelegram(
+      result.registration.visibleUserId,
+      `✅ <b>ثبت‌نام تورنومنت انجام شد</b>
+
+🏆 ${result.tournamentName}
+👤 بازیکن: <b>${result.playerName}</b>
+💳 ورودی: <b>${formatTomanFromRial(bigIntFromText(result.entryFeeRial))}</b>
+
+زمان چک‌این، لابی و نتیجه‌ها از همین ربات هم اطلاع‌رسانی می‌شود.`,
+      { inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${process.env.APP_URL || "https://www.gament1.ir"}/tournaments/${result.registration.tournamentId}` }]] }
+    ).catch(() => undefined);
 
     return NextResponse.json(result, { status: 201 });
   } catch (err) {
