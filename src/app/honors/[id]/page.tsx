@@ -78,6 +78,30 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
+  if (honor?.htmlUrl) {
+    return (
+      <div className="min-h-screen bg-[#050508] text-white">
+        <header className="sticky top-0 z-50 h-14 bg-[#050508]/95 backdrop-blur-xl border-b border-white/10 px-3 flex items-center gap-2">
+          <Link href="/honors" className="shrink-0 text-[11px] font-black text-purple-100 bg-white/5 border border-white/10 rounded-2xl px-3 py-2">
+            ← بازگشت
+          </Link>
+          <div className="min-w-0 flex-1 text-right">
+            <div className="text-[10px] text-cyan-300 font-black">{TYPE_LABELS[honor.type] || "خبر"}{honor.game ? ` • ${GAME_LABELS[honor.game] || honor.game}` : ""}</div>
+            <h1 className="text-xs font-black truncate">{honor.title}</h1>
+          </div>
+          <button onClick={shareHonor} className="shrink-0 text-[11px] font-black text-white bg-gradient-to-r from-purple-600 to-cyan-600 rounded-2xl px-3 py-2">
+            اشتراک
+          </button>
+        </header>
+        <iframe
+          src={honor.htmlUrl}
+          title={honor.title}
+          className="block w-full h-[calc(100dvh-56px)] border-0 bg-[#0a0a2e]"
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#050508] text-white pb-28">
       <div className="relative min-h-[300px] overflow-hidden">
