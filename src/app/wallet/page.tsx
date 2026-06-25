@@ -83,6 +83,7 @@ export default function WalletPage() {
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [walletDialog, setWalletDialog] = useState<"deposit" | "withdrawal" | "">("");
   const [depositStep, setDepositStep] = useState<1 | 2>(1);
+  const [depositTermsOpen, setDepositTermsOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositTrackingNumber, setDepositTrackingNumber] = useState("");
   const [depositNote, setDepositNote] = useState("");
@@ -134,6 +135,7 @@ export default function WalletPage() {
     setError("");
     setMessage("");
     setDepositStep(1);
+    setDepositTermsOpen(false);
     setWalletDialog("deposit");
   }
 
@@ -147,6 +149,7 @@ export default function WalletPage() {
     if (submitting) return;
     setWalletDialog("");
     setDepositStep(1);
+    setDepositTermsOpen(false);
   }
 
   function handleDepositReceiptChange(e: ChangeEvent<HTMLInputElement>) {
@@ -212,6 +215,7 @@ export default function WalletPage() {
       setDepositReceiptPreview("");
       setWalletDialog("");
       setDepositStep(1);
+      setDepositTermsOpen(false);
       const receiptInput = document.getElementById("wallet-deposit-receipt") as HTMLInputElement | null;
       if (receiptInput) receiptInput.value = "";
       load();
@@ -427,12 +431,23 @@ export default function WalletPage() {
                   <span className="text-sm font-black leading-7 text-purple-100">قوانین کیف پول و کارت‌به‌کارت را خوانده‌ام و قبول دارم.</span>
                 </label>
 
-                <div className="rounded-3xl bg-white/[.04] border border-white/10 p-4">
-                  <h3 className="font-black mb-2 text-gray-100">قوانین واریز</h3>
-                  <p className="text-xs leading-7 text-gray-400">{WALLET_TERMS}</p>
-                </div>
-
                 <button type="button" disabled={!canContinueDeposit} onClick={() => setDepositStep(2)} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">ادامه و دریافت شماره کارت</button>
+
+                <div className="rounded-3xl bg-white/[.04] border border-white/10 overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setDepositTermsOpen((value) => !value)}
+                    className="w-full p-4 flex items-center justify-between gap-3 text-right"
+                  >
+                    <span className="font-black text-gray-100">قوانین واریز</span>
+                    <span className={`w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-300/20 flex items-center justify-center text-purple-200 transition-transform ${depositTermsOpen ? "rotate-180" : ""}`}>⌄</span>
+                  </button>
+                  {depositTermsOpen && (
+                    <div className="px-4 pb-4 animate-slide-up">
+                      <p className="text-xs leading-7 text-gray-400">{WALLET_TERMS}</p>
+                    </div>
+                  )}
+                </div>
               </div>
             ) : (
               <form onSubmit={requestDeposit} className="space-y-5">
