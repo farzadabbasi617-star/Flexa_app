@@ -231,15 +231,27 @@ function mainMenuKeyboard() {
         { text: "🎮 پیش‌ثبت‌نام", callback_data: "menu:register" },
       ],
       [
-        { text: "📜 قوانین", callback_data: "menu:rules" },
-        { text: "👤 وضعیت من", callback_data: "menu:status" },
-      ],
-      [
         { text: "💳 کیف پول", callback_data: "menu:wallet" },
-        { text: "🔗 اتصال حساب", callback_data: "menu:link" },
+        { text: "🏆 تورنومنت‌های من", callback_data: "menu:my_tournaments" },
       ],
       [
+        { text: "✅ چک‌این", callback_data: "menu:checkin" },
+        { text: "⚔️ مسابقات من", callback_data: "menu:matches" },
+      ],
+      [
+        { text: "🎯 مأموریت‌ها", callback_data: "menu:missions" },
+        { text: "🧠 کوییز روزانه", callback_data: "menu:quiz" },
+      ],
+      [
+        { text: "🎧 پشتیبانی", callback_data: "menu:support" },
+        { text: "📜 قوانین", callback_data: "menu:rules" },
+      ],
+      [
+        { text: "🔗 اتصال حساب", callback_data: "menu:link" },
         { text: "👤 پروفایل", callback_data: "menu:profile" },
+      ],
+      [
+        { text: "👤 وضعیت من", callback_data: "menu:status" },
       ],
       [
         { text: "🆕 ساخت حساب", url: `${APP_URL}/register` },
@@ -2905,6 +2917,12 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:link") return linkCommand(chatId, callback.from);
   if (data === "menu:profile") return profileCommand(chatId, telegramId);
   if (data === "menu:wallet") return walletCommand(chatId, telegramId);
+  if (data === "menu:my_tournaments") return myTournamentsCommand(chatId, telegramId);
+  if (data === "menu:matches") return matchesCommand(chatId, telegramId);
+  if (data === "menu:checkin") return checkInCommand(chatId, telegramId);
+  if (data === "menu:missions") return missionsCommand(chatId, telegramId);
+  if (data === "menu:quiz") return quizCommand(chatId, telegramId);
+  if (data === "menu:support") return supportStartCommand(chatId, telegramId);
   if (data === "wallet:deposit") return startWalletDeposit(chatId, telegramId);
   if (data.startsWith("match:")) return handleMatchAction(chatId, telegramId, data.replace("match:", ""));
   if (data.startsWith("result:")) {
