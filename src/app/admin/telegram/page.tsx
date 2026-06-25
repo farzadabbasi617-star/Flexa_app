@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface TelegramAnalytics {
+  settings?: Record<string, string>;
   stats: Record<string, number>;
   campaigns: Array<{ campaign: string; events: number }>;
   coupons: Array<{ code: string; discountPercent: number; usedCount: number; isActive: boolean }>;
@@ -26,6 +27,9 @@ export default function AdminTelegramPage() {
   const [data, setData] = useState<TelegramAnalytics | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  const [settings, setSettings] = useState<Record<string, string>>({});
+  const [savingSettings, setSavingSettings] = useState(false);
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
   const load = useCallback(async () => {
@@ -36,6 +40,7 @@ export default function AdminTelegramPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "آمار تلگرام بارگذاری نشد");
       setData(json);
+      setSettings(json.settings || {});
     } catch (err) {
       setError(err instanceof Error ? err.message : "آمار تلگرام بارگذاری نشد");
     }
@@ -45,6 +50,61 @@ export default function AdminTelegramPage() {
   useEffect(() => { refreshUser().catch(() => undefined); }, [refreshUser]);
   useEffect(() => { if (!loading && (!user || !isAdmin)) router.push("/"); }, [loading, user, isAdmin, router]);
   useEffect(() => { if (isAdmin) load(); }, [isAdmin, load]);
+
+
+  function boolSetting(key: string, fallback = true) {
+    const value = settings[key];
+    if (value === "true") return true;
+    if (value === "false") return false;
+    return fallback;
+  }
+
+  function setBoolSetting(key: string, value: boolean) {
+    setSettings((prev) => ({ ...prev, [key]: value ? "true" : "false" }));
+  }
+
+  async function saveSettings() {
+    setSavingSettings(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/telegram", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ settings }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "ذخیره تنظیمات انجام نشد");
+      setSettings(json.settings || settings);
+      setMessage("تنظیمات ربات ذخیره شد.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ذخیره تنظیمات انجام نشد");
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function setupBot() {
+    setSavingSettings(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/telegram", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ action: "setup" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "تنظیم ربات انجام نشد");
+      setMessage("Commands، Menu Button و توضیحات ربات در تلگرام بروزرسانی شد.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تنظیم ربات انجام نشد");
+    } finally {
+      setSavingSettings(false);
+    }
+  }
 
   const statCards = useMemo(() => {
     const s = data?.stats || {};
@@ -79,6 +139,43 @@ export default function AdminTelegramPage() {
         </div>
 
         {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-2xl p-4 mb-6">{error}</div>}
+        {message && <div className="bg-green-500/10 border border-green-500/30 text-green-300 rounded-2xl p-4 mb-6">{message}</div>}
+
+
+        <section className="gaming-card p-5 mb-8 border border-purple-500/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+            <div>
+              <h2 className="font-black text-xl">⚙️ تنظیمات ربات تلگرام</h2>
+              <p className="text-xs text-gray-500 mt-1">کنترل سریع قابلیت‌های ربات بدون تغییر کد یا env</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button onClick={setupBot} disabled={savingSettings} className="px-4 py-2 rounded-xl bg-cyan-600 text-xs font-black disabled:opacity-50">تنظیم Commands/Menu</button>
+              <button onClick={saveSettings} disabled={savingSettings} className="px-4 py-2 rounded-xl bg-purple-600 text-xs font-black disabled:opacity-50">ذخیره تنظیمات</button>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            {[
+              ["telegram_bot_enabled", "فعال بودن ربات"],
+              ["telegram_require_channel_membership", "اجبار عضویت کانال"],
+              ["telegram_wallet_deposit_enabled", "ثبت فیش از ربات"],
+              ["telegram_support_enabled", "پشتیبانی تلگرامی"],
+              ["telegram_missions_enabled", "مأموریت‌ها و XP"],
+              ["telegram_quiz_enabled", "کوییز روزانه"],
+              ["telegram_ai_enabled", "دستیار AI"],
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-center justify-between gap-3 rounded-2xl bg-white/[.03] border border-white/10 p-3 text-sm">
+                <span>{label}</span>
+                <input type="checkbox" checked={boolSetting(key, true)} onChange={(e) => setBoolSetting(key, e.target.checked)} className="w-5 h-5 accent-purple-500" />
+              </label>
+            ))}
+          </div>
+          <textarea
+            value={settings.telegram_welcome_text || ""}
+            onChange={(e) => setSettings((prev) => ({ ...prev, telegram_welcome_text: e.target.value }))}
+            placeholder="متن خوشامد سفارشی /start (اختیاری)"
+            className="w-full min-h-24 bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-purple-400"
+          />
+        </section>
 
         <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {busy ? Array.from({ length: 8 }).map((_, i) => <div key={i} className="gaming-card p-5 h-24 animate-pulse" />) : statCards.map(([icon, label, value]) => (

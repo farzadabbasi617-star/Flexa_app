@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews } from "@/db/schema";
+import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews, siteSettings } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishHonorToTelegramChannel, publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { generateRealAssistantResponse } from "@/lib/ai-service";
@@ -169,6 +169,29 @@ function validateWebhookSecret(request: NextRequest) {
     return { ok: false, status: 401, error: "Unauthorized" };
   }
   return { ok: true, status: 200, error: null };
+}
+
+
+async function getTelegramSetting(key: string, fallback = "") {
+  try {
+    const [row] = await db.select({ value: siteSettings.value }).from(siteSettings).where(eq(siteSettings.key, key)).limit(1);
+    return row?.value ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+async function telegramFeatureEnabled(key: string, fallback = true) {
+  const value = await getTelegramSetting(key, fallback ? "true" : "false");
+  if (value === "false") return false;
+  if (value === "true") return true;
+  return fallback;
+}
+
+async function ensureFeatureEnabled(chatId: number, key: string, label: string) {
+  if (await telegramFeatureEnabled(key, true)) return true;
+  await sendMessage(chatId, `این قابلیت فعلاً از سمت مدیریت غیرفعال است: <b>${html(label)}</b>`);
+  return false;
 }
 
 function normalizeGame(value?: string | null) {
@@ -371,7 +394,8 @@ async function answerCallback(callbackQueryId: string, text?: string) {
 }
 
 async function isChannelMember(telegramId: string) {
-  const requireMembership = process.env.TELEGRAM_REQUIRE_CHANNEL_MEMBERSHIP === "true";
+  const setting = await getTelegramSetting("telegram_require_channel_membership", "");
+  const requireMembership = setting ? setting === "true" : process.env.TELEGRAM_REQUIRE_CHANNEL_MEMBERSHIP === "true";
   if (!requireMembership) return true;
   const result = await telegramApi("getChatMember", {
     chat_id: process.env.TELEGRAM_CHANNEL_ID || "@Gament_games",
@@ -2540,19 +2564,19 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/link") return linkCommand(chatId, user);
   if (normalizedCommand === "/profile") return profileCommand(chatId, telegramId);
   if (normalizedCommand === "/wallet") return walletCommand(chatId, telegramId);
-  if (normalizedCommand === "/deposit" || normalizedCommand === "/wallet_deposit") return startWalletDeposit(chatId, telegramId);
+  if (normalizedCommand === "/deposit" || normalizedCommand === "/wallet_deposit") { if (!(await ensureFeatureEnabled(chatId, "telegram_wallet_deposit_enabled", "ثبت فیش از ربات"))) return; return startWalletDeposit(chatId, telegramId); }
   if (normalizedCommand === "/achievements") return achievementsCommand(chatId, telegramId);
   if (normalizedCommand === "/my_tournaments") return myTournamentsCommand(chatId, telegramId);
   if (normalizedCommand === "/daily") return dailyCommand(chatId, telegramId);
-  if (normalizedCommand === "/quiz" || normalizedCommand === "/challenge") return quizCommand(chatId, telegramId);
+  if (normalizedCommand === "/quiz" || normalizedCommand === "/challenge") { if (!(await ensureFeatureEnabled(chatId, "telegram_quiz_enabled", "کوییز روزانه"))) return; return quizCommand(chatId, telegramId); }
   if (normalizedCommand === "/coupon") return couponCommand(chatId, telegramId, args.join(" "));
   if (normalizedCommand === "/shop") return shopCommand(chatId);
   if (normalizedCommand === "/invite") return inviteCommand(chatId, telegramId);
-  if (normalizedCommand === "/missions") return missionsCommand(chatId, telegramId);
+  if (normalizedCommand === "/missions") { if (!(await ensureFeatureEnabled(chatId, "telegram_missions_enabled", "مأموریت‌ها"))) return; return missionsCommand(chatId, telegramId); }
   if (normalizedCommand === "/claim_missions") return missionsCommand(chatId, telegramId);
   if (normalizedCommand === "/leaderboard") return leaderboardCommand(chatId);
-  if (normalizedCommand === "/ai") return aiCommand(chatId, args.join(" "), telegramId);
-  if (normalizedCommand === "/support") return supportStartCommand(chatId, telegramId);
+  if (normalizedCommand === "/ai") { if (!(await ensureFeatureEnabled(chatId, "telegram_ai_enabled", "دستیار AI"))) return; return aiCommand(chatId, args.join(" "), telegramId); }
+  if (normalizedCommand === "/support") { if (!(await ensureFeatureEnabled(chatId, "telegram_support_enabled", "پشتیبانی"))) return; return supportStartCommand(chatId, telegramId); }
   if (normalizedCommand === "/my_tickets") return myTicketsCommand(chatId, telegramId);
   if (normalizedCommand === "/matches") return matchesCommand(chatId, telegramId);
   if (normalizedCommand === "/checkin") return checkInCommand(chatId, telegramId);
@@ -2920,10 +2944,10 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:my_tournaments") return myTournamentsCommand(chatId, telegramId);
   if (data === "menu:matches") return matchesCommand(chatId, telegramId);
   if (data === "menu:checkin") return checkInCommand(chatId, telegramId);
-  if (data === "menu:missions") return missionsCommand(chatId, telegramId);
-  if (data === "menu:quiz") return quizCommand(chatId, telegramId);
-  if (data === "menu:support") return supportStartCommand(chatId, telegramId);
-  if (data === "wallet:deposit") return startWalletDeposit(chatId, telegramId);
+  if (data === "menu:missions") { if (!(await ensureFeatureEnabled(chatId, "telegram_missions_enabled", "مأموریت‌ها"))) return; return missionsCommand(chatId, telegramId); }
+  if (data === "menu:quiz") { if (!(await ensureFeatureEnabled(chatId, "telegram_quiz_enabled", "کوییز روزانه"))) return; return quizCommand(chatId, telegramId); }
+  if (data === "menu:support") { if (!(await ensureFeatureEnabled(chatId, "telegram_support_enabled", "پشتیبانی"))) return; return supportStartCommand(chatId, telegramId); }
+  if (data === "wallet:deposit") { if (!(await ensureFeatureEnabled(chatId, "telegram_wallet_deposit_enabled", "ثبت فیش از ربات"))) return; return startWalletDeposit(chatId, telegramId); }
   if (data.startsWith("match:")) return handleMatchAction(chatId, telegramId, data.replace("match:", ""));
   if (data.startsWith("result:")) {
     const [, action, matchId] = data.split(":");
@@ -3010,6 +3034,11 @@ async function handleUpdate(update: TelegramUpdate) {
   const message = update.message;
   if (!message?.from) return;
   const text = message.text || "";
+
+  if (!(await telegramFeatureEnabled("telegram_bot_enabled", true)) && !text.trim().startsWith("/admin")) {
+    await sendMessage(message.chat.id, "ربات Gament فعلاً در حالت تعمیرات است. لطفاً کمی بعد دوباره تلاش کن.");
+    return;
+  }
 
   if (text.trim().startsWith("/")) {
     await handleCommand(message, text);
