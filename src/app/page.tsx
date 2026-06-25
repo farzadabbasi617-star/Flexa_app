@@ -149,21 +149,15 @@ export default function LuxuryHomePage() {
                     {gameImage && <img src={gameImage.url} alt={gameImage.altText || gameImage.title} className="absolute inset-0 w-full h-full object-cover opacity-30 brightness-110 contrast-110 transition-transform duration-700 group-hover:scale-110" />}
                     <div className="absolute inset-0 bg-gradient-to-l from-black/75 via-black/30 to-black/5" />
                     
-                    {/* Left Side: Game Logo Container (Fully uniform, centered, and glowing!) */}
+                    {/* Left Side: Uniform Game Logo Badge — every source image keeps its aspect ratio inside the same square frame. */}
                     <div className="relative z-10 w-16 h-16 sm:w-20 sm:h-20 bg-white/5 border border-white/10 rounded-2xl sm:rounded-3xl p-2.5 flex items-center justify-center shadow-2xl transition-all group-hover:border-purple-500/30 group-hover:shadow-[0_0_20px_rgba(168,85,247,0.2)] shrink-0">
-                      {imageMap.bySlug[`icon-${game.id}`] ? (
-                        <img 
-                          src={imageMap.bySlug[`icon-${game.id}`].url} 
-                          alt={game.name} 
-                          className="w-full h-full object-contain" 
+                      <div className="w-12 h-12 sm:w-14 sm:h-14 rounded-xl sm:rounded-2xl bg-black/35 border border-white/10 flex items-center justify-center overflow-hidden shadow-inner">
+                        <img
+                          src={imageMap.bySlug[`icon-${game.id}`]?.url || game.icon}
+                          alt={game.name}
+                          className="block w-[78%] h-[78%] object-contain"
                         />
-                      ) : (
-                        <img 
-                          src={game.icon} 
-                          alt={game.name} 
-                          className="w-full h-full object-contain" 
-                        />
-                      )}
+                      </div>
                     </div>
 
                     {/* Right Side: Game Title & Details */}
