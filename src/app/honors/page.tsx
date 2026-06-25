@@ -5,6 +5,7 @@ import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 
 type HonorType = "all" | "winner" | "levelup" | "news";
+type HonorFilterIcon = "all" | "winner" | "levelup" | "news";
 
 interface Honor {
   id: string;
@@ -27,12 +28,41 @@ interface Honor {
   viewsCount?: number;
 }
 
-const FILTERS: { id: HonorType; label: string; icon: string }[] = [
-  { id: "all", label: "همه", icon: "🌟" },
-  { id: "winner", label: "برندگان", icon: "🏆" },
-  { id: "levelup", label: "لول‌آپ", icon: "⚡" },
-  { id: "news", label: "اخبار", icon: "📰" },
+const FILTERS: { id: HonorType; label: string; icon: HonorFilterIcon }[] = [
+  { id: "all", label: "همه", icon: "all" },
+  { id: "winner", label: "برندگان", icon: "winner" },
+  { id: "levelup", label: "لول‌آپ", icon: "levelup" },
+  { id: "news", label: "اخبار", icon: "news" },
 ];
+
+
+function HonorFilterSvgIcon({ name, className = "w-4 h-4" }: { name: HonorFilterIcon; className?: string }) {
+  if (name === "all") return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
+      <path d="M12 3.5 14.2 8l4.9.7-3.6 3.5.9 4.9-4.4-2.3-4.4 2.3.9-4.9L4.9 8.7 9.8 8 12 3.5Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M5 19.5h14" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+  if (name === "winner") return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
+      <path d="M8 4h8v3.4c0 3.7-1.6 6.1-4 7.1-2.4-1-4-3.4-4-7.1V4Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M8 6H5c.2 3.1 1.4 4.7 3.8 5.2M16 6h3c-.2 3.1-1.4 4.7-3.8 5.2M12 14.5V18M8.8 20h6.4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+  if (name === "levelup") return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
+      <path d="M12 20V5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="m7 10 5-5 5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 17h14M7 21h10" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" aria-hidden="true">
+      <path d="M6 4.5h9.5L19 8v11.5H6V4.5Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M15.5 4.5V8H19M8.7 11h6.6M8.7 14h6.6M8.7 17h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 const GAME_FILTERS = [
   { id: "all", label: "همه بازی‌ها" },
@@ -101,7 +131,7 @@ export default function HonorsPage() {
                     : "bg-[#111114] border-white/10 text-white/70"
                 }`}
               >
-                {f.icon} {f.label}
+                <span className="inline-flex items-center gap-2"><HonorFilterSvgIcon name={f.icon} className="w-4 h-4" /><span>{f.label}</span></span>
               </button>
             ))}
           </div>

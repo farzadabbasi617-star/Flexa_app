@@ -385,8 +385,8 @@ export default function WalletPage() {
       </main>
 
       {walletDialog === "deposit" && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-end sm:items-center justify-center px-3 py-4" dir="rtl">
-          <div className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[2.5rem] sm:rounded-[2.5rem] bg-[#111016] border border-white/10 shadow-[0_0_80px_rgba(139,92,246,.25)] p-5 animate-slide-up">
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-start justify-center px-3 pt-2 pb-4" dir="rtl">
+          <div className="w-full max-w-md max-h-[calc(100dvh-16px)] overflow-y-auto rounded-[2.25rem] bg-[#111016] border border-white/10 shadow-[0_0_80px_rgba(139,92,246,.25)] p-4 sm:p-5 animate-slide-up overscroll-contain">
             <div className="flex items-center justify-between mb-5">
               <button onClick={closeWalletDialog} className="w-11 h-11 rounded-full bg-white text-gray-700 text-2xl leading-none">×</button>
               <div className="text-center">
@@ -398,10 +398,10 @@ export default function WalletPage() {
 
             {depositStep === 1 ? (
               <div className="space-y-5">
-                <div className="rounded-[2rem] bg-gradient-to-br from-purple-950/80 to-[#191421] border border-purple-400/25 p-5">
+                <div className="rounded-[2rem] bg-gradient-to-br from-purple-950/80 to-[#191421] border border-purple-400/25 p-4">
                   <div className="text-xs font-black text-purple-200 mb-2">مبلغی که می‌خواهید واریز کنید</div>
-                  <div className="flex items-center justify-center rounded-[1.75rem] bg-white/10 border border-white/10 p-6 mb-4">
-                    <span className="text-4xl font-black num-en">{depositAmount || "0"}</span>
+                  <div className="flex items-center justify-center rounded-[1.75rem] bg-white/10 border border-white/10 p-4 mb-3">
+                    <span className="text-3xl sm:text-4xl font-black num-en">{depositAmount || "0"}</span>
                     <span className="mr-2 font-bold text-purple-200">تومان</span>
                   </div>
                   <input
@@ -500,7 +500,7 @@ export default function WalletPage() {
                 </label>
 
                 <textarea className="gaming-input min-h-20" placeholder="توضیح اختیاری" value={depositNote} onChange={(e) => setDepositNote(e.target.value)} />
-                <div className="grid grid-cols-2 gap-3">
+                <div className="sticky bottom-0 -mx-4 sm:-mx-5 px-4 sm:px-5 pt-3 pb-2 bg-gradient-to-t from-[#111016] via-[#111016]/95 to-transparent grid grid-cols-2 gap-3">
                   <button type="button" onClick={() => setDepositStep(1)} className="px-4 py-4 rounded-2xl bg-white/10 border border-white/10 font-black text-gray-200">بازگشت</button>
                   <button disabled={!acceptedTerms || submitting === "deposit" || !depositAmount} className="gaming-btn disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال ثبت..." : "ثبت فیش"}</button>
                 </div>
@@ -511,8 +511,8 @@ export default function WalletPage() {
       )}
 
       {walletDialog === "withdrawal" && (
-        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-end sm:items-center justify-center px-3 py-4" dir="rtl">
-          <form onSubmit={requestWithdrawal} className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[2.5rem] sm:rounded-[2.5rem] bg-[#111016] border border-white/10 shadow-[0_0_80px_rgba(45,212,191,.18)] p-5 animate-slide-up space-y-4">
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-start justify-center px-3 pt-2 pb-4" dir="rtl">
+          <form onSubmit={requestWithdrawal} className="w-full max-w-md max-h-[calc(100dvh-16px)] overflow-y-auto rounded-[2.25rem] bg-[#111016] border border-white/10 shadow-[0_0_80px_rgba(45,212,191,.18)] p-4 sm:p-5 animate-slide-up space-y-4 overscroll-contain">
             <div className="flex items-center justify-between mb-2">
               <button type="button" onClick={closeWalletDialog} className="w-11 h-11 rounded-full bg-white text-gray-700 text-2xl leading-none">×</button>
               <h2 className="text-2xl font-black">درخواست برداشت</h2>
