@@ -10,10 +10,13 @@ export function parseTomanToRial(value: string | null | undefined): bigint {
   const hasThousand = /هزار|thousand|k\b/.test(raw);
   const hasRial = /ریال|rial/.test(raw);
 
-  const numericMatches = raw.match(/[0-9]+(?:[.,][0-9]+)?/g);
+  // Treat comma/Arabic comma/space as thousands separators, so inputs such as
+  // 200,000 or ۲۰۰،۰۰۰ are parsed as two hundred thousand, not 200.000.
+  const normalizedNumberText = raw.replace(/[،,\s_]/g, "");
+  const numericMatches = normalizedNumberText.match(/[0-9]+(?:\.[0-9]+)?/g);
   if (!numericMatches || numericMatches.length === 0) return BigInt(0);
 
-  const firstNumber = Number(numericMatches[0].replace(/,/g, "."));
+  const firstNumber = Number(numericMatches[0]);
   if (!Number.isFinite(firstNumber) || firstNumber <= 0) return BigInt(0);
 
   let amount = firstNumber;

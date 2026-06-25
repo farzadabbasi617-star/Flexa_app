@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { transactions, users, wallets } from "@/db/schema";
+import { notifications, transactions, users, wallets } from "@/db/schema";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
@@ -118,18 +118,27 @@ async function handlePendingTransaction(request: NextRequest, authUserId: string
       paymentTrackingNumber: paymentTrackingNumber || null,
     };
 
+    const amountRial = bigIntFromText(pending.amount);
+    const [wallet] = await tx.select().from(wallets).where(eq(wallets.id, pending.walletId)).limit(1);
+    if (!wallet) throw new Error("کیف پول پیدا نشد");
+
     if (decision === "reject") {
       const [updatedTx] = await tx
         .update(transactions)
         .set({ status: "cancelled", metadata: nextMeta, updatedAt: new Date() })
         .where(eq(transactions.id, pending.id))
         .returning();
-      return { transaction: updatedTx, wallet: null };
-    }
 
-    const amountRial = bigIntFromText(pending.amount);
-    const [wallet] = await tx.select().from(wallets).where(eq(wallets.id, pending.walletId)).limit(1);
-    if (!wallet) throw new Error("کیف پول پیدا نشد");
+      await tx.insert(notifications).values({
+        userId: wallet.userId,
+        type: "wallet",
+        title: pending.type === "withdrawal" ? "درخواست برداشت رد شد" : "درخواست شارژ رد شد",
+        message: adminNote || (pending.type === "withdrawal" ? "درخواست برداشت شما توسط مدیریت رد شد." : "درخواست شارژ شما توسط مدیریت رد شد."),
+        link: "/wallet",
+      });
+
+      return { transaction: updatedTx, wallet, userId: wallet.userId };
+    }
 
     const [updatedWallet] = await tx
       .update(wallets)
@@ -154,7 +163,17 @@ async function handlePendingTransaction(request: NextRequest, authUserId: string
       .where(eq(transactions.id, pending.id))
       .returning();
 
-    return { transaction: updatedTx, wallet: updatedWallet };
+    await tx.insert(notifications).values({
+      userId: wallet.userId,
+      type: "wallet",
+      title: pending.type === "withdrawal" ? "برداشت با موفقیت پرداخت شد" : "شارژ کیف پول تأیید شد",
+      message: pending.type === "withdrawal"
+        ? `درخواست برداشت شما تأیید شد و پرداخت بانکی انجام شد.${paymentTrackingNumber ? ` شماره پیگیری: ${paymentTrackingNumber}` : ""}`
+        : "درخواست شارژ شما تأیید و به موجودی کیف پول اضافه شد.",
+      link: "/wallet",
+    });
+
+    return { transaction: updatedTx, wallet: updatedWallet, userId: wallet.userId };
   });
 
   await logAdminAction({

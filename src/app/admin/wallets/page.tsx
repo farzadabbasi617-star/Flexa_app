@@ -37,7 +37,14 @@ interface PendingTransaction {
 
 function metaText(tx: PendingTransaction, key: string) {
   const value = tx.metadata?.[key];
-  return typeof value === "string" ? value : "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number") return String(value);
+  return "";
+}
+
+function copyText(value: string) {
+  if (!value) return;
+  navigator.clipboard?.writeText(value).catch(() => undefined);
 }
 
 export default function AdminWalletsPage() {
@@ -89,6 +96,10 @@ export default function AdminWalletsPage() {
     return rows.filter((row) => JSON.stringify(row).toLowerCase().includes(q));
   }, [query, rows]);
 
+  const pendingWithdrawals = useMemo(() => pendingTransactions.filter((tx) => tx.type === "withdrawal"), [pendingTransactions]);
+  const pendingDeposits = useMemo(() => pendingTransactions.filter((tx) => tx.type === "deposit"), [pendingTransactions]);
+  const pendingWithdrawalTotal = useMemo(() => pendingWithdrawals.reduce((sum, tx) => sum + tx.amountToman, 0), [pendingWithdrawals]);
+
   async function adjust(e: FormEvent) {
     e.preventDefault();
     if (!selected) return;
@@ -121,6 +132,9 @@ export default function AdminWalletsPage() {
         ? "این شارژ تایید و به موجودی کاربر اضافه شود؟"
         : "این برداشت تایید شود؟ مطمئن شوید پرداخت بانکی انجام شده است."
       : "این درخواست رد شود؟";
+    if (decision === "approve" && tx.type === "withdrawal" && !paymentTrackingNumber.trim()) {
+      if (!confirm("شماره پیگیری پرداخت وارد نشده است. آیا مطمئنید پرداخت بانکی انجام شده و بدون شماره پیگیری تأیید شود؟")) return;
+    }
     if (!confirm(confirmText)) return;
 
     setSaving(true);
@@ -161,9 +175,23 @@ export default function AdminWalletsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
               <h2 className="font-black text-xl">درخواست‌های در انتظار</h2>
-              <p className="text-xs text-gray-500 mt-1">شارژ بعد از تایید به موجودی اضافه می‌شود؛ برداشت بعد از پرداخت بانکی توسط ادمین تایید شود.</p>
+              <p className="text-xs text-gray-500 mt-1">واریزهای پی‌پینگ معمولاً خودکار تکمیل می‌شوند؛ برداشت بعد از پرداخت بانکی توسط ادمین تأیید شود.</p>
             </div>
             <button onClick={load} className="px-4 py-2 rounded-xl bg-dark-700 text-sm font-bold">🔄 بروزرسانی</button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+            <div className="rounded-2xl bg-orange-500/10 border border-orange-500/20 p-4">
+              <div className="text-xs text-orange-200 mb-1">برداشت‌های در انتظار</div>
+              <div className="text-2xl font-black text-orange-300">{pendingWithdrawals.length.toLocaleString("fa-IR")}</div>
+            </div>
+            <div className="rounded-2xl bg-yellow-500/10 border border-yellow-500/20 p-4">
+              <div className="text-xs text-yellow-200 mb-1">جمع مبلغ برداشت</div>
+              <div className="text-2xl font-black text-yellow-300">{pendingWithdrawalTotal.toLocaleString("fa-IR")} تومان</div>
+            </div>
+            <div className="rounded-2xl bg-green-500/10 border border-green-500/20 p-4">
+              <div className="text-xs text-green-200 mb-1">شارژهای pending</div>
+              <div className="text-2xl font-black text-green-300">{pendingDeposits.length.toLocaleString("fa-IR")}</div>
+            </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
             <input className="gaming-input" placeholder="یادداشت ادمین (اختیاری)" value={adminNote} onChange={(e) => setAdminNote(e.target.value)} />
@@ -182,13 +210,16 @@ export default function AdminWalletsPage() {
                       <td className="p-3 text-xs text-gray-300 leading-6">
                         {tx.type === "withdrawal" ? (
                           <>
-                            <div>صاحب حساب: {metaText(tx, "accountOwner") || "—"}</div>
-                            <div>کد ملی: <span dir="ltr">{metaText(tx, "nationalId") || "—"}</span></div>
-                            <div>شبا: <span dir="ltr">{metaText(tx, "iban") || "—"}</span></div>
+                            <div>صاحب حساب: <b className="text-white">{metaText(tx, "accountOwner") || "—"}</b></div>
+                            <div>کد ملی: <button type="button" onClick={() => copyText(metaText(tx, "nationalId"))} dir="ltr" className="text-cyan-300 hover:underline">{metaText(tx, "nationalId") || "—"}</button></div>
+                            <div>شبا: <button type="button" onClick={() => copyText(metaText(tx, "iban"))} dir="ltr" className="text-cyan-300 hover:underline break-all">{metaText(tx, "iban") || "—"}</button></div>
+                            <div>توضیح کاربر: {metaText(tx, "note") || "—"}</div>
                           </>
                         ) : (
                           <>
-                            <div>پیگیری: {metaText(tx, "trackingNumber") || "—"}</div>
+                            <div>درگاه: {metaText(tx, "provider") || "manual"}</div>
+                            <div>کد پی‌پینگ: <span dir="ltr" className="text-cyan-300">{metaText(tx, "paypingCode") || "—"}</span></div>
+                            <div>RefId: <span dir="ltr" className="text-cyan-300">{metaText(tx, "paypingRefId") || metaText(tx, "trackingNumber") || "—"}</span></div>
                             <div>توضیح: {metaText(tx, "note") || "—"}</div>
                           </>
                         )}

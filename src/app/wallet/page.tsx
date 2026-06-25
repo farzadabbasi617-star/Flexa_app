@@ -47,6 +47,17 @@ const STATUS_LABELS: Record<string, string> = {
   cancelled: "لغوشده",
 };
 
+const QUICK_DEPOSIT_AMOUNTS = [50_000, 100_000, 200_000, 500_000, 1_000_000];
+
+function formatTomanInput(value: string) {
+  const digits = value.replace(/[^\d۰-۹٠-٩]/g, "");
+  if (!digits) return "";
+  const englishDigits = digits
+    .replace(/[۰-۹]/g, (d) => String("۰۱۲۳۴۵۶۷۸۹".indexOf(d)))
+    .replace(/[٠-٩]/g, (d) => String("٠١٢٣٤٥٦٧٨٩".indexOf(d)));
+  return Number(englishDigits).toLocaleString("en-US");
+}
+
 function txSign(type: string) {
   return type === "entry_fee" || type === "withdrawal" ? "-" : "+";
 }
@@ -242,7 +253,28 @@ export default function WalletPage() {
               <h2 className="font-black mb-1">شارژ آنلاین کیف پول</h2>
               <p className="text-xs text-gray-500 leading-6">پرداخت از طریق درگاه امن پی‌پینگ انجام می‌شود و پس از تأیید موفق، موجودی قابل استفاده داخل سایت به‌صورت خودکار افزایش می‌یابد. شارژ مستقیم قابل برداشت نیست.</p>
             </div>
-            <input className="gaming-input" placeholder="مبلغ (تومان)" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
+            <div className="space-y-3">
+              <input
+                className="gaming-input text-left num-en"
+                dir="ltr"
+                inputMode="numeric"
+                placeholder="مثلاً 200,000 تومان"
+                value={depositAmount}
+                onChange={(e) => setDepositAmount(formatTomanInput(e.target.value))}
+              />
+              <div className="flex flex-wrap gap-2">
+                {QUICK_DEPOSIT_AMOUNTS.map((amount) => (
+                  <button
+                    key={amount}
+                    type="button"
+                    onClick={() => setDepositAmount(amount.toLocaleString("en-US"))}
+                    className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[11px] font-black text-purple-100 hover:border-purple-400/40"
+                  >
+                    {amount.toLocaleString("fa-IR")} تومان
+                  </button>
+                ))}
+              </div>
+            </div>
             <textarea className="gaming-input min-h-20" placeholder="توضیح اختیاری" value={depositNote} onChange={(e) => setDepositNote(e.target.value)} />
             <button disabled={!acceptedTerms || submitting === "deposit"} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال انتقال..." : "پرداخت آنلاین با پی‌پینگ"}</button>
           </form>
@@ -252,7 +284,7 @@ export default function WalletPage() {
               <h2 className="font-black mb-1">درخواست برداشت</h2>
               <p className="text-xs text-gray-500 leading-6">برداشت فقط از موجودی قابل برداشت مثل جوایز و پاداش‌های رسمی امکان‌پذیر است. حداقل برداشت ۵۰٬۰۰۰ تومان.</p>
             </div>
-            <input className="gaming-input" placeholder="مبلغ برداشت (تومان)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(e.target.value)} />
+            <input className="gaming-input text-left num-en" dir="ltr" inputMode="numeric" placeholder="مبلغ برداشت (مثلاً 200,000 تومان)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(formatTomanInput(e.target.value))} />
             <input className="gaming-input" placeholder="نام و نام خانوادگی صاحب حساب" value={accountOwner} onChange={(e) => setAccountOwner(e.target.value)} />
             <input className="gaming-input" placeholder="کد ملی صاحب حساب" value={nationalId} onChange={(e) => setNationalId(e.target.value)} dir="ltr" />
             <input className="gaming-input" placeholder="شماره شبا مثل IRxxxxxxxxxxxxxxxxxxxxxxxx" value={iban} onChange={(e) => setIban(e.target.value)} dir="ltr" />
