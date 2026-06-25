@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors } from "@/db/schema";
+import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishHonorToTelegramChannel, publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { generateRealAssistantResponse } from "@/lib/ai-service";
@@ -1162,6 +1162,7 @@ async function adminCommand(chatId: number, telegramId: string) {
       "/pending_wallets — شارژ/برداشت‌های در انتظار",
       "/pending_disputes — اعتراض‌های باز",
       "/pending_honors — محتوای تالار افتخارات در انتظار",
+      "/honor_stats — آمار بازدید و لایک خبرها",
       "/manage — مدیریت سریع تورنومنت‌ها",
       "/announce متن — ارسال اطلاعیه به کاربران ربات",
       "/post_latest — انتشار آخرین تورنومنت فعال در کانال",
@@ -1169,7 +1170,8 @@ async function adminCommand(chatId: number, telegramId: string) {
     {
       inline_keyboard: [
         [{ text: "💳 کیف پول‌ها", callback_data: "admin:wallets" }, { text: "🚨 اعتراض‌ها", callback_data: "admin:disputes" }],
-        [{ text: "🏛 افتخارات", callback_data: "admin:honors" }, { text: "🧩 تورنومنت‌ها", callback_data: "admin:tournaments" }],
+        [{ text: "🏛 افتخارات", callback_data: "admin:honors" }, { text: "📊 آمار خبرها", callback_data: "admin:honor_stats" }],
+        [{ text: "🧩 تورنومنت‌ها", callback_data: "admin:tournaments" }],
         [{ text: "ورود به پنل ادمین", url: `${APP_URL}/admin` }],
       ],
     }
@@ -1253,6 +1255,33 @@ async function pendingDisputesCommand(chatId: number, telegramId: string) {
       ...rows.slice(0, 5).map((row, i) => [{ text: `مشاهده اعتراض ${i + 1}`, url: `${APP_URL}/admin/disputes?matchId=${row.matchId}` }]),
       [{ text: "پنل اعتراض‌ها", url: `${APP_URL}/admin/disputes` }],
     ],
+  });
+}
+
+async function honorStatsCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+
+  const topViews = await db
+    .select({ title: honors.title, id: honors.id, count: sql<number>`count(${honorViews.id})::int` })
+    .from(honorViews)
+    .innerJoin(honors, eq(honorViews.honorId, honors.id))
+    .where(eq(honors.status, "approved"))
+    .groupBy(honors.id, honors.title)
+    .orderBy(desc(sql`count(${honorViews.id})`))
+    .limit(5);
+  const topLikes = await db
+    .select({ title: honors.title, id: honors.id, count: sql<number>`count(${honorLikes.id})::int` })
+    .from(honorLikes)
+    .innerJoin(honors, eq(honorLikes.honorId, honors.id))
+    .where(eq(honors.status, "approved"))
+    .groupBy(honors.id, honors.title)
+    .orderBy(desc(sql`count(${honorLikes.id})`))
+    .limit(5);
+
+  const views = topViews.length ? topViews.map((row, i) => `${i + 1}) <b>${html(row.title)}</b> — ${Number(row.count).toLocaleString("fa-IR")} سین`).join("\n") : "داده‌ای ثبت نشده.";
+  const likes = topLikes.length ? topLikes.map((row, i) => `${i + 1}) <b>${html(row.title)}</b> — ${Number(row.count).toLocaleString("fa-IR")} لایک`).join("\n") : "داده‌ای ثبت نشده.";
+  await sendMessage(chatId, ["🏛 <b>آمار تالار افتخارات</b>", "", "👁 پربازدیدترین‌ها", views, "", "♥️ محبوب‌ترین‌ها", likes].join("\n"), {
+    inline_keyboard: [[{ text: "پنل تالار افتخارات", url: `${APP_URL}/admin/honors` }]],
   });
 }
 
@@ -2358,6 +2387,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/pending_wallets") return pendingWalletsCommand(chatId, telegramId);
   if (normalizedCommand === "/pending_disputes") return pendingDisputesCommand(chatId, telegramId);
   if (normalizedCommand === "/pending_honors") return pendingHonorsCommand(chatId, telegramId);
+  if (normalizedCommand === "/honor_stats") return honorStatsCommand(chatId, telegramId);
   if (normalizedCommand === "/ops") return adminCommand(chatId, telegramId);
   if (normalizedCommand === "/manage" || normalizedCommand === "/tournaments_admin") return adminTournamentsCommand(chatId, telegramId);
   if (normalizedCommand === "/post_latest") return postLatestTournamentCommand(chatId, telegramId);
@@ -2653,6 +2683,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "admin:wallets") return pendingWalletsCommand(chatId, telegramId);
   if (data === "admin:disputes") return pendingDisputesCommand(chatId, telegramId);
   if (data === "admin:honors") return pendingHonorsCommand(chatId, telegramId);
+  if (data === "admin:honor_stats") return honorStatsCommand(chatId, telegramId);
   if (data === "admin:tournaments") return adminTournamentsCommand(chatId, telegramId);
   if (data.startsWith("honor:")) {
     const [, action, honorId] = data.split(":");

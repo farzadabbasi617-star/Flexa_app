@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { and, count, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions, honors } from "@/db/schema";
+import { matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions, honors, honorLikes, honorViews } from "@/db/schema";
 import { getTelegramChannelChatId, sendTelegramMessage } from "@/lib/telegram";
 import { generateDailyGamingNews } from "@/lib/gaming-news-generator";
 import logger from "@/lib/logger";
@@ -146,6 +146,115 @@ async function runHourlyClassifiedScrape() {
   const totalNew = results.reduce((sum, r) => sum + r.new, 0);
   await markSent(key, "classified_scrape");
   return { ran: true as const, results, totalNew, intervalHours };
+}
+
+
+function telegramAdminIds() {
+  return (process.env.TELEGRAM_ADMIN_IDS || process.env.ADMIN_IDS || "")
+    .split(",")
+    .map((x) => x.trim())
+    .filter((id) => Number.isFinite(Number(id)));
+}
+
+async function sendToAdmins(text: string, replyMarkup?: Record<string, unknown>) {
+  let sent = 0;
+  for (const id of telegramAdminIds()) {
+    await sendTelegramMessage(Number(id), text, replyMarkup);
+    sent += 1;
+  }
+  return sent;
+}
+
+async function honorEngagementRows(kind: "views" | "likes", limit = 5) {
+  const table = kind === "views" ? honorViews : honorLikes;
+  return db
+    .select({
+      honorId: honors.id,
+      title: honors.title,
+      type: honors.type,
+      game: honors.game,
+      count: sql<number>`count(${table.id})::int`,
+    })
+    .from(table)
+    .innerJoin(honors, eq(table.honorId, honors.id))
+    .where(eq(honors.status, "approved"))
+    .groupBy(honors.id, honors.title, honors.type, honors.game)
+    .orderBy(desc(sql`count(${table.id})`))
+    .limit(limit);
+}
+
+async function sendHonorEngagementReport() {
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
+  const key = `honor-engagement-report:${today}`;
+  if (await hasSent(key)) return 0;
+  if (!telegramAdminIds().length) return 0;
+
+  const [topViews, topLikes, approvedNews] = await Promise.all([
+    honorEngagementRows("views", 5),
+    honorEngagementRows("likes", 5),
+    db.select({ value: count() }).from(honors).where(and(eq(honors.status, "approved"), eq(honors.type, "news"))),
+  ]);
+
+  const viewLines = topViews.length
+    ? topViews.map((row, index) => `${index + 1}) <b>${html(row.title)}</b> — ${Number(row.count || 0).toLocaleString("fa-IR")} سین`).join("\n")
+    : "هنوز بازدیدی ثبت نشده.";
+  const likeLines = topLikes.length
+    ? topLikes.map((row, index) => `${index + 1}) <b>${html(row.title)}</b> — ${Number(row.count || 0).toLocaleString("fa-IR")} لایک`).join("\n")
+    : "هنوز لایکی ثبت نشده.";
+
+  const text = [
+    "🏛 <b>گزارش روزانه تالار افتخارات</b>",
+    "",
+    `خبرهای منتشرشده: <b>${(approvedNews[0]?.value || 0).toLocaleString("fa-IR")}</b>`,
+    "",
+    "👁 <b>پربازدیدترین‌ها</b>",
+    viewLines,
+    "",
+    "♥️ <b>محبوب‌ترین‌ها</b>",
+    likeLines,
+  ].join("\n");
+
+  const sent = await sendToAdmins(text, { inline_keyboard: [[{ text: "پنل تالار افتخارات", url: `${process.env.APP_URL || "https://www.gament1.ir"}/admin/honors` }]] });
+  await markSent(key, "honor_engagement_report");
+  return sent;
+}
+
+async function sendHonorMilestoneAlerts() {
+  if (!telegramAdminIds().length) return 0;
+  const rows = await db.select({ id: honors.id, title: honors.title, type: honors.type }).from(honors).where(eq(honors.status, "approved")).limit(200);
+  let sent = 0;
+  const viewThresholds = [10, 50, 100, 250, 500, 1000];
+  const likeThresholds = [5, 10, 25, 50, 100, 250];
+
+  for (const honor of rows) {
+    const [viewRow] = await db.select({ value: sql<number>`count(*)::int` }).from(honorViews).where(eq(honorViews.honorId, honor.id));
+    const [likeRow] = await db.select({ value: sql<number>`count(*)::int` }).from(honorLikes).where(eq(honorLikes.honorId, honor.id));
+    const views = Number(viewRow?.value || 0);
+    const likes = Number(likeRow?.value || 0);
+
+    for (const threshold of viewThresholds) {
+      if (views < threshold) continue;
+      const key = `honor:milestone:view:${honor.id}:${threshold}`;
+      if (await hasSent(key)) continue;
+      await sendToAdmins(`👁 <b>رکورد بازدید خبر</b>\n\n<b>${html(honor.title)}</b> به <b>${threshold.toLocaleString("fa-IR")}</b> سین رسید.`, {
+        inline_keyboard: [[{ text: "مشاهده خبر", url: `${process.env.APP_URL || "https://www.gament1.ir"}/honors/${honor.id}` }]],
+      });
+      await markSent(key, "honor_view_milestone");
+      sent += 1;
+    }
+
+    for (const threshold of likeThresholds) {
+      if (likes < threshold) continue;
+      const key = `honor:milestone:like:${honor.id}:${threshold}`;
+      if (await hasSent(key)) continue;
+      await sendToAdmins(`♥️ <b>رکورد لایک خبر</b>\n\n<b>${html(honor.title)}</b> به <b>${threshold.toLocaleString("fa-IR")}</b> لایک رسید.`, {
+        inline_keyboard: [[{ text: "مشاهده خبر", url: `${process.env.APP_URL || "https://www.gament1.ir"}/honors/${honor.id}` }]],
+      });
+      await markSent(key, "honor_like_milestone");
+      sent += 1;
+    }
+  }
+  return sent;
 }
 
 async function sendDailyAdminReport() {
@@ -380,6 +489,8 @@ export async function GET(request: NextRequest) {
   const classifiedScrape = await safeCronStep("classifiedScrape", runHourlyClassifiedScrape);
   const classifiedCleanup = await safeCronStep("classifiedCleanup", cleanupClassifiedAds);
   const dailyReports = await safeCronStep("dailyReports", sendDailyAdminReport);
+  const honorEngagementReport = await safeCronStep("honorEngagementReport", sendHonorEngagementReport);
+  const honorMilestones = await safeCronStep("honorMilestones", sendHonorMilestoneAlerts);
   const dailyGamingNews = await safeCronStep("dailyGamingNews", () => generateDailyGamingNews());
 
   return NextResponse.json({
@@ -394,6 +505,8 @@ export async function GET(request: NextRequest) {
     classifiedScrape,
     classifiedCleanup,
     dailyReports,
+    honorEngagementReport,
+    honorMilestones,
     dailyGamingNews,
   });
 }
