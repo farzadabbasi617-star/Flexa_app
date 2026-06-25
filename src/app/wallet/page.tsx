@@ -30,7 +30,7 @@ interface WalletData {
 }
 
 const WALLET_TERMS =
-  "شارژ کیف پول گیمنت فعلاً از طریق کارت‌به‌کارت انجام می‌شود. پس از انتقال وجه به کارت اعلام‌شده، رسید/شماره پیگیری را ثبت کنید تا مدیریت پرداخت را بررسی و موجودی قابل استفاده داخل سایت را تأیید کند. مبالغ شارژ شده صرفاً برای خدمات داخل پلتفرم مثل ثبت‌نام تورنومنت قابل استفاده است و به‌صورت مستقیم قابل برداشت نیست. مبالغ قابل برداشت شامل جوایز، پاداش‌های رسمی و مبالغی است که طبق قوانین گیمنت قابل تسویه اعلام شده‌اند. درخواست‌های برداشت پس از ثبت اطلاعات بانکی معتبر و بررسی توسط تیم پشتیبانی، طی ۲۴ تا ۷۲ ساعت کاری پرداخت می‌شوند.";
+  "شارژ کیف پول گیمنت فعلاً فقط از طریق کارت‌به‌کارت انجام می‌شود. بعد از انتقال وجه، تصویر فیش و در صورت امکان شماره پیگیری را ارسال کنید تا مدیریت پرداخت را بررسی و موجودی قابل استفاده داخل سایت را تأیید کند. مبالغ شارژ شده صرفاً برای خدمات داخل پلتفرم مثل ثبت‌نام تورنومنت قابل استفاده است و به‌صورت مستقیم قابل برداشت نیست. مبالغ قابل برداشت شامل جوایز، پاداش‌های رسمی و مبالغی است که طبق قوانین گیمنت قابل تسویه اعلام شده‌اند. درخواست‌های برداشت پس از ثبت اطلاعات بانکی معتبر و بررسی توسط تیم پشتیبانی، طی ۲۴ تا ۷۲ ساعت کاری پرداخت می‌شوند.";
 
 const TYPE_LABELS: Record<string, string> = {
   deposit: "شارژ کیف پول",
@@ -41,7 +41,7 @@ const TYPE_LABELS: Record<string, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  pending: "در انتظار",
+  pending: "در حال بررسی",
   completed: "تکمیل‌شده",
   failed: "ناموفق",
   cancelled: "لغوشده",
@@ -70,11 +70,19 @@ function txColor(type: string) {
   return type === "entry_fee" || type === "withdrawal" ? "text-red-400" : "text-emerald-400";
 }
 
+function transactionIcon(type: string) {
+  if (type === "withdrawal" || type === "entry_fee") return "↗";
+  if (type === "tournament_win") return "🏆";
+  return "↙";
+}
+
 export default function WalletPage() {
   const { user, loading } = useAuth();
   const [data, setData] = useState<WalletData | null>(null);
   const [busy, setBusy] = useState(true);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
+  const [walletDialog, setWalletDialog] = useState<"deposit" | "withdrawal" | "">("");
+  const [depositStep, setDepositStep] = useState<1 | 2>(1);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositTrackingNumber, setDepositTrackingNumber] = useState("");
   const [depositNote, setDepositNote] = useState("");
@@ -120,7 +128,26 @@ export default function WalletPage() {
 
   const pendingDeposits = useMemo(() => data?.transactions.filter((tx) => tx.type === "deposit" && tx.status === "pending") || [], [data]);
   const pendingWithdrawals = useMemo(() => data?.transactions.filter((tx) => tx.type === "withdrawal" && tx.status === "pending") || [], [data]);
+  const canContinueDeposit = acceptedTerms && Boolean(depositAmount);
 
+  function openDeposit() {
+    setError("");
+    setMessage("");
+    setDepositStep(1);
+    setWalletDialog("deposit");
+  }
+
+  function openWithdrawal() {
+    setError("");
+    setMessage("");
+    setWalletDialog("withdrawal");
+  }
+
+  function closeWalletDialog() {
+    if (submitting) return;
+    setWalletDialog("");
+    setDepositStep(1);
+  }
 
   function handleDepositReceiptChange(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0] || null;
@@ -147,6 +174,12 @@ export default function WalletPage() {
     const reader = new FileReader();
     reader.onload = () => setDepositReceiptPreview(typeof reader.result === "string" ? reader.result : "");
     reader.readAsDataURL(file);
+  }
+
+  function copyDepositCard() {
+    navigator.clipboard?.writeText(DEPOSIT_CARD_NUMBER).then(() => {
+      setMessage("شماره کارت کپی شد.");
+    }).catch(() => undefined);
   }
 
   async function requestDeposit(e: FormEvent) {
@@ -177,6 +210,8 @@ export default function WalletPage() {
       setDepositNote("");
       setDepositReceiptFile(null);
       setDepositReceiptPreview("");
+      setWalletDialog("");
+      setDepositStep(1);
       const receiptInput = document.getElementById("wallet-deposit-receipt") as HTMLInputElement | null;
       if (receiptInput) receiptInput.value = "";
       load();
@@ -215,6 +250,7 @@ export default function WalletPage() {
       setNationalId("");
       setIban("");
       setWithdrawNote("");
+      setWalletDialog("");
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "درخواست برداشت ثبت نشد");
@@ -245,183 +281,229 @@ export default function WalletPage() {
 
   return (
     <div className="min-h-screen bg-[#050508] text-white relative overflow-x-hidden">
-      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_-10%,rgba(92,0,160,.62),transparent_70%)]" />
+      <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_22%_8%,rgba(255,214,10,.22),transparent_35%),radial-gradient(circle_at_80%_12%,rgba(139,92,246,.35),transparent_38%),linear-gradient(140deg,#050508,#0b0b10_45%,#050508)]" />
+      <div className="fixed inset-0 pointer-events-none opacity-25 bg-[linear-gradient(125deg,transparent_0_20%,rgba(255,255,255,.08)_20%_21%,transparent_21%_42%,rgba(255,255,255,.05)_42%_43%,transparent_43%)]" />
       <Navbar />
+
       <main className="relative z-10 max-w-[760px] mx-auto px-4 sm:px-6 py-8 pb-32" dir="rtl">
-        <div className="flex items-center justify-between gap-4 mb-6">
+        <div className="flex items-center justify-between gap-4 mb-7">
           <div>
-            <h1 className="text-3xl font-black neon-text-purple">💳 کیف پول</h1>
-            <p className="text-gray-500 text-sm mt-2">موجودی قابل استفاده، قابل برداشت و تاریخچه تراکنش‌ها</p>
+            <p className="text-xs font-black text-yellow-300 mb-2">GAMENT WALLET</p>
+            <h1 className="text-3xl font-black">کیف پول</h1>
           </div>
-          <button onClick={load} className="px-4 py-3 rounded-xl bg-dark-700 text-sm font-bold">🔄</button>
+          <button onClick={load} className="w-12 h-12 rounded-2xl bg-white/10 border border-white/10 text-lg font-bold hover:bg-white/15">🔄</button>
         </div>
 
-        {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-5 text-sm leading-7">{error}</div>}
-        {message && <div className="bg-green-500/10 border border-green-500/30 text-green-300 rounded-xl p-3 mb-5 text-sm leading-7">{message}</div>}
+        {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-2xl p-3 mb-5 text-sm leading-7">{error}</div>}
+        {message && <div className="bg-green-500/10 border border-green-500/30 text-green-300 rounded-2xl p-3 mb-5 text-sm leading-7">{message}</div>}
 
-        <section className="glass-panel p-7 mb-6 bg-gradient-to-br from-purple-900/30 to-[#0a0a0e] border-purple-500/20">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-bold text-purple-400">موجودی کل / قابل استفاده داخل سایت</p>
-            <div className="flex gap-2">
-              {pendingDeposits.length > 0 && <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">{pendingDeposits.length} شارژ در انتظار</span>}
-              {pendingWithdrawals.length > 0 && <span className="text-[10px] px-2.5 py-0.5 rounded-full bg-orange-500/10 text-orange-300 border border-orange-500/20">{pendingWithdrawals.length} برداشت در انتظار</span>}
-            </div>
-          </div>
-          <div className="flex items-baseline gap-2 mb-5">
-            <span className="text-5xl sm:text-6xl font-black tracking-tighter num-en">{(data?.wallet.usableToman || 0).toLocaleString("fa-IR")}</span>
-            <span className="text-xl font-bold text-purple-400">تومان</span>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <div className="text-xs text-gray-500 mb-1">موجودی قابل برداشت</div>
-              <div className="text-2xl font-black text-yellow-300">{(data?.wallet.withdrawableToman || 0).toLocaleString("fa-IR")} تومان</div>
-            </div>
-            <div className="rounded-2xl bg-white/5 border border-white/10 p-4">
-              <div className="text-xs text-gray-500 mb-1">شارژ/موجودی غیرقابل برداشت مستقیم</div>
-              <div className="text-2xl font-black text-neon-blue">{(data?.wallet.nonWithdrawableToman || 0).toLocaleString("fa-IR")} تومان</div>
-            </div>
-          </div>
-        </section>
-
-        <section className="glass-panel p-5 mb-6 border border-yellow-500/20 bg-yellow-500/5">
-          <h2 className="font-black text-yellow-200 mb-3">قوانین مهم کیف پول</h2>
-          <p className="text-sm leading-8 text-gray-200 mb-4">{WALLET_TERMS}</p>
-          <label className="flex items-start gap-3 rounded-2xl bg-dark-800/70 border border-white/10 p-4 cursor-pointer">
-            <input type="checkbox" checked={acceptedTerms} onChange={(e) => toggleTerms(e.target.checked)} className="mt-1 w-5 h-5 accent-purple-600" />
-            <span className="text-sm font-bold leading-7">قوانین کیف پول را خوانده‌ام و قبول دارم. پس از تأیید این گزینه امکان ثبت درخواست شارژ یا برداشت فعال می‌شود.</span>
-          </label>
-        </section>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <form onSubmit={requestDeposit} className="glass-panel p-5 space-y-5 overflow-hidden relative">
-            <div className="absolute -top-16 -left-16 w-44 h-44 bg-purple-600/20 rounded-full blur-3xl" />
+        <section className="relative mb-7 min-h-[250px]">
+          <div className="absolute right-[28%] top-9 bottom-0 left-0 rounded-[2.25rem] border-2 border-dashed border-white/35 bg-white/[.04] backdrop-blur-sm" />
+          <div className="relative w-[76%] max-w-[520px] min-h-[220px] rounded-[2.25rem] bg-gradient-to-br from-yellow-200 via-yellow-300 to-yellow-500 text-[#34333d] shadow-[0_0_60px_rgba(250,204,21,.34)] p-7 sm:p-9 overflow-hidden flex flex-col justify-center">
+            <div className="absolute -top-16 -left-12 w-44 h-44 rounded-full border-[7px] border-white/50" />
+            <div className="absolute top-9 -left-5 w-32 h-32 rounded-full border-[6px] border-white/45" />
             <div className="relative">
-              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-400/20 text-[11px] font-black text-purple-200 mb-3">
-                فقط کارت‌به‌کارت
+              <div className="flex items-baseline gap-3 mb-7">
+                <span className="text-4xl sm:text-5xl font-black num-en">{(data?.wallet.usableToman || 0).toLocaleString("fa-IR")}</span>
+                <span className="text-xl font-black">تومان</span>
               </div>
-              <h2 className="font-black text-xl mb-1">افزایش موجودی</h2>
-              <p className="text-xs text-gray-400 leading-6">مبلغ را وارد کن، به کارت گیمنت واریز کن و تصویر فیش را از گالری ارسال کن تا ادمین بررسی و شارژ را تأیید کند.</p>
-            </div>
-
-            <div className="relative rounded-[2rem] bg-gradient-to-br from-purple-950/80 via-[#17101f]/90 to-cyan-950/40 border border-purple-400/25 p-4 shadow-[0_0_45px_rgba(139,92,246,.15)] space-y-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[11px] text-purple-200 font-black mb-1">مبلغ واریزی</div>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black num-en">{depositAmount || "0"}</span>
-                    <span className="text-sm font-bold text-purple-300">تومان</span>
-                  </div>
-                </div>
-                <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-2xl">💳</div>
-              </div>
-
-              <input
-                className="gaming-input text-left num-en bg-white/10"
-                dir="ltr"
-                inputMode="numeric"
-                placeholder="مثلاً 200,000 تومان"
-                value={depositAmount}
-                onChange={(e) => setDepositAmount(formatTomanInput(e.target.value))}
-              />
-              <div className="flex flex-wrap gap-2">
-                {QUICK_DEPOSIT_AMOUNTS.map((amount) => (
-                  <button
-                    key={amount}
-                    type="button"
-                    onClick={() => setDepositAmount(amount.toLocaleString("en-US"))}
-                    className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[11px] font-black text-purple-100 hover:border-purple-400/40"
-                  >
-                    {amount.toLocaleString("fa-IR")}
-                  </button>
-                ))}
+              <p className="text-sm sm:text-base font-bold text-[#5d5a5a]">موجودی اعتبار شما</p>
+              <div className="flex flex-wrap gap-2 mt-5">
+                {pendingDeposits.length > 0 && <span className="text-[11px] px-3 py-1 rounded-full bg-black/15 text-black/70 font-black">{pendingDeposits.length.toLocaleString("fa-IR")} واریز در بررسی</span>}
+                {pendingWithdrawals.length > 0 && <span className="text-[11px] px-3 py-1 rounded-full bg-black/15 text-black/70 font-black">{pendingWithdrawals.length.toLocaleString("fa-IR")} برداشت در بررسی</span>}
               </div>
             </div>
+          </div>
+        </section>
 
-            <div className="rounded-[2rem] bg-white/[.04] border border-white/10 p-4 space-y-3">
-              <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
-                <span className="font-black text-white">کارت مقصد</span>
-                <span>{DEPOSIT_BANK_NAME} • به نام <b className="text-yellow-200">{DEPOSIT_CARD_OWNER}</b></span>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigator.clipboard?.writeText(DEPOSIT_CARD_NUMBER)}
-                className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-4 text-center text-xl sm:text-2xl font-black tracking-[0.12em] num-en text-white hover:border-cyan-300/40"
-                dir="ltr"
-                title="کپی شماره کارت"
-              >
-                {DEPOSIT_CARD_NUMBER.replace(/(\d{4})(?=\d)/g, "$1 ")}
-              </button>
-              <div className="text-[10px] text-cyan-200/80 leading-5">با لمس شماره کارت، کپی می‌شود.</div>
-            </div>
+        <section className="grid grid-cols-2 gap-4 mb-8">
+          <button onClick={openDeposit} className="group relative overflow-hidden min-h-[108px] rounded-[2rem] bg-gradient-to-br from-purple-500 to-violet-600 shadow-[0_0_35px_rgba(139,92,246,.35)] p-4 flex items-center justify-between text-right active:scale-[.98] transition-transform">
+            <span className="w-16 h-16 rounded-2xl bg-white text-purple-600 flex items-center justify-center text-4xl group-hover:rotate-[-8deg] transition-transform">↙</span>
+            <span className="text-2xl font-black">واریز</span>
+          </button>
+          <button onClick={openWithdrawal} className="group relative overflow-hidden min-h-[108px] rounded-[2rem] bg-gradient-to-br from-teal-300 to-cyan-600 shadow-[0_0_35px_rgba(45,212,191,.28)] p-4 flex items-center justify-between text-right active:scale-[.98] transition-transform">
+            <span className="w-16 h-16 rounded-2xl bg-white text-teal-500 flex items-center justify-center text-4xl group-hover:rotate-[-8deg] transition-transform">↗</span>
+            <span className="text-2xl font-black">برداشت</span>
+          </button>
+        </section>
 
-            <input className="gaming-input text-left num-en" dir="ltr" placeholder="شماره پیگیری / ۴ رقم آخر کارت مبدأ" value={depositTrackingNumber} onChange={(e) => setDepositTrackingNumber(e.target.value.slice(0, 80))} />
+        <section className="grid grid-cols-2 gap-3 mb-8">
+          <div className="rounded-3xl bg-white/[.06] border border-white/10 p-4">
+            <div className="text-xs text-gray-500 mb-1">قابل برداشت</div>
+            <div className="text-xl font-black text-yellow-300">{(data?.wallet.withdrawableToman || 0).toLocaleString("fa-IR")}</div>
+          </div>
+          <div className="rounded-3xl bg-white/[.06] border border-white/10 p-4">
+            <div className="text-xs text-gray-500 mb-1">اعتبار غیرقابل برداشت</div>
+            <div className="text-xl font-black text-cyan-300">{(data?.wallet.nonWithdrawableToman || 0).toLocaleString("fa-IR")}</div>
+          </div>
+        </section>
 
-            <label htmlFor="wallet-deposit-receipt" className="block rounded-[2rem] border border-dashed border-purple-400/40 bg-purple-500/10 p-4 cursor-pointer hover:bg-purple-500/15 transition-colors">
-              <input
-                id="wallet-deposit-receipt"
-                type="file"
-                accept="image/*"
-                className="sr-only"
-                onChange={handleDepositReceiptChange}
-              />
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-black/30 border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
-                  {depositReceiptPreview ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={depositReceiptPreview} alt="پیش‌نمایش فیش واریز" className="w-full h-full object-cover" />
-                  ) : <span className="text-3xl">🧾</span>}
-                </div>
-                <div className="min-w-0">
-                  <div className="font-black text-white">انتخاب فیش از گالری</div>
-                  <div className="text-xs text-gray-400 leading-6 truncate">
-                    {depositReceiptFile ? depositReceiptFile.name : `JPG/PNG/WEBP تا ${MAX_RECEIPT_SIZE_MB}MB`}
-                  </div>
-                </div>
-              </div>
-            </label>
-
-            <textarea className="gaming-input min-h-20" placeholder="توضیح اختیاری" value={depositNote} onChange={(e) => setDepositNote(e.target.value)} />
-            <button disabled={!acceptedTerms || submitting === "deposit"} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال ثبت..." : "ثبت و ارسال فیش کارت‌به‌کارت"}</button>
-          </form>
-
-          <form onSubmit={requestWithdrawal} className="glass-panel p-5 space-y-4">
-            <div>
-              <h2 className="font-black mb-1">درخواست برداشت</h2>
-              <p className="text-xs text-gray-500 leading-6">برداشت فقط از موجودی قابل برداشت مثل جوایز و پاداش‌های رسمی امکان‌پذیر است. حداقل برداشت ۵۰٬۰۰۰ تومان.</p>
-            </div>
-            <input className="gaming-input text-left num-en" dir="ltr" inputMode="numeric" placeholder="مبلغ برداشت (مثلاً 200,000 تومان)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(formatTomanInput(e.target.value))} />
-            <input className="gaming-input" placeholder="نام و نام خانوادگی صاحب حساب" value={accountOwner} onChange={(e) => setAccountOwner(e.target.value)} />
-            <input className="gaming-input" placeholder="کد ملی صاحب حساب" value={nationalId} onChange={(e) => setNationalId(e.target.value)} dir="ltr" />
-            <input className="gaming-input" placeholder="شماره شبا مثل IRxxxxxxxxxxxxxxxxxxxxxxxx" value={iban} onChange={(e) => setIban(e.target.value)} dir="ltr" />
-            <textarea className="gaming-input min-h-20" placeholder="توضیح اختیاری" value={withdrawNote} onChange={(e) => setWithdrawNote(e.target.value)} />
-            <button disabled={!acceptedTerms || submitting === "withdrawal" || (data?.wallet.withdrawableToman || 0) <= 0} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "withdrawal" ? "در حال ثبت..." : "ثبت درخواست برداشت"}</button>
-          </form>
-        </div>
-
-        <section className="glass-panel overflow-hidden">
-          <div className="px-5 py-4 border-b border-white/10 flex items-center justify-between">
-            <span className="font-black">تاریخچه تراکنش‌ها</span>
-            <span className="text-xs text-gray-500">{data?.transactions.length || 0} مورد</span>
+        <section className="rounded-t-[2.25rem] rounded-b-[1.5rem] bg-white/[.08] border border-white/10 backdrop-blur-xl overflow-hidden shadow-2xl">
+          <div className="px-6 py-5 border-b border-white/10 flex items-center justify-between">
+            <span className="font-black text-xl">تراکنش‌ها</span>
+            <span className="text-xs text-gray-400">{data?.transactions.length || 0} مورد</span>
           </div>
           {data?.transactions.length ? (
             <div className="divide-y divide-white/10 text-sm">
               {data.transactions.map((tx) => (
                 <div key={tx.id} className="px-5 py-4 flex items-center justify-between gap-4">
-                  <div>
-                    <div className="font-bold">{TYPE_LABELS[tx.type] || tx.type}</div>
-                    <div className="text-xs text-gray-500 mt-0.5 leading-6">
-                      {new Date(tx.createdAt).toLocaleString("fa-IR")} • {STATUS_LABELS[tx.status] || tx.status}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shrink-0 ${tx.type === "withdrawal" || tx.type === "entry_fee" ? "bg-teal-400/15 text-teal-300" : "bg-purple-500/20 text-purple-300"}`}>{transactionIcon(tx.type)}</div>
+                    <div className="min-w-0">
+                      <div className="font-black truncate">{TYPE_LABELS[tx.type] || tx.type}</div>
+                      <div className="text-xs text-gray-500 mt-1 leading-6">
+                        {new Date(tx.createdAt).toLocaleString("fa-IR")} • {STATUS_LABELS[tx.status] || tx.status}
+                      </div>
                     </div>
                   </div>
-                  <div className={`font-black num-en ${txColor(tx.type)}`}>
+                  <div className={`font-black text-lg num-en whitespace-nowrap ${txColor(tx.type)}`}>
                     {txSign(tx.type)}{tx.amountToman.toLocaleString("fa-IR")}
                   </div>
                 </div>
               ))}
             </div>
-          ) : <div className="p-8 text-center text-gray-500 text-sm">هنوز تراکنشی ثبت نشده است.</div>}
+          ) : <div className="p-10 text-center text-gray-500 text-sm">هنوز تراکنشی ثبت نشده است.</div>}
         </section>
       </main>
+
+      {walletDialog === "deposit" && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-end sm:items-center justify-center px-3 py-4" dir="rtl">
+          <div className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[2.5rem] sm:rounded-[2.5rem] bg-[#111016] border border-white/10 shadow-[0_0_80px_rgba(139,92,246,.25)] p-5 animate-slide-up">
+            <div className="flex items-center justify-between mb-5">
+              <button onClick={closeWalletDialog} className="w-11 h-11 rounded-full bg-white text-gray-700 text-2xl leading-none">×</button>
+              <div className="text-center">
+                <div className="text-xs text-purple-300 font-black mb-1">مرحله {depositStep} از ۲</div>
+                <h2 className="text-2xl font-black">افزایش موجودی</h2>
+              </div>
+              <div className="w-11 h-11 rounded-2xl bg-purple-500/20 text-purple-200 flex items-center justify-center text-2xl">↙</div>
+            </div>
+
+            {depositStep === 1 ? (
+              <div className="space-y-5">
+                <div className="rounded-[2rem] bg-gradient-to-br from-purple-950/80 to-[#191421] border border-purple-400/25 p-5">
+                  <div className="text-xs font-black text-purple-200 mb-2">مبلغی که می‌خواهید واریز کنید</div>
+                  <div className="flex items-center justify-center rounded-[1.75rem] bg-white/10 border border-white/10 p-6 mb-4">
+                    <span className="text-4xl font-black num-en">{depositAmount || "0"}</span>
+                    <span className="mr-2 font-bold text-purple-200">تومان</span>
+                  </div>
+                  <input
+                    className="gaming-input text-left num-en"
+                    dir="ltr"
+                    inputMode="numeric"
+                    placeholder="مثلاً 200,000 تومان"
+                    value={depositAmount}
+                    onChange={(e) => setDepositAmount(formatTomanInput(e.target.value))}
+                  />
+                  <div className="flex flex-wrap gap-2 mt-3">
+                    {QUICK_DEPOSIT_AMOUNTS.map((amount) => (
+                      <button
+                        key={amount}
+                        type="button"
+                        onClick={() => setDepositAmount(amount.toLocaleString("en-US"))}
+                        className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[11px] font-black text-purple-100 hover:border-purple-400/40"
+                      >
+                        {amount.toLocaleString("fa-IR")}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <label className="flex items-start gap-3 rounded-3xl bg-yellow-400/10 border border-yellow-300/20 p-4 cursor-pointer">
+                  <input type="checkbox" checked={acceptedTerms} onChange={(e) => toggleTerms(e.target.checked)} className="mt-1 w-5 h-5 accent-yellow-400" />
+                  <span className="text-sm font-black leading-7 text-yellow-100">قوانین کیف پول و کارت‌به‌کارت را خوانده‌ام و قبول دارم.</span>
+                </label>
+
+                <div className="rounded-3xl bg-white/[.04] border border-white/10 p-4">
+                  <h3 className="font-black mb-2 text-gray-100">قوانین واریز</h3>
+                  <p className="text-xs leading-7 text-gray-400">{WALLET_TERMS}</p>
+                </div>
+
+                <button type="button" disabled={!canContinueDeposit} onClick={() => setDepositStep(2)} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">ادامه و دریافت شماره کارت</button>
+              </div>
+            ) : (
+              <form onSubmit={requestDeposit} className="space-y-5">
+                <div className="rounded-[2rem] bg-white/[.04] border border-white/10 p-4 space-y-3">
+                  <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
+                    <span className="font-black text-white">کارت مقصد</span>
+                    <span>{DEPOSIT_BANK_NAME} • به نام <b className="text-yellow-200">{DEPOSIT_CARD_OWNER}</b></span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={copyDepositCard}
+                    className="w-full rounded-2xl bg-black/35 border border-white/10 px-4 py-4 text-center text-xl sm:text-2xl font-black tracking-[0.12em] num-en text-white hover:border-yellow-300/50"
+                    dir="ltr"
+                    title="کپی شماره کارت"
+                  >
+                    {DEPOSIT_CARD_NUMBER.replace(/(\d{4})(?=\d)/g, "$1 ")}
+                  </button>
+                  <div className="text-[10px] text-yellow-200/80 leading-5">روی شماره کارت بزنید تا کپی شود، سپس فیش واریز را ارسال کنید.</div>
+                </div>
+
+                <div className="rounded-3xl bg-purple-500/10 border border-purple-400/20 p-4 flex items-center justify-between">
+                  <span className="text-sm text-gray-300">مبلغ انتخابی</span>
+                  <b className="text-2xl text-white num-en">{depositAmount || "0"} تومان</b>
+                </div>
+
+                <input className="gaming-input text-left num-en" dir="ltr" placeholder="شماره پیگیری / ۴ رقم آخر کارت مبدأ" value={depositTrackingNumber} onChange={(e) => setDepositTrackingNumber(e.target.value.slice(0, 80))} />
+
+                <label htmlFor="wallet-deposit-receipt" className="block rounded-[2rem] border border-dashed border-purple-400/40 bg-purple-500/10 p-4 cursor-pointer hover:bg-purple-500/15 transition-colors">
+                  <input
+                    id="wallet-deposit-receipt"
+                    type="file"
+                    accept="image/*"
+                    className="sr-only"
+                    onChange={handleDepositReceiptChange}
+                  />
+                  <div className="flex items-center gap-4">
+                    <div className="w-16 h-16 rounded-2xl bg-black/30 border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                      {depositReceiptPreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={depositReceiptPreview} alt="پیش‌نمایش فیش واریز" className="w-full h-full object-cover" />
+                      ) : <span className="text-3xl">🧾</span>}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="font-black text-white">انتخاب فیش از گالری</div>
+                      <div className="text-xs text-gray-400 leading-6 truncate">
+                        {depositReceiptFile ? depositReceiptFile.name : `JPG/PNG/WEBP تا ${MAX_RECEIPT_SIZE_MB}MB`}
+                      </div>
+                    </div>
+                  </div>
+                </label>
+
+                <textarea className="gaming-input min-h-20" placeholder="توضیح اختیاری" value={depositNote} onChange={(e) => setDepositNote(e.target.value)} />
+                <div className="grid grid-cols-2 gap-3">
+                  <button type="button" onClick={() => setDepositStep(1)} className="px-4 py-4 rounded-2xl bg-white/10 border border-white/10 font-black text-gray-200">بازگشت</button>
+                  <button disabled={!acceptedTerms || submitting === "deposit" || !depositAmount} className="gaming-btn disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال ثبت..." : "ثبت فیش"}</button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {walletDialog === "withdrawal" && (
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-md flex items-end sm:items-center justify-center px-3 py-4" dir="rtl">
+          <form onSubmit={requestWithdrawal} className="w-full max-w-md max-h-[92vh] overflow-y-auto rounded-t-[2.5rem] sm:rounded-[2.5rem] bg-[#111016] border border-white/10 shadow-[0_0_80px_rgba(45,212,191,.18)] p-5 animate-slide-up space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <button type="button" onClick={closeWalletDialog} className="w-11 h-11 rounded-full bg-white text-gray-700 text-2xl leading-none">×</button>
+              <h2 className="text-2xl font-black">درخواست برداشت</h2>
+              <div className="w-11 h-11 rounded-2xl bg-teal-400/20 text-teal-200 flex items-center justify-center text-2xl">↗</div>
+            </div>
+            <div className="rounded-3xl bg-teal-400/10 border border-teal-300/20 p-4 text-sm leading-7 text-gray-300">برداشت فقط از موجودی قابل برداشت مثل جوایز و پاداش‌های رسمی امکان‌پذیر است. حداقل برداشت ۵۰٬۰۰۰ تومان.</div>
+            <input className="gaming-input text-left num-en" dir="ltr" inputMode="numeric" placeholder="مبلغ برداشت (مثلاً 200,000 تومان)" value={withdrawAmount} onChange={(e) => setWithdrawAmount(formatTomanInput(e.target.value))} />
+            <input className="gaming-input" placeholder="نام و نام خانوادگی صاحب حساب" value={accountOwner} onChange={(e) => setAccountOwner(e.target.value)} />
+            <input className="gaming-input" placeholder="کد ملی صاحب حساب" value={nationalId} onChange={(e) => setNationalId(e.target.value)} dir="ltr" />
+            <input className="gaming-input" placeholder="شماره شبا مثل IRxxxxxxxxxxxxxxxxxxxxxxxx" value={iban} onChange={(e) => setIban(e.target.value)} dir="ltr" />
+            <textarea className="gaming-input min-h-20" placeholder="توضیح اختیاری" value={withdrawNote} onChange={(e) => setWithdrawNote(e.target.value)} />
+            <label className="flex items-start gap-3 rounded-3xl bg-white/[.04] border border-white/10 p-4 cursor-pointer">
+              <input type="checkbox" checked={acceptedTerms} onChange={(e) => toggleTerms(e.target.checked)} className="mt-1 w-5 h-5 accent-teal-400" />
+              <span className="text-sm font-bold leading-7">قوانین کیف پول را خوانده‌ام و قبول دارم.</span>
+            </label>
+            <button disabled={!acceptedTerms || submitting === "withdrawal" || (data?.wallet.withdrawableToman || 0) <= 0} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "withdrawal" ? "در حال ثبت..." : "ثبت درخواست برداشت"}</button>
+          </form>
+        </div>
+      )}
+
       <BottomNav />
     </div>
   );
