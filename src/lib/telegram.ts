@@ -1,4 +1,7 @@
 import logger from "@/lib/logger";
+import { db } from "@/db";
+import { telegramAccounts } from "@/db/schema";
+import { eq } from "drizzle-orm";
 
 export interface TelegramTournamentPost {
   id: string;
@@ -144,6 +147,73 @@ export async function publishTournamentToTelegramChannel(tournament: TelegramTou
   return telegramApi("sendMessage", {
     chat_id: channelId,
     text: caption,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+    reply_markup: replyMarkup,
+  });
+}
+
+
+export async function notifyLinkedUserOnTelegram(userId: string, text: string, replyMarkup?: Record<string, unknown>) {
+  try {
+    const [account] = await db
+      .select({ telegramId: telegramAccounts.telegramId })
+      .from(telegramAccounts)
+      .where(eq(telegramAccounts.userId, userId))
+      .limit(1);
+    if (!account?.telegramId) return { ok: false, skipped: true, reason: "telegram_not_linked" };
+    const numericChatId = Number(account.telegramId);
+    if (!Number.isFinite(numericChatId)) return { ok: false, skipped: true, reason: "invalid_telegram_id" };
+    const result = await sendTelegramMessage(numericChatId, text, replyMarkup);
+    return { ...result, skipped: false };
+  } catch (err) {
+    logger.warn({ err, userId }, "Failed to notify linked Telegram user");
+    return { ok: false, skipped: false, reason: "send_failed" };
+  }
+}
+
+export async function publishHonorToTelegramChannel(honor: {
+  id: string;
+  title: string;
+  description: string;
+  type?: string | null;
+  game?: string | null;
+  imageUrl?: string | null;
+  highlight?: boolean | null;
+}) {
+  const url = `${appUrl()}/honors/${honor.id}`;
+  const label = honor.type === "news" ? "خبر جدید" : "افتخار جدید";
+  const game = honor.game ? `\n🎮 بازی: <b>${html(honor.game)}</b>` : "";
+  const text = [
+    `🏛 <b>${label} در تالار افتخارات Gament</b>`,
+    "",
+    `🔥 <b>${html(honor.title)}</b>`,
+    game,
+    "",
+    html((honor.description || "").slice(0, 650)),
+    "",
+    "برای دیدن جزئیات، لایک و سین خبر وارد Gament شو 👇",
+  ].filter(Boolean).join("\n");
+  const replyMarkup = {
+    inline_keyboard: [[
+      { text: "مشاهده در تالار افتخارات", url },
+      { text: "باز کردن Gament", web_app: { url: appUrl() } },
+    ]],
+  };
+
+  if (honor.imageUrl) {
+    const photo = await telegramApi("sendPhoto", {
+      chat_id: getTelegramChannelChatId(),
+      photo: honor.imageUrl,
+      caption: text,
+      parse_mode: "HTML",
+      reply_markup: replyMarkup,
+    });
+    if (photo.ok) return photo;
+  }
+  return telegramApi("sendMessage", {
+    chat_id: getTelegramChannelChatId(),
+    text,
     parse_mode: "HTML",
     disable_web_page_preview: true,
     reply_markup: replyMarkup,

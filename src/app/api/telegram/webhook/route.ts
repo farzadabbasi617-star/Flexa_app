@@ -1074,6 +1074,7 @@ async function adminCommand(chatId: number, telegramId: string) {
       `جدید و پیگیری‌نشده: <b>${newItems.value}</b>`,
       "",
       "/players — آخرین پیش‌ثبت‌نام‌ها",
+      "/pending_wallets — شارژ/برداشت‌های در انتظار",
       "/announce متن — ارسال اطلاعیه به همه کاربران ربات",
       "/announce_game cod_mobile متن — اطلاعیه هدفمند برای یک بازی",
       "/post_latest — انتشار آخرین تورنومنت فعال در کانال",
@@ -1082,6 +1083,48 @@ async function adminCommand(chatId: number, telegramId: string) {
     ].join("\n"),
     { inline_keyboard: [[{ text: "ورود به پنل ادمین", url: `${APP_URL}/admin` }]] }
   );
+}
+
+
+async function pendingWalletsCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) {
+    await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+    return;
+  }
+
+  const rows = await db
+    .select({
+      id: transactions.id,
+      type: transactions.type,
+      amount: transactions.amount,
+      status: transactions.status,
+      createdAt: transactions.createdAt,
+      displayName: users.displayName,
+      username: users.username,
+      phoneNumber: users.phoneNumber,
+    })
+    .from(transactions)
+    .innerJoin(wallets, eq(transactions.walletId, wallets.id))
+    .leftJoin(users, eq(wallets.userId, users.id))
+    .where(and(inArray(transactions.type, ["deposit", "withdrawal"]), eq(transactions.status, "pending")))
+    .orderBy(desc(transactions.createdAt))
+    .limit(10);
+
+  if (!rows.length) {
+    await sendMessage(chatId, "✅ درخواست pending کیف پول وجود ندارد.", { inline_keyboard: [[{ text: "پنل کیف پول", url: `${APP_URL}/admin/wallets` }]] });
+    return;
+  }
+
+  const text = [
+    "💳 <b>درخواست‌های pending کیف پول</b>",
+    "",
+    ...rows.map((row, index) => {
+      const type = row.type === "deposit" ? "شارژ" : "برداشت";
+      return `${index + 1}) <b>${type}</b> — <b>${html(formatTomanFromRial(bigIntFromText(row.amount)))}</b>\n👤 ${html(row.displayName || "—")} ${row.username ? `(@${html(row.username)})` : ""}\n📞 ${html(row.phoneNumber || "—")} | ${new Date(row.createdAt).toLocaleString("fa-IR")}`;
+    }),
+  ].join("\n\n");
+
+  await sendMessage(chatId, text, { inline_keyboard: [[{ text: "بررسی در پنل کیف پول", url: `${APP_URL}/admin/wallets` }]] });
 }
 
 async function playersCommand(chatId: number, telegramId: string) {
@@ -2051,6 +2094,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/unregister") return unregisterCommand(chatId, telegramId);
   if (normalizedCommand === "/admin" || normalizedCommand === "/stats") return adminCommand(chatId, telegramId);
   if (normalizedCommand === "/players") return playersCommand(chatId, telegramId);
+  if (normalizedCommand === "/pending_wallets") return pendingWalletsCommand(chatId, telegramId);
   if (normalizedCommand === "/manage" || normalizedCommand === "/tournaments_admin") return adminTournamentsCommand(chatId, telegramId);
   if (normalizedCommand === "/post_latest") return postLatestTournamentCommand(chatId, telegramId);
   if (normalizedCommand === "/announce") return announceCommand(chatId, telegramId, args.join(" "));

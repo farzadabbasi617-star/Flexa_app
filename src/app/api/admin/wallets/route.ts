@@ -7,6 +7,7 @@ import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { createWalletReference } from "@/lib/wallet-security";
 import { bigIntFromText, rialToTomanNumber } from "@/lib/money";
 import { walletBreakdown } from "@/lib/wallet-accounting";
+import { notifyLinkedUserOnTelegram } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -235,6 +236,24 @@ export async function PATCH(request: NextRequest) {
 
     if (body.transactionId) {
       const result = await handlePendingTransaction(request, auth.user.id, body);
+      const tx = result.transaction;
+      const amount = rialToTomanNumber(bigIntFromText(tx.amount)).toLocaleString("fa-IR");
+      const isApproved = tx.status === "completed";
+      const title = tx.type === "withdrawal"
+        ? (isApproved ? "برداشت کیف پول پرداخت شد" : "درخواست برداشت رد شد")
+        : (isApproved ? "شارژ کیف پول تأیید شد" : "درخواست شارژ رد شد");
+      const detail = tx.type === "withdrawal"
+        ? (isApproved ? `مبلغ ${amount} تومان برای شما پرداخت شد.` : `درخواست برداشت ${amount} تومان تأیید نشد.`)
+        : (isApproved ? `مبلغ ${amount} تومان به کیف پول شما اضافه شد.` : `درخواست شارژ ${amount} تومان تأیید نشد.`);
+      await notifyLinkedUserOnTelegram(
+        result.userId,
+        `💳 <b>${title}</b>
+
+${detail}${body.adminNote ? `
+
+یادداشت ادمین: ${String(body.adminNote).slice(0, 250)}` : ""}`,
+        { inline_keyboard: [[{ text: "مشاهده کیف پول", url: `${process.env.APP_URL || "https://www.gament1.ir"}/wallet` }]] }
+      );
       return NextResponse.json({ success: true, ...result });
     }
 

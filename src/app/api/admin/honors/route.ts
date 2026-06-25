@@ -4,6 +4,7 @@ import { honorLikes, honors, honorViews } from "@/db/schema";
 import { validateAdmin } from "@/lib/auth";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import logger from "@/lib/logger";
+import { publishHonorToTelegramChannel } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -118,6 +119,18 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
+    if (created.status === "approved") {
+      await publishHonorToTelegramChannel({
+        id: created.id,
+        title: created.title,
+        description: created.description,
+        type: created.type,
+        game: created.game,
+        imageUrl: created.imageUrl,
+        highlight: created.highlight,
+      }).catch((err) => logger.warn({ err, honorId: created.id }, "Failed to publish honor to Telegram"));
+    }
+
     return NextResponse.json({ success: true, honor: { ...created, image: created.imageUrl } }, { status: 201 });
   } catch (err) {
     logger.error({ err }, "Admin honors POST failed");
@@ -150,8 +163,20 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
+    const [before] = await db.select({ status: honors.status }).from(honors).where(eq(honors.id, id)).limit(1);
     const [updated] = await db.update(honors).set(patch).where(eq(honors.id, id)).returning();
     if (!updated) return NextResponse.json({ error: "Honor not found" }, { status: 404 });
+    if (updated.status === "approved" && before?.status !== "approved") {
+      await publishHonorToTelegramChannel({
+        id: updated.id,
+        title: updated.title,
+        description: updated.description,
+        type: updated.type,
+        game: updated.game,
+        imageUrl: updated.imageUrl,
+        highlight: updated.highlight,
+      }).catch((err) => logger.warn({ err, honorId: updated.id }, "Failed to publish approved honor to Telegram"));
+    }
     return NextResponse.json({ success: true, honor: { ...updated, image: updated.imageUrl } });
   } catch (err) {
     logger.error({ err }, "Admin honors PATCH failed");
