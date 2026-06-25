@@ -7,8 +7,9 @@ import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { generateRealAssistantResponse } from "@/lib/ai-service";
 import { getGameIdGuide, gameGuideKeyboard } from "./guide";
-import { bigIntFromText, formatTomanFromRial } from "@/lib/money";
+import { bigIntFromText, formatTomanFromRial, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
+import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
 import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achievement-service";
 import { LevelingService } from "@/lib/leveling-service";
 import logger from "@/lib/logger";
@@ -26,6 +27,9 @@ type BotState =
   | "confirm"
   | "support_subject"
   | "support_message"
+  | "wallet_deposit_amount"
+  | "wallet_deposit_tracking"
+  | "wallet_deposit_receipt"
   | "dispute_reason"
   | "evidence_upload";
 
@@ -83,6 +87,8 @@ interface SessionData {
   city?: string;
   teamName?: string;
   supportSubject?: string;
+  walletDepositAmountToman?: string;
+  walletDepositTracking?: string;
   disputeMatchId?: string;
   evidenceMatchId?: string;
   selectedAdIds?: string[];
@@ -229,7 +235,10 @@ function mainMenuKeyboard() {
         { text: "👤 وضعیت من", callback_data: "menu:status" },
       ],
       [
+        { text: "💳 کیف پول", callback_data: "menu:wallet" },
         { text: "🔗 اتصال حساب", callback_data: "menu:link" },
+      ],
+      [
         { text: "👤 پروفایل", callback_data: "menu:profile" },
       ],
       [
@@ -412,6 +421,63 @@ async function getOrCreateWallet(userId: string, tx: any = db) {
   if (existing) return existing;
   const [created] = await tx.insert(wallets).values({ userId, balance: "0", currency: "RIAL" }).returning();
   return created;
+}
+
+
+async function downloadTelegramPhotoAsDataUrl(fileId: string) {
+  const token = process.env.BOT_TOKEN?.trim();
+  if (!token) throw new Error("BOT_TOKEN is missing");
+  const fileInfo = await telegramApi("getFile", { file_id: fileId }) as { ok?: boolean; result?: { file_path?: string; file_size?: number } } | null;
+  const filePath = fileInfo?.result?.file_path;
+  if (!fileInfo?.ok || !filePath) throw new Error("TELEGRAM_FILE_NOT_FOUND");
+  const size = Number(fileInfo.result?.file_size || 0);
+  if (size > 1.2 * 1024 * 1024) throw new Error("RECEIPT_TOO_LARGE");
+
+  const res = await fetch(`https://api.telegram.org/file/bot${token}/${filePath}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("TELEGRAM_FILE_DOWNLOAD_FAILED");
+  const contentType = res.headers.get("content-type") || "image/jpeg";
+  if (!contentType.startsWith("image/")) throw new Error("INVALID_RECEIPT_TYPE");
+  const buffer = Buffer.from(await res.arrayBuffer());
+  if (buffer.byteLength > 1.2 * 1024 * 1024) throw new Error("RECEIPT_TOO_LARGE");
+  return {
+    dataUrl: `data:${contentType};base64,${buffer.toString("base64")}`,
+    contentType,
+    size: buffer.byteLength,
+    fileName: filePath.split("/").pop() || "telegram-receipt.jpg",
+  };
+}
+
+async function notifyAdminsOnWalletDeposit(user: TelegramUser, userId: string, amountRial: bigint, txId: string) {
+  const adminIds = getAdminIds();
+  if (!adminIds.length) return;
+  const username = user.username ? `@${user.username}` : "—";
+  const text = [
+    "💳 <b>فیش واریز جدید از ربات</b>",
+    "",
+    `مبلغ: <b>${html(formatTomanFromRial(amountRial))}</b>`,
+    `Telegram: <code>${html(user.id)}</code> | ${html(username)}`,
+    `User ID: <code>${html(userId)}</code>`,
+    `Transaction: <code>${html(txId)}</code>`,
+    "",
+    "برای مشاهده فیش و تأیید/رد وارد پنل کیف پول شو.",
+  ].join("\n");
+  for (const adminId of adminIds) {
+    const numericId = Number(adminId);
+    if (!Number.isFinite(numericId)) continue;
+    await sendMessage(numericId, text, { inline_keyboard: [[{ text: "پنل کیف پول", url: `${APP_URL}/admin/wallets` }]] });
+  }
+}
+
+async function startWalletDeposit(chatId: number, telegramId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(chatId, "برای ثبت فیش واریز، اول حساب تلگرامت را با /link به Gament وصل کن.", {
+      inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]],
+    });
+    return;
+  }
+  await setSession(telegramId, "wallet_deposit_amount", {});
+  await sendMessage(chatId, "💳 <b>ثبت فیش واریز کارت‌به‌کارت</b>\n\nمبلغ واریزی را به تومان وارد کن. مثال: <code>500000</code> یا <code>500,000</code>", replyKeyboard([[CANCEL_TEXT]]));
 }
 
 async function rewardUserXP(userId: string, amount: number, reason: string) {
@@ -2058,6 +2124,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/link") return linkCommand(chatId, user);
   if (normalizedCommand === "/profile") return profileCommand(chatId, telegramId);
   if (normalizedCommand === "/wallet") return walletCommand(chatId, telegramId);
+  if (normalizedCommand === "/deposit" || normalizedCommand === "/wallet_deposit") return startWalletDeposit(chatId, telegramId);
   if (normalizedCommand === "/achievements") return achievementsCommand(chatId, telegramId);
   if (normalizedCommand === "/my_tournaments") return myTournamentsCommand(chatId, telegramId);
   if (normalizedCommand === "/daily") return dailyCommand(chatId, telegramId);
@@ -2122,6 +2189,90 @@ async function handleConversationMessage(message: TelegramMessage) {
 
   const session = await getSession(telegramId);
   const data = { ...session.data };
+
+
+  if (session.state === "wallet_deposit_amount") {
+    const linked = await getLinkedUserByTelegram(telegramId);
+    if (!linked?.userId) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "حساب شما لینک نیست. اول /link را انجام بده.", removeKeyboard());
+      return;
+    }
+    const amountRial = parseTomanToRial(text);
+    const validation = validateDepositAmountRial(amountRial);
+    if (!validation.ok) {
+      await sendMessage(chatId, `${html(validation.error)}\n\nمبلغ را دوباره به تومان وارد کن:`);
+      return;
+    }
+    data.walletDepositAmountToman = rialToTomanNumber(amountRial).toString();
+    await setSession(telegramId, "wallet_deposit_tracking", data);
+    await sendMessage(chatId, `مبلغ ثبت شد: <b>${html(formatTomanFromRial(amountRial))}</b>\n\nشماره پیگیری یا ۴ رقم آخر کارت مبدأ را بفرست. اگر نداری «رد کردن» را بزن.`, replyKeyboard([[SKIP_TEXT], [CANCEL_TEXT]]));
+    return;
+  }
+
+  if (session.state === "wallet_deposit_tracking") {
+    data.walletDepositTracking = text === SKIP_TEXT ? "" : text.slice(0, 80);
+    await setSession(telegramId, "wallet_deposit_receipt", data);
+    await sendMessage(chatId, "حالا تصویر فیش واریز را به‌صورت عکس ارسال کن.\n\nحداکثر حجم قابل قبول ۱.۲ مگابایت است.", replyKeyboard([[CANCEL_TEXT]]));
+    return;
+  }
+
+  if (session.state === "wallet_deposit_receipt") {
+    const linked = await getLinkedUserByTelegram(telegramId);
+    if (!linked?.userId || !data.walletDepositAmountToman) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "اطلاعات واریز ناقص است. دوباره /deposit را شروع کن.", removeKeyboard());
+      return;
+    }
+    const photos = message.photo || [];
+    const bestPhoto = photos[photos.length - 1];
+    if (!bestPhoto) {
+      await sendMessage(chatId, "لطفاً فیش را به‌صورت عکس ارسال کن، نه متن یا فایل دیگر.");
+      return;
+    }
+
+    try {
+      const amountRial = parseTomanToRial(data.walletDepositAmountToman);
+      const receipt = await downloadTelegramPhotoAsDataUrl(bestPhoto.file_id);
+      const wallet = await getOrCreateWallet(linked.userId);
+      const [tx] = await db.insert(transactions).values({
+        walletId: wallet.id,
+        amount: amountRial.toString(),
+        type: "deposit",
+        status: "pending",
+        referenceId: createWalletReference("deposit"),
+        metadata: {
+          kind: "manual_deposit_request",
+          provider: "telegram_bot_card_transfer",
+          withdrawable: false,
+          userId: linked.userId,
+          telegramId,
+          displayName: linked.displayName,
+          trackingNumber: data.walletDepositTracking || null,
+          note: sanitizeWalletNote(message.caption || "ثبت از ربات تلگرام"),
+          receiptUploaded: true,
+          receiptUrl: receipt.dataUrl,
+          receiptFileName: receipt.fileName,
+          receiptFileType: receipt.contentType,
+          receiptFileSize: receipt.size,
+          telegramFileId: bestPhoto.file_id,
+          telegramFileUniqueId: bestPhoto.file_unique_id,
+        },
+      }).returning();
+
+      await clearSession(telegramId);
+      await sendMessage(chatId, `✅ فیش واریز ثبت شد.\n\nمبلغ: <b>${html(formatTomanFromRial(amountRial))}</b>\nوضعیت: <b>در انتظار بررسی ادمین</b>\n\nبعد از تأیید مدیریت، موجودی کیف پولت افزایش پیدا می‌کند.`, {
+        inline_keyboard: [[{ text: "مشاهده کیف پول", url: `${APP_URL}/wallet` }]],
+      });
+      await notifyAdminsOnWalletDeposit(user, linked.userId, amountRial, tx.id).catch((err) => logger.warn({ err }, "Failed to notify admins on Telegram wallet deposit"));
+    } catch (err) {
+      const messageText = err instanceof Error && err.message === "RECEIPT_TOO_LARGE"
+        ? "حجم تصویر فیش بیشتر از ۱.۲ مگابایت است. لطفاً تصویر سبک‌تر ارسال کن."
+        : "ثبت فیش انجام نشد. لطفاً دوباره عکس فیش را ارسال کن یا بعداً از سایت اقدام کن.";
+      await sendMessage(chatId, messageText);
+    }
+    return;
+  }
 
   if (session.state === "evidence_upload") {
     const linked = await getLinkedUserByTelegram(telegramId);
@@ -2327,6 +2478,8 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:status") return statusCommand(chatId, telegramId);
   if (data === "menu:link") return linkCommand(chatId, callback.from);
   if (data === "menu:profile") return profileCommand(chatId, telegramId);
+  if (data === "menu:wallet") return walletCommand(chatId, telegramId);
+  if (data === "wallet:deposit") return startWalletDeposit(chatId, telegramId);
   if (data.startsWith("match:")) return handleMatchAction(chatId, telegramId, data.replace("match:", ""));
   if (data.startsWith("result:")) {
     const [, action, matchId] = data.split(":");
