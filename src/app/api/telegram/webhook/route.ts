@@ -1251,6 +1251,27 @@ async function notifyAdminsOnPreRegistration(user: TelegramUser, data: SessionDa
   }
 }
 
+
+async function notifyAdminsOnSupportTicket(telegramUser: TelegramUser, userId: string, ticketId: string, subject: string, message: string) {
+  const adminIds = getAdminIds();
+  if (!adminIds.length) return;
+  const username = telegramUser.username ? `@${telegramUser.username}` : "—";
+  const text = [
+    "🎧 <b>تیکت پشتیبانی جدید از تلگرام</b>",
+    "",
+    `موضوع: <b>${html(subject)}</b>`,
+    `Telegram: <code>${html(telegramUser.id)}</code> | ${html(username)}`,
+    `User ID: <code>${html(userId)}</code>`,
+    "",
+    `پیام: ${html(message.slice(0, 700))}`,
+  ].join("\n");
+  for (const adminId of adminIds) {
+    const numericId = Number(adminId);
+    if (!Number.isFinite(numericId)) continue;
+    await sendMessage(numericId, text, { inline_keyboard: [[{ text: "مشاهده تیکت", url: `${APP_URL}/admin/support?ticketId=${ticketId}` }]] });
+  }
+}
+
 async function adminCommand(chatId: number, telegramId: string) {
   if (!hasAdminAccess(telegramId)) {
     await sendMessage(chatId, "شما دسترسی ادمین ندارید.");
@@ -1261,6 +1282,7 @@ async function adminCommand(chatId: number, telegramId: string) {
   const [walletPending] = await db.select({ value: count() }).from(transactions).where(and(inArray(transactions.type, ["deposit", "withdrawal"]), eq(transactions.status, "pending")));
   const [openDisputes] = await db.select({ value: count() }).from(disputes).where(eq(disputes.status, "open"));
   const [pendingHonors] = await db.select({ value: count() }).from(honors).where(eq(honors.status, "pending"));
+  const [openSupport] = await db.select({ value: count() }).from(tickets).where(eq(tickets.status, "open"));
   const [activeTournaments] = await db.select({ value: count() }).from(tournaments).where(inArray(tournaments.status, ["registration", "in_progress"]));
 
   await sendMessage(
@@ -1271,12 +1293,14 @@ async function adminCommand(chatId: number, telegramId: string) {
       `تورنومنت‌های فعال: <b>${activeTournaments.value}</b>`,
       `کیف پول pending: <b>${walletPending.value}</b>`,
       `اعتراض‌های باز: <b>${openDisputes.value}</b>`,
+      `تیکت‌های باز: <b>${openSupport.value}</b>`,
       `افتخارات pending: <b>${pendingHonors.value}</b>`,
       `پیش‌ثبت‌نام تلگرام: <b>${total.value}</b> | جدید: <b>${newItems.value}</b>`,
       "",
       "/players — آخرین پیش‌ثبت‌نام‌ها",
       "/pending_wallets — شارژ/برداشت‌های در انتظار",
       "/pending_disputes — اعتراض‌های باز",
+      "/pending_support — تیکت‌های باز پشتیبانی",
       "/pending_honors — محتوای تالار افتخارات در انتظار",
       "/honor_stats — آمار بازدید و لایک خبرها",
       "/manage — مدیریت سریع تورنومنت‌ها",
@@ -1287,6 +1311,7 @@ async function adminCommand(chatId: number, telegramId: string) {
     {
       inline_keyboard: [
         [{ text: "💳 کیف پول‌ها", callback_data: "admin:wallets" }, { text: "🚨 اعتراض‌ها", callback_data: "admin:disputes" }],
+        [{ text: "🎧 پشتیبانی", callback_data: "admin:support" }],
         [{ text: "🏛 افتخارات", callback_data: "admin:honors" }, { text: "📊 آمار خبرها", callback_data: "admin:honor_stats" }],
         [{ text: "🧩 تورنومنت‌ها", callback_data: "admin:tournaments" }],
         [{ text: "ورود به پنل ادمین", url: `${APP_URL}/admin` }],
@@ -1336,6 +1361,43 @@ async function pendingWalletsCommand(chatId: number, telegramId: string) {
   await sendMessage(chatId, text, { inline_keyboard: [[{ text: "بررسی در پنل کیف پول", url: `${APP_URL}/admin/wallets` }]] });
 }
 
+
+
+async function pendingSupportCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const rows = await db
+    .select({ id: tickets.id, subject: tickets.subject, status: tickets.status, createdAt: tickets.createdAt, displayName: users.displayName, username: users.username, phoneNumber: users.phoneNumber })
+    .from(tickets)
+    .leftJoin(users, eq(tickets.userId, users.id))
+    .where(eq(tickets.status, "open"))
+    .orderBy(desc(tickets.createdAt))
+    .limit(10);
+
+  if (!rows.length) return sendMessage(chatId, "✅ تیکت باز وجود ندارد.", { inline_keyboard: [[{ text: "پنل پشتیبانی", url: `${APP_URL}/admin/support` }]] });
+  const text = [
+    "🎧 <b>تیکت‌های باز پشتیبانی</b>",
+    "",
+    ...rows.map((row, i) => `${i + 1}) <b>${html(row.subject)}</b>\n👤 ${html(row.displayName || row.username || "—")} | 📞 ${html(row.phoneNumber || "—")}\n⏱ ${new Date(row.createdAt).toLocaleString("fa-IR")}`),
+  ].join("\n\n");
+  await sendMessage(chatId, text, {
+    inline_keyboard: [
+      ...rows.slice(0, 5).map((row, i) => [{ text: `مشاهده تیکت ${i + 1}`, url: `${APP_URL}/admin/support?ticketId=${row.id}` }]),
+      [{ text: "پنل پشتیبانی", url: `${APP_URL}/admin/support` }],
+    ],
+  });
+}
+
+async function myTicketsCommand(chatId: number, telegramId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) return sendMessage(chatId, "برای مشاهده تیکت‌ها، اول حساب را با /link وصل کن.", { inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]] });
+  const rows = await db.select().from(tickets).where(eq(tickets.userId, linked.userId)).orderBy(desc(tickets.createdAt)).limit(8);
+  if (!rows.length) return sendMessage(chatId, "هنوز تیکتی ثبت نکرده‌ای. برای ساخت تیکت /support را بزن.");
+  await sendMessage(chatId, [
+    "🎧 <b>تیکت‌های من</b>",
+    "",
+    ...rows.map((row, i) => `${i + 1}) <b>${html(row.subject)}</b> — ${html(row.status || "open")}\n${new Date(row.createdAt).toLocaleString("fa-IR")}`),
+  ].join("\n\n"), { inline_keyboard: [[{ text: "مرکز پشتیبانی", url: `${APP_URL}/support` }]] });
+}
 
 async function pendingDisputesCommand(chatId: number, telegramId: string) {
   if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
@@ -2479,6 +2541,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/leaderboard") return leaderboardCommand(chatId);
   if (normalizedCommand === "/ai") return aiCommand(chatId, args.join(" "), telegramId);
   if (normalizedCommand === "/support") return supportStartCommand(chatId, telegramId);
+  if (normalizedCommand === "/my_tickets") return myTicketsCommand(chatId, telegramId);
   if (normalizedCommand === "/matches") return matchesCommand(chatId, telegramId);
   if (normalizedCommand === "/checkin") return checkInCommand(chatId, telegramId);
   if (normalizedCommand === "/judge") return judgeCommand(chatId, telegramId);
@@ -2506,6 +2569,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/players") return playersCommand(chatId, telegramId);
   if (normalizedCommand === "/pending_wallets") return pendingWalletsCommand(chatId, telegramId);
   if (normalizedCommand === "/pending_disputes") return pendingDisputesCommand(chatId, telegramId);
+  if (normalizedCommand === "/pending_support") return pendingSupportCommand(chatId, telegramId);
   if (normalizedCommand === "/pending_honors") return pendingHonorsCommand(chatId, telegramId);
   if (normalizedCommand === "/honor_stats") return honorStatsCommand(chatId, telegramId);
   if (normalizedCommand === "/ops") return adminCommand(chatId, telegramId);
@@ -2681,8 +2745,9 @@ async function handleConversationMessage(message: TelegramMessage) {
     await db.insert(ticketMessages).values({ ticketId: ticket.id, senderId: linked.userId, message: text });
     await clearSession(telegramId);
     await sendMessage(chatId, "✅ تیکت پشتیبانی شما ثبت شد. از داخل سایت هم می‌توانید پیگیری کنید.", {
-      inline_keyboard: [[{ text: "مرکز پشتیبانی", url: `${APP_URL}/support` }]],
+      inline_keyboard: [[{ text: "مرکز پشتیبانی", url: `${APP_URL}/support` }], [{ text: "تیکت‌های من", callback_data: "support:mine" }]],
     });
+    await notifyAdminsOnSupportTicket(user, linked.userId, ticket.id, data.supportSubject || "پشتیبانی تلگرام", text).catch((err) => logger.warn({ err, ticketId: ticket.id }, "Failed to notify admins on Telegram support ticket"));
     return;
   }
 
@@ -2798,11 +2863,13 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   await answerCallback(callback.id);
   if (!chatId) return;
 
+  if (data === "support:mine") return myTicketsCommand(chatId, telegramId);
   if (data === "menu:home") return startCommand(chatId);
   if (data === "mission:invite") return inviteCommand(chatId, telegramId);
   if (data.startsWith("mission:claim:")) return claimMissionReward(chatId, telegramId, data.replace("mission:claim:", ""));
   if (data === "admin:wallets") return pendingWalletsCommand(chatId, telegramId);
   if (data === "admin:disputes") return pendingDisputesCommand(chatId, telegramId);
+  if (data === "admin:support") return pendingSupportCommand(chatId, telegramId);
   if (data === "admin:honors") return pendingHonorsCommand(chatId, telegramId);
   if (data === "admin:honor_stats") return honorStatsCommand(chatId, telegramId);
   if (data === "admin:tournaments") return adminTournamentsCommand(chatId, telegramId);

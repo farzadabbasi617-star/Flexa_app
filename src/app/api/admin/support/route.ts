@@ -4,6 +4,7 @@ import { ticketMessages, tickets, users } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
+import { notifyLinkedUserOnTelegram } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -43,8 +44,22 @@ export async function POST(request: NextRequest) {
     const message = String(body.message || "").trim();
     const status = body.status ? String(body.status) : undefined;
     if (!ticketId || !message) return NextResponse.json({ error: "ticketId and message required" }, { status: 400 });
+    const [ticket] = await db.select({ userId: tickets.userId, subject: tickets.subject }).from(tickets).where(eq(tickets.id, ticketId)).limit(1);
     const [created] = await db.insert(ticketMessages).values({ ticketId, senderId: auth.user.id, message }).returning();
     if (status) await db.update(tickets).set({ status }).where(eq(tickets.id, ticketId));
+    if (ticket?.userId) {
+      await notifyLinkedUserOnTelegram(
+        ticket.userId,
+        `🎧 <b>پاسخ پشتیبانی Gament</b>
+
+موضوع: <b>${ticket.subject}</b>
+
+${message.slice(0, 900)}${status ? `
+
+وضعیت تیکت: <b>${status}</b>` : ""}`,
+        { inline_keyboard: [[{ text: "مشاهده تیکت", url: `${process.env.APP_URL || "https://www.gament1.ir"}/support?ticketId=${ticketId}` }]] }
+      ).catch(() => undefined);
+    }
     await logAdminAction({ adminId: auth.user.id, action: "reply", entityType: "ticket", entityId: ticketId, metadata: { status }, ipAddress: getClientIp(request.headers) });
     return NextResponse.json(created, { status: 201 });
   } catch {
