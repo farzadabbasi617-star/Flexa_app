@@ -30,7 +30,7 @@ interface WalletData {
 }
 
 const WALLET_TERMS =
-  "مبالغ شارژ شده در کیف پول گیمنت صرفاً جهت استفاده از خدمات داخل پلتفرم، از جمله ثبت‌نام در تورنومنت‌ها و خدمات مرتبط قابل استفاده است و به‌صورت مستقیم قابل برداشت نیست. مبالغ قابل برداشت شامل جوایز تورنومنت‌ها، پاداش‌های رسمی و مبالغی است که طبق قوانین گیمنت قابل تسویه اعلام شده‌اند. درخواست‌های برداشت پس از ثبت اطلاعات بانکی معتبر و بررسی توسط تیم پشتیبانی، طی ۲۴ تا ۷۲ ساعت کاری پرداخت می‌شوند.";
+  "شارژ کیف پول گیمنت فعلاً از طریق کارت‌به‌کارت انجام می‌شود. پس از انتقال وجه به کارت اعلام‌شده، رسید/شماره پیگیری را ثبت کنید تا مدیریت پرداخت را بررسی و موجودی قابل استفاده داخل سایت را تأیید کند. مبالغ شارژ شده صرفاً برای خدمات داخل پلتفرم مثل ثبت‌نام تورنومنت قابل استفاده است و به‌صورت مستقیم قابل برداشت نیست. مبالغ قابل برداشت شامل جوایز، پاداش‌های رسمی و مبالغی است که طبق قوانین گیمنت قابل تسویه اعلام شده‌اند. درخواست‌های برداشت پس از ثبت اطلاعات بانکی معتبر و بررسی توسط تیم پشتیبانی، طی ۲۴ تا ۷۲ ساعت کاری پرداخت می‌شوند.";
 
 const TYPE_LABELS: Record<string, string> = {
   deposit: "شارژ کیف پول",
@@ -48,6 +48,9 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const QUICK_DEPOSIT_AMOUNTS = [50_000, 100_000, 200_000, 500_000, 1_000_000];
+const DEPOSIT_CARD_NUMBER = "5892101742614775";
+const DEPOSIT_CARD_OWNER = "فرزاد عباسی";
+const DEPOSIT_BANK_NAME = "بانک سپه";
 
 function formatTomanInput(value: string) {
   const digits = value.replace(/[^\d۰-۹٠-٩]/g, "");
@@ -72,6 +75,7 @@ export default function WalletPage() {
   const [busy, setBusy] = useState(true);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
+  const [depositTrackingNumber, setDepositTrackingNumber] = useState("");
   const [depositNote, setDepositNote] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [accountOwner, setAccountOwner] = useState("");
@@ -120,21 +124,25 @@ export default function WalletPage() {
     setError("");
     setMessage("");
     try {
-      const res = await fetch("/api/payment/payping/create", {
+      const res = await fetch("/api/wallet/transactions", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({
+          action: "deposit",
           amountToman: depositAmount,
+          trackingNumber: depositTrackingNumber,
           note: depositNote,
           acceptTerms: acceptedTerms,
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "شروع پرداخت انجام نشد");
-      if (!json.paymentUrl) throw new Error("لینک پرداخت دریافت نشد");
-      setMessage("در حال انتقال به درگاه پی‌پینگ...");
-      window.location.assign(json.paymentUrl);
+      if (!res.ok) throw new Error(json.error || "درخواست شارژ ثبت نشد");
+      setMessage(json.message || "رسید کارت‌به‌کارت ثبت شد و پس از تأیید مدیریت، موجودی کیف پول افزایش می‌یابد.");
+      setDepositAmount("");
+      setDepositTrackingNumber("");
+      setDepositNote("");
+      load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "درخواست شارژ ثبت نشد");
     } finally {
@@ -250,15 +258,34 @@ export default function WalletPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <form onSubmit={requestDeposit} className="glass-panel p-5 space-y-4">
             <div>
-              <h2 className="font-black mb-1">شارژ آنلاین کیف پول</h2>
-              <p className="text-xs text-gray-500 leading-6">پرداخت از طریق درگاه امن پی‌پینگ انجام می‌شود و پس از تأیید موفق، موجودی قابل استفاده داخل سایت به‌صورت خودکار افزایش می‌یابد. شارژ مستقیم قابل برداشت نیست.</p>
+              <h2 className="font-black mb-1">شارژ کیف پول با کارت‌به‌کارت</h2>
+              <p className="text-xs text-gray-500 leading-6">مبلغ را به کارت زیر منتقل کنید، سپس شماره پیگیری/رسید را ثبت کنید. شارژ پس از تأیید مدیریت به موجودی قابل استفاده داخل سایت اضافه می‌شود و قابل برداشت مستقیم نیست.</p>
             </div>
+
+            <div className="rounded-3xl bg-gradient-to-br from-purple-700/20 to-cyan-700/10 border border-purple-400/25 p-4 space-y-3">
+              <div className="text-[11px] text-purple-200 font-black">کارت مقصد شارژ کیف پول</div>
+              <button
+                type="button"
+                onClick={() => navigator.clipboard?.writeText(DEPOSIT_CARD_NUMBER)}
+                className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 text-center text-2xl font-black tracking-[0.14em] num-en text-white hover:border-cyan-300/40"
+                dir="ltr"
+                title="کپی شماره کارت"
+              >
+                {DEPOSIT_CARD_NUMBER.replace(/(\d{4})(?=\d)/g, "$1 ")}
+              </button>
+              <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
+                <span>{DEPOSIT_BANK_NAME}</span>
+                <span>به نام <b className="text-yellow-200">{DEPOSIT_CARD_OWNER}</b></span>
+              </div>
+              <div className="text-[10px] text-cyan-200/80 leading-5">روی شماره کارت بزنید تا کپی شود. بعد از انتقال وجه، حتماً شماره پیگیری یا ۴ رقم آخر کارت مبدأ را وارد کنید.</div>
+            </div>
+
             <div className="space-y-3">
               <input
                 className="gaming-input text-left num-en"
                 dir="ltr"
                 inputMode="numeric"
-                placeholder="مثلاً 200,000 تومان"
+                placeholder="مبلغ انتقالی، مثلاً 200,000 تومان"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(formatTomanInput(e.target.value))}
               />
@@ -275,8 +302,9 @@ export default function WalletPage() {
                 ))}
               </div>
             </div>
+            <input className="gaming-input text-left num-en" dir="ltr" placeholder="شماره پیگیری / ۴ رقم آخر کارت مبدأ" value={depositTrackingNumber} onChange={(e) => setDepositTrackingNumber(e.target.value.slice(0, 80))} />
             <textarea className="gaming-input min-h-20" placeholder="توضیح اختیاری" value={depositNote} onChange={(e) => setDepositNote(e.target.value)} />
-            <button disabled={!acceptedTerms || submitting === "deposit"} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال انتقال..." : "پرداخت آنلاین با پی‌پینگ"}</button>
+            <button disabled={!acceptedTerms || submitting === "deposit"} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال ثبت..." : "ثبت رسید کارت‌به‌کارت"}</button>
           </form>
 
           <form onSubmit={requestWithdrawal} className="glass-panel p-5 space-y-4">

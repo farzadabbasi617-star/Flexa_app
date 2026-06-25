@@ -175,7 +175,7 @@ export default function AdminWalletsPage() {
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
               <h2 className="font-black text-xl">درخواست‌های در انتظار</h2>
-              <p className="text-xs text-gray-500 mt-1">واریزهای پی‌پینگ معمولاً خودکار تکمیل می‌شوند؛ برداشت بعد از پرداخت بانکی توسط ادمین تأیید شود.</p>
+              <p className="text-xs text-gray-500 mt-1">رسیدهای کارت‌به‌کارت بعد از تطبیق با حساب بانکی تأیید شوند؛ برداشت بعد از پرداخت بانکی توسط ادمین تأیید شود.</p>
             </div>
             <button onClick={load} className="px-4 py-2 rounded-xl bg-dark-700 text-sm font-bold">🔄 بروزرسانی</button>
           </div>
@@ -217,9 +217,8 @@ export default function AdminWalletsPage() {
                           </>
                         ) : (
                           <>
-                            <div>درگاه: {metaText(tx, "provider") || "manual"}</div>
-                            <div>کد پی‌پینگ: <span dir="ltr" className="text-cyan-300">{metaText(tx, "paypingCode") || "—"}</span></div>
-                            <div>RefId: <span dir="ltr" className="text-cyan-300">{metaText(tx, "paypingRefId") || metaText(tx, "trackingNumber") || "—"}</span></div>
+                            <div>روش: کارت‌به‌کارت / تأیید دستی</div>
+                            <div>شماره پیگیری/۴ رقم آخر: <button type="button" onClick={() => copyText(metaText(tx, "trackingNumber"))} dir="ltr" className="text-cyan-300 hover:underline">{metaText(tx, "trackingNumber") || "—"}</button></div>
                             <div>توضیح: {metaText(tx, "note") || "—"}</div>
                           </>
                         )}
