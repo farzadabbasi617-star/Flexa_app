@@ -630,6 +630,122 @@ async function recordReferralIfNeeded(user: TelegramUser, startPayload?: string)
   }
 }
 
+
+function normalizeStartPayload(value?: string) {
+  return decodeURIComponent(value || "").trim().slice(0, 120).replace(/\s+/g, "_");
+}
+
+function deepLinkKeyboard(url: string, label = "باز کردن در Gament") {
+  return {
+    inline_keyboard: [
+      [{ text: label, web_app: { url } }],
+      [{ text: "باز کردن در مرورگر", url }],
+      [{ text: "منوی اصلی ربات", callback_data: "menu:home" }],
+    ],
+  };
+}
+
+async function handleStartPayload(chatId: number, telegramId: string, user: TelegramUser, rawPayload?: string) {
+  const payload = normalizeStartPayload(rawPayload);
+  if (!payload || payload.startsWith("ref_") || payload.startsWith("campaign_") || payload.startsWith("streamer_") || payload.startsWith("utm_")) return false;
+
+  if (["wallet", "wallet_deposit", "deposit", "charge"].includes(payload)) {
+    if (payload === "deposit" || payload === "wallet_deposit" || payload === "charge") {
+      await startWalletDeposit(chatId, telegramId);
+      return true;
+    }
+    await walletCommand(chatId, telegramId);
+    return true;
+  }
+
+  if (payload === "profile") {
+    await profileCommand(chatId, telegramId);
+    return true;
+  }
+  if (payload === "register") {
+    await registerStart(chatId, telegramId);
+    return true;
+  }
+  if (payload === "rooms" || payload === "tournaments") {
+    await roomsCommand(chatId);
+    return true;
+  }
+  if (payload === "missions") {
+    await missionsCommand(chatId, telegramId);
+    return true;
+  }
+  if (payload === "invite") {
+    await inviteCommand(chatId, telegramId);
+    return true;
+  }
+
+  if (payload === "honors" || payload === "honor_latest") {
+    const [latest] = await db.select({ id: honors.id, title: honors.title, type: honors.type }).from(honors).where(eq(honors.status, "approved")).orderBy(desc(honors.publishedAt), desc(honors.createdAt)).limit(1);
+    const url = latest ? `${APP_URL}/honors/${latest.id}` : `${APP_URL}/honors`;
+    await sendMessage(
+      chatId,
+      latest ? `🏛 <b>آخرین خبر/افتخار Gament</b>\n\n${html(latest.title)}` : "🏛 تالار افتخارات Gament",
+      deepLinkKeyboard(url, latest ? "مشاهده آخرین خبر" : "مشاهده تالار افتخارات")
+    );
+    return true;
+  }
+
+  if (payload === "link") {
+    await linkCommand(chatId, user);
+    return true;
+  }
+
+  const tournamentId = payload.match(/^(?:tournament|t)_([0-9a-f-]{36})$/i)?.[1];
+  if (tournamentId) {
+    const [tournament] = await db.select({ id: tournaments.id, name: tournaments.name, game: tournaments.game, status: tournaments.status, entryFee: tournaments.entryFee, startDate: tournaments.startDate }).from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
+    const url = `${APP_URL}/tournaments/${tournamentId}`;
+    await sendMessage(
+      chatId,
+      tournament
+        ? `🏆 <b>${html(tournament.name)}</b>\n\n🎮 ${html(gameLabel(tournament.game))}\nوضعیت: <b>${html(tournament.status)}</b>\nورودی: <b>${html(tournament.entryFee || "رایگان")}</b>${tournament.startDate ? `\nشروع: <b>${new Date(tournament.startDate).toLocaleString("fa-IR")}</b>` : ""}`
+        : "🏆 این تورنومنت در Gament باز می‌شود.",
+      deepLinkKeyboard(url, tournament?.status === "registration" ? "ثبت‌نام / مشاهده تورنومنت" : "مشاهده تورنومنت")
+    );
+    return true;
+  }
+
+  const honorId = payload.match(/^(?:honor|h)_([a-zA-Z0-9-]{3,80})$/)?.[1];
+  if (honorId) {
+    const uuidLike = /^[0-9a-f-]{36}$/i.test(honorId);
+    const row = uuidLike ? (await db.select({ id: honors.id, title: honors.title, type: honors.type, game: honors.game }).from(honors).where(eq(honors.id, honorId)).limit(1))[0] : null;
+    const url = `${APP_URL}/honors/${honorId}`;
+    await sendMessage(
+      chatId,
+      row
+        ? `🏛 <b>${html(row.title)}</b>\n\nنوع: <b>${html(row.type)}</b>${row.game ? `\nبازی: <b>${html(row.game)}</b>` : ""}\n\nبرای خواندن کامل، لایک و مشاهده آمار وارد Gament شو.`
+        : "🏛 این خبر/افتخار در تالار افتخارات Gament باز می‌شود.",
+      deepLinkKeyboard(url, "مشاهده خبر / افتخار")
+    );
+    return true;
+  }
+
+  await sendMessage(chatId, "لینک ورودی را متوجه نشدم؛ منوی اصلی را باز کردم.", mainMenuKeyboard());
+  return true;
+}
+
+function telegramStartLink(payload: string) {
+  const username = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
+  return `https://t.me/${username}?start=${encodeURIComponent(payload)}`;
+}
+
+async function deepLinksCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const rows = [
+    ["کیف پول", telegramStartLink("wallet")],
+    ["ثبت فیش", telegramStartLink("deposit")],
+    ["تورنومنت‌ها", telegramStartLink("tournaments")],
+    ["تالار افتخارات", telegramStartLink("honor_latest")],
+    ["مأموریت‌ها", telegramStartLink("missions")],
+    ["اتصال حساب", telegramStartLink("link")],
+  ];
+  await sendMessage(chatId, ["🔗 <b>Deep Linkهای آماده ربات</b>", "", ...rows.map(([label, link]) => `<b>${label}</b>\n<code>${html(link)}</code>`)].join("\n\n"));
+}
+
 async function startCommand(chatId: number) {
   await sendMessage(
     chatId,
@@ -1166,6 +1282,7 @@ async function adminCommand(chatId: number, telegramId: string) {
       "/manage — مدیریت سریع تورنومنت‌ها",
       "/announce متن — ارسال اطلاعیه به کاربران ربات",
       "/post_latest — انتشار آخرین تورنومنت فعال در کانال",
+      "/deep_links — لینک‌های آماده برای کانال/کمپین",
     ].join("\n"),
     {
       inline_keyboard: [
@@ -2337,11 +2454,14 @@ async function handleCommand(message: TelegramMessage, text: string) {
   const normalizedCommand = command.split("@")[0].toLowerCase();
 
   if (normalizedCommand === "/start") {
-    await recordReferralIfNeeded(user, args[0]);
+    const payload = args[0];
+    await recordReferralIfNeeded(user, payload);
+    if (await handleStartPayload(chatId, telegramId, user, payload)) return;
     return startCommand(chatId);
   }
   if (normalizedCommand === "/help") return startCommand(chatId);
   if (normalizedCommand === "/links") return linksCommand(chatId);
+  if (normalizedCommand === "/deep_links") return deepLinksCommand(chatId, telegramId);
   if (normalizedCommand === "/channel") return channelCommand(chatId);
   if (normalizedCommand === "/link") return linkCommand(chatId, user);
   if (normalizedCommand === "/profile") return profileCommand(chatId, telegramId);
@@ -2678,6 +2798,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   await answerCallback(callback.id);
   if (!chatId) return;
 
+  if (data === "menu:home") return startCommand(chatId);
   if (data === "mission:invite") return inviteCommand(chatId, telegramId);
   if (data.startsWith("mission:claim:")) return claimMissionReward(chatId, telegramId, data.replace("mission:claim:", ""));
   if (data === "admin:wallets") return pendingWalletsCommand(chatId, telegramId);
