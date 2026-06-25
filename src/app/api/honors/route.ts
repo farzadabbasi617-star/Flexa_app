@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { honors } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import logger from "@/lib/logger";
+import { STATIC_HONORS } from "@/lib/static-honors";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +33,11 @@ function relativeTime(date: Date | string | null | undefined) {
 }
 
 export async function GET() {
+  const staticRows = STATIC_HONORS.map((item) => ({
+    ...item,
+    time: relativeTime(item.publishedAt || item.createdAt),
+  }));
+
   try {
     const rows = await db
       .select()
@@ -40,30 +46,30 @@ export async function GET() {
       .orderBy(desc(honors.highlight), desc(honors.publishedAt), desc(honors.createdAt))
       .limit(100);
 
-    return NextResponse.json(
-      rows.map((row) => ({
-        id: row.id,
-        type: row.type,
-        icon: row.icon || iconForType(row.type),
-        title: row.title,
-        description: row.description,
-        time: relativeTime(row.publishedAt || row.createdAt),
-        prize: row.prize || undefined,
-        username: row.username || undefined,
-        level: row.level || undefined,
-        highlight: row.highlight,
-        image: row.imageUrl || undefined,
-        imageAlt: metadataObject(row.metadata).imageAlt || row.title,
-        summary: metadataObject(row.metadata).summary || undefined,
-        seoKeywords: metadataObject(row.metadata).seoKeywords || [],
-        readTimeMinutes: metadataObject(row.metadata).readTimeMinutes || undefined,
-        sources: metadataObject(row.metadata).sources || [],
-        game: row.game || undefined,
-        publishedAt: row.publishedAt,
-      }))
-    );
+    const dbRows = rows.map((row) => ({
+      id: row.id,
+      type: row.type,
+      icon: row.icon || iconForType(row.type),
+      title: row.title,
+      description: row.description,
+      time: relativeTime(row.publishedAt || row.createdAt),
+      prize: row.prize || undefined,
+      username: row.username || undefined,
+      level: row.level || undefined,
+      highlight: row.highlight,
+      image: row.imageUrl || undefined,
+      imageAlt: metadataObject(row.metadata).imageAlt || row.title,
+      summary: metadataObject(row.metadata).summary || undefined,
+      seoKeywords: metadataObject(row.metadata).seoKeywords || [],
+      readTimeMinutes: metadataObject(row.metadata).readTimeMinutes || undefined,
+      sources: metadataObject(row.metadata).sources || [],
+      game: row.game || undefined,
+      publishedAt: row.publishedAt,
+    }));
+
+    return NextResponse.json([...staticRows, ...dbRows]);
   } catch (err) {
     logger.error({ err }, "Public honors GET failed");
-    return NextResponse.json([], { status: 200 });
+    return NextResponse.json(staticRows, { status: 200 });
   }
 }

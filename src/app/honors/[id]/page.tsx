@@ -23,6 +23,7 @@ interface HonorDetail {
   sources?: Array<{ title: string; link: string; source: string; pubDate?: string | null }>;
   game?: string;
   publishedAt?: string | null;
+  htmlUrl?: string;
 }
 
 const GAME_LABELS: Record<string, string> = {
@@ -110,11 +111,22 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
         ) : honor ? (
           <div className="space-y-5">
             <section className="glass-panel rounded-[34px] border border-white/10 p-6">
-              <article className="space-y-5">
-                {honor.description.split(/\n\s*\n/).filter(Boolean).map((paragraph, index) => (
-                  <p key={index} className={`leading-8 whitespace-pre-wrap ${index === 0 ? "text-base text-white font-medium" : "text-sm text-gray-200"}`}>{paragraph}</p>
-                ))}
-              </article>
+              {honor.htmlUrl ? (
+                <div className="overflow-hidden rounded-[28px] border border-white/10 bg-black/30">
+                  <iframe
+                    src={honor.htmlUrl}
+                    title={honor.title}
+                    className="w-full h-[82vh] bg-[#0a0a2e]"
+                    loading="lazy"
+                  />
+                </div>
+              ) : (
+                <article className="space-y-5">
+                  {honor.description.split(/\n\s*\n/).filter(Boolean).map((paragraph, index) => (
+                    <p key={index} className={`leading-8 whitespace-pre-wrap ${index === 0 ? "text-base text-white font-medium" : "text-sm text-gray-200"}`}>{paragraph}</p>
+                  ))}
+                </article>
+              )}
 
               {honor.seoKeywords?.length ? (
                 <div className="flex flex-wrap gap-2 mt-6 pt-5 border-t border-white/10">

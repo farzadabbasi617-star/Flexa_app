@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { honors } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import logger from "@/lib/logger";
+import { getStaticHonorById } from "@/lib/static-honors";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,14 @@ function relativeTime(date: Date | string | null | undefined) {
 export async function GET(_request: NextRequest, context: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await context.params;
+    const staticHonor = getStaticHonorById(id);
+    if (staticHonor) {
+      return NextResponse.json({
+        ...staticHonor,
+        time: relativeTime(staticHonor.publishedAt || staticHonor.createdAt),
+      });
+    }
+
     const [row] = await db
       .select()
       .from(honors)
