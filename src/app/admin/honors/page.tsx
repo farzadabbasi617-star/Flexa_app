@@ -18,6 +18,8 @@ interface Honor {
   image?: string;
   createdAt?: string;
   publishedAt?: string | null;
+  likesCount?: number;
+  viewsCount?: number;
 }
 
 export default function AdminHonorsPage() {
@@ -319,6 +321,8 @@ export default function AdminHonorsPage() {
                         {honor.level && <span>سطح {honor.level}</span>}
                         {honor.prize && <span className="text-yellow-400">{honor.prize}</span>}
                         <span>{honor.time || (honor.publishedAt || honor.createdAt ? new Date(honor.publishedAt || honor.createdAt!).toLocaleString("fa-IR") : "—")}</span>
+                        <span className="text-pink-300">لایک: {(honor.likesCount || 0).toLocaleString("fa-IR")}</span>
+                        <span className="text-cyan-300">سین/بازدید: {(honor.viewsCount || 0).toLocaleString("fa-IR")}</span>
                       </div>
                     </div>
 

@@ -23,6 +23,8 @@ interface Honor {
   seoKeywords?: string[];
   readTimeMinutes?: number;
   game?: string;
+  likesCount?: number;
+  viewsCount?: number;
 }
 
 const FILTERS: { id: HonorType; label: string; icon: string }[] = [
@@ -178,13 +180,21 @@ export default function HonorsPage() {
                       {honor.seoKeywords.slice(0, 3).map((tag) => <span key={tag} className="text-[9px] px-2 py-1 rounded-full bg-white/5 text-purple-200 border border-white/10">#{tag}</span>)}
                     </div>
                   ) : null}
-                  <div className="flex items-center justify-between text-xs">
+                  <div className="flex items-center justify-between gap-3 text-xs">
                     <div className="text-purple-400 truncate">
                       {honor.username && `@${honor.username}`}
                       {honor.level && ` • سطح ${honor.level}`}
                       {honor.prize && ` • ${honor.prize}`}
                     </div>
-                    <div className="text-white/40 shrink-0">ادامه خبر ←</div>
+                    <div className="flex items-center gap-2 text-white/45 shrink-0">
+                      {honor.type === "news" && (
+                        <>
+                          <span className="inline-flex items-center gap-1">♡ {(honor.likesCount || 0).toLocaleString("fa-IR")}</span>
+                          <span className="inline-flex items-center gap-1">👁 {(honor.viewsCount || 0).toLocaleString("fa-IR")}</span>
+                        </>
+                      )}
+                      <span>ادامه خبر ←</span>
+                    </div>
                   </div>
                 </div>
               </Link>

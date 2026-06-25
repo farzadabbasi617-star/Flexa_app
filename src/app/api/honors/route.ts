@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
-import { honors } from "@/db/schema";
-import { desc, eq } from "drizzle-orm";
+import { honorLikes, honors, honorViews } from "@/db/schema";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import logger from "@/lib/logger";
 import { STATIC_HONORS } from "@/lib/static-honors";
 
@@ -18,6 +18,25 @@ function iconForType(type: string) {
 
 function metadataObject(metadata: unknown): Record<string, any> {
   return metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata as Record<string, any> : {};
+}
+
+
+async function engagementCounts(honorIds: string[]) {
+  if (!honorIds.length) return new Map<string, { likes: number; views: number }>();
+  try {
+    const [viewRows, likeRows] = await Promise.all([
+      db.select({ honorId: honorViews.honorId, count: sql<number>`count(*)::int` }).from(honorViews).where(inArray(honorViews.honorId, honorIds)).groupBy(honorViews.honorId),
+      db.select({ honorId: honorLikes.honorId, count: sql<number>`count(*)::int` }).from(honorLikes).where(inArray(honorLikes.honorId, honorIds)).groupBy(honorLikes.honorId),
+    ]);
+    const map = new Map<string, { likes: number; views: number }>();
+    for (const id of honorIds) map.set(id, { likes: 0, views: 0 });
+    for (const row of viewRows) map.set(row.honorId, { ...(map.get(row.honorId) || { likes: 0, views: 0 }), views: Number(row.count || 0) });
+    for (const row of likeRows) map.set(row.honorId, { ...(map.get(row.honorId) || { likes: 0, views: 0 }), likes: Number(row.count || 0) });
+    return map;
+  } catch (err) {
+    logger.warn({ err }, "Honor engagement counts unavailable");
+    return new Map<string, { likes: number; views: number }>();
+  }
 }
 
 function relativeTime(date: Date | string | null | undefined) {
@@ -46,6 +65,8 @@ export async function GET() {
       .orderBy(desc(honors.highlight), desc(honors.publishedAt), desc(honors.createdAt))
       .limit(100);
 
+    const counts = await engagementCounts(rows.map((row) => row.id));
+
     const dbRows = rows.map((row) => ({
       id: row.id,
       type: row.type,
@@ -65,6 +86,8 @@ export async function GET() {
       sources: metadataObject(row.metadata).sources || [],
       game: row.game || undefined,
       publishedAt: row.publishedAt,
+      likesCount: counts.get(row.id)?.likes || 0,
+      viewsCount: counts.get(row.id)?.views || 0,
     }));
 
     return NextResponse.json([...staticRows, ...dbRows]);

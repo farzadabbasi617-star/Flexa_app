@@ -24,6 +24,9 @@ interface HonorDetail {
   game?: string;
   publishedAt?: string | null;
   htmlUrl?: string;
+  likesCount?: number;
+  viewsCount?: number;
+  likedByMe?: boolean;
 }
 
 const GAME_LABELS: Record<string, string> = {
@@ -49,6 +52,7 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
   const [honor, setHonor] = useState<HonorDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [engagementBusy, setEngagementBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +69,40 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
       cancelled = true;
     };
   }, [id]);
+
+  useEffect(() => {
+    if (!honor || honor.htmlUrl) return;
+    let cancelled = false;
+    fetch(`/api/honors/${honor.id}/engagement`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+      body: JSON.stringify({ action: "view" }),
+      credentials: "include",
+    })
+      .then((res) => res.json())
+      .then((stats) => {
+        if (!cancelled) setHonor((prev) => prev ? { ...prev, ...stats } : prev);
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [honor?.id, honor?.htmlUrl]);
+
+  async function toggleLike() {
+    if (!honor || engagementBusy) return;
+    setEngagementBusy(true);
+    try {
+      const res = await fetch(`/api/honors/${honor.id}/engagement`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ action: "like" }),
+        credentials: "include",
+      });
+      const stats = await res.json();
+      if (res.ok) setHonor((prev) => prev ? { ...prev, ...stats } : prev);
+    } finally {
+      setEngagementBusy(false);
+    }
+  }
 
   async function shareHonor() {
     if (!honor) return;
@@ -124,7 +162,10 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
           </div>
           <h1 className="text-3xl sm:text-4xl font-black leading-tight">{loading ? "در حال بارگذاری..." : honor?.title || "افتخار پیدا نشد"}</h1>
           {honor?.summary && <p className="mt-4 text-sm leading-7 text-white/75 max-w-xl">{honor.summary}</p>}
-          {honor?.readTimeMinutes && <div className="mt-4 inline-flex text-[10px] font-black text-cyan-200 bg-cyan-500/10 border border-cyan-400/20 rounded-full px-3 py-1">زمان مطالعه: {honor.readTimeMinutes.toLocaleString("fa-IR")} دقیقه</div>}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {honor?.readTimeMinutes && <div className="inline-flex text-[10px] font-black text-cyan-200 bg-cyan-500/10 border border-cyan-400/20 rounded-full px-3 py-1">زمان مطالعه: {honor.readTimeMinutes.toLocaleString("fa-IR")} دقیقه</div>}
+            {honor?.type === "news" && <div className="inline-flex text-[10px] font-black text-purple-200 bg-purple-500/10 border border-purple-400/20 rounded-full px-3 py-1">{(honor.viewsCount || 0).toLocaleString("fa-IR")} سین / بازدید</div>}
+          </div>
         </div>
       </div>
 
@@ -179,6 +220,21 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </section>
             ) : null}
+
+            {honor.type === "news" && (
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={toggleLike}
+                  disabled={engagementBusy}
+                  className={`rounded-[28px] py-4 text-sm font-black border transition-all disabled:opacity-60 ${honor.likedByMe ? "bg-pink-500/20 border-pink-400/40 text-pink-200" : "bg-white/5 border-white/10 text-white/80"}`}
+                >
+                  {honor.likedByMe ? "♥ پسندیده شد" : "♡ لایک"} • {(honor.likesCount || 0).toLocaleString("fa-IR")}
+                </button>
+                <div className="rounded-[28px] py-4 text-sm font-black bg-cyan-500/10 border border-cyan-400/20 text-cyan-200 text-center">
+                  👁 {(honor.viewsCount || 0).toLocaleString("fa-IR")} سین
+                </div>
+              </div>
+            )}
 
             <button onClick={shareHonor} className="w-full rounded-[28px] bg-gradient-to-r from-purple-600 to-cyan-600 py-4 text-sm font-black shadow-[0_0_30px_rgba(168,85,247,.25)]">
               اشتراک‌گذاری خبر

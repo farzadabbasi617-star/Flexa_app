@@ -1,14 +1,33 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { honors } from "@/db/schema";
+import { honorLikes, honors, honorViews } from "@/db/schema";
 import { validateAdmin } from "@/lib/auth";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, inArray, sql } from "drizzle-orm";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 const ALLOWED_TYPES = new Set(["winner", "runner_up", "levelup", "rankup", "record", "fairplay", "team", "news", "event"]);
 const ALLOWED_STATUS = new Set(["pending", "approved", "rejected"]);
+
+
+async function engagementCounts(honorIds: string[]) {
+  if (!honorIds.length) return new Map<string, { likes: number; views: number }>();
+  try {
+    const [viewRows, likeRows] = await Promise.all([
+      db.select({ honorId: honorViews.honorId, count: sql<number>`count(*)::int` }).from(honorViews).where(inArray(honorViews.honorId, honorIds)).groupBy(honorViews.honorId),
+      db.select({ honorId: honorLikes.honorId, count: sql<number>`count(*)::int` }).from(honorLikes).where(inArray(honorLikes.honorId, honorIds)).groupBy(honorLikes.honorId),
+    ]);
+    const map = new Map<string, { likes: number; views: number }>();
+    for (const id of honorIds) map.set(id, { likes: 0, views: 0 });
+    for (const row of viewRows) map.set(row.honorId, { ...(map.get(row.honorId) || { likes: 0, views: 0 }), views: Number(row.count || 0) });
+    for (const row of likeRows) map.set(row.honorId, { ...(map.get(row.honorId) || { likes: 0, views: 0 }), likes: Number(row.count || 0) });
+    return map;
+  } catch (err) {
+    logger.warn({ err }, "Admin honor engagement counts unavailable");
+    return new Map<string, { likes: number; views: number }>();
+  }
+}
 
 function relativeTime(date: Date | string | null | undefined) {
   if (!date) return "به‌تازگی";
@@ -64,7 +83,14 @@ export async function GET(request: NextRequest) {
 
   try {
     const rows = await db.select().from(honors).orderBy(desc(honors.createdAt)).limit(300);
-    return NextResponse.json(rows.map((row) => ({ ...row, image: row.imageUrl, time: relativeTime(row.publishedAt || row.createdAt) })));
+    const counts = await engagementCounts(rows.map((row) => row.id));
+    return NextResponse.json(rows.map((row) => ({
+      ...row,
+      image: row.imageUrl,
+      time: relativeTime(row.publishedAt || row.createdAt),
+      likesCount: counts.get(row.id)?.likes || 0,
+      viewsCount: counts.get(row.id)?.views || 0,
+    })));
   } catch (err) {
     logger.error({ err }, "Admin honors GET failed");
     return NextResponse.json({ error: "Failed to load honors. Run drizzle/manual/0008_add_honors.sql first." }, { status: 500 });

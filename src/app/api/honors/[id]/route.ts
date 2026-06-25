@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { honors } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { honorLikes, honors, honorViews } from "@/db/schema";
+import { and, eq, sql } from "drizzle-orm";
 import logger from "@/lib/logger";
 import { getStaticHonorById } from "@/lib/static-honors";
 
@@ -18,6 +18,18 @@ function iconForType(type: string) {
 
 function metadataObject(metadata: unknown): Record<string, any> {
   return metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata as Record<string, any> : {};
+}
+
+
+async function engagementCount(honorId: string) {
+  try {
+    const [viewsRow] = await db.select({ count: sql<number>`count(*)::int` }).from(honorViews).where(eq(honorViews.honorId, honorId));
+    const [likesRow] = await db.select({ count: sql<number>`count(*)::int` }).from(honorLikes).where(eq(honorLikes.honorId, honorId));
+    return { viewsCount: Number(viewsRow?.count || 0), likesCount: Number(likesRow?.count || 0) };
+  } catch (err) {
+    logger.warn({ err, honorId }, "Honor engagement count unavailable");
+    return { viewsCount: 0, likesCount: 0 };
+  }
 }
 
 function relativeTime(date: Date | string | null | undefined) {
@@ -51,6 +63,8 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
 
     if (!row) return NextResponse.json({ error: "Honor not found" }, { status: 404 });
 
+    const engagement = await engagementCount(row.id);
+
     return NextResponse.json({
       id: row.id,
       type: row.type,
@@ -71,6 +85,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
       game: row.game || undefined,
       publishedAt: row.publishedAt,
       createdAt: row.createdAt,
+      ...engagement,
     });
   } catch (err) {
     logger.error({ err }, "Public honor detail GET failed");
