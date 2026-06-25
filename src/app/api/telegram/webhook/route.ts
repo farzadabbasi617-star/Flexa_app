@@ -593,14 +593,28 @@ async function recordReferralIfNeeded(user: TelegramUser, startPayload?: string)
   if (payload.startsWith("ref_")) {
     const referrerTelegramId = payload.replace("ref_", "").trim();
     if (/^\d+$/.test(referrerTelegramId) && referrerTelegramId !== referredTelegramId) {
-      await db
+      const [created] = await db
         .insert(telegramReferrals)
         .values({
           referrerTelegramId,
           referredTelegramId,
           referredUsername: user.username || null,
         })
-        .onConflictDoNothing({ target: telegramReferrals.referredTelegramId });
+        .onConflictDoNothing({ target: telegramReferrals.referredTelegramId })
+        .returning({ id: telegramReferrals.id });
+      if (created) {
+        const referrer = await getLinkedUserByTelegram(referrerTelegramId);
+        if (referrer?.userId) {
+          const key = `referral:first:${referrerTelegramId}:${referredTelegramId}`;
+          const [existingReward] = await db.select({ id: telegramSentNotifications.id }).from(telegramSentNotifications).where(eq(telegramSentNotifications.dedupeKey, key)).limit(1);
+          if (!existingReward) {
+            await db.insert(telegramSentNotifications).values({ dedupeKey: key, telegramId: referrerTelegramId, type: "referral_reward" });
+            const xpText = await rewardUserXP(referrer.userId, 30, "دعوت کاربر جدید");
+            const chatId = Number(referrerTelegramId);
+            if (Number.isFinite(chatId)) await sendMessage(chatId, `🎉 یک نفر با لینک دعوت شما وارد ربات شد.${xpText}`);
+          }
+        }
+      }
     }
     return;
   }
@@ -1658,22 +1672,64 @@ async function inviteCommand(chatId: number, telegramId: string) {
   });
 }
 
-async function missionsCommand(chatId: number, telegramId: string) {
+function missionsKeyboard(status: { channelMember: boolean; linked: boolean; preReg: boolean; invites: number }) {
+  const rows: Array<Array<Record<string, string>>> = [];
+  if (status.channelMember) rows.push([{ text: "🎁 دریافت پاداش عضویت کانال", callback_data: "mission:claim:channel" }]);
+  if (status.linked) rows.push([{ text: "🎁 دریافت پاداش اتصال حساب", callback_data: "mission:claim:link" }]);
+  if (status.preReg) rows.push([{ text: "🎁 دریافت پاداش پیش‌ثبت‌نام", callback_data: "mission:claim:prereg" }]);
+  if (status.invites > 0) rows.push([{ text: "🎁 دریافت پاداش دعوت", callback_data: "mission:claim:invite" }]);
+  rows.push([{ text: "🔗 لینک دعوت من", callback_data: "mission:invite" }, { text: "اتصال حساب", callback_data: "menu:link" }]);
+  return { inline_keyboard: rows };
+}
+
+async function getMissionStatus(telegramId: string) {
   const linked = await getLinkedUserByTelegram(telegramId);
   const [preReg] = await db.select({ id: telegramPreRegistrations.id }).from(telegramPreRegistrations).where(eq(telegramPreRegistrations.telegramId, telegramId)).limit(1);
   const [{ value: invites }] = await db.select({ value: count() }).from(telegramReferrals).where(eq(telegramReferrals.referrerTelegramId, telegramId));
   const channelMember = await isChannelMember(telegramId);
-  await sendMessage(chatId, [
-    "🎯 <b>مأموریت‌های Gament</b>",
-    "",
-    `${channelMember ? "✅" : "⬜"} عضویت در کانال Gament Games`,
-    `${linked ? "✅" : "⬜"} اتصال حساب با /link`,
-    `${preReg ? "✅" : "⬜"} پیش‌ثبت‌نام در ربات`,
-    `${invites > 0 ? "✅" : "⬜"} دعوت حداقل یک نفر با /invite`,
-    "",
-    "جایزه XP/اعتبار برای مأموریت‌ها در فاز بعدی فعال می‌شود.",
-  ].join("\n"), mainMenuKeyboard());
+  return { linked, preReg: Boolean(preReg), invites, channelMember };
 }
+
+async function missionsCommand(chatId: number, telegramId: string) {
+  const status = await getMissionStatus(telegramId);
+  await sendMessage(chatId, [
+    "🎯 <b>مأموریت‌های رشد Gament</b>",
+    "",
+    `${status.channelMember ? "✅" : "⬜"} عضویت در کانال Gament Games — <b>10 XP</b>`,
+    `${status.linked ? "✅" : "⬜"} اتصال حساب با /link — <b>30 XP</b>`,
+    `${status.preReg ? "✅" : "⬜"} پیش‌ثبت‌نام در ربات — <b>20 XP</b>`,
+    `${status.invites > 0 ? "✅" : "⬜"} دعوت حداقل یک نفر با /invite — <b>50 XP</b>`,
+    "",
+    "اگر مأموریت انجام شده باشد، دکمه دریافت پاداش را بزن. هر پاداش فقط یک‌بار قابل دریافت است.",
+  ].join("\n"), missionsKeyboard({ channelMember: status.channelMember, linked: Boolean(status.linked), preReg: status.preReg, invites: status.invites }));
+}
+
+async function claimMissionReward(chatId: number, telegramId: string, mission: string) {
+  const status = await getMissionStatus(telegramId);
+  if (!status.linked?.userId) {
+    await sendMessage(chatId, "برای دریافت پاداش XP، اول حساب تلگرام را با /link به Gament وصل کن.", { inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]] });
+    return;
+  }
+
+  const missions: Record<string, { ok: boolean; xp: number; title: string }> = {
+    channel: { ok: status.channelMember, xp: 10, title: "عضویت در کانال" },
+    link: { ok: Boolean(status.linked), xp: 30, title: "اتصال حساب" },
+    prereg: { ok: status.preReg, xp: 20, title: "پیش‌ثبت‌نام" },
+    invite: { ok: status.invites > 0, xp: 50, title: "دعوت دوست" },
+  };
+  const item = missions[mission];
+  if (!item) return sendMessage(chatId, "این مأموریت معتبر نیست.");
+  if (!item.ok) return sendMessage(chatId, "این مأموریت هنوز کامل نشده است. /missions را ببین.");
+
+  const key = `mission:${mission}:${telegramId}`;
+  const [existing] = await db.select({ id: telegramSentNotifications.id }).from(telegramSentNotifications).where(eq(telegramSentNotifications.dedupeKey, key)).limit(1);
+  if (existing) return sendMessage(chatId, `✅ پاداش مأموریت «${html(item.title)}» قبلاً دریافت شده است.`);
+
+  await db.insert(telegramSentNotifications).values({ dedupeKey: key, telegramId, type: "mission_reward" });
+  const xpText = await rewardUserXP(status.linked.userId, item.xp, item.title);
+  await sendMessage(chatId, `🎁 <b>پاداش مأموریت دریافت شد</b>\n\n${html(item.title)}${xpText}`);
+}
+
 
 async function sendLobbyToRegisteredUsers(chatId: number, tournamentId: string) {
   const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
@@ -2213,6 +2269,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/shop") return shopCommand(chatId);
   if (normalizedCommand === "/invite") return inviteCommand(chatId, telegramId);
   if (normalizedCommand === "/missions") return missionsCommand(chatId, telegramId);
+  if (normalizedCommand === "/claim_missions") return missionsCommand(chatId, telegramId);
   if (normalizedCommand === "/leaderboard") return leaderboardCommand(chatId);
   if (normalizedCommand === "/ai") return aiCommand(chatId, args.join(" "), telegramId);
   if (normalizedCommand === "/support") return supportStartCommand(chatId, telegramId);
@@ -2534,6 +2591,8 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   await answerCallback(callback.id);
   if (!chatId) return;
 
+  if (data === "mission:invite") return inviteCommand(chatId, telegramId);
+  if (data.startsWith("mission:claim:")) return claimMissionReward(chatId, telegramId, data.replace("mission:claim:", ""));
   if (data === "admin:wallets") return pendingWalletsCommand(chatId, telegramId);
   if (data === "admin:disputes") return pendingDisputesCommand(chatId, telegramId);
   if (data === "admin:honors") return pendingHonorsCommand(chatId, telegramId);
