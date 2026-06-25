@@ -2,9 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets } from "@/db/schema";
+import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
-import { publishTournamentToTelegramChannel } from "@/lib/telegram";
+import { publishHonorToTelegramChannel, publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { generateRealAssistantResponse } from "@/lib/ai-service";
 import { getGameIdGuide, gameGuideKeyboard } from "./guide";
 import { bigIntFromText, formatTomanFromRial, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
@@ -1127,30 +1127,40 @@ async function adminCommand(chatId: number, telegramId: string) {
     return;
   }
   const [total] = await db.select({ value: count() }).from(telegramPreRegistrations);
-  const [newItems] = await db
-    .select({ value: count() })
-    .from(telegramPreRegistrations)
-    .where(eq(telegramPreRegistrations.status, "new"));
+  const [newItems] = await db.select({ value: count() }).from(telegramPreRegistrations).where(eq(telegramPreRegistrations.status, "new"));
+  const [walletPending] = await db.select({ value: count() }).from(transactions).where(and(inArray(transactions.type, ["deposit", "withdrawal"]), eq(transactions.status, "pending")));
+  const [openDisputes] = await db.select({ value: count() }).from(disputes).where(eq(disputes.status, "open"));
+  const [pendingHonors] = await db.select({ value: count() }).from(honors).where(eq(honors.status, "pending"));
+  const [activeTournaments] = await db.select({ value: count() }).from(tournaments).where(inArray(tournaments.status, ["registration", "in_progress"]));
+
   await sendMessage(
     chatId,
     [
-      "🛠 <b>پنل ادمین Gament</b>",
+      "🛠 <b>داشبورد ادمین Gament</b>",
       "",
-      `کل پیش‌ثبت‌نام‌های تلگرام: <b>${total.value}</b>`,
-      `جدید و پیگیری‌نشده: <b>${newItems.value}</b>`,
+      `تورنومنت‌های فعال: <b>${activeTournaments.value}</b>`,
+      `کیف پول pending: <b>${walletPending.value}</b>`,
+      `اعتراض‌های باز: <b>${openDisputes.value}</b>`,
+      `افتخارات pending: <b>${pendingHonors.value}</b>`,
+      `پیش‌ثبت‌نام تلگرام: <b>${total.value}</b> | جدید: <b>${newItems.value}</b>`,
       "",
       "/players — آخرین پیش‌ثبت‌نام‌ها",
       "/pending_wallets — شارژ/برداشت‌های در انتظار",
-      "/announce متن — ارسال اطلاعیه به همه کاربران ربات",
-      "/announce_game cod_mobile متن — اطلاعیه هدفمند برای یک بازی",
+      "/pending_disputes — اعتراض‌های باز",
+      "/pending_honors — محتوای تالار افتخارات در انتظار",
+      "/manage — مدیریت سریع تورنومنت‌ها",
+      "/announce متن — ارسال اطلاعیه به کاربران ربات",
       "/post_latest — انتشار آخرین تورنومنت فعال در کانال",
-      "",
-      "مدیریت کامل از داخل پنل سایت انجام می‌شود.",
     ].join("\n"),
-    { inline_keyboard: [[{ text: "ورود به پنل ادمین", url: `${APP_URL}/admin` }]] }
+    {
+      inline_keyboard: [
+        [{ text: "💳 کیف پول‌ها", callback_data: "admin:wallets" }, { text: "🚨 اعتراض‌ها", callback_data: "admin:disputes" }],
+        [{ text: "🏛 افتخارات", callback_data: "admin:honors" }, { text: "🧩 تورنومنت‌ها", callback_data: "admin:tournaments" }],
+        [{ text: "ورود به پنل ادمین", url: `${APP_URL}/admin` }],
+      ],
+    }
   );
 }
-
 
 async function pendingWalletsCommand(chatId: number, telegramId: string) {
   if (!hasAdminAccess(telegramId)) {
@@ -1191,6 +1201,76 @@ async function pendingWalletsCommand(chatId: number, telegramId: string) {
   ].join("\n\n");
 
   await sendMessage(chatId, text, { inline_keyboard: [[{ text: "بررسی در پنل کیف پول", url: `${APP_URL}/admin/wallets` }]] });
+}
+
+
+async function pendingDisputesCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const rows = await db
+    .select({
+      id: disputes.id,
+      reason: disputes.reason,
+      status: disputes.status,
+      createdAt: disputes.createdAt,
+      matchId: matches.id,
+      round: matches.round,
+      matchNumber: matches.matchNumber,
+      tournamentId: tournaments.id,
+      tournamentName: tournaments.name,
+      playerName: players.displayName,
+      playerUsername: players.username,
+    })
+    .from(disputes)
+    .innerJoin(matches, eq(disputes.matchId, matches.id))
+    .leftJoin(tournaments, eq(matches.tournamentId, tournaments.id))
+    .leftJoin(players, eq(disputes.raisedById, players.id))
+    .where(eq(disputes.status, "open"))
+    .orderBy(desc(disputes.createdAt))
+    .limit(10);
+
+  if (!rows.length) return sendMessage(chatId, "✅ اعتراض باز وجود ندارد.", { inline_keyboard: [[{ text: "پنل اعتراض‌ها", url: `${APP_URL}/admin/disputes` }]] });
+  const text = [
+    "🚨 <b>اعتراض‌های باز</b>",
+    "",
+    ...rows.map((row, i) => `${i + 1}) <b>${html(row.tournamentName || "تورنومنت")}</b> | R${row.round}-${row.matchNumber}\n👤 ${html(row.playerName || row.playerUsername || "بازیکن")}\n📝 ${html(row.reason.slice(0, 160))}\n⏱ ${new Date(row.createdAt).toLocaleString("fa-IR")}`),
+  ].join("\n\n");
+  await sendMessage(chatId, text, {
+    inline_keyboard: [
+      ...rows.slice(0, 5).map((row, i) => [{ text: `مشاهده اعتراض ${i + 1}`, url: `${APP_URL}/admin/disputes?matchId=${row.matchId}` }]),
+      [{ text: "پنل اعتراض‌ها", url: `${APP_URL}/admin/disputes` }],
+    ],
+  });
+}
+
+async function pendingHonorsCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const rows = await db.select().from(honors).where(eq(honors.status, "pending")).orderBy(desc(honors.createdAt)).limit(10);
+  if (!rows.length) return sendMessage(chatId, "✅ محتوای pending تالار افتخارات وجود ندارد.", { inline_keyboard: [[{ text: "پنل تالار افتخارات", url: `${APP_URL}/admin/honors` }]] });
+  const text = [
+    "🏛 <b>تالار افتخارات — در انتظار بررسی</b>",
+    "",
+    ...rows.map((row, i) => `${i + 1}) <b>${html(row.title)}</b>\nنوع: <b>${html(row.type)}</b> | بازی: <b>${html(row.game || "عمومی")}</b>\n${html(row.description.slice(0, 180))}`),
+  ].join("\n\n");
+  await sendMessage(chatId, text, {
+    inline_keyboard: [
+      ...rows.slice(0, 5).map((row, i) => ([
+        { text: `✅ تأیید ${i + 1}`, callback_data: `honor:approve:${row.id}` },
+        { text: `❌ رد ${i + 1}`, callback_data: `honor:reject:${row.id}` },
+      ])),
+      [{ text: "پنل تالار افتخارات", url: `${APP_URL}/admin/honors` }],
+    ],
+  });
+}
+
+async function reviewHonorFromTelegram(chatId: number, telegramId: string, honorId: string, decision: "approve" | "reject") {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const status = decision === "approve" ? "approved" : "rejected";
+  const [updated] = await db.update(honors).set({ status, publishedAt: status === "approved" ? new Date() : null, updatedAt: new Date() }).where(eq(honors.id, honorId)).returning();
+  if (!updated) return sendMessage(chatId, "محتوا پیدا نشد.");
+  if (status === "approved") {
+    await publishHonorToTelegramChannel({ id: updated.id, title: updated.title, description: updated.description, type: updated.type, game: updated.game, imageUrl: updated.imageUrl, highlight: updated.highlight }).catch(() => undefined);
+  }
+  await sendMessage(chatId, status === "approved" ? `✅ منتشر شد: <b>${html(updated.title)}</b>` : `❌ رد شد: <b>${html(updated.title)}</b>`, { inline_keyboard: [[{ text: "پنل تالار افتخارات", url: `${APP_URL}/admin/honors` }]] });
 }
 
 async function playersCommand(chatId: number, telegramId: string) {
@@ -2162,6 +2242,9 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/admin" || normalizedCommand === "/stats") return adminCommand(chatId, telegramId);
   if (normalizedCommand === "/players") return playersCommand(chatId, telegramId);
   if (normalizedCommand === "/pending_wallets") return pendingWalletsCommand(chatId, telegramId);
+  if (normalizedCommand === "/pending_disputes") return pendingDisputesCommand(chatId, telegramId);
+  if (normalizedCommand === "/pending_honors") return pendingHonorsCommand(chatId, telegramId);
+  if (normalizedCommand === "/ops") return adminCommand(chatId, telegramId);
   if (normalizedCommand === "/manage" || normalizedCommand === "/tournaments_admin") return adminTournamentsCommand(chatId, telegramId);
   if (normalizedCommand === "/post_latest") return postLatestTournamentCommand(chatId, telegramId);
   if (normalizedCommand === "/announce") return announceCommand(chatId, telegramId, args.join(" "));
@@ -2451,6 +2534,14 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   await answerCallback(callback.id);
   if (!chatId) return;
 
+  if (data === "admin:wallets") return pendingWalletsCommand(chatId, telegramId);
+  if (data === "admin:disputes") return pendingDisputesCommand(chatId, telegramId);
+  if (data === "admin:honors") return pendingHonorsCommand(chatId, telegramId);
+  if (data === "admin:tournaments") return adminTournamentsCommand(chatId, telegramId);
+  if (data.startsWith("honor:")) {
+    const [, action, honorId] = data.split(":");
+    if ((action === "approve" || action === "reject") && honorId) return reviewHonorFromTelegram(chatId, telegramId, honorId, action);
+  }
   if (data === "menu:rooms") return roomsCommand(chatId);
   if (data === "menu:register") return registerStart(chatId, telegramId);
   if (data === "menu:ads") return classifiedAdsCommand(chatId, telegramId);
