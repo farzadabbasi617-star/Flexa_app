@@ -12,6 +12,43 @@ import logger from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 const MIN_WITHDRAWAL_RIAL = BigInt(500_000); // 50,000 تومان
+const MAX_RECEIPT_SIZE = 1.2 * 1024 * 1024;
+
+
+type WalletRequestBody = Record<string, unknown> & { receipt?: File };
+
+async function parseWalletRequestBody(request: NextRequest): Promise<WalletRequestBody> {
+  const contentType = request.headers.get("content-type") || "";
+  if (contentType.includes("multipart/form-data")) {
+    const form = await request.formData();
+    const body: WalletRequestBody = {};
+    for (const [key, value] of form.entries()) {
+      if (key === "receipt" && value instanceof File) {
+        body.receipt = value;
+      } else if (typeof value === "string") {
+        body[key] = value;
+      }
+    }
+    body.acceptTerms = body.acceptTerms === true || body.acceptTerms === "true";
+    return body;
+  }
+
+  return await request.json();
+}
+
+async function receiptToMetadata(file: File | undefined) {
+  if (!file || file.size === 0) return null;
+  if (!file.type.startsWith("image/")) throw new Error("INVALID_RECEIPT_TYPE");
+  if (file.size > MAX_RECEIPT_SIZE) throw new Error("RECEIPT_TOO_LARGE");
+
+  const buffer = Buffer.from(await file.arrayBuffer());
+  return {
+    receiptUrl: `data:${file.type};base64,${buffer.toString("base64")}`,
+    receiptFileName: file.name.slice(0, 160),
+    receiptFileType: file.type,
+    receiptFileSize: file.size,
+  };
+}
 
 async function getOrCreateWallet(userId: string) {
   const [existing] = await db.select().from(wallets).where(eq(wallets.userId, userId)).limit(1);
@@ -88,7 +125,7 @@ export async function POST(request: NextRequest) {
     const user = await validateSession(token || "", ip, ua, request);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const body = await request.json();
+    const body = await parseWalletRequestBody(request);
     const termsError = requireTermsAccepted(body);
     if (termsError) return NextResponse.json({ error: termsError }, { status: 400 });
 
@@ -107,6 +144,7 @@ export async function POST(request: NextRequest) {
       const amountValidation = validateDepositAmountRial(amountRial);
       if (!amountValidation.ok) return NextResponse.json({ error: amountValidation.error }, { status: 400 });
 
+      const receiptMetadata = await receiptToMetadata(body.receipt);
       const wallet = await getOrCreateWallet(user.id);
 
       const [tx] = await db
@@ -125,6 +163,8 @@ export async function POST(request: NextRequest) {
             displayName: user.displayName,
             note: sanitizeWalletNote(body.note),
             trackingNumber: sanitizeShortText(body.trackingNumber, 80) || null,
+            receiptUploaded: Boolean(receiptMetadata),
+            ...receiptMetadata,
             requestedIp: ip,
             userAgent: ua.slice(0, 300),
           },
@@ -214,6 +254,12 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     if (err instanceof Error && err.message === "INSUFFICIENT_WITHDRAWABLE_BALANCE") {
       return NextResponse.json({ error: "موجودی قابل برداشت کافی نیست." }, { status: 400 });
+    }
+    if (err instanceof Error && err.message === "INVALID_RECEIPT_TYPE") {
+      return NextResponse.json({ error: "فقط تصویر فیش واریز قابل ارسال است." }, { status: 400 });
+    }
+    if (err instanceof Error && err.message === "RECEIPT_TOO_LARGE") {
+      return NextResponse.json({ error: "حجم تصویر فیش واریز باید کمتر از ۱.۲ مگابایت باشد." }, { status: 400 });
     }
 
     logger.error({ err }, "Wallet transaction request failed");

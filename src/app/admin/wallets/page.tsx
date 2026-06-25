@@ -219,6 +219,14 @@ export default function AdminWalletsPage() {
                           <>
                             <div>روش: کارت‌به‌کارت / تأیید دستی</div>
                             <div>شماره پیگیری/۴ رقم آخر: <button type="button" onClick={() => copyText(metaText(tx, "trackingNumber"))} dir="ltr" className="text-cyan-300 hover:underline">{metaText(tx, "trackingNumber") || "—"}</button></div>
+                            {metaText(tx, "receiptUrl") ? (
+                              <a href={metaText(tx, "receiptUrl")} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-2 rounded-xl border border-purple-400/25 bg-purple-500/10 px-3 py-2 text-purple-200 hover:bg-purple-500/20">
+                                <span>مشاهده فیش واریز</span>
+                                <span className="text-[10px] text-gray-400">{metaText(tx, "receiptFileName") || "receipt"}</span>
+                              </a>
+                            ) : (
+                              <div className="text-yellow-300/80">فیش تصویری ارسال نشده</div>
+                            )}
                             <div>توضیح: {metaText(tx, "note") || "—"}</div>
                           </>
                         )}

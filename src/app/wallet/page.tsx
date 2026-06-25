@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
@@ -51,6 +51,7 @@ const QUICK_DEPOSIT_AMOUNTS = [50_000, 100_000, 200_000, 500_000, 1_000_000];
 const DEPOSIT_CARD_NUMBER = "5892101742614775";
 const DEPOSIT_CARD_OWNER = "فرزاد عباسی";
 const DEPOSIT_BANK_NAME = "بانک سپه";
+const MAX_RECEIPT_SIZE_MB = 1.2;
 
 function formatTomanInput(value: string) {
   const digits = value.replace(/[^\d۰-۹٠-٩]/g, "");
@@ -77,6 +78,8 @@ export default function WalletPage() {
   const [depositAmount, setDepositAmount] = useState("");
   const [depositTrackingNumber, setDepositTrackingNumber] = useState("");
   const [depositNote, setDepositNote] = useState("");
+  const [depositReceiptFile, setDepositReceiptFile] = useState<File | null>(null);
+  const [depositReceiptPreview, setDepositReceiptPreview] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [accountOwner, setAccountOwner] = useState("");
   const [nationalId, setNationalId] = useState("");
@@ -118,23 +121,53 @@ export default function WalletPage() {
   const pendingDeposits = useMemo(() => data?.transactions.filter((tx) => tx.type === "deposit" && tx.status === "pending") || [], [data]);
   const pendingWithdrawals = useMemo(() => data?.transactions.filter((tx) => tx.type === "withdrawal" && tx.status === "pending") || [], [data]);
 
+
+  function handleDepositReceiptChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0] || null;
+    setDepositReceiptFile(null);
+    setDepositReceiptPreview("");
+
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setError("فقط تصویر رسید قابل ارسال است.");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > MAX_RECEIPT_SIZE_MB * 1024 * 1024) {
+      setError(`حجم تصویر رسید باید کمتر از ${MAX_RECEIPT_SIZE_MB} مگابایت باشد.`);
+      e.target.value = "";
+      return;
+    }
+
+    setError("");
+    setDepositReceiptFile(file);
+
+    const reader = new FileReader();
+    reader.onload = () => setDepositReceiptPreview(typeof reader.result === "string" ? reader.result : "");
+    reader.readAsDataURL(file);
+  }
+
   async function requestDeposit(e: FormEvent) {
     e.preventDefault();
     setSubmitting("deposit");
     setError("");
     setMessage("");
     try {
+      const form = new FormData();
+      form.append("action", "deposit");
+      form.append("amountToman", depositAmount);
+      form.append("trackingNumber", depositTrackingNumber);
+      form.append("note", depositNote);
+      form.append("acceptTerms", String(acceptedTerms));
+      if (depositReceiptFile) form.append("receipt", depositReceiptFile);
+
       const res = await fetch("/api/wallet/transactions", {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-        body: JSON.stringify({
-          action: "deposit",
-          amountToman: depositAmount,
-          trackingNumber: depositTrackingNumber,
-          note: depositNote,
-          acceptTerms: acceptedTerms,
-        }),
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+        body: form,
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "درخواست شارژ ثبت نشد");
@@ -142,6 +175,10 @@ export default function WalletPage() {
       setDepositAmount("");
       setDepositTrackingNumber("");
       setDepositNote("");
+      setDepositReceiptFile(null);
+      setDepositReceiptPreview("");
+      const receiptInput = document.getElementById("wallet-deposit-receipt") as HTMLInputElement | null;
+      if (receiptInput) receiptInput.value = "";
       load();
     } catch (err) {
       setError(err instanceof Error ? err.message : "درخواست شارژ ثبت نشد");
@@ -256,36 +293,33 @@ export default function WalletPage() {
         </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <form onSubmit={requestDeposit} className="glass-panel p-5 space-y-4">
-            <div>
-              <h2 className="font-black mb-1">شارژ کیف پول با کارت‌به‌کارت</h2>
-              <p className="text-xs text-gray-500 leading-6">مبلغ را به کارت زیر منتقل کنید، سپس شماره پیگیری/رسید را ثبت کنید. شارژ پس از تأیید مدیریت به موجودی قابل استفاده داخل سایت اضافه می‌شود و قابل برداشت مستقیم نیست.</p>
-            </div>
-
-            <div className="rounded-3xl bg-gradient-to-br from-purple-700/20 to-cyan-700/10 border border-purple-400/25 p-4 space-y-3">
-              <div className="text-[11px] text-purple-200 font-black">کارت مقصد شارژ کیف پول</div>
-              <button
-                type="button"
-                onClick={() => navigator.clipboard?.writeText(DEPOSIT_CARD_NUMBER)}
-                className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-3 text-center text-2xl font-black tracking-[0.14em] num-en text-white hover:border-cyan-300/40"
-                dir="ltr"
-                title="کپی شماره کارت"
-              >
-                {DEPOSIT_CARD_NUMBER.replace(/(\d{4})(?=\d)/g, "$1 ")}
-              </button>
-              <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
-                <span>{DEPOSIT_BANK_NAME}</span>
-                <span>به نام <b className="text-yellow-200">{DEPOSIT_CARD_OWNER}</b></span>
+          <form onSubmit={requestDeposit} className="glass-panel p-5 space-y-5 overflow-hidden relative">
+            <div className="absolute -top-16 -left-16 w-44 h-44 bg-purple-600/20 rounded-full blur-3xl" />
+            <div className="relative">
+              <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-purple-500/10 border border-purple-400/20 text-[11px] font-black text-purple-200 mb-3">
+                فقط کارت‌به‌کارت
               </div>
-              <div className="text-[10px] text-cyan-200/80 leading-5">روی شماره کارت بزنید تا کپی شود. بعد از انتقال وجه، حتماً شماره پیگیری یا ۴ رقم آخر کارت مبدأ را وارد کنید.</div>
+              <h2 className="font-black text-xl mb-1">افزایش موجودی</h2>
+              <p className="text-xs text-gray-400 leading-6">مبلغ را وارد کن، به کارت گیمنت واریز کن و تصویر فیش را از گالری ارسال کن تا ادمین بررسی و شارژ را تأیید کند.</p>
             </div>
 
-            <div className="space-y-3">
+            <div className="relative rounded-[2rem] bg-gradient-to-br from-purple-950/80 via-[#17101f]/90 to-cyan-950/40 border border-purple-400/25 p-4 shadow-[0_0_45px_rgba(139,92,246,.15)] space-y-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] text-purple-200 font-black mb-1">مبلغ واریزی</div>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black num-en">{depositAmount || "0"}</span>
+                    <span className="text-sm font-bold text-purple-300">تومان</span>
+                  </div>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/10 flex items-center justify-center text-2xl">💳</div>
+              </div>
+
               <input
-                className="gaming-input text-left num-en"
+                className="gaming-input text-left num-en bg-white/10"
                 dir="ltr"
                 inputMode="numeric"
-                placeholder="مبلغ انتقالی، مثلاً 200,000 تومان"
+                placeholder="مثلاً 200,000 تومان"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(formatTomanInput(e.target.value))}
               />
@@ -297,14 +331,57 @@ export default function WalletPage() {
                     onClick={() => setDepositAmount(amount.toLocaleString("en-US"))}
                     className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-[11px] font-black text-purple-100 hover:border-purple-400/40"
                   >
-                    {amount.toLocaleString("fa-IR")} تومان
+                    {amount.toLocaleString("fa-IR")}
                   </button>
                 ))}
               </div>
             </div>
+
+            <div className="rounded-[2rem] bg-white/[.04] border border-white/10 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
+                <span className="font-black text-white">کارت مقصد</span>
+                <span>{DEPOSIT_BANK_NAME} • به نام <b className="text-yellow-200">{DEPOSIT_CARD_OWNER}</b></span>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigator.clipboard?.writeText(DEPOSIT_CARD_NUMBER)}
+                className="w-full rounded-2xl bg-black/30 border border-white/10 px-4 py-4 text-center text-xl sm:text-2xl font-black tracking-[0.12em] num-en text-white hover:border-cyan-300/40"
+                dir="ltr"
+                title="کپی شماره کارت"
+              >
+                {DEPOSIT_CARD_NUMBER.replace(/(\d{4})(?=\d)/g, "$1 ")}
+              </button>
+              <div className="text-[10px] text-cyan-200/80 leading-5">با لمس شماره کارت، کپی می‌شود.</div>
+            </div>
+
             <input className="gaming-input text-left num-en" dir="ltr" placeholder="شماره پیگیری / ۴ رقم آخر کارت مبدأ" value={depositTrackingNumber} onChange={(e) => setDepositTrackingNumber(e.target.value.slice(0, 80))} />
+
+            <label htmlFor="wallet-deposit-receipt" className="block rounded-[2rem] border border-dashed border-purple-400/40 bg-purple-500/10 p-4 cursor-pointer hover:bg-purple-500/15 transition-colors">
+              <input
+                id="wallet-deposit-receipt"
+                type="file"
+                accept="image/*"
+                className="sr-only"
+                onChange={handleDepositReceiptChange}
+              />
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl bg-black/30 border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
+                  {depositReceiptPreview ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={depositReceiptPreview} alt="پیش‌نمایش فیش واریز" className="w-full h-full object-cover" />
+                  ) : <span className="text-3xl">🧾</span>}
+                </div>
+                <div className="min-w-0">
+                  <div className="font-black text-white">انتخاب فیش از گالری</div>
+                  <div className="text-xs text-gray-400 leading-6 truncate">
+                    {depositReceiptFile ? depositReceiptFile.name : `JPG/PNG/WEBP تا ${MAX_RECEIPT_SIZE_MB}MB`}
+                  </div>
+                </div>
+              </div>
+            </label>
+
             <textarea className="gaming-input min-h-20" placeholder="توضیح اختیاری" value={depositNote} onChange={(e) => setDepositNote(e.target.value)} />
-            <button disabled={!acceptedTerms || submitting === "deposit"} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال ثبت..." : "ثبت رسید کارت‌به‌کارت"}</button>
+            <button disabled={!acceptedTerms || submitting === "deposit"} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال ثبت..." : "ثبت و ارسال فیش کارت‌به‌کارت"}</button>
           </form>
 
           <form onSubmit={requestWithdrawal} className="glass-panel p-5 space-y-4">
