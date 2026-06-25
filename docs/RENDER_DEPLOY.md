@@ -52,6 +52,8 @@ TELEGRAM_WEBHOOK_SECRET=your_long_random_webhook_secret
 TELEGRAM_ADMIN_IDS=your_numeric_telegram_id
 TELEGRAM_CHANNEL_URL=https://t.me/Gament_games
 TELEGRAM_CHANNEL_ID=@Gament_games
+PAYPING_TOKEN=your_payping_api_token
+PAYPING_CALLBACK_URL=https://www.gament1.ir/api/payment/payping/callback
 # Optional legacy Python-worker integration:
 TELEGRAM_INTEGRATION_SECRET=your_long_random_secret
 ```

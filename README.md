@@ -164,6 +164,8 @@ GROQ_API_KEY="your_key"
 # در production برای راه‌اندازی امن اولین مدیر اصلی لازم است
 ADMIN_SETUP_SECRET="your_long_random_bootstrap_secret"
 OTP_TOKEN_PEPPER="your_different_long_random_otp_hash_pepper"
+PAYPING_TOKEN="your_payping_api_token"
+PAYPING_CALLBACK_URL="https://www.gament1.ir/api/payment/payping/callback"
 # فعلاً اختیاری است؛ ورود با رمز عبور کار می‌کند و OTP بعداً فعال می‌شود
 FARAZSMS_API_KEY="your_key"
 FARAZSMS_PATTERN_CODE="your_code"

@@ -61,7 +61,6 @@ export default function WalletPage() {
   const [busy, setBusy] = useState(true);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
-  const [depositTrackingNumber, setDepositTrackingNumber] = useState("");
   const [depositNote, setDepositNote] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [accountOwner, setAccountOwner] = useState("");
@@ -110,25 +109,21 @@ export default function WalletPage() {
     setError("");
     setMessage("");
     try {
-      const res = await fetch("/api/wallet/transactions", {
+      const res = await fetch("/api/payment/payping/create", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({
-          action: "deposit",
           amountToman: depositAmount,
-          trackingNumber: depositTrackingNumber,
           note: depositNote,
           acceptTerms: acceptedTerms,
         }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "درخواست شارژ ثبت نشد");
-      setMessage(json.message || "درخواست شارژ ثبت شد");
-      setDepositAmount("");
-      setDepositTrackingNumber("");
-      setDepositNote("");
-      load();
+      if (!res.ok) throw new Error(json.error || "شروع پرداخت انجام نشد");
+      if (!json.paymentUrl) throw new Error("لینک پرداخت دریافت نشد");
+      setMessage("در حال انتقال به درگاه پی‌پینگ...");
+      window.location.assign(json.paymentUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "درخواست شارژ ثبت نشد");
     } finally {
@@ -244,13 +239,12 @@ export default function WalletPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <form onSubmit={requestDeposit} className="glass-panel p-5 space-y-4">
             <div>
-              <h2 className="font-black mb-1">درخواست شارژ کیف پول</h2>
-              <p className="text-xs text-gray-500 leading-6">شارژ پس از بررسی و تأیید مدیریت به موجودی قابل استفاده داخل سایت اضافه می‌شود و قابل برداشت مستقیم نیست.</p>
+              <h2 className="font-black mb-1">شارژ آنلاین کیف پول</h2>
+              <p className="text-xs text-gray-500 leading-6">پرداخت از طریق درگاه امن پی‌پینگ انجام می‌شود و پس از تأیید موفق، موجودی قابل استفاده داخل سایت به‌صورت خودکار افزایش می‌یابد. شارژ مستقیم قابل برداشت نیست.</p>
             </div>
             <input className="gaming-input" placeholder="مبلغ (تومان)" value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} />
-            <input className="gaming-input" placeholder="شماره پیگیری/رسید پرداخت (اختیاری)" value={depositTrackingNumber} onChange={(e) => setDepositTrackingNumber(e.target.value)} />
             <textarea className="gaming-input min-h-20" placeholder="توضیح اختیاری" value={depositNote} onChange={(e) => setDepositNote(e.target.value)} />
-            <button disabled={!acceptedTerms || submitting === "deposit"} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال ثبت..." : "ثبت درخواست شارژ"}</button>
+            <button disabled={!acceptedTerms || submitting === "deposit"} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال انتقال..." : "پرداخت آنلاین با پی‌پینگ"}</button>
           </form>
 
           <form onSubmit={requestWithdrawal} className="glass-panel p-5 space-y-4">

@@ -34,6 +34,10 @@ services:
         value: 'false'
       - key: TELEGRAM_INTEGRATION_SECRET
         sync: false
+      - key: PAYPING_TOKEN
+        sync: false
+      - key: PAYPING_CALLBACK_URL
+        value: https://www.gament1.ir/api/payment/payping/callback
       - key: FARAZSMS_API_KEY
         sync: false
       - key: FARAZSMS_PATTERN_CODE
