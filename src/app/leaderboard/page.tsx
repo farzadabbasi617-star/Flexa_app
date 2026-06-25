@@ -28,12 +28,13 @@ interface Player {
 
 type Board = "rating" | "xp" | "wins" | "winrate";
 type GameFilter = "all" | "clash_royale" | "cod_mobile" | "fortnite";
+type LeaderboardIcon = "rating" | "xp" | "wins" | "winrate" | "search" | "empty" | "gamepad" | "legend" | "diamond" | "gold" | "silver" | "bronze";
 
-const BOARDS: Array<{ id: Board; label: string; icon: string }> = [
-  { id: "rating", label: "امتیاز رنکینگ", icon: "⭐" },
-  { id: "xp", label: "سطح و تجربه (XP)", icon: "⚡" },
-  { id: "wins", label: "تعداد بردها", icon: "🏆" },
-  { id: "winrate", label: "درصد برد", icon: "📈" },
+const BOARDS: Array<{ id: Board; label: string; icon: LeaderboardIcon }> = [
+  { id: "rating", label: "امتیاز رنکینگ", icon: "rating" },
+  { id: "xp", label: "سطح و تجربه (XP)", icon: "xp" },
+  { id: "wins", label: "تعداد بردها", icon: "wins" },
+  { id: "winrate", label: "درصد برد", icon: "winrate" },
 ];
 
 const GAMES: Array<{ id: GameFilter; label: string; icon: string }> = [
@@ -63,11 +64,11 @@ function scoreUnit(board: Board) {
 }
 
 function getRankTier(rating: number) {
-  if (rating >= 2000) return { label: "افسانه‌ای", color: "text-purple-400 bg-purple-950/40 border-purple-500/50", icon: "🔮" };
-  if (rating >= 1600) return { label: "الماس", color: "text-cyan-400 bg-cyan-950/40 border-cyan-500/50", icon: "💎" };
-  if (rating >= 1300) return { label: "طلایی", color: "text-yellow-400 bg-yellow-950/40 border-yellow-500/50", icon: "🥇" };
-  if (rating >= 1000) return { label: "نقره‌ای", color: "text-gray-300 bg-gray-900/40 border-gray-500/50", icon: "🥈" };
-  return { label: "برنزی", color: "text-amber-600 bg-amber-950/40 border-amber-800/50", icon: "🥉" };
+  if (rating >= 2000) return { label: "افسانه‌ای", color: "text-purple-400 bg-purple-950/40 border-purple-500/50", icon: "legend" as LeaderboardIcon };
+  if (rating >= 1600) return { label: "الماس", color: "text-cyan-400 bg-cyan-950/40 border-cyan-500/50", icon: "diamond" as LeaderboardIcon };
+  if (rating >= 1300) return { label: "طلایی", color: "text-yellow-400 bg-yellow-950/40 border-yellow-500/50", icon: "gold" as LeaderboardIcon };
+  if (rating >= 1000) return { label: "نقره‌ای", color: "text-gray-300 bg-gray-900/40 border-gray-500/50", icon: "silver" as LeaderboardIcon };
+  return { label: "برنزی", color: "text-amber-600 bg-amber-950/40 border-amber-800/50", icon: "bronze" as LeaderboardIcon };
 }
 
 function getRoleBadge(role?: string | null) {
@@ -78,11 +79,85 @@ function getRoleBadge(role?: string | null) {
   return null;
 }
 
-function medal(index: number) {
-  if (index === 0) return "🥇";
-  if (index === 1) return "🥈";
-  if (index === 2) return "🥉";
-  return `#${index + 1}`;
+function LeaderboardSvgIcon({ name, className = "w-4 h-4" }: { name: LeaderboardIcon; className?: string }) {
+  const common = "none";
+  if (name === "rating") return (
+    <svg viewBox="0 0 24 24" className={className} fill={common} aria-hidden="true">
+      <path d="M12 3.2 14.6 8l5.4.9-3.8 3.9.8 5.5-5-2.4-5 2.4.8-5.5L4 8.9 9.4 8 12 3.2Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M12 7.8v5.6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+  if (name === "xp") return (
+    <svg viewBox="0 0 24 24" className={className} fill={common} aria-hidden="true">
+      <path d="M13.5 2.8 5.8 13h5.4l-.7 8.2 7.7-10.4h-5.3l.6-8Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M7.2 4.5 5.6 6.1M18.4 17.8l-1.6 1.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+  if (name === "wins") return (
+    <svg viewBox="0 0 24 24" className={className} fill={common} aria-hidden="true">
+      <path d="M8 4h8v3.2c0 4-1.7 6.5-4 7.5-2.3-1-4-3.5-4-7.5V4Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M8 6H4.8c.2 3.5 1.7 5.1 4.2 5.7M16 6h3.2c-.2 3.5-1.7 5.1-4.2 5.7M12 14.7V18M8.5 20h7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  if (name === "winrate") return (
+    <svg viewBox="0 0 24 24" className={className} fill={common} aria-hidden="true">
+      <path d="M4 18.5h16M6 15l3.7-3.7 2.7 2.4L18.5 7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15.2 7h3.3v3.3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  if (name === "search") return (
+    <svg viewBox="0 0 24 24" className={className} fill={common} aria-hidden="true">
+      <circle cx="10.8" cy="10.8" r="5.8" stroke="currentColor" strokeWidth="1.8" />
+      <path d="m15.3 15.3 4 4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+  if (name === "empty") return (
+    <svg viewBox="0 0 24 24" className={className} fill={common} aria-hidden="true">
+      <path d="M5 8.5 12 4l7 4.5v7L12 20l-7-4.5v-7Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M9 10.5h.01M15 10.5h.01M9.5 15c1.4-1 3.6-1 5 0" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+  if (name === "gamepad") return (
+    <svg viewBox="0 0 24 24" className={className} fill={common} aria-hidden="true">
+      <path d="M7.5 9.2h9c2 0 3.5 1.3 3.9 3.2l.7 3.3c.3 1.6-.9 3-2.5 3-.8 0-1.5-.4-2-1l-1.2-1.6H8.6l-1.2 1.6c-.5.6-1.2 1-2 1-1.6 0-2.8-1.4-2.5-3l.7-3.3c.4-1.9 1.9-3.2 3.9-3.2Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M8 12v3M6.5 13.5h3M15.8 12.7h.01M18 14.4h.01" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+  if (name === "legend") return (
+    <svg viewBox="0 0 24 24" className={className} fill={common} aria-hidden="true">
+      <path d="M12 3 4.8 8.2 7.6 17h8.8l2.8-8.8L12 3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M8 8.5 12 17l4-8.5M6 8.5h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+  if (name === "diamond") return (
+    <svg viewBox="0 0 24 24" className={className} fill={common} aria-hidden="true">
+      <path d="M7 4h10l4 5-9 11L3 9l4-5Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <path d="M3 9h18M8 4l-2 5 6 11 6-11-2-5" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  );
+  const medalColor = name === "gold" ? "text-yellow-300" : name === "silver" ? "text-slate-200" : "text-amber-600";
+  return (
+    <svg viewBox="0 0 24 24" className={`${className} ${medalColor}`} fill={common} aria-hidden="true">
+      <path d="M8 3h8l-1.5 6h-5L8 3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
+      <circle cx="12" cy="15" r="5" stroke="currentColor" strokeWidth="1.7" />
+      <path d="M10.2 15.2 11.5 16.5l2.6-3" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function RankBadge({ index, podium = false }: { index: number; podium?: boolean }) {
+  if (index > 2) return <span className="num-en">#{index + 1}</span>;
+  const icon: LeaderboardIcon = index === 0 ? "gold" : index === 1 ? "silver" : "bronze";
+  const tone = index === 0
+    ? "from-yellow-500/30 to-amber-600/10 border-yellow-400/40 text-yellow-200"
+    : index === 1
+      ? "from-slate-300/20 to-slate-600/10 border-slate-300/30 text-slate-200"
+      : "from-amber-700/25 to-orange-900/10 border-amber-600/35 text-amber-500";
+  return (
+    <span className={`inline-flex items-center justify-center rounded-2xl bg-gradient-to-br ${tone} border shadow-lg ${podium ? "w-12 h-12" : "w-9 h-9"}`}>
+      <LeaderboardSvgIcon name={icon} className={podium ? "w-7 h-7" : "w-5 h-5"} />
+    </span>
+  );
 }
 
 export default function LeaderboardPage() {
@@ -184,7 +259,7 @@ export default function LeaderboardPage() {
             dir="rtl"
           />
           <div className="absolute top-1/2 right-4 -translate-y-1/2 text-gray-500">
-            🔍
+            <LeaderboardSvgIcon name="search" className="w-5 h-5" />
           </div>
           {searchQuery && (
             <button
@@ -208,7 +283,10 @@ export default function LeaderboardPage() {
                   : "bg-[#111114] border-white/10 text-gray-400 hover:border-white/30"
               }`}
             >
-              {item.icon} {item.label}
+              <span className="inline-flex items-center gap-2">
+                <LeaderboardSvgIcon name={item.icon} className="w-4 h-4" />
+                <span>{item.label}</span>
+              </span>
             </button>
           ))}
         </div>
@@ -217,7 +295,7 @@ export default function LeaderboardPage() {
           <div className="text-center py-20 animate-pulse text-purple-500">در حال دریافت لیست قهرمانان...</div>
         ) : filteredPlayers.length === 0 ? (
           <div className="gaming-card p-12 text-center text-gray-500 border border-white/5 rounded-3xl bg-[#111114]/40">
-            <span className="text-4xl block mb-3">🧐</span>
+            <LeaderboardSvgIcon name="empty" className="w-12 h-12 mx-auto mb-3 text-purple-300" />
             هیچ بازیکنی با این مشخصات پیدا نشد.
           </div>
         ) : (
@@ -231,7 +309,7 @@ export default function LeaderboardPage() {
                     href={`/players/${topThree[1].id}`} 
                     className="glass-panel p-4 rounded-3xl text-center active:scale-[0.985] transition-all border border-white/5 hover:border-white/20 relative animate-float-slow"
                   >
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">{medal(1)}</div>
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2"><RankBadge index={1} podium /></div>
                     {/* User Profile Avatar */}
                     <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-gray-400 to-gray-600 overflow-hidden ring-4 ring-[#050508] mt-2 flex items-center justify-center">
                       {topThree[1].avatarUrl ? (
@@ -254,7 +332,7 @@ export default function LeaderboardPage() {
                     href={`/players/${topThree[0].id}`} 
                     className="glass-panel p-5 rounded-3xl text-center active:scale-[0.985] transition-all border border-yellow-500/30 shadow-[0_0_30px_rgba(234,179,8,.1)] scale-[1.05] relative z-10 animate-float-slow"
                   >
-                    <div className="absolute -top-4 left-1/2 -translate-x-1/2 text-3xl">{medal(0)}</div>
+                    <div className="absolute -top-7 left-1/2 -translate-x-1/2"><RankBadge index={0} podium /></div>
                     {/* User Profile Avatar */}
                     <div className="w-18 h-18 mx-auto rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 overflow-hidden ring-4 ring-[#050508] mt-2 shadow-[0_0_15px_rgba(234,179,8,.3)] flex items-center justify-center">
                       {topThree[0].avatarUrl ? (
@@ -277,7 +355,7 @@ export default function LeaderboardPage() {
                     href={`/players/${topThree[2].id}`} 
                     className="glass-panel p-4 rounded-3xl text-center active:scale-[0.985] transition-all border border-white/5 hover:border-white/20 relative animate-float-slow"
                   >
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 text-2xl">{medal(2)}</div>
+                    <div className="absolute -top-6 left-1/2 -translate-x-1/2"><RankBadge index={2} podium /></div>
                     {/* User Profile Avatar */}
                     <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-amber-700 to-amber-900 overflow-hidden ring-4 ring-[#050508] mt-2 flex items-center justify-center">
                       {topThree[2].avatarUrl ? (
@@ -323,7 +401,7 @@ export default function LeaderboardPage() {
                     <div className="flex items-center gap-3.5 flex-1 min-w-0">
                       {/* Rank Position */}
                       <div className="w-9 text-center text-base sm:text-lg font-black text-purple-400 num-en shrink-0">
-                        {medal(actualIndex)}
+                        <RankBadge index={actualIndex} />
                       </div>
                       
                       {/* Avatar Image of user instead of first letter of their name */}
@@ -349,7 +427,7 @@ export default function LeaderboardPage() {
                           )}
                           {ign && (
                             <span className="text-[9px] text-cyan-400 bg-cyan-950/20 px-1.5 py-0.5 rounded-md border border-cyan-500/10 num-en font-bold shrink-0">
-                              🎮 {ign}
+                              <LeaderboardSvgIcon name="gamepad" className="w-3 h-3" /> {ign}
                             </span>
                           )}
                         </div>
@@ -365,7 +443,7 @@ export default function LeaderboardPage() {
                         {board === "rating" && (
                           <div className="mt-0.5">
                             <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] border font-bold ${tier.color}`}>
-                              <span>{tier.icon}</span>
+                              <LeaderboardSvgIcon name={tier.icon} className="w-3 h-3" />
                               <span>{tier.label}</span>
                             </span>
                           </div>
