@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 
 const sections = [
   {
@@ -10,50 +11,56 @@ const sections = [
     content: (
       <>
         <p className="mb-3">
-          گیمنت (Gament) یک پلتفرم حرفه‌ای تورنومنت گیمینگ است که با تمرکز بر بازی‌های محبوب موبایل و PC، تجربه‌ای عادلانه، سریع و هوشمند را برای گیمرها فراهم می‌کند.
+          گیمنت (Gament) یک پلتفرم تورنمنت گیمینگ، ثبت‌نام، داوری، پشتیبانی، کیف پول داخلی و انتشار خبرهای رقابتی است. تمرکز ما روی تجربه امن، شفاف و مهارتی برای گیمرهاست.
         </p>
         <p>
-          ما با استفاده از هوش مصنوعی برای داوری، سیستم کیف پول امن و جوایز واقعی، بستری ایجاد کرده‌ایم که بازیکنان بتوانند با خیال راحت در مسابقات شرکت کنند و مهارت خود را به نمایش بگذارند.
+          گیمنت ناشر یا نماینده رسمی بازی‌ها نیست؛ بازی‌ها و نام‌های تجاری متعلق به مالکان اصلی خودشان هستند و استفاده از آن‌ها صرفاً برای معرفی رویدادها و محتوای مرتبط است.
         </p>
       </>
     ),
   },
   {
     id: "contact",
-    title: "تماس با ما",
+    title: "تماس و پشتیبانی",
     icon: "📬",
     content: (
       <>
-        <p className="mb-4">برای هرگونه سوال، پیشنهاد یا گزارش مشکل می‌توانید از راه‌های زیر با ما در ارتباط باشید:</p>
+        <p className="mb-4">برای گزارش مشکل، پیگیری پرداخت، اعتراض مسابقه یا پیشنهاد همکاری از مسیرهای زیر اقدام کنید:</p>
         <div className="space-y-3 text-sm">
-          <div className="flex items-center gap-3">
-            <span className="text-purple-400">✉️</span>
-            <span>support@gament1.ir</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-purple-400">📱</span>
-            <span>تلگرام: @gament_support</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-purple-400">💬</span>
-            <span>چت داخل اپلیکیشن (بخش پشتیبانی)</span>
-          </div>
+          <div className="flex items-center gap-3"><span className="text-purple-400">✉️</span><span>support@gament1.ir</span></div>
+          <div className="flex items-center gap-3"><span className="text-purple-400">🤖</span><span>ربات تلگرام: @FlexaTournamentBot</span></div>
+          <div className="flex items-center gap-3"><span className="text-purple-400">💬</span><span>بخش پشتیبانی داخل سایت</span></div>
         </div>
       </>
     ),
   },
   {
     id: "privacy",
-    title: "حریم خصوصی",
+    title: "حریم خصوصی و داده‌ها",
     icon: "🔒",
     content: (
       <>
-        <p className="mb-3">ما به حریم خصوصی کاربران اهمیت ویژه‌ای می‌دهیم. اطلاعات شخصی شما:</p>
+        <p className="mb-3">اطلاعات ضروری فقط برای ارائه خدمات، امنیت، داوری، پشتیبانی، پرداخت، جلوگیری از تقلب و الزامات قانونی پردازش می‌شود.</p>
         <ul className="list-disc pr-5 space-y-1 text-sm">
-          <li>فقط برای ارائه خدمات و احراز هویت استفاده می‌شود</li>
-          <li>با هیچ شخص ثالثی به اشتراک گذاشته نمی‌شود</li>
-          <li>در صورت درخواست کاربر، قابل حذف است</li>
-          <li>با رمزنگاری امن ذخیره می‌شود</li>
+          <li>شماره موبایل، آیدی بازی، سوابق مسابقه و تراکنش برای ارائه خدمات نگهداری می‌شود.</li>
+          <li>اطلاعات بانکی/شبا فقط برای بررسی و پرداخت برداشت استفاده می‌شود.</li>
+          <li>حساب تلگرام در صورت لینک کردن، برای ورود سریع، اعلان و امکانات ربات استفاده می‌شود.</li>
+          <li>حذف داده‌ها در چارچوب محدودیت‌های مالی، امنیتی و قانونی بررسی می‌شود.</li>
+        </ul>
+      </>
+    ),
+  },
+  {
+    id: "skill",
+    title: "ماهیت مهارتی مسابقات",
+    icon: "⚖️",
+    content: (
+      <>
+        <p className="mb-3">تورنومنت‌های گیمنت بر پایه مهارت، استراتژی، تصمیم‌گیری و عملکرد واقعی بازیکنان برگزار می‌شود و شرط‌بندی یا قمار نیست.</p>
+        <ul className="list-disc pr-5 space-y-1 text-sm">
+          <li>پرداخت احتمالی بابت خدمات پلتفرم، داوری، زیرساخت و مدیریت رویداد است.</li>
+          <li>جایزه فقط بعد از تأیید نتیجه و عدم تخلف پرداخت می‌شود.</li>
+          <li>تبانی، خرید/فروش نتیجه و پرداخت خارج از پلتفرم ممنوع است.</li>
         </ul>
       </>
     ),
@@ -64,18 +71,9 @@ const sections = [
     icon: "❓",
     content: (
       <div className="space-y-4 text-sm">
-        <div>
-          <p className="font-bold text-purple-300 mb-1">چگونه در تورنومنت شرکت کنم؟</p>
-          <p>از صفحه تورنومنت‌ها، روم مورد نظر را انتخاب و روی «شرکت در مسابقه» کلیک کنید.</p>
-        </div>
-        <div>
-          <p className="font-bold text-purple-300 mb-1">جوایز چطور پرداخت می‌شود؟</p>
-          <p>جوایز به کیف پول داخل اپلیکیشن واریز می‌شود و قابل برداشت به حساب بانکی است.</p>
-        </div>
-        <div>
-          <p className="font-bold text-purple-300 mb-1">داوری چطور انجام می‌شود؟</p>
-          <p>ترکیبی از داوری هوش مصنوعی و بررسی انسانی برای اطمینان از عدالت.</p>
-        </div>
+        <div><p className="font-bold text-purple-300 mb-1">چگونه در تورنومنت شرکت کنم؟</p><p>از صفحه تورنومنت‌ها، رویداد مورد نظر را انتخاب کنید، قوانین اختصاصی را بخوانید و ثبت‌نام را کامل کنید.</p></div>
+        <div><p className="font-bold text-purple-300 mb-1">جوایز چطور پرداخت می‌شود؟</p><p>پس از تأیید نتیجه و نبود تخلف، جایزه به کیف پول یا روش اعلام‌شده در همان رویداد پرداخت می‌شود.</p></div>
+        <div><p className="font-bold text-purple-300 mb-1">داوری چطور انجام می‌شود؟</p><p>بر اساس مدارک، گزارش کاربران، بررسی انسانی و در صورت فعال بودن تحلیل هوش مصنوعی انجام می‌شود.</p></div>
       </div>
     ),
   },
@@ -84,29 +82,27 @@ const sections = [
     title: "راهنمای شرکت در تورنومنت",
     icon: "🎮",
     content: (
-      <>
-        <ol className="list-decimal pr-5 space-y-2 text-sm">
-          <li>بازی مورد نظر خود را انتخاب کنید</li>
-          <li>از لیست روم‌ها، تورنومنت مناسب سطح خود را پیدا کنید</li>
-          <li>هزینه ورودی را پرداخت کنید</li>
-          <li>در زمان مشخص شده در روم حضور داشته باشید</li>
-          <li>نتایج را آپلود کنید و منتظر داوری باشید</li>
-        </ol>
-      </>
+      <ol className="list-decimal pr-5 space-y-2 text-sm">
+        <li>حساب بسازید و اطلاعات بازی خود را کامل کنید.</li>
+        <li>تورنومنت مناسب را از لیست روم‌ها انتخاب کنید.</li>
+        <li>قوانین، زمان، ظرفیت، جایزه و شرایط داوری را بخوانید.</li>
+        <li>در صورت وجود ورودی، پرداخت/کسر کیف پول را کامل کنید.</li>
+        <li>در زمان اعلام‌شده چک‌این کنید و مدارک نتیجه را به‌موقع ارسال کنید.</li>
+      </ol>
     ),
   },
   {
     id: "wallet-guide",
-    title: "راهنمای کیف پول و جوایز",
+    title: "راهنمای کیف پول، شارژ و برداشت",
     icon: "💰",
     content: (
       <>
-        <p className="mb-3">کیف پول گیمنت امکان مدیریت موجودی و جوایز را فراهم می‌کند:</p>
+        <p className="mb-3">کیف پول گیمنت برای مدیریت ورودی‌ها، جوایز و تراکنش‌های داخل پلتفرم است و حساب بانکی یا سپرده سرمایه‌گذاری محسوب نمی‌شود.</p>
         <ul className="list-disc pr-5 space-y-1 text-sm">
-          <li>شارژ کیف پول از طریق درگاه‌های امن</li>
-          <li>برداشت جوایز به حساب بانکی (حداقل ۵۰٬۰۰۰ تومان)</li>
-          <li>مشاهده تاریخچه تمام تراکنش‌ها</li>
-          <li>جوایز به‌صورت خودکار به کیف پول اضافه می‌شوند</li>
+          <li>شارژ کیف پول پس از تأیید پرداخت معتبر اعمال می‌شود.</li>
+          <li>برداشت فقط به حساب متعلق به خود کاربر و پس از بررسی امنیتی انجام می‌شود.</li>
+          <li>موجودی قابل استفاده و موجودی قابل برداشت ممکن است متفاوت باشد.</li>
+          <li>ثبت رسید جعلی، سوءاستفاده مالی یا تلاش برای دستکاری موجودی موجب مسدودی و پیگیری می‌شود.</li>
         </ul>
       </>
     ),
@@ -124,7 +120,6 @@ export default function LegalDrawer() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-[55] max-w-[480px] mx-auto pointer-events-none">
       <div className="mx-3 mb-1 pointer-events-auto">
-        {/* Small Fixed Bar */}
         <button
           onClick={() => setIsOpen(!isOpen)}
           className="w-full flex items-center justify-center gap-2 bg-[#0f0f14] border border-white/10 rounded-2xl py-2.5 text-xs font-bold text-white/70 active:bg-white/5 transition-all shadow-lg"
@@ -133,7 +128,6 @@ export default function LegalDrawer() {
           <span className={`text-base transition-transform ${isOpen ? "rotate-180" : ""}`}>⌄</span>
         </button>
 
-        {/* Expandable Content */}
         {isOpen && (
           <div className="mt-1 bg-[#0f0f14] border border-white/10 rounded-2xl overflow-hidden shadow-2xl max-h-[60vh] overflow-y-auto">
             {sections.map((section) => (
@@ -146,9 +140,7 @@ export default function LegalDrawer() {
                     <span className="text-lg">{section.icon}</span>
                     <span className="font-bold text-sm">{section.title}</span>
                   </div>
-                  <span className={`text-lg transition-transform ${activeSection === section.id ? "rotate-180" : ""}`}>
-                    ⌄
-                  </span>
+                  <span className={`text-lg transition-transform ${activeSection === section.id ? "rotate-180" : ""}`}>⌄</span>
                 </button>
 
                 {activeSection === section.id && (
@@ -158,6 +150,11 @@ export default function LegalDrawer() {
                 )}
               </div>
             ))}
+            <div className="p-4">
+              <Link href="/rules" className="block text-center rounded-2xl bg-purple-600/20 border border-purple-400/30 text-purple-100 text-xs font-black py-3">
+                مشاهده متن کامل قوانین و شرایط استفاده
+              </Link>
+            </div>
           </div>
         )}
       </div>

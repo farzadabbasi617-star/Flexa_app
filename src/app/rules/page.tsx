@@ -23,8 +23,13 @@ export default function RulesPage() {
           </div>
         </div>
 
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-5 mb-8 text-yellow-100 leading-8 text-sm">
-          <strong className="text-yellow-300">تذکر مهم:</strong> این مقررات برای شفاف‌سازی رابطه کاربر و پلتفرم نوشته شده است. برای استفاده تجاری گسترده، پیشنهاد می‌شود نسخه نهایی توسط مشاور حقوقی متخصص در حوزه فناوری، پرداخت و ورزش‌های الکترونیک بررسی شود.
+        <div className="grid gap-4 mb-8">
+          <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-5 text-yellow-100 leading-8 text-sm">
+            <strong className="text-yellow-300">تذکر مهم:</strong> این مقررات برای شفاف‌سازی رابطه کاربر و پلتفرم نوشته شده است و جایگزین مشاوره حقوقی تخصصی نیست. برای استفاده تجاری گسترده، اتصال درگاه پرداخت و برگزاری رویدادهای بزرگ، پیشنهاد می‌شود نسخه نهایی توسط مشاور حقوقی حوزه فناوری، پرداخت و ورزش‌های الکترونیک بررسی شود.
+          </div>
+          <div className="bg-cyan-500/10 border border-cyan-500/25 rounded-2xl p-5 text-cyan-50 leading-8 text-sm">
+            <strong className="text-cyan-300">خلاصه کاربردی:</strong> مسابقات گیمنت مهارتی هستند، پرداخت‌ها بابت خدمات پلتفرم و مدیریت رویداد است، جایزه فقط بعد از تأیید نتیجه و عدم تخلف پرداخت می‌شود، برداشت کیف پول نیازمند احراز مالکیت حساب بانکی است و تقلب/تبانی/رسید جعلی باعث محرومیت و پیگیری خواهد شد.
+          </div>
         </div>
 
         <div className="space-y-6">
