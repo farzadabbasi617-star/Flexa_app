@@ -288,49 +288,63 @@ export default function WalletPage() {
       <main className="relative z-10 max-w-[760px] mx-auto px-4 sm:px-6 py-8 pb-32" dir="rtl">
         <div className="flex items-center justify-between gap-4 mb-7">
           <div>
-            <p className="text-xs font-black text-yellow-300 mb-2">GAMENT WALLET</p>
-            <h1 className="text-3xl font-black">کیف پول</h1>
+            <p className="text-xs font-black text-cyan-300 mb-2 tracking-[0.24em]">GAMENT WALLET</p>
+            <h1 className="text-3xl font-black neon-text-purple">کیف پول</h1>
           </div>
-          <button onClick={load} className="w-12 h-12 rounded-2xl bg-white/10 border border-white/10 text-lg font-bold hover:bg-white/15">🔄</button>
+          <button onClick={load} className="w-12 h-12 rounded-2xl bg-purple-500/10 border border-purple-300/20 text-lg font-bold hover:bg-purple-500/20">🔄</button>
         </div>
 
         {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-2xl p-3 mb-5 text-sm leading-7">{error}</div>}
         {message && <div className="bg-green-500/10 border border-green-500/30 text-green-300 rounded-2xl p-3 mb-5 text-sm leading-7">{message}</div>}
 
-        <section className="relative mb-7 min-h-[250px]">
-          <div className="absolute right-[28%] top-9 bottom-0 left-0 rounded-[2.25rem] border-2 border-dashed border-white/35 bg-white/[.04] backdrop-blur-sm" />
-          <div className="relative w-[76%] max-w-[520px] min-h-[220px] rounded-[2.25rem] bg-gradient-to-br from-yellow-200 via-yellow-300 to-yellow-500 text-[#34333d] shadow-[0_0_60px_rgba(250,204,21,.34)] p-7 sm:p-9 overflow-hidden flex flex-col justify-center">
-            <div className="absolute -top-16 -left-12 w-44 h-44 rounded-full border-[7px] border-white/50" />
-            <div className="absolute top-9 -left-5 w-32 h-32 rounded-full border-[6px] border-white/45" />
-            <div className="relative">
-              <div className="flex items-baseline gap-3 mb-7">
-                <span className="text-4xl sm:text-5xl font-black num-en">{(data?.wallet.usableToman || 0).toLocaleString("fa-IR")}</span>
-                <span className="text-xl font-black">تومان</span>
+        <section className="relative mb-7">
+          <div className="absolute -inset-4 rounded-[2.5rem] bg-[radial-gradient(circle_at_22%_10%,rgba(34,211,238,.22),transparent_36%),radial-gradient(circle_at_85%_20%,rgba(168,85,247,.24),transparent_38%)] blur-xl" />
+          <div className="relative min-h-[235px] rounded-[2.25rem] border border-purple-300/20 bg-gradient-to-br from-[#161021]/95 via-[#0d1020]/95 to-[#071b22]/95 shadow-[0_0_60px_rgba(124,58,237,.20)] p-6 sm:p-8 overflow-hidden">
+            <div className="absolute -top-24 -right-24 w-56 h-56 rounded-full bg-purple-500/20 blur-2xl" />
+            <div className="absolute -bottom-20 -left-16 w-56 h-56 rounded-full bg-cyan-400/15 blur-2xl" />
+            <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-l from-transparent via-cyan-200/60 to-transparent" />
+            <div className="relative flex items-start justify-between gap-4 mb-10">
+              <div>
+                <div className="text-xs font-black text-purple-200 mb-2">اعتبار قابل استفاده</div>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-5xl sm:text-6xl font-black num-en tracking-tighter text-white">{(data?.wallet.usableToman || 0).toLocaleString("fa-IR")}</span>
+                  <span className="text-lg font-black text-cyan-200">تومان</span>
+                </div>
               </div>
-              <p className="text-sm sm:text-base font-bold text-[#5d5a5a]">موجودی اعتبار شما</p>
-              <div className="flex flex-wrap gap-2 mt-5">
-                {pendingDeposits.length > 0 && <span className="text-[11px] px-3 py-1 rounded-full bg-black/15 text-black/70 font-black">{pendingDeposits.length.toLocaleString("fa-IR")} واریز در بررسی</span>}
-                {pendingWithdrawals.length > 0 && <span className="text-[11px] px-3 py-1 rounded-full bg-black/15 text-black/70 font-black">{pendingWithdrawals.length.toLocaleString("fa-IR")} برداشت در بررسی</span>}
+              <div className="w-16 h-16 rounded-[1.5rem] bg-white/5 border border-white/10 flex items-center justify-center shadow-[0_0_30px_rgba(34,211,238,.18)]">
+                <span className="text-3xl">◇</span>
+              </div>
+            </div>
+            <div className="relative grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-white/[.06] border border-white/10 p-3">
+                <div className="text-[11px] text-gray-400 mb-1">وضعیت واریز</div>
+                <div className="font-black text-purple-200">{pendingDeposits.length ? `${pendingDeposits.length.toLocaleString("fa-IR")} در بررسی` : "بدون درخواست"}</div>
+              </div>
+              <div className="rounded-2xl bg-white/[.06] border border-white/10 p-3">
+                <div className="text-[11px] text-gray-400 mb-1">وضعیت برداشت</div>
+                <div className="font-black text-cyan-200">{pendingWithdrawals.length ? `${pendingWithdrawals.length.toLocaleString("fa-IR")} در بررسی` : "بدون درخواست"}</div>
               </div>
             </div>
           </div>
         </section>
 
         <section className="grid grid-cols-2 gap-4 mb-8">
-          <button onClick={openDeposit} className="group relative overflow-hidden min-h-[108px] rounded-[2rem] bg-gradient-to-br from-purple-500 to-violet-600 shadow-[0_0_35px_rgba(139,92,246,.35)] p-4 flex items-center justify-between text-right active:scale-[.98] transition-transform">
-            <span className="w-16 h-16 rounded-2xl bg-white text-purple-600 flex items-center justify-center text-4xl group-hover:rotate-[-8deg] transition-transform">↙</span>
-            <span className="text-2xl font-black">واریز</span>
+          <button onClick={openDeposit} className="group relative overflow-hidden min-h-[112px] rounded-[2rem] bg-[#120d1c]/80 border border-purple-300/25 shadow-[0_0_35px_rgba(139,92,246,.18)] p-4 flex flex-col items-start justify-between text-right active:scale-[.98] transition-transform hover:border-purple-300/50">
+            <span className="absolute -left-10 -top-10 w-28 h-28 bg-purple-500/25 rounded-full blur-2xl" />
+            <span className="relative w-14 h-14 rounded-2xl bg-purple-500/15 border border-purple-300/30 text-purple-200 flex items-center justify-center text-4xl group-hover:rotate-[-8deg] transition-transform">↙</span>
+            <span className="relative text-2xl font-black">واریز</span>
           </button>
-          <button onClick={openWithdrawal} className="group relative overflow-hidden min-h-[108px] rounded-[2rem] bg-gradient-to-br from-teal-300 to-cyan-600 shadow-[0_0_35px_rgba(45,212,191,.28)] p-4 flex items-center justify-between text-right active:scale-[.98] transition-transform">
-            <span className="w-16 h-16 rounded-2xl bg-white text-teal-500 flex items-center justify-center text-4xl group-hover:rotate-[-8deg] transition-transform">↗</span>
-            <span className="text-2xl font-black">برداشت</span>
+          <button onClick={openWithdrawal} className="group relative overflow-hidden min-h-[112px] rounded-[2rem] bg-[#07171b]/80 border border-cyan-300/25 shadow-[0_0_35px_rgba(45,212,191,.16)] p-4 flex flex-col items-start justify-between text-right active:scale-[.98] transition-transform hover:border-cyan-300/50">
+            <span className="absolute -left-10 -top-10 w-28 h-28 bg-cyan-400/20 rounded-full blur-2xl" />
+            <span className="relative w-14 h-14 rounded-2xl bg-cyan-400/15 border border-cyan-300/30 text-cyan-200 flex items-center justify-center text-4xl group-hover:rotate-[-8deg] transition-transform">↗</span>
+            <span className="relative text-2xl font-black">برداشت</span>
           </button>
         </section>
 
         <section className="grid grid-cols-2 gap-3 mb-8">
           <div className="rounded-3xl bg-white/[.06] border border-white/10 p-4">
             <div className="text-xs text-gray-500 mb-1">قابل برداشت</div>
-            <div className="text-xl font-black text-yellow-300">{(data?.wallet.withdrawableToman || 0).toLocaleString("fa-IR")}</div>
+            <div className="text-xl font-black text-purple-300">{(data?.wallet.withdrawableToman || 0).toLocaleString("fa-IR")}</div>
           </div>
           <div className="rounded-3xl bg-white/[.06] border border-white/10 p-4">
             <div className="text-xs text-gray-500 mb-1">اعتبار غیرقابل برداشت</div>
@@ -408,9 +422,9 @@ export default function WalletPage() {
                   </div>
                 </div>
 
-                <label className="flex items-start gap-3 rounded-3xl bg-yellow-400/10 border border-yellow-300/20 p-4 cursor-pointer">
-                  <input type="checkbox" checked={acceptedTerms} onChange={(e) => toggleTerms(e.target.checked)} className="mt-1 w-5 h-5 accent-yellow-400" />
-                  <span className="text-sm font-black leading-7 text-yellow-100">قوانین کیف پول و کارت‌به‌کارت را خوانده‌ام و قبول دارم.</span>
+                <label className="flex items-start gap-3 rounded-3xl bg-purple-500/10 border border-purple-300/20 p-4 cursor-pointer">
+                  <input type="checkbox" checked={acceptedTerms} onChange={(e) => toggleTerms(e.target.checked)} className="mt-1 w-5 h-5 accent-purple-500" />
+                  <span className="text-sm font-black leading-7 text-purple-100">قوانین کیف پول و کارت‌به‌کارت را خوانده‌ام و قبول دارم.</span>
                 </label>
 
                 <div className="rounded-3xl bg-white/[.04] border border-white/10 p-4">
@@ -425,18 +439,18 @@ export default function WalletPage() {
                 <div className="rounded-[2rem] bg-white/[.04] border border-white/10 p-4 space-y-3">
                   <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
                     <span className="font-black text-white">کارت مقصد</span>
-                    <span>{DEPOSIT_BANK_NAME} • به نام <b className="text-yellow-200">{DEPOSIT_CARD_OWNER}</b></span>
+                    <span>{DEPOSIT_BANK_NAME} • به نام <b className="text-purple-200">{DEPOSIT_CARD_OWNER}</b></span>
                   </div>
                   <button
                     type="button"
                     onClick={copyDepositCard}
-                    className="w-full rounded-2xl bg-black/35 border border-white/10 px-4 py-4 text-center text-xl sm:text-2xl font-black tracking-[0.12em] num-en text-white hover:border-yellow-300/50"
+                    className="w-full rounded-2xl bg-black/35 border border-white/10 px-4 py-4 text-center text-xl sm:text-2xl font-black tracking-[0.12em] num-en text-white hover:border-cyan-300/50"
                     dir="ltr"
                     title="کپی شماره کارت"
                   >
                     {DEPOSIT_CARD_NUMBER.replace(/(\d{4})(?=\d)/g, "$1 ")}
                   </button>
-                  <div className="text-[10px] text-yellow-200/80 leading-5">روی شماره کارت بزنید تا کپی شود، سپس فیش واریز را ارسال کنید.</div>
+                  <div className="text-[10px] text-cyan-200/80 leading-5">روی شماره کارت بزنید تا کپی شود، سپس فیش واریز را ارسال کنید.</div>
                 </div>
 
                 <div className="rounded-3xl bg-purple-500/10 border border-purple-400/20 p-4 flex items-center justify-between">
