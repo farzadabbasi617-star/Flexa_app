@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { notifications, transactions, users, wallets } from "@/db/schema";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { createWalletReference } from "@/lib/wallet-security";
@@ -27,6 +27,57 @@ function tomanToRial(value: unknown) {
 
 function metadataObject(metadata: unknown): Record<string, unknown> {
   return metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata as Record<string, unknown> : {};
+}
+
+async function walletBalanceColumnType(tx: any): Promise<string> {
+  const result = await tx.execute(sql`
+    select data_type
+    from information_schema.columns
+    where table_schema = 'public' and table_name = 'wallets' and column_name = 'balance'
+    limit 1
+  `);
+  return String(result?.rows?.[0]?.data_type || "numeric");
+}
+
+async function updateWalletBalanceSafely(tx: any, walletId: string, amountRial: bigint, direction: "increase" | "decrease") {
+  const amount = amountRial.toString();
+  const now = new Date();
+  const balanceType = await walletBalanceColumnType(tx);
+  const isTextBalance = balanceType === "text" || balanceType === "character varying";
+
+  const result = direction === "increase"
+    ? isTextBalance
+      ? await tx.execute(sql`
+          update wallets
+          set balance = ((balance)::numeric + ${amount}::numeric)::text,
+              updated_at = ${now}
+          where id = ${walletId}
+          returning id, user_id, balance, currency, updated_at
+        `)
+      : await tx.execute(sql`
+          update wallets
+          set balance = (balance)::numeric + ${amount}::numeric,
+              updated_at = ${now}
+          where id = ${walletId}
+          returning id, user_id, balance, currency, updated_at
+        `)
+    : isTextBalance
+      ? await tx.execute(sql`
+          update wallets
+          set balance = ((balance)::numeric - ${amount}::numeric)::text,
+              updated_at = ${now}
+          where id = ${walletId} and (balance)::numeric >= ${amount}::numeric
+          returning id, user_id, balance, currency, updated_at
+        `)
+      : await tx.execute(sql`
+          update wallets
+          set balance = (balance)::numeric - ${amount}::numeric,
+              updated_at = ${now}
+          where id = ${walletId} and (balance)::numeric >= ${amount}::numeric
+          returning id, user_id, balance, currency, updated_at
+        `);
+
+  return result?.rows?.[0] || null;
 }
 
 export async function GET(request: NextRequest) {
@@ -140,20 +191,7 @@ async function handlePendingTransaction(request: NextRequest, authUserId: string
       return { transaction: updatedTx, wallet, userId: wallet.userId };
     }
 
-    const [updatedWallet] = await tx
-      .update(wallets)
-      .set({
-        balance: pending.type === "deposit"
-          ? sql`${wallets.balance} + ${amountRial.toString()}::numeric`
-          : sql`${wallets.balance} - ${amountRial.toString()}::numeric`,
-        updatedAt: new Date(),
-      })
-      .where(
-        pending.type === "deposit"
-          ? eq(wallets.id, wallet.id)
-          : and(eq(wallets.id, wallet.id), sql`${wallets.balance} >= ${amountRial.toString()}::numeric`)
-      )
-      .returning();
+    const updatedWallet = await updateWalletBalanceSafely(tx, wallet.id, amountRial, pending.type === "deposit" ? "increase" : "decrease");
 
     if (!updatedWallet) throw new Error("موجودی کافی نیست یا کیف پول بروزرسانی نشد");
 
@@ -217,20 +255,7 @@ export async function PATCH(request: NextRequest) {
       if (!before) throw new Error("کیف پول پیدا نشد");
       const current = toBigIntSafe(before.balance);
 
-      const [updated] = await tx
-        .update(wallets)
-        .set({
-          balance: direction === "increase"
-            ? sql`${wallets.balance} + ${amountRial.toString()}::numeric`
-            : sql`${wallets.balance} - ${amountRial.toString()}::numeric`,
-          updatedAt: new Date(),
-        })
-        .where(
-          direction === "increase"
-            ? eq(wallets.id, before.id)
-            : and(eq(wallets.id, before.id), sql`${wallets.balance} >= ${amountRial.toString()}::numeric`)
-        )
-        .returning();
+      const updated = await updateWalletBalanceSafely(tx, before.id, amountRial, direction);
 
       if (!updated) throw new Error("موجودی کافی نیست");
 
