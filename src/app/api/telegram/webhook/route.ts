@@ -1876,26 +1876,83 @@ async function dailyCommand(chatId: number, telegramId: string) {
   await sendMessage(chatId, `🎁 <b>جایزه روزانه Gament</b>\n\nامروز گرفتی:${xpText}`);
 }
 
-async function quizCommand(chatId: number) {
-  await sendMessage(chatId, "🧠 کوییز Gament\n\nکدام مورد برای شرکت در تورنومنت ضروری‌تر است؟", {
-    inline_keyboard: [
-      [{ text: "آیدی بازی صحیح", callback_data: "quiz:correct" }],
-      [{ text: "چند اکانت همزمان", callback_data: "quiz:wrong" }],
-      [{ text: "ارسال نتیجه جعلی", callback_data: "quiz:wrong" }],
-    ],
+const QUIZ_QUESTIONS = [
+  {
+    question: "برای شرکت معتبر در تورنومنت، مهم‌ترین مورد چیست؟",
+    options: ["آیدی بازی صحیح", "چند اکانت همزمان", "ارسال نتیجه جعلی"],
+    correct: 0,
+    explain: "آیدی بازی باید با پروفایل Gament و روز مسابقه یکی باشد.",
+  },
+  {
+    question: "اگر نتیجه مسابقه مورد اختلاف باشد، بهترین کار چیست؟",
+    options: ["ثبت اعتراض با مدرک", "دعوا در چت", "خروج از تورنومنت"],
+    correct: 0,
+    explain: "اعتراض همراه با اسکرین‌شات/مدرک مسیر درست داوری است.",
+  },
+  {
+    question: "شارژ کیف پول کارت‌به‌کارت چه زمانی قابل استفاده می‌شود؟",
+    options: ["بعد از تأیید ادمین", "بلافاصله بدون فیش", "بعد از حذف حساب"],
+    correct: 0,
+    explain: "فیش واریز باید بررسی شود و بعد موجودی داخل سایت فعال می‌شود.",
+  },
+  {
+    question: "استفاده از چیت یا ابزار غیرمجاز چه نتیجه‌ای دارد؟",
+    options: ["حذف/بن طبق قوانین", "امتیاز اضافه", "برد خودکار"],
+    correct: 0,
+    explain: "Gament روی بازی جوانمردانه و داوری معتبر حساس است.",
+  },
+];
+
+function todayTehranKey() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
+}
+
+function dailyQuizIndex() {
+  const today = todayTehranKey();
+  let hash = 0;
+  for (const ch of today) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0;
+  return hash % QUIZ_QUESTIONS.length;
+}
+
+async function quizCommand(chatId: number, telegramId?: string) {
+  const today = todayTehranKey();
+  const questionIndex = dailyQuizIndex();
+  const q = QUIZ_QUESTIONS[questionIndex];
+  const alreadyAnswered = telegramId
+    ? await db.select({ id: telegramSentNotifications.id }).from(telegramSentNotifications).where(eq(telegramSentNotifications.dedupeKey, `quiz:${today}:${telegramId}`)).limit(1)
+    : [];
+
+  await sendMessage(chatId, [
+    "🧠 <b>کوییز روزانه Gament</b>",
+    "",
+    q.question,
+    "",
+    alreadyAnswered.length ? "✅ امروز قبلاً امتیاز کوییز را گرفته‌ای؛ باز هم می‌توانی جواب را ببینی." : "جواب درست، XP روزانه می‌دهد.",
+  ].join("\n"), {
+    inline_keyboard: q.options.map((option, index) => ([{ text: option, callback_data: `quiz:ans:${questionIndex}:${index}` }])),
   });
 }
 
-async function handleQuizAnswer(chatId: number, telegramId: string, correct: boolean) {
+async function handleQuizAnswer(chatId: number, telegramId: string, questionIndex: number, answerIndex: number) {
+  const q = QUIZ_QUESTIONS[questionIndex] || QUIZ_QUESTIONS[dailyQuizIndex()];
+  const correct = answerIndex === q.correct;
+  if (!correct) {
+    await sendMessage(chatId, `❌ جواب درست نبود.\n\n✅ پاسخ صحیح: <b>${html(q.options[q.correct])}</b>\n${html(q.explain)}`);
+    return;
+  }
+
   const linked = await getLinkedUserByTelegram(telegramId);
-  if (!correct) return sendMessage(chatId, "❌ جواب درست نبود. آیدی بازی صحیح مهم‌ترین مورد است.");
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
+  const today = todayTehranKey();
   const key = `quiz:${today}:${telegramId}`;
   const [existing] = await db.select({ id: telegramSentNotifications.id }).from(telegramSentNotifications).where(eq(telegramSentNotifications.dedupeKey, key)).limit(1);
-  if (existing) return sendMessage(chatId, "✅ درست بود! امتیاز امروز را قبلاً گرفته‌ای.");
+  if (existing) {
+    await sendMessage(chatId, `✅ درست بود!\n\nامتیاز امروز را قبلاً گرفته‌ای.\n${html(q.explain)}`);
+    return;
+  }
+
   await db.insert(telegramSentNotifications).values({ dedupeKey: key, telegramId, type: "quiz" });
-  const xpText = linked?.userId ? await rewardUserXP(linked.userId, 20, "کوییز روزانه") : "";
-  await sendMessage(chatId, `✅ درست بود!${xpText || ""}`);
+  const xpText = linked?.userId ? await rewardUserXP(linked.userId, 20, "کوییز روزانه") : "\nبرای دریافت XP، حساب را با /link وصل کن.";
+  await sendMessage(chatId, `✅ درست بود!\n${html(q.explain)}${xpText || ""}`);
 }
 
 async function healthCommand(chatId: number, telegramId: string) {
@@ -2264,7 +2321,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/achievements") return achievementsCommand(chatId, telegramId);
   if (normalizedCommand === "/my_tournaments") return myTournamentsCommand(chatId, telegramId);
   if (normalizedCommand === "/daily") return dailyCommand(chatId, telegramId);
-  if (normalizedCommand === "/quiz") return quizCommand(chatId);
+  if (normalizedCommand === "/quiz" || normalizedCommand === "/challenge") return quizCommand(chatId, telegramId);
   if (normalizedCommand === "/coupon") return couponCommand(chatId, telegramId, args.join(" "));
   if (normalizedCommand === "/shop") return shopCommand(chatId);
   if (normalizedCommand === "/invite") return inviteCommand(chatId, telegramId);
@@ -2641,7 +2698,10 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     const [, action, matchId] = data.split(":");
     if (action && matchId) return handleJudgeAction(chatId, telegramId, action, matchId);
   }
-  if (data.startsWith("quiz:")) return handleQuizAnswer(chatId, telegramId, data.endsWith(":correct"));
+  if (data.startsWith("quiz:ans:")) {
+    const [, , qIndex, aIndex] = data.split(":");
+    return handleQuizAnswer(chatId, telegramId, Number(qIndex), Number(aIndex));
+  }
   if (data.startsWith("adm:")) {
     const [, action, tournamentId] = data.split(":");
     if (action && tournamentId) return handleAdminTournamentAction(chatId, telegramId, action, tournamentId);
