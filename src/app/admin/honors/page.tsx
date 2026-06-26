@@ -174,8 +174,8 @@ export default function AdminHonorsPage() {
   return (
     <div className="min-h-screen bg-[#070711] text-white">
       <Navbar />
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-black">مدیریت تالار افتخارات</h1>
             <p className="text-sm text-gray-400 mt-1">ایجاد، ویرایش، تأیید و حذف محتوا</p>
@@ -193,7 +193,7 @@ export default function AdminHonorsPage() {
         </div>
 
         {/* فرم ایجاد */}
-        <div className="glass-panel p-6 rounded-3xl mb-10 border border-white/10">
+        <div className="glass-panel p-4 sm:p-6 rounded-3xl mb-10 border border-white/10">
           <h3 className="font-black mb-5 text-lg">ایجاد محتوای جدید</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
@@ -311,7 +311,7 @@ export default function AdminHonorsPage() {
                   </div>
                 ) : (
                   // نمایش عادی
-                  <div className="flex justify-between gap-6">
+                  <div className="flex flex-col sm:flex-row sm:justify-between gap-5">
                     <div className="flex-1">
                       <div className="font-black text-xl mb-1.5">{honor.title}</div>
                       <p className="text-sm text-white/80 mb-4 leading-relaxed">{honor.description}</p>
@@ -326,7 +326,7 @@ export default function AdminHonorsPage() {
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end gap-2 min-w-[150px]">
+                    <div className="flex flex-row sm:flex-col flex-wrap items-start sm:items-end gap-2 sm:min-w-[150px]">
                       <div className={`text-xs px-3 py-1 rounded-full border text-center ${
                         honor.status === "approved" ? "bg-green-500/10 text-green-400 border-green-500/20" :
                         honor.status === "rejected" ? "bg-red-500/10 text-red-400 border-red-500/20" :

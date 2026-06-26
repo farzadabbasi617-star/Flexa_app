@@ -126,7 +126,7 @@ export default function AdminTelegramPage() {
   return (
     <div className="min-h-screen bg-[#070711] text-white">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
           <div>
             <h1 className="text-3xl font-black">⚡ داشبورد تلگرام Gament</h1>
@@ -142,7 +142,7 @@ export default function AdminTelegramPage() {
         {message && <div className="bg-green-500/10 border border-green-500/30 text-green-300 rounded-2xl p-4 mb-6">{message}</div>}
 
 
-        <section className="gaming-card p-5 mb-8 border border-purple-500/20">
+        <section className="gaming-card p-4 sm:p-5 mb-8 border border-purple-500/20">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
             <div>
               <h2 className="font-black text-xl">⚙️ تنظیمات ربات تلگرام</h2>
@@ -177,7 +177,7 @@ export default function AdminTelegramPage() {
           />
         </section>
 
-        <section className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <section className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
           {busy ? Array.from({ length: 8 }).map((_, i) => <div key={i} className="gaming-card p-5 h-24 animate-pulse" />) : statCards.map(([icon, label, value]) => (
             <div key={String(label)} className="gaming-card p-5">
               <div className="text-3xl mb-2">{icon}</div>
@@ -216,7 +216,7 @@ export default function AdminTelegramPage() {
 
         <section className="gaming-card overflow-hidden">
           <div className="p-5 border-b border-white/10 font-black">آخرین پیش‌ثبت‌نام‌ها</div>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 scrollbar-hide">
             <table className="w-full min-w-[760px] text-sm">
               <thead className="bg-white/[.03] text-gray-400"><tr>{["نام", "تلگرام", "شماره", "بازی", "وضعیت", "آخرین بروزرسانی"].map((h) => <th key={h} className="text-right p-3">{h}</th>)}</tr></thead>
               <tbody>

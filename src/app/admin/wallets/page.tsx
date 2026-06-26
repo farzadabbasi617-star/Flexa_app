@@ -164,14 +164,14 @@ export default function AdminWalletsPage() {
   return (
     <div className="min-h-screen bg-dark-900">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
         <button onClick={() => router.push("/admin")} className="text-gray-500 hover:text-white mb-4">← بازگشت</button>
         <h1 className="text-3xl font-black neon-text-purple mb-2">💳 مدیریت کیف پول‌ها</h1>
         <p className="text-gray-500 text-sm mb-6">مدیریت درخواست‌های شارژ/برداشت، موجودی قابل برداشت و اصلاح دستی</p>
         {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-5 text-sm">{error}</div>}
         {message && <div className="bg-green-500/10 border border-green-500/30 text-green-300 rounded-xl p-3 mb-5 text-sm">{message}</div>}
 
-        <section className="gaming-card p-5 mb-6">
+        <section className="gaming-card p-4 sm:p-5 mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
             <div>
               <h2 className="font-black text-xl">درخواست‌های در انتظار</h2>
@@ -198,7 +198,7 @@ export default function AdminWalletsPage() {
             <input className="gaming-input" placeholder="شماره پیگیری پرداخت برداشت (اختیاری)" value={paymentTrackingNumber} onChange={(e) => setPaymentTrackingNumber(e.target.value)} />
           </div>
           {pendingTransactions.length ? (
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 scrollbar-hide">
               <table className="w-full min-w-[980px] text-sm">
                 <thead className="bg-dark-800 text-gray-400"><tr><th className="p-3 text-right">نوع</th><th className="p-3 text-right">کاربر</th><th className="p-3 text-right">مبلغ</th><th className="p-3 text-right">اطلاعات</th><th className="p-3 text-right">زمان</th><th className="p-3 text-right">عملیات</th></tr></thead>
                 <tbody>
@@ -249,7 +249,7 @@ export default function AdminWalletsPage() {
         <input className="gaming-input max-w-md mb-5" placeholder="جستجوی کاربر..." value={query} onChange={(e) => setQuery(e.target.value)} />
 
         {selected && (
-          <form onSubmit={adjust} className="gaming-card p-5 mb-6 grid grid-cols-1 sm:grid-cols-4 gap-4 animate-slide-up">
+          <form onSubmit={adjust} className="gaming-card p-4 sm:p-5 mb-6 grid grid-cols-1 sm:grid-cols-4 gap-4 animate-slide-up">
             <div className="sm:col-span-4 text-sm text-gray-300">اصلاح موجودی برای <b>{selected.displayName}</b> — موجودی کل: {selected.balanceToman.toLocaleString("fa-IR")} تومان، قابل برداشت: {selected.withdrawableToman.toLocaleString("fa-IR")} تومان</div>
             <select className="gaming-select" value={direction} onChange={(e) => setDirection(e.target.value as "increase" | "decrease")}><option value="increase">افزایش</option><option value="decrease">کاهش</option></select>
             <input className="gaming-input" placeholder="مبلغ تومان" value={amountToman} onChange={(e) => setAmountToman(e.target.value)} />
@@ -260,8 +260,8 @@ export default function AdminWalletsPage() {
         )}
 
         {busy ? <div className="text-center py-20 text-4xl animate-neon-pulse">💳</div> : (
-          <div className="gaming-card overflow-hidden">
-            <div className="overflow-x-auto">
+          <div className="gaming-card overflow-hidden -mx-1 sm:mx-0">
+            <div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 scrollbar-hide">
               <table className="w-full min-w-[920px] text-sm">
                 <thead className="bg-dark-800 text-gray-400"><tr><th className="p-3 text-right">کاربر</th><th className="p-3 text-right">موبایل</th><th className="p-3 text-right">نقش</th><th className="p-3 text-right">کل</th><th className="p-3 text-right">قابل مصرف</th><th className="p-3 text-right">قابل برداشت</th><th className="p-3 text-right">عملیات</th></tr></thead>
                 <tbody>

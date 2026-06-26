@@ -213,7 +213,7 @@ export default function AdminTournamentsPage() {
   return (
     <div className="min-h-screen bg-dark-900 text-white">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <button onClick={() => router.push("/admin")} className="text-gray-500 hover:text-white mb-3">← بازگشت</button>
@@ -226,7 +226,7 @@ export default function AdminTournamentsPage() {
         {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-5 text-sm">{error}</div>}
 
         {showForm && (
-          <form onSubmit={save} className="gaming-card p-5 mb-8 grid grid-cols-1 md:grid-cols-2 gap-4 animate-slide-up">
+          <form onSubmit={save} className="gaming-card p-4 sm:p-5 mb-8 grid grid-cols-1 md:grid-cols-2 gap-4 animate-slide-up">
             <input className="gaming-input" placeholder="نام تورنومنت" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <input className="gaming-input" placeholder="لینک تصویر بنر" value={form.bannerUrl} onChange={(e) => setForm({ ...form, bannerUrl: e.target.value })} />
             <select className="gaming-select" value={form.game} onChange={(e) => setForm({ ...form, game: e.target.value as GameId })}>{games.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}</select>
@@ -255,14 +255,14 @@ export default function AdminTournamentsPage() {
             </div>
             <textarea className="gaming-input min-h-24 md:col-span-2" placeholder="توضیحات" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             <textarea className="gaming-input min-h-28 md:col-span-2" placeholder="قوانین" value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })} />
-            <div className="md:col-span-2 flex gap-3">
+            <div className="md:col-span-2 flex flex-col sm:flex-row gap-3">
               <button disabled={saving} className="gaming-btn disabled:opacity-50">{saving ? "ذخیره..." : "ذخیره"}</button>
               <button type="button" onClick={() => setShowForm(false)} className="px-5 py-3 rounded-xl bg-dark-700 text-gray-300">انصراف</button>
             </div>
           </form>
         )}
 
-        <div className="mb-5 flex gap-3">
+        <div className="mb-5 flex flex-col sm:flex-row gap-3">
           <input className="gaming-input max-w-md" placeholder="جستجو..." value={query} onChange={(e) => setQuery(e.target.value)} />
           <button onClick={load} className="px-4 py-3 rounded-xl bg-dark-700 text-sm font-bold">🔄</button>
         </div>
@@ -270,10 +270,10 @@ export default function AdminTournamentsPage() {
         {busy ? <div className="text-center py-20 text-4xl animate-neon-pulse">🏆</div> : (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {filtered.map((row) => (
-              <article key={row.id} className="gaming-card p-5 overflow-hidden relative">
+              <article key={row.id} className="gaming-card p-4 sm:p-5 overflow-hidden relative">
                 {row.bannerUrl && <img src={row.bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-15" />}
                 <div className="relative">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div>
                       <h2 className="font-black text-lg text-white">{row.name}</h2>
                       <p className="text-xs text-gray-500 mt-1">{row.game} • {row.format} • {row.registrations} ثبت‌نام</p>
