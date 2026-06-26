@@ -214,9 +214,9 @@ export default function AdminImagesPage() {
     <div className="min-h-screen bg-dark-900">
       <Navbar />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <button onClick={() => router.push("/admin")} className="text-gray-500 hover:text-white">←</button>
             <h1 className="text-2xl font-bold">
@@ -239,7 +239,7 @@ export default function AdminImagesPage() {
 
         {/* Form */}
         {showForm && (
-          <div className="gaming-card p-6 mb-6 animate-slide-up">
+          <div className="gaming-card p-4 sm:p-6 mb-6 animate-slide-up">
             <h3 className="text-lg font-bold mb-4 neon-text-blue">
               {editingId
                 ? lang === "fa" ? "ویرایش تصویر" : "Edit Image"
@@ -314,7 +314,7 @@ export default function AdminImagesPage() {
               {form.url && (
                 <div className="sm:col-span-2">
                   <p className="text-xs text-gray-500 mb-1">{lang === "fa" ? "پیش‌نمایش:" : "Preview:"}</p>
-                  <img src={form.url} alt="Preview" className="h-32 rounded-lg object-cover border border-gaming-border" />
+                  <img src={form.url} alt="Preview" className="w-full max-h-48 rounded-lg object-cover border border-gaming-border" />
                 </div>
               )}
               <div>
@@ -355,7 +355,7 @@ export default function AdminImagesPage() {
                   onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value) || 0 })}
                 />
               </div>
-              <div className="sm:col-span-2 flex gap-3">
+              <div className="sm:col-span-2 flex flex-col sm:flex-row gap-3">
                 <button type="submit" disabled={saving} className="gaming-btn text-sm disabled:opacity-50">
                   {saving
                     ? lang === "fa" ? "در حال ذخیره..." : "Saving..."

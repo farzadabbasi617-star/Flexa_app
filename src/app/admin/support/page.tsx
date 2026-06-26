@@ -147,14 +147,14 @@ export default function AdminSupportPage() {
   return (
     <div className="min-h-screen bg-dark-900 text-white">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
         <button onClick={() => router.push("/admin")} className="text-gray-500 hover:text-white mb-4">
           ← بازگشت
         </button>
         <h1 className="text-3xl font-black neon-text-purple mb-2">🎧 مرکز پشتیبانی</h1>
         <p className="text-gray-500 text-sm mb-6">مشاهده تیکت‌ها، پاسخ مدیر، تغییر وضعیت و تحلیل هوشمند AI</p>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-5">
           <section className="lg:col-span-1">
             <input className="gaming-input mb-4" placeholder="جستجو..." value={query} onChange={(e) => setQuery(e.target.value)} />
             {busy ? (
@@ -177,7 +177,7 @@ export default function AdminSupportPage() {
             )}
           </section>
 
-          <section className="lg:col-span-2 gaming-card p-5 min-h-[520px]">
+          <section className="lg:col-span-2 gaming-card p-4 sm:p-5 min-h-[min(520px,calc(100dvh-180px))]">
             {selected ? (
               <>
                 <div className="flex flex-col sm:flex-row justify-between gap-3 mb-4">
@@ -196,7 +196,7 @@ export default function AdminSupportPage() {
                       {aiBusy ? "تحلیل..." : "🤖 تحلیل AI"}
                     </button>
                     <select
-                      className="gaming-select max-w-[180px]"
+                      className="gaming-select w-full sm:max-w-[180px]"
                       value={status}
                       onChange={(e) => {
                         setStatus(e.target.value);
@@ -245,7 +245,7 @@ export default function AdminSupportPage() {
                   </div>
                 )}
 
-                <div className="space-y-3 max-h-[360px] overflow-y-auto mb-4">
+                <div className="space-y-3 max-h-[45dvh] overflow-y-auto overscroll-contain mb-4">
                   {messages.map((message) => (
                     <div key={message.id} className="bg-dark-700 rounded-2xl p-3">
                       <div className="text-xs text-gray-500 mb-2">

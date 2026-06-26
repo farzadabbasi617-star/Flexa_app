@@ -114,14 +114,14 @@ export default function AdminMatchesPage() {
   return (
     <div className="min-h-screen bg-dark-900 text-white">
       <Navbar />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
         <button onClick={() => router.push("/admin")} className="text-gray-500 hover:text-white mb-4">← بازگشت</button>
         <h1 className="text-3xl font-black neon-text-purple mb-2">⚔️ مدیریت مسابقات</h1>
         <p className="text-gray-500 text-sm mb-6">ثبت نتیجه، تعیین برنده، تغییر وضعیت و زمان‌بندی مسابقات</p>
         {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-5 text-sm">{error}</div>}
 
         {editing && (
-          <form onSubmit={save} className="gaming-card p-5 mb-6 grid grid-cols-1 sm:grid-cols-5 gap-4 animate-slide-up">
+          <form onSubmit={save} className="gaming-card p-4 sm:p-5 mb-6 grid grid-cols-1 sm:grid-cols-5 gap-4 animate-slide-up">
             <div className="sm:col-span-5 text-sm text-gray-300">ویرایش مسابقه {editing.tournamentName || "—"} / دور {editing.round} / شماره {editing.matchNumber}</div>
             <select className="gaming-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((s) => <option key={s} value={s}>{s}</option>)}</select>
             <input className="gaming-input" placeholder="امتیاز بازیکن ۱" value={form.player1Score} onChange={(e) => setForm({ ...form, player1Score: e.target.value })} />
@@ -136,9 +136,9 @@ export default function AdminMatchesPage() {
           </form>
         )}
 
-        <div className="mb-5 flex gap-3"><input className="gaming-input max-w-md" placeholder="جستجو..." value={query} onChange={(e) => setQuery(e.target.value)} /><button onClick={load} className="px-4 py-3 rounded-xl bg-dark-700">🔄</button></div>
+        <div className="mb-5 flex flex-col sm:flex-row gap-3"><input className="gaming-input max-w-md" placeholder="جستجو..." value={query} onChange={(e) => setQuery(e.target.value)} /><button onClick={load} className="px-4 py-3 rounded-xl bg-dark-700">🔄</button></div>
         {busy ? <div className="text-center py-20 text-4xl animate-neon-pulse">⚔️</div> : (
-          <div className="gaming-card overflow-hidden"><div className="overflow-x-auto"><table className="w-full min-w-[980px] text-sm">
+          <div className="gaming-card overflow-hidden"><div className="overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0 scrollbar-hide"><table className="w-full min-w-[980px] text-sm">
             <thead className="bg-dark-800 text-gray-400"><tr><th className="p-3 text-right">تورنومنت</th><th className="p-3 text-right">دور/شماره</th><th className="p-3 text-right">بازیکن‌ها</th><th className="p-3 text-right">امتیاز</th><th className="p-3 text-right">برنده</th><th className="p-3 text-right">وضعیت</th><th className="p-3 text-right">عملیات</th></tr></thead>
             <tbody>{filtered.map((m) => <tr key={m.id} className="border-t border-white/5 hover:bg-white/[.03]"><td className="p-3">{m.tournamentName || "—"}</td><td className="p-3">{m.round}/{m.matchNumber}</td><td className="p-3">{m.player1Name || "TBD"} vs {m.player2Name || "TBD"}</td><td className="p-3">{m.player1Score ?? "—"} - {m.player2Score ?? "—"}</td><td className="p-3">{m.winnerName || "—"}</td><td className="p-3 text-neon-purple">{m.status}</td><td className="p-3 flex gap-2"><button onClick={() => startEdit(m)} className="text-neon-blue text-xs">ویرایش</button><button onClick={() => remove(m.id)} className="text-red-400 text-xs">حذف</button></td></tr>)}</tbody>
           </table></div></div>

@@ -195,8 +195,8 @@ export default function AdminUsersPage() {
     <div className="min-h-screen bg-dark-900">
       <Navbar />
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <button onClick={() => router.push("/admin")} className="text-gray-500 hover:text-white">←</button>
             <h1 className="text-2xl font-bold">
@@ -210,7 +210,7 @@ export default function AdminUsersPage() {
         {error && <div className="bg-red-900/30 border border-red-500/40 text-red-300 rounded-xl p-3 mb-5 text-sm">{error}</div>}
 
         {showCreate && (
-          <form onSubmit={createUser} className="gaming-card p-5 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-slide-up">
+          <form onSubmit={createUser} className="gaming-card p-4 sm:p-5 mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 animate-slide-up">
             <input className="gaming-input text-sm" placeholder="شماره موبایل" value={newUser.phoneNumber} onChange={(e) => setNewUser({ ...newUser, phoneNumber: e.target.value })} />
             <input className="gaming-input text-sm" placeholder="ایمیل اختیاری" value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
             <input className="gaming-input text-sm" placeholder="نام کاربری" value={newUser.username} onChange={(e) => setNewUser({ ...newUser, username: e.target.value })} />
@@ -227,7 +227,7 @@ export default function AdminUsersPage() {
         )}
 
         {permissionTarget && (
-          <div className="gaming-card p-5 mb-6 animate-slide-up border-neon-purple/30">
+          <div className="gaming-card p-4 sm:p-5 mb-6 animate-slide-up border-neon-purple/30">
             <div className="flex items-center justify-between gap-4 mb-4">
               <div>
                 <h2 className="font-black text-lg text-neon-purple">سطح دسترسی {permissionTarget.displayName}</h2>
@@ -235,7 +235,7 @@ export default function AdminUsersPage() {
               </div>
               <button onClick={() => setPermissionTarget(null)} className="text-gray-500 hover:text-white">✕</button>
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-4 gap-3">
               {PERMISSIONS.map((permission) => {
                 const checked = selectedPermissions.includes(permission.key);
                 return (
