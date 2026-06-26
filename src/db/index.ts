@@ -33,14 +33,25 @@ const globalForDb = globalThis as typeof globalThis & {
   __gamentPool?: Pool;
 };
 
+const configuredPoolMax = Number(process.env.DB_POOL_MAX || process.env.PGPOOL_MAX || "");
+const poolMax = Number.isFinite(configuredPoolMax) && configuredPoolMax > 0
+  ? Math.min(Math.max(Math.floor(configuredPoolMax), 1), 30)
+  : process.env.NODE_ENV === "production"
+    ? 5
+    : 10;
+
 export const pool =
   globalForDb.__gamentPool ??
   new Pool({
     connectionString: databaseUrl,
     ssl: { rejectUnauthorized: !noVerify },
-    max: 10,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 5000,
+    max: poolMax,
+    min: 0,
+    idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 30000),
+    connectionTimeoutMillis: Number(process.env.DB_CONNECTION_TIMEOUT_MS || 5000),
+    maxUses: Number(process.env.DB_MAX_USES || 7500),
+    keepAlive: true,
+    application_name: process.env.DB_APPLICATION_NAME || "gament-next",
   });
 
 if (process.env.NODE_ENV !== "production") {
