@@ -355,10 +355,10 @@ export default function ProfilePage() {
         <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-purple-700/20 blur-[80px]" />
       </div>
 
-      <div className="relative z-10 max-w-[540px] mx-auto px-5 pb-28">
+      <div className="relative z-10 max-w-[540px] mx-auto px-4 sm:px-5" style={{ paddingBottom: "var(--bottom-nav-space)" }}>
         
         {/* Header */}
-        <header className="pt-10 pb-4 text-right">
+        <header className="pt-7 sm:pt-10 pb-4 text-right">
           <div className="inline-flex items-center gap-2 text-[10px] font-black text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-full px-3 py-1 mb-3">
             👑 تنظیمات، پروفایل و داشبورد کاربری گیمنت
           </div>

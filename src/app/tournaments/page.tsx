@@ -169,7 +169,7 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
 
                       <div className="flex gap-4 overflow-x-auto snap-x pb-2 -mx-1 px-1 scrollbar-hide">
                         {list.map((tournament) => (
-                          <div key={tournament.id} className="snap-start shrink-0 w-[295px]">
+                          <div key={tournament.id} className="snap-start shrink-0 w-[min(295px,calc(100vw-48px))]">
                             <TournamentCardLuxury t={tournament} walletBalanceToman={walletBalanceToman} isLoggedIn={isLoggedIn} />
                           </div>
                         ))}
@@ -207,7 +207,7 @@ export default function TournamentsPage() {
   return (
     <div className="min-h-screen bg-dark-900">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "var(--bottom-nav-space)" }}>
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6" dir="rtl">
           <div className="text-right">
             <h1 className="text-2xl sm:text-3xl font-black flex items-center gap-2.5 justify-start">

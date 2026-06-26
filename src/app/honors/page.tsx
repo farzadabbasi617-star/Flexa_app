@@ -113,7 +113,7 @@ export default function HonorsPage() {
   }, [featured.length, featuredIndex]);
 
   return (
-    <div className="min-h-screen bg-[#050508] text-white pb-24">
+    <div className="min-h-screen bg-[#050508] text-white">
       {/* Luxurious Header */}
       <div className="relative pt-8 pb-10 px-6 bg-gradient-to-b from-purple-950/40 via-[#050508] to-[#050508]">
         <div className="max-w-[480px] mx-auto text-center">
@@ -125,7 +125,7 @@ export default function HonorsPage() {
         </div>
       </div>
 
-      <div className="max-w-[480px] mx-auto px-5">
+      <div className="max-w-[480px] mx-auto px-5" style={{ paddingBottom: "var(--bottom-nav-space)" }}>
         {/* Filters */}
         <div className="mb-5 space-y-3">
           <input

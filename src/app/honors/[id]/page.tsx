@@ -212,7 +212,7 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   return (
-    <div className="min-h-screen bg-[#050508] text-white pb-28">
+    <div className="min-h-screen bg-[#050508] text-white">
       {honor && (
         <>
           <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleJsonLd(honor)) }} />
@@ -247,7 +247,7 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {/* Adjusted margin to -mt-8 to pull the glass panel card beautifully over the gradient header */}
-      <main className="max-w-[560px] mx-auto px-5 -mt-8 relative z-10">
+      <main className="max-w-[560px] mx-auto px-5 -mt-8 relative z-10" style={{ paddingBottom: "var(--bottom-nav-space)" }}>
         {error ? (
           <div className="glass-panel rounded-3xl border border-red-500/20 p-6 text-red-300">{error}</div>
         ) : honor ? (

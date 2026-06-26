@@ -289,7 +289,7 @@ export default function WalletPage() {
       <div className="fixed inset-0 pointer-events-none opacity-25 bg-[linear-gradient(125deg,transparent_0_20%,rgba(255,255,255,.08)_20%_21%,transparent_21%_42%,rgba(255,255,255,.05)_42%_43%,transparent_43%)]" />
       <Navbar />
 
-      <main className="relative z-10 max-w-[760px] mx-auto px-4 sm:px-6 py-8 pb-32" dir="rtl">
+      <main className="relative z-10 max-w-[760px] mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "var(--bottom-nav-space)" }} dir="rtl">
         <div className="flex items-center justify-between gap-4 mb-7">
           <div>
             <p className="text-xs font-black text-cyan-300 mb-2 tracking-[0.24em]">GAMENT WALLET</p>
@@ -385,8 +385,8 @@ export default function WalletPage() {
       </main>
 
       {walletDialog === "deposit" && (
-        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-start justify-center px-3 pt-2 pb-4" dir="rtl">
-          <div className="w-full max-w-md max-h-[calc(100dvh-16px)] overflow-y-auto rounded-[2.25rem] bg-[#111016] border border-white/10 shadow-[0_0_80px_rgba(139,92,246,.25)] p-4 sm:p-5 animate-slide-up overscroll-contain">
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-start justify-center px-3 pt-2" dir="rtl">
+          <div className="w-full max-w-md max-h-[calc(100dvh-12px)] overflow-y-auto rounded-[2.25rem] bg-[#111016] border border-white/10 shadow-[0_0_80px_rgba(139,92,246,.25)] p-4 sm:p-5 animate-slide-up overscroll-contain">
             <div className="flex items-center justify-between mb-5">
               <button onClick={closeWalletDialog} className="w-11 h-11 rounded-full bg-white text-gray-700 text-2xl leading-none">×</button>
               <div className="text-center">
@@ -500,7 +500,7 @@ export default function WalletPage() {
                 </label>
 
                 <textarea className="gaming-input min-h-20" placeholder="توضیح اختیاری" value={depositNote} onChange={(e) => setDepositNote(e.target.value)} />
-                <div className="sticky bottom-0 -mx-4 sm:-mx-5 px-4 sm:px-5 pt-3 pb-2 bg-gradient-to-t from-[#111016] via-[#111016]/95 to-transparent grid grid-cols-2 gap-3">
+                <div className="sticky bottom-0 -mx-4 sm:-mx-5 px-4 sm:px-5 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] bg-gradient-to-t from-[#111016] via-[#111016]/95 to-transparent grid grid-cols-2 gap-3">
                   <button type="button" onClick={() => setDepositStep(1)} className="px-4 py-4 rounded-2xl bg-white/10 border border-white/10 font-black text-gray-200">بازگشت</button>
                   <button disabled={!acceptedTerms || submitting === "deposit" || !depositAmount} className="gaming-btn disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال ثبت..." : "ثبت فیش"}</button>
                 </div>
@@ -511,8 +511,8 @@ export default function WalletPage() {
       )}
 
       {walletDialog === "withdrawal" && (
-        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-start justify-center px-3 pt-2 pb-4" dir="rtl">
-          <form onSubmit={requestWithdrawal} className="w-full max-w-md max-h-[calc(100dvh-16px)] overflow-y-auto rounded-[2.25rem] bg-[#111016] border border-white/10 shadow-[0_0_80px_rgba(45,212,191,.18)] p-4 sm:p-5 animate-slide-up space-y-4 overscroll-contain">
+        <div className="fixed inset-0 z-[100] bg-black/70 backdrop-blur-md flex items-start justify-center px-3 pt-2" dir="rtl">
+          <form onSubmit={requestWithdrawal} className="w-full max-w-md max-h-[calc(100dvh-12px)] overflow-y-auto rounded-[2.25rem] bg-[#111016] border border-white/10 shadow-[0_0_80px_rgba(45,212,191,.18)] p-4 sm:p-5 animate-slide-up space-y-4 overscroll-contain">
             <div className="flex items-center justify-between mb-2">
               <button type="button" onClick={closeWalletDialog} className="w-11 h-11 rounded-full bg-white text-gray-700 text-2xl leading-none">×</button>
               <h2 className="text-2xl font-black">درخواست برداشت</h2>

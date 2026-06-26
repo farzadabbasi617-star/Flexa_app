@@ -126,8 +126,8 @@ export default function TournamentLobby() {
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_100%_0%,_#2a004f_0%,_transparent_50%)]" />
       </div>
 
-      <div className="relative z-10 max-w-[480px] mx-auto px-6 pb-40">
-        <header className="pt-12 pb-8 flex items-center justify-between">
+      <div className="relative z-10 max-w-[480px] mx-auto px-4 sm:px-6" style={{ paddingBottom: "var(--bottom-nav-space)" }}>
+        <header className="pt-7 sm:pt-12 pb-6 sm:pb-8 flex items-center justify-between">
           <Link href={`/tournaments/${tournament.id}`} className="w-10 h-10 glass-panel rounded-full flex items-center justify-center text-xs opacity-70">❯</Link>
           <div className="text-center">
             <h1 className="text-xl font-black italic tracking-tighter en-font">MATCH LOBBY</h1>
