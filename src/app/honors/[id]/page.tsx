@@ -35,6 +35,21 @@ const GAME_LABELS: Record<string, string> = {
   fortnite: "فورتنایت",
 };
 
+
+function linkifyText(text: string) {
+  const parts = text.split(/(https?:\/\/[^\s)]+|store\.supercell\.com[^\s)]*)/gi);
+  return parts.map((part, index) => {
+    const isUrl = /^(https?:\/\/|store\.supercell\.com)/i.test(part);
+    if (!isUrl) return <span key={index}>{part}</span>;
+    const href = part.startsWith("http") ? part : `https://${part}`;
+    return (
+      <a key={index} href={href} target="_blank" rel="noopener noreferrer" className="text-cyan-300 underline decoration-cyan-300/40 underline-offset-4 hover:text-cyan-200 break-all">
+        {part}
+      </a>
+    );
+  });
+}
+
 const TYPE_LABELS: Record<string, string> = {
   winner: "قهرمان",
   runner_up: "نایب‌قهرمان",
@@ -188,7 +203,7 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
               ) : (
                 <article className="space-y-5">
                   {honor.description.split(/\n\s*\n/).filter(Boolean).map((paragraph, index) => (
-                    <p key={index} className={`leading-8 whitespace-pre-wrap ${index === 0 ? "text-base text-white font-medium" : "text-sm text-gray-200"}`}>{paragraph}</p>
+                    <p key={index} className={`leading-8 whitespace-pre-wrap ${index === 0 ? "text-base text-white font-medium" : "text-sm text-gray-200"}`}>{linkifyText(paragraph)}</p>
                   ))}
                 </article>
               )}

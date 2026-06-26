@@ -1,14 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { honorLikes, honors, honorViews } from "@/db/schema";
+import { honorContentLikes, honorContentViews, honors } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
+import { getStaticHonorById } from "@/lib/static-honors";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 const VISITOR_COOKIE = "gament_honor_visitor";
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const CONTENT_ID_RE = /^[a-zA-Z0-9_-]{3,120}$/;
 
 function getClientIp(request: NextRequest) {
   return request.headers.get("x-forwarded-for")?.split(",")[0] || request.headers.get("x-real-ip") || "unknown";
@@ -31,12 +33,19 @@ function getVisitorKey(request: NextRequest, userId?: string | null) {
   return { key: `anon:${visitorId}`, visitorId };
 }
 
-async function getCounts(honorId: string, visitorKey?: string) {
-  const [viewsRow] = await db.select({ count: sql<number>`count(*)::int` }).from(honorViews).where(eq(honorViews.honorId, honorId));
-  const [likesRow] = await db.select({ count: sql<number>`count(*)::int` }).from(honorLikes).where(eq(honorLikes.honorId, honorId));
+async function contentExists(id: string) {
+  if (getStaticHonorById(id)) return true;
+  if (!UUID_RE.test(id)) return false;
+  const [honor] = await db.select({ id: honors.id }).from(honors).where(and(eq(honors.id, id), eq(honors.status, "approved"))).limit(1);
+  return Boolean(honor);
+}
+
+async function getCounts(contentId: string, visitorKey?: string) {
+  const [viewsRow] = await db.select({ count: sql<number>`count(*)::int` }).from(honorContentViews).where(eq(honorContentViews.contentId, contentId));
+  const [likesRow] = await db.select({ count: sql<number>`count(*)::int` }).from(honorContentLikes).where(eq(honorContentLikes.contentId, contentId));
   let likedByMe = false;
   if (visitorKey) {
-    const [liked] = await db.select({ id: honorLikes.id }).from(honorLikes).where(and(eq(honorLikes.honorId, honorId), eq(honorLikes.visitorKey, visitorKey))).limit(1);
+    const [liked] = await db.select({ id: honorContentLikes.id }).from(honorContentLikes).where(and(eq(honorContentLikes.contentId, contentId), eq(honorContentLikes.visitorKey, visitorKey))).limit(1);
     likedByMe = Boolean(liked);
   }
   return { views: Number(viewsRow?.count || 0), likes: Number(likesRow?.count || 0), likedByMe };
@@ -44,7 +53,7 @@ async function getCounts(honorId: string, visitorKey?: string) {
 
 export async function GET(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  if (!UUID_RE.test(id)) return NextResponse.json({ views: 0, likes: 0, likedByMe: false });
+  if (!CONTENT_ID_RE.test(id)) return NextResponse.json({ views: 0, likes: 0, likedByMe: false });
   try {
     const user = await getOptionalUser(request);
     const { key } = getVisitorKey(request, user?.id);
@@ -57,14 +66,14 @@ export async function GET(request: NextRequest, context: { params: Promise<{ id:
 
 export async function POST(request: NextRequest, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  if (!UUID_RE.test(id)) return NextResponse.json({ views: 0, likes: 0, likedByMe: false });
+  if (!CONTENT_ID_RE.test(id)) return NextResponse.json({ views: 0, likes: 0, likedByMe: false });
 
   try {
+    const exists = await contentExists(id);
+    if (!exists) return NextResponse.json({ error: "Honor not found" }, { status: 404 });
+
     const body = await request.json().catch(() => ({}));
     const action = body.action === "like" ? "like" : "view";
-    const [honor] = await db.select({ id: honors.id }).from(honors).where(and(eq(honors.id, id), eq(honors.status, "approved"))).limit(1);
-    if (!honor) return NextResponse.json({ error: "Honor not found" }, { status: 404 });
-
     const user = await getOptionalUser(request);
     const { key, visitorId } = getVisitorKey(request, user?.id);
     const ip = getClientIp(request);
@@ -72,15 +81,15 @@ export async function POST(request: NextRequest, context: { params: Promise<{ id
 
     if (action === "view") {
       await db
-        .insert(honorViews)
-        .values({ honorId: id, userId: user?.id || null, visitorKey: key, ipAddress: ip, userAgent: ua, lastSeenAt: new Date() })
-        .onConflictDoUpdate({ target: [honorViews.honorId, honorViews.visitorKey], set: { lastSeenAt: new Date(), userId: user?.id || null } });
+        .insert(honorContentViews)
+        .values({ contentId: id, userId: user?.id || null, visitorKey: key, ipAddress: ip, userAgent: ua, lastSeenAt: new Date() })
+        .onConflictDoUpdate({ target: [honorContentViews.contentId, honorContentViews.visitorKey], set: { lastSeenAt: new Date(), userId: user?.id || null } });
     } else {
-      const [existing] = await db.select({ id: honorLikes.id }).from(honorLikes).where(and(eq(honorLikes.honorId, id), eq(honorLikes.visitorKey, key))).limit(1);
+      const [existing] = await db.select({ id: honorContentLikes.id }).from(honorContentLikes).where(and(eq(honorContentLikes.contentId, id), eq(honorContentLikes.visitorKey, key))).limit(1);
       if (existing) {
-        await db.delete(honorLikes).where(eq(honorLikes.id, existing.id));
+        await db.delete(honorContentLikes).where(eq(honorContentLikes.id, existing.id));
       } else {
-        await db.insert(honorLikes).values({ honorId: id, userId: user?.id || null, visitorKey: key, ipAddress: ip, userAgent: ua });
+        await db.insert(honorContentLikes).values({ contentId: id, userId: user?.id || null, visitorKey: key, ipAddress: ip, userAgent: ua });
       }
     }
 

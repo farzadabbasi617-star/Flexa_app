@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { honorLikes, honors, honorViews } from "@/db/schema";
+import { honorContentLikes, honorContentViews, honors } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import logger from "@/lib/logger";
 import { getStaticHonorById } from "@/lib/static-honors";
@@ -23,8 +23,8 @@ function metadataObject(metadata: unknown): Record<string, any> {
 
 async function engagementCount(honorId: string) {
   try {
-    const [viewsRow] = await db.select({ count: sql<number>`count(*)::int` }).from(honorViews).where(eq(honorViews.honorId, honorId));
-    const [likesRow] = await db.select({ count: sql<number>`count(*)::int` }).from(honorLikes).where(eq(honorLikes.honorId, honorId));
+    const [viewsRow] = await db.select({ count: sql<number>`count(*)::int` }).from(honorContentViews).where(eq(honorContentViews.contentId, honorId));
+    const [likesRow] = await db.select({ count: sql<number>`count(*)::int` }).from(honorContentLikes).where(eq(honorContentLikes.contentId, honorId));
     return { viewsCount: Number(viewsRow?.count || 0), likesCount: Number(likesRow?.count || 0) };
   } catch (err) {
     logger.warn({ err, honorId }, "Honor engagement count unavailable");
@@ -49,9 +49,11 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     const { id } = await context.params;
     const staticHonor = getStaticHonorById(id);
     if (staticHonor) {
+      const engagement = await engagementCount(staticHonor.id);
       return NextResponse.json({
         ...staticHonor,
         time: relativeTime(staticHonor.publishedAt || staticHonor.createdAt),
+        ...engagement,
       });
     }
 

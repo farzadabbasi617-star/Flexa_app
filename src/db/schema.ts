@@ -271,6 +271,34 @@ export const honorLikes = pgTable("honor_likes", {
   uniqueLikeIdx: uniqueIndex("honor_likes_honor_visitor_unique").on(table.honorId, table.visitorKey),
 }));
 
+
+export const honorContentViews = pgTable("honor_content_views", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  contentId: varchar("content_id", { length: 120 }).notNull(),
+  userId: uuid("user_id").references(() => users.id),
+  visitorKey: varchar("visitor_key", { length: 120 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: varchar("user_agent", { length: 300 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  lastSeenAt: timestamp("last_seen_at").defaultNow().notNull(),
+}, (table) => ({
+  contentIdx: index("honor_content_views_content_id_idx").on(table.contentId),
+  uniqueViewerIdx: uniqueIndex("honor_content_views_content_visitor_unique").on(table.contentId, table.visitorKey),
+}));
+
+export const honorContentLikes = pgTable("honor_content_likes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  contentId: varchar("content_id", { length: 120 }).notNull(),
+  userId: uuid("user_id").references(() => users.id),
+  visitorKey: varchar("visitor_key", { length: 120 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: varchar("user_agent", { length: 300 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  contentIdx: index("honor_content_likes_content_id_idx").on(table.contentId),
+  uniqueLikeIdx: uniqueIndex("honor_content_likes_content_visitor_unique").on(table.contentId, table.visitorKey),
+}));
+
 // Players
 export const players = pgTable("players", {
   id: uuid("id").defaultRandom().primaryKey(),

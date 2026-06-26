@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { honorLikes, honors, honorViews } from "@/db/schema";
+import { honorContentLikes, honorContentViews, honors } from "@/db/schema";
 import { validateAdmin } from "@/lib/auth";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import logger from "@/lib/logger";
@@ -16,8 +16,8 @@ async function engagementCounts(honorIds: string[]) {
   if (!honorIds.length) return new Map<string, { likes: number; views: number }>();
   try {
     const [viewRows, likeRows] = await Promise.all([
-      db.select({ honorId: honorViews.honorId, count: sql<number>`count(*)::int` }).from(honorViews).where(inArray(honorViews.honorId, honorIds)).groupBy(honorViews.honorId),
-      db.select({ honorId: honorLikes.honorId, count: sql<number>`count(*)::int` }).from(honorLikes).where(inArray(honorLikes.honorId, honorIds)).groupBy(honorLikes.honorId),
+      db.select({ honorId: honorContentViews.contentId, count: sql<number>`count(*)::int` }).from(honorContentViews).where(inArray(honorContentViews.contentId, honorIds)).groupBy(honorContentViews.contentId),
+      db.select({ honorId: honorContentLikes.contentId, count: sql<number>`count(*)::int` }).from(honorContentLikes).where(inArray(honorContentLikes.contentId, honorIds)).groupBy(honorContentLikes.contentId),
     ]);
     const map = new Map<string, { likes: number; views: number }>();
     for (const id of honorIds) map.set(id, { likes: 0, views: 0 });
