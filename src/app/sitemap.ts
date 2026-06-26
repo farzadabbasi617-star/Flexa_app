@@ -3,6 +3,7 @@ import { eq, or, desc } from 'drizzle-orm';
 
 import { SITE_URL } from '@/lib/seo';
 import { gameLandings } from '@/lib/game-landing';
+import { STATIC_HONORS } from '@/lib/static-honors';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = SITE_URL;
@@ -45,6 +46,15 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       lastModified: now,
       changeFrequency: 'weekly',
       priority: 0.86,
+    });
+  });
+
+  STATIC_HONORS.forEach((honor) => {
+    routes.push({
+      url: `${baseUrl}/honors/${honor.id}`,
+      lastModified: honor.publishedAt || honor.createdAt ? new Date(honor.publishedAt || honor.createdAt!) : now,
+      changeFrequency: 'weekly',
+      priority: honor.highlight ? 0.78 : 0.68,
     });
   });
 
@@ -125,7 +135,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const honorList = await db
       .select({ id: honors.id, updatedAt: honors.updatedAt })
       .from(honors)
-      .where(eq(honors.status, 'published'))
+      .where(eq(honors.status, 'approved'))
       .orderBy(desc(honors.updatedAt))
       .limit(100);
 

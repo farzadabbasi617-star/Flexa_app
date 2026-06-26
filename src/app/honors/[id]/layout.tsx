@@ -29,7 +29,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
         description: honor.description.slice(0, 155),
         path: `/honors/${id}`,
         image: honor.imageUrl || undefined,
-        keywords: [honor.title, gameName, "افتخارات گیمنت", "قهرمانان گیمینگ"],
+        keywords: [honor.title, gameName, "تالار افتخارات گیمنت", "اخبار گیمینگ", "Gament"],
       });
     }
   } catch {

@@ -30,12 +30,67 @@ interface HonorDetail {
   likedByMe?: boolean;
 }
 
+const SITE_URL = "https://www.gament1.ir";
+
 const GAME_LABELS: Record<string, string> = {
   clash_royale: "کلش رویال",
   cod_mobile: "کالاف موبایل",
   fortnite: "فورتنایت",
 };
 
+
+
+function absoluteUrl(path?: string) {
+  if (!path) return SITE_URL;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+}
+
+function newsArticleJsonLd(honor: HonorDetail) {
+  const description = (honor.summary || honor.description || "").replace(/\s+/g, " ").slice(0, 240);
+  return {
+    "@context": "https://schema.org",
+    "@type": honor.type === "news" ? "NewsArticle" : "Article",
+    headline: honor.title,
+    description,
+    image: honor.image ? [absoluteUrl(honor.image)] : undefined,
+    datePublished: honor.publishedAt || undefined,
+    dateModified: honor.publishedAt || undefined,
+    inLanguage: "fa-IR",
+    mainEntityOfPage: {
+      "@type": "WebPage",
+      "@id": absoluteUrl(`/honors/${honor.id}`),
+    },
+    author: {
+      "@type": "Organization",
+      name: "Gament",
+      url: SITE_URL,
+    },
+    publisher: {
+      "@type": "Organization",
+      name: "Gament",
+      url: SITE_URL,
+      logo: {
+        "@type": "ImageObject",
+        url: absoluteUrl("/icons/gament-icon-192.png"),
+      },
+    },
+    keywords: honor.seoKeywords?.join(", "),
+    articleSection: honor.game ? GAME_LABELS[honor.game] || honor.game : "گیمینگ",
+  };
+}
+
+function breadcrumbJsonLd(honor: HonorDetail) {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "خانه", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "تالار افتخارات", item: absoluteUrl("/honors") },
+      { "@type": "ListItem", position: 3, name: honor.title, item: absoluteUrl(`/honors/${honor.id}`) },
+    ],
+  };
+}
 
 function linkifyText(text: string) {
   const parts = text.split(/(https?:\/\/[^\s)]+|store\.supercell\.com[^\s)]*)/gi);
@@ -158,6 +213,12 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <div className="min-h-screen bg-[#050508] text-white pb-28">
+      {honor && (
+        <>
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleJsonLd(honor)) }} />
+          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd(honor)) }} />
+        </>
+      )}
       <div className="relative min-h-[300px] overflow-hidden">
         {honor?.image ? (
           <img src={honor.image} alt={honor.imageAlt || honor.title} className="absolute inset-0 w-full h-full object-cover opacity-80" />
