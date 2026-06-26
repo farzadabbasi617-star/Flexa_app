@@ -23,6 +23,40 @@ export type StaticHonor = {
 
 export const STATIC_HONORS: StaticHonor[] = [
   {
+    id: "supercell-store-free-goblin-emote-2026-fa",
+    type: "news",
+    icon: "📰",
+    title: "ایموت گابلین رایگان در Supercell Store؛ فرصت محدود برای دریافت جایزه",
+    description:
+      "سوپرسل یک ایموت گابلین رایگان و محدود به زمان را از طریق Supercell Store در دسترس قرار داده است. کاربران بازی‌های سوپرسل می‌توانند با ورود به فروشگاه رسمی سوپرسل و بررسی بخش پیشنهادها، این جایزه رایگان را دریافت کنند. این نوع هدیه‌ها معمولاً برای مدت کوتاهی فعال هستند و بهتر است بازیکنان کلش رویال، کلش آو کلنز و دیگر بازی‌های Supercell سریع‌تر وضعیت حساب خود را در فروشگاه رسمی بررسی کنند. برای امنیت حساب، فقط از دامنه رسمی store.supercell.com استفاده کنید و از وارد کردن اطلاعات در لینک‌های ناشناس یا مشابه خودداری کنید.",
+    summary:
+      "یک Goblin Emote رایگان به‌صورت محدود در فروشگاه رسمی Supercell Store فعال شده است؛ کاربران باید از دامنه رسمی store.supercell.com برای دریافت آن اقدام کنند.",
+    highlight: true,
+    image: "/news/supercell-store-goblin-emote-freebie.jpg",
+    imageAlt: "هدیه رایگان ایموت گابلین در Supercell Store با تصویر شخصیت‌های کلش رویال",
+    seoKeywords: [
+      "ایموت گابلین رایگان",
+      "Supercell Store",
+      "سوپرسل استور",
+      "Goblin Emote",
+      "کلش رویال",
+      "هدیه رایگان سوپرسل",
+      "Gament اخبار گیمینگ",
+    ],
+    readTimeMinutes: 3,
+    game: "clash_royale",
+    publishedAt: "2026-06-26T13:10:00+03:30",
+    createdAt: "2026-06-26T13:10:00+03:30",
+    sources: [
+      {
+        title: "Supercell Store — Goblin Emote freebie",
+        link: "https://store.supercell.com/en?boost=Biscotti",
+        source: "Supercell Store",
+        pubDate: "2026-06-26",
+      },
+    ],
+  },
+  {
     id: "merge-tactics-season-9-balance-changes-fa",
     type: "news",
     icon: "📰",

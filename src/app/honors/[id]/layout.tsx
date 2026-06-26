@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { honors } from "@/db/schema";
 import { createPageMetadata, gameNamesFa } from "@/lib/seo";
+import { getStaticHonorById } from "@/lib/static-honors";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -33,6 +34,18 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
     }
   } catch {
     // Keep a safe fallback if database metadata is temporarily unavailable.
+  }
+
+  const staticHonor = getStaticHonorById(id);
+  if (staticHonor) {
+    const gameName = staticHonor.game ? gameNamesFa[staticHonor.game] || staticHonor.game : "گیمینگ";
+    return createPageMetadata({
+      title: staticHonor.title,
+      description: (staticHonor.summary || staticHonor.description).slice(0, 155),
+      path: `/honors/${id}`,
+      image: staticHonor.image,
+      keywords: [...(staticHonor.seoKeywords || []), gameName, "تالار افتخارات گیمنت", "اخبار گیمینگ"],
+    });
   }
 
   return createPageMetadata({
