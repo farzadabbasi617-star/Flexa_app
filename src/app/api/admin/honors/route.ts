@@ -55,6 +55,79 @@ function normalizeText(value: unknown, max = 255) {
   return String(value ?? "").trim().slice(0, max);
 }
 
+
+function metadataObject(metadata: unknown): Record<string, unknown> {
+  return metadata && typeof metadata === "object" && !Array.isArray(metadata) ? metadata as Record<string, unknown> : {};
+}
+
+function parseList(value: unknown, maxItems = 12) {
+  if (Array.isArray(value)) return value.map((item) => normalizeText(item, 240)).filter(Boolean).slice(0, maxItems);
+  return String(value ?? "")
+    .split(/[,\n،]/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, maxItems);
+}
+
+function parseGallery(value: unknown) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => typeof item === "object" && item ? item as Record<string, unknown> : { src: item } as Record<string, unknown>)
+      .map((item) => ({ src: normalizeText(item.src || item.url, 1000), alt: normalizeText(item.alt || item.title, 255) }))
+      .filter((item) => item.src)
+      .slice(0, 8);
+  }
+  return String(value ?? "")
+    .split(/\n/)
+    .map((src) => src.trim())
+    .filter(Boolean)
+    .slice(0, 8)
+    .map((src) => ({ src: src.slice(0, 1000), alt: "تصویر خبر" }));
+}
+
+function parseSources(body: Record<string, unknown>) {
+  const current = body.sources;
+  if (Array.isArray(current)) {
+    return current
+      .map((item) => typeof item === "object" && item ? item as Record<string, unknown> : null)
+      .filter(Boolean)
+      .map((item) => ({
+        title: normalizeText(item!.title, 200),
+        link: normalizeText(item!.link || item!.url, 1000),
+        source: normalizeText(item!.source, 120) || "Source",
+        pubDate: normalizeText(item!.pubDate, 40) || null,
+      }))
+      .filter((item) => item.link)
+      .slice(0, 6);
+  }
+  const sourceLink = normalizeText(body.sourceLink || body.externalLink, 1000);
+  if (!sourceLink) return [];
+  return [{
+    title: normalizeText(body.sourceTitle, 200) || "منبع خبر",
+    link: sourceLink,
+    source: normalizeText(body.sourceName, 120) || "External",
+    pubDate: normalizeText(body.sourcePubDate, 40) || null,
+  }];
+}
+
+function normalizeHonorMetadata(body: Record<string, unknown>, existing?: unknown) {
+  const base = metadataObject(existing);
+  const readTime = body.readTimeMinutes === undefined || body.readTimeMinutes === "" ? base.readTimeMinutes : Number(body.readTimeMinutes);
+  return {
+    ...base,
+    imageAlt: normalizeText(body.imageAlt, 255) || base.imageAlt || undefined,
+    summary: normalizeText(body.summary, 700) || base.summary || undefined,
+    seoKeywords: body.seoKeywords !== undefined ? parseList(body.seoKeywords, 16) : (base.seoKeywords || []),
+    readTimeMinutes: Number.isFinite(readTime) ? Math.max(1, Math.min(Math.round(Number(readTime)), 60)) : base.readTimeMinutes || undefined,
+    galleryImages: body.galleryImages !== undefined ? parseGallery(body.galleryImages) : (base.galleryImages || []),
+    sources: (body.sourceLink || body.externalLink || body.sources !== undefined) ? parseSources(body) : (base.sources || []),
+  };
+}
+
+function hasMetadataFields(body: Record<string, unknown>) {
+  return ["imageAlt", "summary", "seoKeywords", "readTimeMinutes", "galleryImages", "sourceLink", "externalLink", "sourceTitle", "sourceName", "sourcePubDate", "sources"].some((key) => body[key] !== undefined);
+}
+
 function normalizeHonorBody(body: Record<string, unknown>) {
   const typeRaw = normalizeText(body.type || "news", 30);
   const type = ALLOWED_TYPES.has(typeRaw) ? typeRaw : "news";
@@ -88,6 +161,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(rows.map((row) => ({
       ...row,
       image: row.imageUrl,
+      imageAlt: metadataObject(row.metadata).imageAlt || "",
+      summary: metadataObject(row.metadata).summary || "",
+      seoKeywords: metadataObject(row.metadata).seoKeywords || [],
+      readTimeMinutes: metadataObject(row.metadata).readTimeMinutes || "",
+      galleryImages: metadataObject(row.metadata).galleryImages || [],
+      sources: metadataObject(row.metadata).sources || [],
       time: relativeTime(row.publishedAt || row.createdAt),
       likesCount: counts.get(row.id)?.likes || 0,
       viewsCount: counts.get(row.id)?.views || 0,
@@ -115,6 +194,7 @@ export async function POST(request: NextRequest) {
         createdById: auth.user.id,
         approvedById: data.status === "approved" ? auth.user.id : null,
         publishedAt: data.status === "approved" ? now : null,
+        metadata: normalizeHonorMetadata(body),
         updatedAt: now,
       })
       .returning();
@@ -163,7 +243,8 @@ export async function PATCH(request: NextRequest) {
       }
     }
 
-    const [before] = await db.select({ status: honors.status }).from(honors).where(eq(honors.id, id)).limit(1);
+    const [before] = await db.select({ status: honors.status, metadata: honors.metadata }).from(honors).where(eq(honors.id, id)).limit(1);
+    if (hasMetadataFields(body)) patch.metadata = normalizeHonorMetadata(body, before?.metadata);
     const [updated] = await db.update(honors).set(patch).where(eq(honors.id, id)).returning();
     if (!updated) return NextResponse.json({ error: "Honor not found" }, { status: 404 });
     if (updated.status === "approved" && before?.status !== "approved") {

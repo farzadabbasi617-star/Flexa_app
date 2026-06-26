@@ -87,6 +87,7 @@ export async function GET() {
       seoKeywords: metadataObject(row.metadata).seoKeywords || [],
       readTimeMinutes: metadataObject(row.metadata).readTimeMinutes || undefined,
       sources: metadataObject(row.metadata).sources || [],
+      galleryImages: metadataObject(row.metadata).galleryImages || [],
       game: row.game || undefined,
       publishedAt: row.publishedAt,
       likesCount: counts.get(row.id)?.likes || 0,

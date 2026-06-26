@@ -84,6 +84,7 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
       seoKeywords: metadataObject(row.metadata).seoKeywords || [],
       readTimeMinutes: metadataObject(row.metadata).readTimeMinutes || undefined,
       sources: metadataObject(row.metadata).sources || [],
+      galleryImages: metadataObject(row.metadata).galleryImages || [],
       game: row.game || undefined,
       publishedAt: row.publishedAt,
       createdAt: row.createdAt,

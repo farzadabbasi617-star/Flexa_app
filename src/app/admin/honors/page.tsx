@@ -16,6 +16,7 @@ interface Honor {
   highlight: boolean;
   status: "pending" | "approved" | "rejected";
   image?: string;
+  summary?: string;
   createdAt?: string;
   publishedAt?: string | null;
   likesCount?: number;
@@ -41,6 +42,14 @@ export default function AdminHonorsPage() {
     game: "",
     highlight: false,
     image: "",
+    imageAlt: "",
+    summary: "",
+    seoKeywords: "",
+    readTimeMinutes: "4",
+    galleryImages: "",
+    sourceTitle: "",
+    sourceLink: "",
+    sourceName: "",
   });
 
   const fetchHonors = async () => {
@@ -142,6 +151,14 @@ export default function AdminHonorsPage() {
       game: "",
       highlight: false,
       image: "",
+      imageAlt: "",
+      summary: "",
+      seoKeywords: "",
+      readTimeMinutes: "4",
+      galleryImages: "",
+      sourceTitle: "",
+      sourceLink: "",
+      sourceName: "",
     });
 
     fetchHonors();
@@ -234,12 +251,45 @@ export default function AdminHonorsPage() {
             </select>
           </div>
 
-          <input 
-            placeholder="لینک تصویر (URL)" 
-            value={newHonor.image}
-            onChange={(e) => setNewHonor({...newHonor, image: e.target.value})}
-            className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm mb-4"
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <input 
+              placeholder="لینک تصویر اصلی (URL)" 
+              value={newHonor.image}
+              onChange={(e) => setNewHonor({...newHonor, image: e.target.value})}
+              className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm"
+            />
+            <input 
+              placeholder="متن جایگزین تصویر / Alt" 
+              value={newHonor.imageAlt}
+              onChange={(e) => setNewHonor({...newHonor, imageAlt: e.target.value})}
+              className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm"
+            />
+          </div>
+
+          <textarea
+            placeholder="خلاصه کوتاه خبر برای کارت‌ها و SEO"
+            value={newHonor.summary}
+            onChange={(e) => setNewHonor({...newHonor, summary: e.target.value})}
+            className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm mb-4 min-h-20 resize-y"
           />
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <input placeholder="کلمات کلیدی SEO با کاما" value={newHonor.seoKeywords} onChange={(e) => setNewHonor({...newHonor, seoKeywords: e.target.value})} className="md:col-span-2 bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm" />
+            <input placeholder="زمان مطالعه" type="number" value={newHonor.readTimeMinutes} onChange={(e) => setNewHonor({...newHonor, readTimeMinutes: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm" />
+          </div>
+
+          <textarea
+            placeholder="گالری تصاویر؛ هر لینک در یک خط"
+            value={newHonor.galleryImages}
+            onChange={(e) => setNewHonor({...newHonor, galleryImages: e.target.value})}
+            className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm mb-4 min-h-20 resize-y"
+          />
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            <input placeholder="عنوان منبع" value={newHonor.sourceTitle} onChange={(e) => setNewHonor({...newHonor, sourceTitle: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm" />
+            <input placeholder="لینک منبع / لینک خارجی" value={newHonor.sourceLink} onChange={(e) => setNewHonor({...newHonor, sourceLink: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm" />
+            <input placeholder="نام منبع مثل Activision" value={newHonor.sourceName} onChange={(e) => setNewHonor({...newHonor, sourceName: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm" />
+          </div>
 
           <div className="flex items-center gap-3 mb-5">
             <label className="flex items-center gap-2 text-sm">
@@ -298,13 +348,32 @@ export default function AdminHonorsPage() {
                       onChange={(e) => setEditData({...editData, description: e.target.value})}
                       className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 h-24"
                     />
-                    <input 
-                      placeholder="لینک تصویر" 
-                      value={editData.image || ""} 
-                      onChange={(e) => setEditData({...editData, image: e.target.value})}
-                      className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3"
-                    />
-                    <div className="flex gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <input 
+                        placeholder="لینک تصویر" 
+                        value={editData.image || ""} 
+                        onChange={(e) => setEditData({...editData, image: e.target.value})}
+                        className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3"
+                      />
+                      <input 
+                        placeholder="Alt تصویر" 
+                        value={editData.imageAlt || ""} 
+                        onChange={(e) => setEditData({...editData, imageAlt: e.target.value})}
+                        className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3"
+                      />
+                    </div>
+                    <textarea placeholder="خلاصه SEO" value={editData.summary || ""} onChange={(e) => setEditData({...editData, summary: e.target.value})} className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 h-20" />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <input placeholder="کلمات کلیدی" value={Array.isArray(editData.seoKeywords) ? editData.seoKeywords.join(", ") : editData.seoKeywords || ""} onChange={(e) => setEditData({...editData, seoKeywords: e.target.value})} className="md:col-span-2 bg-[#111114] border border-white/10 rounded-2xl px-4 py-3" />
+                      <input placeholder="زمان مطالعه" type="number" value={editData.readTimeMinutes || ""} onChange={(e) => setEditData({...editData, readTimeMinutes: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3" />
+                    </div>
+                    <textarea placeholder="گالری تصاویر؛ هر لینک در یک خط" value={Array.isArray(editData.galleryImages) ? editData.galleryImages.map((x: any) => x.src || x.url || x).join("\n") : editData.galleryImages || ""} onChange={(e) => setEditData({...editData, galleryImages: e.target.value})} className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 h-20" />
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <input placeholder="عنوان منبع" value={editData.sourceTitle || editData.sources?.[0]?.title || ""} onChange={(e) => setEditData({...editData, sourceTitle: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3" />
+                      <input placeholder="لینک منبع" value={editData.sourceLink || editData.sources?.[0]?.link || ""} onChange={(e) => setEditData({...editData, sourceLink: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3" />
+                      <input placeholder="نام منبع" value={editData.sourceName || editData.sources?.[0]?.source || ""} onChange={(e) => setEditData({...editData, sourceName: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3" />
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-3">
                       <button onClick={saveEdit} className="bg-green-600 px-6 py-2 rounded-xl text-sm">ذخیره</button>
                       <button onClick={() => setEditingId(null)} className="bg-gray-600 px-6 py-2 rounded-xl text-sm">انصراف</button>
                     </div>
@@ -314,7 +383,8 @@ export default function AdminHonorsPage() {
                   <div className="flex flex-col sm:flex-row sm:justify-between gap-5">
                     <div className="flex-1">
                       <div className="font-black text-xl mb-1.5">{honor.title}</div>
-                      <p className="text-sm text-white/80 mb-4 leading-relaxed">{honor.description}</p>
+                      <p className="text-sm text-white/80 mb-2 leading-relaxed line-clamp-3">{honor.description}</p>
+                      {honor.summary && <p className="text-xs text-cyan-200 mb-4 leading-6">خلاصه: {honor.summary}</p>}
                       
                       <div className="text-xs text-gray-500 flex flex-wrap gap-x-4 gap-y-1">
                         {honor.username && <span>@{honor.username}</span>}
