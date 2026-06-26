@@ -77,6 +77,7 @@ export default function HonorsPage() {
   const [query, setQuery] = useState("");
   const [honors, setHonors] = useState<Honor[]>([]);
   const [loading, setLoading] = useState(true);
+  const [featuredIndex, setFeaturedIndex] = useState(0);
 
   useEffect(() => {
     fetch("/api/honors")
@@ -97,6 +98,19 @@ export default function HonorsPage() {
   });
 
   const featured = honors.filter((h) => h.highlight);
+  const activeFeatured = featured.length ? featured[featuredIndex % featured.length] : null;
+
+  useEffect(() => {
+    if (featured.length <= 1 || activeFilter !== "all" || query.trim()) return;
+    const timer = window.setInterval(() => {
+      setFeaturedIndex((index) => (index + 1) % featured.length);
+    }, 4500);
+    return () => window.clearInterval(timer);
+  }, [featured.length, activeFilter, query]);
+
+  useEffect(() => {
+    if (featuredIndex >= featured.length) setFeaturedIndex(0);
+  }, [featured.length, featuredIndex]);
 
   return (
     <div className="min-h-screen bg-[#050508] text-white pb-24">
@@ -152,25 +166,55 @@ export default function HonorsPage() {
           </div>
         </div>
 
-        {/* Featured Big Visual Cards */}
-        {activeFilter === "all" && featured.length > 0 && (
-          <div className="mb-10 space-y-4">
-            {featured.slice(0, 2).map((item) => (
-              <div key={item.id} className="relative overflow-hidden rounded-3xl border border-white/10 h-[280px] flex items-end">
-                {item.image ? (
-                  <img src={item.image} alt="" className="absolute inset-0 w-full h-full object-cover" />
-                ) : (
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-900 to-black" />
+        {/* Featured News Slider */}
+        {activeFilter === "all" && !query.trim() && activeFeatured && (
+          <section className="mb-10">
+            <div className="flex items-center justify-between mb-3 px-1">
+              <div className="text-[11px] font-black text-purple-300 tracking-[0.28em]">FEATURED</div>
+              {featured.length > 1 && (
+                <div className="flex items-center gap-1.5" dir="ltr">
+                  {featured.map((item, index) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setFeaturedIndex(index)}
+                      aria-label={`نمایش خبر ویژه ${index + 1}`}
+                      className={`h-2 rounded-full transition-all ${index === featuredIndex % featured.length ? "w-7 bg-purple-400 shadow-[0_0_12px_rgba(192,132,252,.55)]" : "w-2 bg-white/25"}`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <Link
+              key={activeFeatured.id}
+              href={`/honors/${activeFeatured.id}`}
+              className="group relative block overflow-hidden rounded-[32px] border border-white/10 h-[300px] active:scale-[0.985] transition-all hover:border-purple-400/40 shadow-[0_0_45px_rgba(168,85,247,.14)]"
+            >
+              {activeFeatured.image ? (
+                <img src={activeFeatured.image} alt={activeFeatured.imageAlt || activeFeatured.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+              ) : (
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-[#12081f] to-cyan-950" />
+              )}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/10" />
+              <div className="absolute top-4 right-4 flex items-center gap-2">
+                <span className="text-[10px] font-black px-3 py-1 rounded-full bg-purple-600/35 border border-purple-300/25 backdrop-blur-md">خبر ویژه</span>
+                {activeFeatured.game && (
+                  <span className="text-[10px] font-black px-3 py-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-md">
+                    {GAME_FILTERS.find((g) => g.id === activeFeatured.game)?.label || activeFeatured.game}
+                  </span>
                 )}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/60 to-transparent" />
-                <div className="relative p-6 text-white">
-                  <div className="text-xs text-purple-400 mb-1 tracking-widest">FEATURED</div>
-                  <div className="font-black text-3xl leading-tight mb-2">{item.title}</div>
-                  <div className="text-sm text-white/80 line-clamp-2">{item.description}</div>
+              </div>
+              <div className="absolute bottom-0 inset-x-0 p-6 text-white" dir="rtl">
+                <div className="text-[10px] text-cyan-300 font-black mb-2">{activeFeatured.readTimeMinutes ? `${activeFeatured.readTimeMinutes} دقیقه مطالعه • ` : ""}{activeFeatured.time}</div>
+                <h2 className="font-black text-2xl sm:text-3xl leading-tight mb-3 line-clamp-2">{activeFeatured.title}</h2>
+                <p className="text-sm text-white/75 leading-6 line-clamp-2">{activeFeatured.summary || activeFeatured.description}</p>
+                <div className="mt-4 inline-flex text-xs font-black text-purple-100 bg-white/10 border border-white/10 rounded-full px-4 py-2 backdrop-blur-md">
+                  مشاهده خبر ←
                 </div>
               </div>
-            ))}
-          </div>
+            </Link>
+          </section>
         )}
 
         {/* Compact Visual Cards */}
