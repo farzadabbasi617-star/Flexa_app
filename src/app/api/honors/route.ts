@@ -4,6 +4,7 @@ import { honorContentLikes, honorContentViews, honors } from "@/db/schema";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import logger from "@/lib/logger";
 import { STATIC_HONORS } from "@/lib/static-honors";
+import { publicCacheHeaders, ttlCache } from "@/lib/server-cache";
 
 export const dynamic = "force-dynamic";
 
@@ -52,51 +53,55 @@ function relativeTime(date: Date | string | null | undefined) {
 }
 
 export async function GET() {
-  const staticCounts = await engagementCounts(STATIC_HONORS.map((item) => item.id));
-  const staticRows = STATIC_HONORS.map((item) => ({
-    ...item,
-    time: relativeTime(item.publishedAt || item.createdAt),
-    likesCount: staticCounts.get(item.id)?.likes || 0,
-    viewsCount: staticCounts.get(item.id)?.views || 0,
-  }));
-
   try {
-    const rows = await db
-      .select()
-      .from(honors)
-      .where(eq(honors.status, "approved"))
-      .orderBy(desc(honors.highlight), desc(honors.publishedAt), desc(honors.createdAt))
-      .limit(100);
+    const payload = await ttlCache("public-honors", 60_000, async () => {
+      const staticCounts = await engagementCounts(STATIC_HONORS.map((item) => item.id));
+      const staticRows = STATIC_HONORS.map((item) => ({
+        ...item,
+        time: relativeTime(item.publishedAt || item.createdAt),
+        likesCount: staticCounts.get(item.id)?.likes || 0,
+        viewsCount: staticCounts.get(item.id)?.views || 0,
+      }));
 
-    const counts = await engagementCounts(rows.map((row) => row.id));
+      const rows = await db
+        .select()
+        .from(honors)
+        .where(eq(honors.status, "approved"))
+        .orderBy(desc(honors.highlight), desc(honors.publishedAt), desc(honors.createdAt))
+        .limit(100);
 
-    const dbRows = rows.map((row) => ({
-      id: row.id,
-      type: row.type,
-      icon: row.icon || iconForType(row.type),
-      title: row.title,
-      description: row.description,
-      time: relativeTime(row.publishedAt || row.createdAt),
-      prize: row.prize || undefined,
-      username: row.username || undefined,
-      level: row.level || undefined,
-      highlight: row.highlight,
-      image: row.imageUrl || undefined,
-      imageAlt: metadataObject(row.metadata).imageAlt || row.title,
-      summary: metadataObject(row.metadata).summary || undefined,
-      seoKeywords: metadataObject(row.metadata).seoKeywords || [],
-      readTimeMinutes: metadataObject(row.metadata).readTimeMinutes || undefined,
-      sources: metadataObject(row.metadata).sources || [],
-      galleryImages: metadataObject(row.metadata).galleryImages || [],
-      game: row.game || undefined,
-      publishedAt: row.publishedAt,
-      likesCount: counts.get(row.id)?.likes || 0,
-      viewsCount: counts.get(row.id)?.views || 0,
-    }));
+      const counts = await engagementCounts(rows.map((row) => row.id));
 
-    return NextResponse.json([...staticRows, ...dbRows]);
+      const dbRows = rows.map((row) => ({
+        id: row.id,
+        type: row.type,
+        icon: row.icon || iconForType(row.type),
+        title: row.title,
+        description: row.description,
+        time: relativeTime(row.publishedAt || row.createdAt),
+        prize: row.prize || undefined,
+        username: row.username || undefined,
+        level: row.level || undefined,
+        highlight: row.highlight,
+        image: row.imageUrl || undefined,
+        imageAlt: metadataObject(row.metadata).imageAlt || row.title,
+        summary: metadataObject(row.metadata).summary || undefined,
+        seoKeywords: metadataObject(row.metadata).seoKeywords || [],
+        readTimeMinutes: metadataObject(row.metadata).readTimeMinutes || undefined,
+        sources: metadataObject(row.metadata).sources || [],
+        galleryImages: metadataObject(row.metadata).galleryImages || [],
+        game: row.game || undefined,
+        publishedAt: row.publishedAt,
+        likesCount: counts.get(row.id)?.likes || 0,
+        viewsCount: counts.get(row.id)?.views || 0,
+      }));
+
+      return [...staticRows, ...dbRows];
+    });
+
+    return NextResponse.json(payload, { headers: publicCacheHeaders(60, 300) });
   } catch (err) {
     logger.error({ err }, "Public honors GET failed");
-    return NextResponse.json(staticRows, { status: 200 });
+    return NextResponse.json(STATIC_HONORS.map((item) => ({ ...item, time: relativeTime(item.publishedAt || item.createdAt), likesCount: 0, viewsCount: 0 })), { status: 200, headers: publicCacheHeaders(30, 120) });
   }
 }

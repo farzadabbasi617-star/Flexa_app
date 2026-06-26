@@ -4,6 +4,7 @@ import { tournaments, registrations } from "@/db/schema";
 import { desc, eq, count } from "drizzle-orm";
 import { requireRole, validateSession } from "@/lib/auth";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
+import { publicCacheHeaders, ttlCache } from "@/lib/server-cache";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -15,8 +16,34 @@ export async function GET(request: NextRequest) {
   const page = parseInt(searchParams.get("page") || "1");
   const limit = parseInt(searchParams.get("limit") || "10");
   const offset = (page - 1) * limit;
+  const token = request.cookies.get("session")?.value;
+  const isPublicRequest = !token;
+  const safeLimit = Math.max(1, Math.min(limit, 100));
+  const cacheKey = `tournaments:${game || "all"}:${page}:${safeLimit}`;
 
   try {
+    if (isPublicRequest) {
+      const payload = await ttlCache(cacheKey, 30_000, async () => {
+        const whereClause = game && ["clash_royale", "cod_mobile", "fortnite"].includes(game)
+          ? eq(tournaments.game, game as "clash_royale" | "cod_mobile" | "fortnite")
+          : undefined;
+        const [totalResult] = await db.select({ value: count() }).from(tournaments).where(whereClause);
+        const results = await db
+          .select({ tournament: tournaments, registeredCount: count(registrations.id) })
+          .from(tournaments)
+          .leftJoin(registrations, eq(tournaments.id, registrations.tournamentId))
+          .where(whereClause)
+          .groupBy(tournaments.id)
+          .orderBy(desc(tournaments.createdAt))
+          .limit(safeLimit)
+          .offset((page - 1) * safeLimit);
+        return {
+          data: results.map(({ tournament, registeredCount }) => ({ ...tournament, registeredCount, isRegistered: false, myPlayerId: null })),
+          pagination: { total: totalResult.value, page, limit: safeLimit, totalPages: Math.ceil(totalResult.value / safeLimit) },
+        };
+      });
+      return NextResponse.json(payload, { headers: publicCacheHeaders(30, 120) });
+    }
     // 1. Get total count for pagination
     const [totalResult] = await db
       .select({ value: count() })
@@ -48,7 +75,6 @@ export async function GET(request: NextRequest) {
     let registeredTournamentIds = new Set<string>();
     let registeredPlayerByTournament = new Map<string, string>();
 
-    const token = request.cookies.get("session")?.value;
     if (token) {
       const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
       const ua = request.headers.get("user-agent") || "unknown";
