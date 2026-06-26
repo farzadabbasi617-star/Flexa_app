@@ -89,7 +89,9 @@ export default function AIAssistant() {
   return (
     <>
       {open && (
-        <div className="fixed inset-x-4 bottom-24 z-[70] mx-auto max-w-[430px] rounded-[28px] border border-purple-400/20 bg-[#090911]/95 shadow-[0_22px_80px_rgba(0,0,0,.72)] backdrop-blur-2xl overflow-hidden">
+        <div className="fixed inset-x-3 z-[70] mx-auto max-w-[430px] rounded-[28px] border border-purple-400/20 bg-[#090911]/95 shadow-[0_22px_80px_rgba(0,0,0,.72)] backdrop-blur-2xl overflow-hidden"
+          style={{ bottom: "calc(112px + env(safe-area-inset-bottom))", maxHeight: "calc(100dvh - 140px - env(safe-area-inset-bottom))" }}
+        >
           <div className="flex items-center justify-between gap-3 px-5 py-4 border-b border-white/10 bg-gradient-to-l from-purple-900/30 to-transparent">
             <div className="text-right">
               <div className="text-sm font-black">🤖 دستیار هوشمند Gament</div>
@@ -100,7 +102,7 @@ export default function AIAssistant() {
             <button onClick={() => setOpen(false)} className="w-9 h-9 rounded-2xl bg-white/5 text-gray-300">×</button>
           </div>
 
-          <div className="max-h-[48vh] overflow-y-auto px-4 py-4 space-y-3">
+          <div className="max-h-[42dvh] overflow-y-auto px-4 py-4 space-y-3 overscroll-contain">
             {messages.map((msg) => (
               <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-start" : "justify-end"}`}>
                 <div className={`max-w-[86%] rounded-3xl px-4 py-3 text-xs leading-6 whitespace-pre-wrap ${
@@ -146,7 +148,8 @@ export default function AIAssistant() {
 
       <button
         onClick={() => setOpen((value) => !value)}
-        className="fixed bottom-24 left-5 z-[69] w-14 h-14 rounded-3xl bg-gradient-to-br from-purple-600 to-cyan-500 shadow-[0_0_32px_rgba(188,0,255,.55)] border border-white/20 text-2xl active:scale-95"
+        className="fixed left-4 z-[69] w-13 h-13 sm:w-14 sm:h-14 rounded-3xl bg-gradient-to-br from-purple-600 to-cyan-500 shadow-[0_0_32px_rgba(188,0,255,.55)] border border-white/20 text-xl sm:text-2xl active:scale-95"
+        style={{ bottom: "calc(112px + env(safe-area-inset-bottom))" }}
         aria-label="دستیار هوشمند Gament"
       >
         🤖
