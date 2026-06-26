@@ -35,10 +35,10 @@ export default function LoginPage() {
     <div className="min-h-screen bg-dark-900">
       <Navbar />
 
-      <div className="max-w-lg mx-auto px-4 py-16">
-        <div className="gaming-card p-8">
+      <div className="max-w-lg mx-auto px-4 py-8 sm:py-16" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
+        <div className="gaming-card p-5 sm:p-8">
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-6 sm:mb-8">
             <AnimatedGamentLogo size="lg" showLabel className="mb-6" />
             <h1 className="text-2xl font-bold neon-text-purple">{t.auth.loginTitle}</h1>
             <p className="text-gray-400 mt-1">{t.auth.loginSubtitle}</p>

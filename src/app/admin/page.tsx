@@ -169,7 +169,7 @@ export default function AdminPage() {
       </div>
       <Navbar />
 
-      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-8">
+      <main className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
         <section className="admin-hero gaming-card p-6 sm:p-8 mb-8 border-neon-purple/20 overflow-hidden relative">
           <div className="absolute -top-16 -left-16 w-48 h-48 rounded-full bg-neon-purple/20 blur-3xl animate-pulse" />
           <div className="absolute -bottom-16 -right-16 w-48 h-48 rounded-full bg-neon-blue/10 blur-3xl" />

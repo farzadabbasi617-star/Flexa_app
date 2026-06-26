@@ -74,7 +74,7 @@ export default function ProfileSecurityPage() {
   return (
     <div className="min-h-screen bg-dark-900 text-white">
       <Navbar />
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
+      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "var(--bottom-nav-space)" }}>
         <Link href="/profile" className="text-gray-500 hover:text-white text-sm">← بازگشت به پروفایل</Link>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mt-5 mb-6">
           <div>

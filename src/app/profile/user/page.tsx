@@ -167,7 +167,7 @@ export default function UserProfileSettingsPage() {
         <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-purple-700/20 blur-[80px]" />
       </div>
 
-      <main className="relative z-10 max-w-[620px] mx-auto px-5 py-8 pb-28" dir="rtl">
+      <main className="relative z-10 max-w-[620px] mx-auto px-4 sm:px-5 py-6 sm:py-8" style={{ paddingBottom: "var(--bottom-nav-space)" }} dir="rtl">
         <Link href="/profile" className="inline-flex items-center gap-2 text-xs text-gray-400 hover:text-white mb-5">← بازگشت به تنظیمات</Link>
 
         <header className="text-right mb-6">
@@ -179,7 +179,7 @@ export default function UserProfileSettingsPage() {
           <p className="text-xs text-gray-500 mt-1 leading-6">نام نمایشی، آواتار، آیدی بازی‌ها و اتصال تلگرام</p>
         </header>
 
-        <section className="glass-panel rounded-[38px] p-6 border border-white/5 mb-6">
+        <section className="glass-panel rounded-[32px] sm:rounded-[38px] p-4 sm:p-6 border border-white/5 mb-6">
           <div className="flex items-center gap-4 mb-5">
             <div className="p-0.5 rounded-full bg-gradient-to-tr from-[#bc00ff] to-[#00d2ff] shadow-[0_0_20px_rgba(188,0,255,0.35)]">
               <img src={selectedAvatar} alt="Avatar" className="w-20 h-20 rounded-full border-4 border-[#09071f] object-cover bg-black/40" onError={(e) => ((e.target as HTMLImageElement).src = "/icons/profile_icon.png")} />
@@ -259,7 +259,7 @@ export default function UserProfileSettingsPage() {
               <div className="text-[11px] text-gray-300 num-en" dir="ltr">{telegramAccount.telegramUsername ? `@${telegramAccount.telegramUsername}` : `ID: ${telegramAccount.telegramId}`}</div>
             </div>
           ) : (
-            <div className="flex gap-2 mb-4" dir="ltr">
+            <div className="flex flex-col sm:flex-row gap-2 mb-4" dir="ltr">
               <input value={telegramCode} onChange={(e) => setTelegramCode(e.target.value.replace(/\D/g, "").slice(0, 6))} className="flex-1 bg-black/25 border border-white/10 rounded-2xl px-4 py-3 text-center text-lg font-black tracking-[0.35em] outline-none focus:border-cyan-400 num-en" placeholder="123456" inputMode="numeric" maxLength={6} />
               <button onClick={submitTelegramCode} disabled={telegramLoading || telegramCode.replace(/\D/g, "").length !== 6} className="bg-gradient-to-r from-cyan-600 to-blue-600 disabled:opacity-40 px-5 rounded-2xl text-xs font-black shrink-0">اتصال</button>
             </div>

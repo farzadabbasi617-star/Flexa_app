@@ -142,7 +142,7 @@ export default function SupportPage() {
     return (
       <div className="min-h-screen bg-dark-900 text-white">
         <Navbar />
-        <div className="max-w-md mx-auto px-4 py-20 text-center">
+        <div className="max-w-md mx-auto px-4 py-16 text-center" style={{ paddingBottom: "var(--bottom-nav-space)" }}>
           <div className="gaming-card p-8">
             <div className="text-6xl mb-4">🎧</div>
             <h1 className="text-2xl font-black mb-3">برای پشتیبانی وارد شو</h1>
@@ -159,7 +159,7 @@ export default function SupportPage() {
     <div className="min-h-screen bg-[#050508] text-white relative overflow-x-hidden">
       <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_50%_-10%,rgba(92,0,160,.62),transparent_70%)]" />
       <Navbar />
-      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-8 pb-32">
+      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8" style={{ paddingBottom: "var(--bottom-nav-space)" }}>
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-black neon-text-purple">🎧 پشتیبانی گیمنت</h1>
@@ -177,7 +177,7 @@ export default function SupportPage() {
         </div>
 
         {showNew && (
-          <form onSubmit={createTicket} className="gaming-card p-5 mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-slide-up">
+          <form onSubmit={createTicket} className="gaming-card p-4 sm:p-5 mb-6 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-slide-up">
             <select className="gaming-select" value={category} onChange={(e) => setCategory(e.target.value)}>
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
@@ -197,14 +197,14 @@ export default function SupportPage() {
             ))}
           </section>
 
-          <section className="lg:col-span-2 gaming-card p-5 min-h-[540px]">
+          <section className="lg:col-span-2 gaming-card p-4 sm:p-5 min-h-[min(540px,calc(100dvh-190px))]">
             {!selectedTicket ? <div className="text-center text-gray-500 py-24">یک تیکت را انتخاب کن یا تیکت جدید بساز.</div> : (
               <>
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5 border-b border-white/5 pb-4">
                   <div><h2 className="font-black text-xl">{selectedTicket.subject}</h2><p className="text-xs text-gray-500 mt-1">وضعیت: {STATUS_LABELS[selectedTicket.status] || selectedTicket.status}</p></div>
                   {selectedTicket.status !== "closed" && <button onClick={closeTicket} className="px-4 py-2 rounded-xl bg-red-500/10 text-red-300 text-xs font-bold">بستن تیکت</button>}
                 </div>
-                <div className="space-y-3 max-h-[360px] overflow-y-auto mb-4">
+                <div className="space-y-3 max-h-[42dvh] overflow-y-auto overscroll-contain mb-4">
                   {messages.map((msg) => {
                     const mine = msg.senderId === user.id;
                     return (

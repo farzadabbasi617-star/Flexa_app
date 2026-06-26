@@ -30,12 +30,12 @@ export default function ProfileDescriptionsPage() {
         <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-purple-700/20 blur-[80px]" />
       </div>
 
-      <main className="relative z-10 max-w-[760px] mx-auto px-5 py-8 pb-28" dir="rtl">
+      <main className="relative z-10 max-w-[760px] mx-auto px-4 sm:px-5 py-6 sm:py-8" style={{ paddingBottom: "var(--bottom-nav-space)" }} dir="rtl">
         <Link href="/profile" className="inline-flex items-center gap-2 text-xs text-gray-400 hover:text-white mb-5">
           ← بازگشت به تنظیمات
         </Link>
 
-        <header className="glass-panel rounded-[30px] p-6 border border-purple-400/15 mb-6 overflow-hidden relative">
+        <header className="glass-panel rounded-[30px] p-4 sm:p-6 border border-purple-400/15 mb-6 overflow-hidden relative">
           <div className="absolute -top-12 -left-12 w-40 h-40 rounded-full bg-purple-500/20 blur-3xl" />
           <div className="relative text-right">
             <span className="inline-flex mb-3 px-3 py-1 rounded-full bg-purple-500/15 border border-purple-400/20 text-purple-200 text-[10px] font-black">
@@ -54,7 +54,7 @@ export default function ProfileDescriptionsPage() {
           </div>
         </header>
 
-        <section className="glass-panel rounded-[30px] p-6 border border-white/10 mb-6">
+        <section className="glass-panel rounded-[30px] p-4 sm:p-6 border border-white/10 mb-6">
           <h2 className="text-xl sm:text-2xl font-black mb-4">مسابقات کالاف موبایل، فورتنایت و کلش رویال در یک پلتفرم</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-center">
             <div className="rounded-2xl bg-white/5 border border-white/10 p-4"><div className="text-2xl mb-2">🏆</div><div className="text-xs font-black text-gray-300">تورنومنت‌های آنلاین</div></div>

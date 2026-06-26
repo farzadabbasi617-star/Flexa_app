@@ -74,10 +74,10 @@ export default function RegisterPage() {
     <div className="min-h-screen bg-dark-900">
       <Navbar />
 
-      <div className="max-w-lg mx-auto px-4 py-12">
-        <div className="gaming-card p-8">
+      <div className="max-w-lg mx-auto px-4 py-6 sm:py-12" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
+        <div className="gaming-card p-5 sm:p-8">
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-6 sm:mb-8">
             <AnimatedGamentLogo size="lg" showLabel className="mb-6" />
             <h1 className="text-2xl font-bold neon-text-purple">{t.auth.registerTitle}</h1>
             <p className="text-gray-400 mt-1">
