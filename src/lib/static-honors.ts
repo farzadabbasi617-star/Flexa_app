@@ -19,9 +19,47 @@ export type StaticHonor = {
   publishedAt?: string;
   createdAt?: string;
   htmlUrl?: string;
+  galleryImages?: Array<{ src: string; alt: string }>;
 };
 
 export const STATIC_HONORS: StaticHonor[] = [
+  {
+    id: "cod-mobile-season-6-arcade-ltm-rewards-fa",
+    type: "news",
+    icon: "📰",
+    title: "آرکید به کالاف دیوتی موبایل می‌آید؛ مودهای محدود، مأموریت‌های ویژه و جوایز فصل ۶",
+    description: `فصل ۶ کالاف دیوتی موبایل با یک تغییر مهم در لابی و رابط کاربری بخش‌های Multiplayer و Battle Royale همراه است: بخش جدید Arcade. این قابلیت قرار است مودهای محدود زمانی و رویدادهای مرتبط را در یک فضای مرتب‌تر و قابل‌فهم‌تر نمایش دهد تا بازیکن‌ها سریع‌تر بتوانند حالت‌های ویژه فصل را پیدا کنند و سراغ مأموریت‌های مخصوص همان مودها بروند.
+
+در نسخه اول Arcade، تمرکز اصلی روی Limited Time Modes است؛ یعنی مودهایی که برای مدت محدود فعال می‌شوند و معمولاً با چالش‌ها و پاداش‌های خاص همراه هستند. برای فصل ۶، دو مود Plunder Treasure Hunt و Throwable Frenzy به‌عنوان محور اصلی Arcade معرفی شده‌اند. بازیکن‌ها با تجربه این دو حالت می‌توانند مأموریت‌های اختصاصی Arcade را کامل کنند و به بیش از دوازده پاداش مرحله‌ای دسترسی داشته باشند.
+
+از مهم‌ترین جوایز اعلام‌شده می‌توان به Konig - The Wolf، اسکین DRH - Fiercest و Lachman-556 - Catwalker اشاره کرد. این پاداش‌ها مخصوص فعالیت در Arcade هستند و نشان می‌دهند کالاف موبایل قصد دارد در فصل‌های آینده Arcade را به یک بخش جدی‌تر برای رویدادها، چالش‌های کوتاه‌مدت و جایزه‌های اختصاصی تبدیل کند.
+
+در کنار Arcade، چند Draw و Offer قدیمی هم در طول فصل برمی‌گردند. برنامه فعلی شامل The Chariot Draw از ۷ تا ۲۰ جولای، Required Draw از ۱۲ تا ۲۰ جولای، Ion Pulse Mythic Drop از ۱۷ جولای تا پایان فصل، Eternal Divinity Draw از ۱۹ جولای تا پایان فصل، Fuschian Nights Mythic Redux از ۲۴ جولای تا پایان فصل، Power Supply Draw از ۲۶ جولای تا فصل ۷ و Lethal Azure Draw از ۲۸ جولای تا فصل ۷ است.
+
+یکی از نکات مهم این فصل، بازگشت دو Draw محبوب در قالب یک Dual Draw جدید با نام Crimson Moonlight Howl Draw است. این بسته شامل Crimson Cloak Draw و Moonlight Draw می‌شود و طبق برنامه فعلی در تاریخ ۲۱ جولای به وقت UTC فعال خواهد شد. البته مثل همیشه، زمان‌بندی Drawها و پیشنهادها ممکن است در طول فصل تغییر کند.`,
+    summary:
+      "در فصل ۶ کالاف موبایل، بخش جدید Arcade برای مودهای محدود زمانی BR و MP معرفی می‌شود؛ همراه با مأموریت‌های اختصاصی، جوایز ویژه و بازگشت چند Draw محبوب.",
+    highlight: true,
+    image: "/news/codm-season-6-arcade-weapons.jpg",
+    imageAlt: "سلاح‌ها و جوایز فصل ۶ کالاف دیوتی موبایل در بخش Arcade",
+    galleryImages: [
+      { src: "/news/codm-season-6-arcade-action.jpg", alt: "نمایی از گیم‌پلی فصل ۶ کالاف دیوتی موبایل و مودهای Arcade" },
+    ],
+    seoKeywords: [
+      "کالاف دیوتی موبایل فصل ۶",
+      "Call of Duty Mobile Season 6",
+      "Arcade COD Mobile",
+      "Plunder Treasure Hunt",
+      "Throwable Frenzy",
+      "Crimson Moonlight Howl Draw",
+      "جوایز کالاف موبایل",
+      "Gament اخبار کالاف موبایل",
+    ],
+    readTimeMinutes: 5,
+    game: "cod_mobile",
+    publishedAt: "2026-06-26T14:00:00+03:30",
+    createdAt: "2026-06-26T14:00:00+03:30",
+  },
   {
     id: "supercell-store-free-goblin-emote-2026-fa",
     type: "news",

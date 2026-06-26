@@ -24,6 +24,7 @@ interface HonorDetail {
   game?: string;
   publishedAt?: string | null;
   htmlUrl?: string;
+  galleryImages?: Array<{ src: string; alt: string }>;
   likesCount?: number;
   viewsCount?: number;
   likedByMe?: boolean;
@@ -207,6 +208,17 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
                   ))}
                 </article>
               )}
+
+              {honor.galleryImages?.length ? (
+                <div className="grid grid-cols-1 gap-3 mt-6">
+                  {honor.galleryImages.map((image) => (
+                    <figure key={image.src} className="overflow-hidden rounded-[26px] border border-white/10 bg-black/25">
+                      <img src={image.src} alt={image.alt} className="w-full h-auto object-cover" loading="lazy" />
+                      <figcaption className="px-4 py-3 text-[11px] text-gray-400 leading-6">{image.alt}</figcaption>
+                    </figure>
+                  ))}
+                </div>
+              ) : null}
 
               {honor.seoKeywords?.length ? (
                 <div className="flex flex-wrap gap-2 mt-6 pt-5 border-t border-white/10">
