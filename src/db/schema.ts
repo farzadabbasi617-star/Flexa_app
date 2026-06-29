@@ -39,11 +39,40 @@ export const tournamentFormatEnum = pgEnum("tournament_format", [
 ]);
 
 export const transactionTypeEnum = pgEnum("transaction_type", [
-  "deposit", "withdrawal", "tournament_win", "entry_fee", "refund"
+  "deposit", "withdrawal", "tournament_win", "entry_fee", "refund",
+  "store_purchase", "store_payout", "store_escrow_hold", "store_escrow_release", "store_fee"
 ]);
 
 export const transactionStatusEnum = pgEnum("transaction_status", [
   "pending", "completed", "failed", "cancelled"
+]);
+
+// --- STORE / MARKETPLACE ENUMS ---
+export const kycStatusEnum = pgEnum("kyc_status", [
+  "none", "pending", "verified", "rejected"
+]);
+
+export const storeItemKindEnum = pgEnum("store_item_kind", [
+  "currency", "account", "item", "service"
+]);
+
+// Who owns/sells the listing: the platform itself, or a regular user (P2P).
+export const storeListingSourceEnum = pgEnum("store_listing_source", [
+  "official", "user"
+]);
+
+export const storeListingStatusEnum = pgEnum("store_listing_status", [
+  "draft", "pending_review", "active", "paused", "sold_out", "rejected", "archived"
+]);
+
+export const storeOrderStatusEnum = pgEnum("store_order_status", [
+  "pending_payment", // order created, awaiting wallet debit
+  "paid_escrow",     // buyer paid, funds held by platform
+  "delivered",       // seller marked as delivered
+  "completed",       // buyer confirmed -> funds released to seller
+  "disputed",        // buyer/seller opened a dispute
+  "refunded",        // funds returned to buyer
+  "cancelled"        // cancelled before payment / by admin
 ]);
 
 // --- TABLES ---
@@ -734,3 +763,94 @@ export const classifiedScrapeLogs = pgTable("classified_scrape_logs", {
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// =========================================================================
+// STORE / MARKETPLACE
+// =========================================================================
+
+// KYC profiles — required before a user can SELL on the marketplace.
+export const kycProfiles = pgTable("kyc_profiles", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id).unique(),
+  fullName: varchar("full_name", { length: 150 }).notNull(),
+  nationalId: varchar("national_id", { length: 10 }).notNull(),
+  birthDate: varchar("birth_date", { length: 10 }), // YYYY-MM-DD (Jalali or Gregorian as entered)
+  idCardImageUrl: varchar("id_card_image_url", { length: 500 }).notNull(),
+  selfieImageUrl: varchar("selfie_image_url", { length: 500 }).notNull(),
+  status: kycStatusEnum("status").notNull().default("pending"),
+  rejectionReason: text("rejection_reason"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  userIdIdx: uniqueIndex("kyc_profiles_user_id_idx").on(table.userId),
+  nationalIdIdx: index("kyc_profiles_national_id_idx").on(table.nationalId),
+  statusIdx: index("kyc_profiles_status_idx").on(table.status),
+}));
+
+// Store listings — both official (platform-owned) and user (P2P) live here.
+export const storeListings = pgTable("store_listings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  source: storeListingSourceEnum("source").notNull().default("user"),
+  sellerId: uuid("seller_id").references(() => users.id), // null for official listings
+  kind: storeItemKindEnum("kind").notNull(),
+  game: gameEnum("game"), // optional: which game this relates to
+  title: varchar("title", { length: 200 }).notNull(),
+  slug: varchar("slug", { length: 220 }),
+  description: text("description"),
+  // Price stored in RIAL (matches wallets/transactions precision pattern).
+  priceRial: numeric("price_rial", { precision: 20, scale: 0 }).notNull(),
+  // For currency packs: how much in-game currency this represents (e.g. "1000 gems").
+  currencyKind: varchar("currency_kind", { length: 50 }), // gem | cp | uc | vbucks | ...
+  currencyAmount: integer("currency_amount"),
+  // Inventory. For unique account sales this is usually 1.
+  stock: integer("stock").notNull().default(1),
+  soldCount: integer("sold_count").notNull().default(0),
+  images: jsonb("images").notNull().default('[]'),
+  // Account-specific protected details revealed only after a completed order.
+  deliveryNotes: text("delivery_notes"),
+  status: storeListingStatusEnum("status").notNull().default("pending_review"),
+  rejectionReason: text("rejection_reason"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  sellerIdx: index("store_listings_seller_idx").on(table.sellerId),
+  sourceStatusIdx: index("store_listings_source_status_idx").on(table.source, table.status),
+  kindIdx: index("store_listings_kind_idx").on(table.kind),
+  statusCreatedIdx: index("store_listings_status_created_idx").on(table.status, table.createdAt),
+}));
+
+// Orders with escrow lifecycle.
+export const storeOrders = pgTable("store_orders", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  listingId: uuid("listing_id").notNull().references(() => storeListings.id),
+  buyerId: uuid("buyer_id").notNull().references(() => users.id),
+  sellerId: uuid("seller_id").references(() => users.id), // null when buying official goods
+  source: storeListingSourceEnum("source").notNull(),
+  quantity: integer("quantity").notNull().default(1),
+  // Snapshot of pricing at purchase time.
+  unitPriceRial: numeric("unit_price_rial", { precision: 20, scale: 0 }).notNull(),
+  totalPriceRial: numeric("total_price_rial", { precision: 20, scale: 0 }).notNull(),
+  platformFeeRial: numeric("platform_fee_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  sellerPayoutRial: numeric("seller_payout_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  status: storeOrderStatusEnum("status").notNull().default("pending_payment"),
+  // Transaction references for auditing the escrow flow.
+  holdTxId: uuid("hold_tx_id"),
+  releaseTxId: uuid("release_tx_id"),
+  refundTxId: uuid("refund_tx_id"),
+  deliveredAt: timestamp("delivered_at"),
+  completedAt: timestamp("completed_at"),
+  buyerNote: text("buyer_note"),
+  disputeReason: text("dispute_reason"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  buyerIdx: index("store_orders_buyer_idx").on(table.buyerId),
+  sellerIdx: index("store_orders_seller_idx").on(table.sellerId),
+  listingIdx: index("store_orders_listing_idx").on(table.listingId),
+  statusIdx: index("store_orders_status_idx").on(table.status),
+}));
