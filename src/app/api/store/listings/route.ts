@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const kind = searchParams.get("kind");
+    const currencyKind = searchParams.get("currencyKind"); // gem | cp | uc | vbucks | ...
     const game = searchParams.get("game");
     const source = searchParams.get("source"); // official | user
     const page = Math.max(1, Number(searchParams.get("page") || "1"));
@@ -23,6 +24,11 @@ export async function GET(request: NextRequest) {
 
     const conditions = [eq(storeListings.status, "active")];
     if (kind) conditions.push(eq(storeListings.kind, kind as never));
+    if (currencyKind) {
+      // Currency-kind filter implies currency items.
+      conditions.push(eq(storeListings.kind, "currency"));
+      conditions.push(eq(storeListings.currencyKind, currencyKind));
+    }
     if (game) conditions.push(eq(storeListings.game, game as never));
     if (source === "official" || source === "user") {
       conditions.push(eq(storeListings.source, source));

@@ -22,13 +22,25 @@ interface Listing {
   sellerName: string | null;
 }
 
-const KINDS: Array<{ id: "all" | Kind; label: string; icon: string }> = [
-  { id: "all", label: "همه", icon: "🛍️" },
-  { id: "currency", label: "ارز داخل بازی", icon: "💎" },
-  { id: "account", label: "اکانت بازی", icon: "🎮" },
-  { id: "item", label: "آیتم", icon: "🎁" },
-  { id: "service", label: "خدمات", icon: "⚙️" },
+// A unified filter. Currency types (gem/cp/uc/vbucks/...) are shown as their own
+// chips so users immediately understand what they're browsing, while non-currency
+// kinds (account/item/service) sit alongside them.
+type FilterId = "all" | "gem" | "cp" | "uc" | "vbucks" | "account" | "item" | "service";
+
+const FILTERS: Array<{ id: FilterId; label: string; icon: string; param: "kind" | "currencyKind" | null }> = [
+  { id: "all", label: "همه", icon: "🛍️", param: null },
+  { id: "gem", label: "جم (Gem)", icon: "💎", param: "currencyKind" },
+  { id: "uc", label: "UC", icon: "🔷", param: "currencyKind" },
+  { id: "cp", label: "CP", icon: "🟡", param: "currencyKind" },
+  { id: "vbucks", label: "وی‌باکس (V-Bucks)", icon: "🟣", param: "currencyKind" },
+  { id: "account", label: "اکانت بازی", icon: "🎮", param: "kind" },
+  { id: "item", label: "آیتم", icon: "🎁", param: "kind" },
+  { id: "service", label: "خدمات", icon: "⚙️", param: "kind" },
 ];
+
+const KIND_ICONS: Record<string, string> = {
+  currency: "💎", account: "🎮", item: "🎁", service: "⚙️",
+};
 
 const SOURCES: Array<{ id: "all" | Source; label: string }> = [
   { id: "all", label: "همه" },
@@ -47,7 +59,7 @@ function toman(n: number) {
 export default function StorePage() {
   const [items, setItems] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
-  const [kind, setKind] = useState<"all" | Kind>("all");
+  const [filter, setFilter] = useState<FilterId>("all");
   const [source, setSource] = useState<"all" | Source>("all");
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -55,7 +67,8 @@ export default function StorePage() {
   const load = useCallback(async () => {
     setLoading(true);
     const params = new URLSearchParams();
-    if (kind !== "all") params.set("kind", kind);
+    const active = FILTERS.find((f) => f.id === filter);
+    if (active && active.param) params.set(active.param, filter);
     if (source !== "all") params.set("source", source);
     try {
       const res = await fetch(`/api/store/listings?${params.toString()}`, { cache: "no-store" });
@@ -66,7 +79,7 @@ export default function StorePage() {
     } finally {
       setLoading(false);
     }
-  }, [kind, source]);
+  }, [filter, source]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -115,7 +128,7 @@ export default function StorePage() {
             <div>
               <h1 className="text-3xl font-black sm:text-4xl">🛒 فروشگاه گیمنت</h1>
               <p className="mt-2 text-sm text-gray-400">
-                خرید و فروش امن ارز داخل بازی، اکانت و آیتم — با پرداخت امانی (اسکرو)
+                خرید و فروش امن جم، UC، CP، وی‌باکس، اکانت و آیتم بازی‌ها — با پرداخت امانی (اسکرو)
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -133,15 +146,15 @@ export default function StorePage() {
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
         {/* Filters */}
         <div className="mb-5 flex flex-wrap gap-2">
-          {KINDS.map((k) => (
+          {FILTERS.map((f) => (
             <button
-              key={k.id}
-              onClick={() => setKind(k.id)}
+              key={f.id}
+              onClick={() => setFilter(f.id)}
               className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
-                kind === k.id ? "bg-purple-600 text-white" : "border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"
+                filter === f.id ? "bg-purple-600 text-white" : "border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"
               }`}
             >
-              <span className="ml-1">{k.icon}</span> {k.label}
+              <span className="ml-1">{f.icon}</span> {f.label}
             </button>
           ))}
         </div>
@@ -181,7 +194,7 @@ export default function StorePage() {
                     <img src={it.images[0]} alt={it.title} className="h-full w-full object-cover" />
                   ) : (
                     <div className="grid h-full w-full place-items-center text-5xl opacity-60">
-                      {KINDS.find((k) => k.id === it.kind)?.icon || "🛍️"}
+                      {KIND_ICONS[it.kind] || "🛍️"}
                     </div>
                   )}
                   <span className={`absolute right-2 top-2 rounded-full px-2 py-0.5 text-[10px] font-black ${
@@ -192,10 +205,10 @@ export default function StorePage() {
                 </Link>
                 <div className="flex flex-1 flex-col p-3">
                   <Link href={`/store/${it.id}`} className="line-clamp-2 text-sm font-black leading-6 hover:text-purple-200">{it.title}</Link>
-                  {it.kind === "currency" && it.currencyAmount && (
-                    <p className="mt-1 text-xs text-purple-300">
-                      {it.currencyAmount.toLocaleString("fa-IR")} {CURRENCY_LABELS[it.currencyKind || "other"]}
-                    </p>
+                  {it.kind === "currency" && (
+                    <span className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-full bg-purple-500/20 px-2 py-0.5 text-[11px] font-black text-purple-200 ring-1 ring-purple-400/30">
+                      💎 {it.currencyAmount ? `${it.currencyAmount.toLocaleString("fa-IR")} ` : ""}{CURRENCY_LABELS[it.currencyKind || "other"]}
+                    </span>
                   )}
                   {it.source === "user" && it.sellerName && (
                     <p className="mt-1 text-[10px] text-gray-500">فروشنده: {it.sellerName}</p>

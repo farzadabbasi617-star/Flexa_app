@@ -135,7 +135,11 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           {/* Details */}
           <div>
             <div className="flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full bg-white/10 px-3 py-1 font-bold">{KIND_LABELS[listing.kind] || listing.kind}</span>
+              <span className="rounded-full bg-white/10 px-3 py-1 font-bold">
+                {listing.kind === "currency"
+                  ? CURRENCY_LABELS[listing.currencyKind || "other"]
+                  : KIND_LABELS[listing.kind] || listing.kind}
+              </span>
               {listing.game && <span className="rounded-full bg-white/10 px-3 py-1 font-bold">{GAME_LABELS[listing.game] || listing.game}</span>}
             </div>
 
