@@ -23,6 +23,7 @@ export const ADMIN_PERMISSIONS = [
   "settings",
   "uploads",
   "maintenance",
+  "store",
 ] as const;
 
 export type AdminPermission = (typeof ADMIN_PERMISSIONS)[number];
@@ -45,6 +46,7 @@ export const PERMISSION_LABELS: Record<AdminPermission, string> = {
   settings: "تنظیمات سایت",
   uploads: "آپلود فایل",
   maintenance: "نگهداری سیستم",
+  store: "فروشگاه و مارکت‌پلیس",
 };
 
 export function isKnownPermission(value: string): value is AdminPermission {

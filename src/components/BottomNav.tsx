@@ -14,6 +14,7 @@ interface SiteImage {
 const navItems = [
   { id: "arena", label: "آرنا", icon: "🔥", path: "/" },
   { id: "rankings", label: "رتبه‌ها", icon: "👑", path: "/leaderboard" },
+  { id: "store", label: "فروشگاه", icon: "🛒", path: "/store" },
   { id: "honors", label: "تالار", icon: "🏆", path: "/honors" },
   { id: "profile", label: "پروفایل", icon: "⚙️", path: "/profile" },
 ];
