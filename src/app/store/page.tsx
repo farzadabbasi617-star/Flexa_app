@@ -27,15 +27,23 @@ interface Listing {
 // kinds (account/item/service) sit alongside them.
 type FilterId = "all" | "gem" | "cp" | "uc" | "vbucks" | "account" | "item" | "service";
 
-const FILTERS: Array<{ id: FilterId; label: string; icon: string; param: "kind" | "currencyKind" | null }> = [
-  { id: "all", label: "همه", icon: "🛍️", param: null },
-  { id: "gem", label: "جم (Gem)", icon: "💎", param: "currencyKind" },
-  { id: "uc", label: "UC", icon: "🔷", param: "currencyKind" },
-  { id: "cp", label: "CP", icon: "🟡", param: "currencyKind" },
-  { id: "vbucks", label: "وی‌باکس (V-Bucks)", icon: "🟣", param: "currencyKind" },
-  { id: "account", label: "اکانت بازی", icon: "🎮", param: "kind" },
-  { id: "item", label: "آیتم", icon: "🎁", param: "kind" },
-  { id: "service", label: "خدمات", icon: "⚙️", param: "kind" },
+// Per-currency image icons (square 96x96, center-cropped) for crisp, uniform display.
+const CURRENCY_ICONS: Record<string, string> = {
+  gem: "/icons/currencies/gem.png",
+  uc: "/icons/currencies/uc.png",
+  cp: "/icons/currencies/cp.png",
+  vbucks: "/icons/currencies/vbucks.png",
+};
+
+const FILTERS: Array<{ id: FilterId; label: string; emoji: string; img?: string; param: "kind" | "currencyKind" | null }> = [
+  { id: "all", label: "همه", emoji: "🛍️", param: null },
+  { id: "gem", label: "جم (Gem)", emoji: "💎", img: CURRENCY_ICONS.gem, param: "currencyKind" },
+  { id: "uc", label: "UC", emoji: "🔷", img: CURRENCY_ICONS.uc, param: "currencyKind" },
+  { id: "cp", label: "CP", emoji: "🟡", img: CURRENCY_ICONS.cp, param: "currencyKind" },
+  { id: "vbucks", label: "وی‌باکس (V-Bucks)", emoji: "🟣", img: CURRENCY_ICONS.vbucks, param: "currencyKind" },
+  { id: "account", label: "اکانت بازی", emoji: "🎮", param: "kind" },
+  { id: "item", label: "آیتم", emoji: "🎁", param: "kind" },
+  { id: "service", label: "خدمات", emoji: "⚙️", param: "kind" },
 ];
 
 const KIND_ICONS: Record<string, string> = {
@@ -150,11 +158,17 @@ export default function StorePage() {
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${
+              className={`flex items-center gap-2 rounded-2xl py-2 pl-4 pr-2.5 text-sm font-bold transition ${
                 filter === f.id ? "bg-purple-600 text-white" : "border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"
               }`}
             >
-              <span className="ml-1">{f.icon}</span> {f.label}
+              {f.img ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={f.img} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" />
+              ) : (
+                <span className="inline-grid h-6 w-6 shrink-0 place-items-center text-base">{f.emoji}</span>
+              )}
+              <span>{f.label}</span>
             </button>
           ))}
         </div>
@@ -206,8 +220,14 @@ export default function StorePage() {
                 <div className="flex flex-1 flex-col p-3">
                   <Link href={`/store/${it.id}`} className="line-clamp-2 text-sm font-black leading-6 hover:text-purple-200">{it.title}</Link>
                   {it.kind === "currency" && (
-                    <span className="mt-1.5 inline-flex w-fit items-center gap-1 rounded-full bg-purple-500/20 px-2 py-0.5 text-[11px] font-black text-purple-200 ring-1 ring-purple-400/30">
-                      💎 {it.currencyAmount ? `${it.currencyAmount.toLocaleString("fa-IR")} ` : ""}{CURRENCY_LABELS[it.currencyKind || "other"]}
+                    <span className="mt-1.5 inline-flex w-fit items-center gap-1.5 rounded-full bg-purple-500/20 py-0.5 pl-2.5 pr-1 text-[11px] font-black text-purple-200 ring-1 ring-purple-400/30">
+                      {CURRENCY_ICONS[it.currencyKind || ""] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={CURRENCY_ICONS[it.currencyKind || ""]} alt="" className="h-4 w-4 shrink-0 rounded object-cover" />
+                      ) : (
+                        <span>💎</span>
+                      )}
+                      {it.currencyAmount ? `${it.currencyAmount.toLocaleString("fa-IR")} ` : ""}{CURRENCY_LABELS[it.currencyKind || "other"]}
                     </span>
                   )}
                   {it.source === "user" && it.sellerName && (

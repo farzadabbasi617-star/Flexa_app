@@ -30,6 +30,12 @@ const GAME_LABELS: Record<string, string> = {
 const CURRENCY_LABELS: Record<string, string> = {
   gem: "جم", cp: "CP", uc: "UC", vbucks: "وی‌باکس", coin: "سکه", gold: "طلا", other: "ارز",
 };
+const CURRENCY_ICONS: Record<string, string> = {
+  gem: "/icons/currencies/gem.png",
+  uc: "/icons/currencies/uc.png",
+  cp: "/icons/currencies/cp.png",
+  vbucks: "/icons/currencies/vbucks.png",
+};
 
 function toman(n: number) { return `${n.toLocaleString("fa-IR")} تومان`; }
 
@@ -135,7 +141,11 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
           {/* Details */}
           <div>
             <div className="flex flex-wrap gap-2 text-xs">
-              <span className="rounded-full bg-white/10 px-3 py-1 font-bold">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 py-1 pl-3 pr-1.5 font-bold">
+                {listing.kind === "currency" && CURRENCY_ICONS[listing.currencyKind || ""] && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={CURRENCY_ICONS[listing.currencyKind || ""]} alt="" className="h-5 w-5 shrink-0 rounded object-cover" />
+                )}
                 {listing.kind === "currency"
                   ? CURRENCY_LABELS[listing.currencyKind || "other"]
                   : KIND_LABELS[listing.kind] || listing.kind}
