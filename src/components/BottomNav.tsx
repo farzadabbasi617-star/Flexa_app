@@ -11,13 +11,22 @@ interface SiteImage {
   altText?: string | null;
 }
 
+// Arena sits in the MIDDLE on purpose and is rendered as a raised, bold,
+// highlighted button. The other four flank it (two on each side).
 const navItems = [
-  { id: "arena", label: "آرنا", icon: "🔥", path: "/" },
   { id: "rankings", label: "رتبه‌ها", icon: "👑", path: "/leaderboard" },
   { id: "store", label: "فروشگاه", icon: "🛒", path: "/store" },
+  { id: "arena", label: "آرنا", icon: "🔥", path: "/", center: true },
   { id: "honors", label: "تالار", icon: "🏆", path: "/honors" },
   { id: "profile", label: "پروفایل", icon: "⚙️", path: "/profile" },
 ];
+
+const customIcons: Record<string, string> = {
+  arena: "/icons/arena_icon.png",
+  rankings: "/icons/rankings_icon.png",
+  honors: "/icons/honors_icon.png",
+  profile: "/icons/settings_icon.png",
+};
 
 export default function BottomNav() {
   const pathname = usePathname();
@@ -42,25 +51,57 @@ export default function BottomNav() {
       style={{ paddingBottom: "max(10px, env(safe-area-inset-bottom))" }}
       aria-label="ناوبری اصلی موبایل"
     >
-      <div className="glass-bottom pointer-events-auto rounded-[24px] px-1.5 py-2.5 flex justify-around items-center border border-white/10 shadow-[0_-12px_35px_rgba(0,0,0,0.7)]">
+      {/* Extra top padding so the raised center (Arena) button can overflow above the bar. */}
+      <div className="glass-bottom pointer-events-auto relative flex items-end justify-around rounded-[24px] border border-white/10 px-1.5 pt-2.5 pb-2.5 shadow-[0_-12px_35px_rgba(0,0,0,0.7)]">
         {navItems.map((item) => {
           const isActive = item.path === "/" ? pathname === "/" : pathname.startsWith(item.path);
           const imageIcon = iconMap[`icon-${item.id}`];
-          const customIcons: Record<string, string> = {
-            arena: "/icons/arena_icon.png",
-            rankings: "/icons/rankings_icon.png",
-            honors: "/icons/honors_icon.png",
-            profile: "/icons/settings_icon.png",
-          };
           const finalIconUrl = customIcons[item.id] || imageIcon?.url;
 
+          // ----- Center (Arena): raised, bold, highlighted -----
+          if (item.center) {
+            return (
+              <Link
+                key={item.id}
+                href={item.path}
+                aria-current={isActive ? "page" : undefined}
+                className="group relative -mt-8 flex min-w-[72px] flex-col items-center justify-center"
+              >
+                <span
+                  className={`flex h-16 w-16 items-center justify-center rounded-full border-4 border-[#0d0d14] bg-gradient-to-br from-purple-500 to-fuchsia-600 shadow-[0_8px_28px_rgba(168,85,247,0.55)] transition-all group-active:scale-95 ${
+                    isActive ? "ring-2 ring-purple-300/70" : ""
+                  }`}
+                >
+                  {finalIconUrl ? (
+                    <img
+                      src={finalIconUrl}
+                      alt=""
+                      aria-hidden="true"
+                      className="h-9 w-9 rounded-xl object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.45)]"
+                    />
+                  ) : (
+                    <span className="text-[30px] drop-shadow-[0_0_10px_rgba(255,255,255,0.45)]">{item.icon}</span>
+                  )}
+                </span>
+                <span
+                  className={`mt-1 text-[11px] font-black leading-none ${
+                    isActive ? "text-purple-100" : "text-purple-200/90"
+                  }`}
+                >
+                  {item.label}
+                </span>
+              </Link>
+            );
+          }
+
+          // ----- Regular tabs -----
           return (
             <Link
               key={item.id}
               href={item.path}
               aria-current={isActive ? "page" : undefined}
-              className={`min-w-[64px] min-h-[56px] rounded-2xl flex flex-col items-center justify-center gap-0.5 px-2 transition-all active:scale-95 ${
-                isActive ? "text-purple-200 bg-purple-500/10" : "text-white/38 hover:text-white/70"
+              className={`flex min-h-[56px] min-w-[60px] flex-col items-center justify-center gap-0.5 rounded-2xl px-2 transition-all active:scale-95 ${
+                isActive ? "bg-purple-500/10 text-purple-200" : "text-white/38 hover:text-white/70"
               }`}
             >
               {finalIconUrl ? (
@@ -68,12 +109,12 @@ export default function BottomNav() {
                   src={finalIconUrl}
                   alt=""
                   aria-hidden="true"
-                  className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl object-contain ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : "opacity-60"}`}
+                  className={`h-7 w-7 rounded-xl object-contain sm:h-8 sm:w-8 ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : "opacity-60"}`}
                 />
               ) : (
                 <div className={`text-[24px] ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : ""}`}>{item.icon}</div>
               )}
-              <span className="text-[9px] font-black leading-none mt-1 max-w-[58px] truncate">{item.label}</span>
+              <span className="mt-1 max-w-[58px] truncate text-[9px] font-black leading-none">{item.label}</span>
             </Link>
           );
         })}

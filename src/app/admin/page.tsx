@@ -239,6 +239,7 @@ export default function AdminPage() {
               { href: "/admin/judgments", icon: "⚖️", title: "مدیریت داوری‌ها", desc: "ثبت و بررسی داوری دستی و هوش مصنوعی" },
               { href: "/admin/disputes", icon: "🚨", title: "مرکز اعتراضات", desc: "پاسخ رسمی، حل‌وفصل، رد یا حذف اعتراضات" },
               { href: "/admin/wallets", icon: "💳", title: "کیف پول کاربران", desc: "مشاهده موجودی کاربران و اصلاح دستی با لاگ مدیریتی" },
+              { href: "/admin/store", icon: "🛒", title: "مدیریت فروشگاه", desc: "تأیید احراز هویت فروشندگان، بررسی آگهی‌ها و حل اختلافات سفارش" },
               { href: "/admin/finance", icon: "📈", title: "گزارش مالی", desc: "گزارش تراکنش‌ها، موجودی‌ها، ورودی‌ها، خروجی‌ها و CSV" },
               { href: "/admin/prizes", icon: "🏆", title: "پرداخت جایزه", desc: "واریز جایزه تورنومنت به کیف پول برنده‌ها" },
               { href: "#telegram", icon: "⚡", title: "پیش‌ثبت‌نام تلگرام", desc: "مشاهده لیدهای ربات، Gament ID، آیدی بازی، شماره تماس و وضعیت پیگیری" },
