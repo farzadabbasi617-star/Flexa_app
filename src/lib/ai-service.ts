@@ -6,8 +6,8 @@ import { gamentSystemPrompt } from "./ai-prompts";
 export interface AssistantAIResponse {
   response: string;
   suggestions: string[];
-  provider: "openrouter" | "groq" | "cache" | "local";
-  cachedProvider?: "openrouter" | "groq";
+  provider: "openrouter" | "groq" | "huggingface" | "cache" | "local";
+  cachedProvider?: "openrouter" | "groq" | "huggingface";
 }
 
 /**

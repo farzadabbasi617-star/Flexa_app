@@ -1,7 +1,7 @@
 import { aiCache } from "./ai-cache";
 import logger from "@/lib/logger";
 
-type AIProvider = "openrouter" | "groq";
+type AIProvider = "openrouter" | "groq" | "huggingface";
 
 export interface AIProviderResult {
   content: string;
@@ -32,11 +32,14 @@ export function isUsableAISecret(value: string) {
   return Boolean(value && !value.includes("your_") && value.length > 12);
 }
 
+type ApiKeyEnv = "OPENROUTER_API_KEY" | "GROQ_API_KEY" | "HUGGINGFACE_API_KEY";
+type ModelEnv = "OPENROUTER_MODEL" | "GROQ_MODEL" | "HUGGINGFACE_MODEL";
+
 const PROVIDERS: Array<{
   id: AIProvider;
   url: string;
-  apiKeyEnv: "OPENROUTER_API_KEY" | "GROQ_API_KEY";
-  modelEnv: "OPENROUTER_MODEL" | "GROQ_MODEL";
+  apiKeyEnv: ApiKeyEnv;
+  modelEnv: ModelEnv;
   defaultModels: string[];
 }> = [
   {
@@ -57,6 +60,19 @@ const PROVIDERS: Array<{
     apiKeyEnv: "GROQ_API_KEY",
     modelEnv: "GROQ_MODEL",
     defaultModels: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "gemma2-9b-it"],
+  },
+  {
+    // HuggingFace Inference Router exposes an OpenAI-compatible chat endpoint,
+    // so it slots into the same messages/Bearer flow as the others.
+    id: "huggingface",
+    url: "https://router.huggingface.co/v1/chat/completions",
+    apiKeyEnv: "HUGGINGFACE_API_KEY",
+    modelEnv: "HUGGINGFACE_MODEL",
+    defaultModels: [
+      "meta-llama/Llama-3.3-70B-Instruct",
+      "Qwen/Qwen2.5-72B-Instruct",
+      "meta-llama/Llama-3.1-8B-Instruct",
+    ],
   },
 ];
 
@@ -157,7 +173,10 @@ async function callProvider(
 }
 
 /**
- * Multi-provider AI call with OpenRouter as primary and Groq as failover.
+ * Multi-provider AI call with automatic failover:
+ * OpenRouter (primary) -> Groq -> HuggingFace. Each provider tries its own list
+ * of models in order, so any model/provider error transparently switches to the
+ * next available one.
  * Supports an optional imageUrl parameter for multimodal analysis (like verifying match screenshots!).
  */
 export async function fetchAIResponse(
