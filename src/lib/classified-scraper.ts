@@ -151,7 +151,7 @@ function getProxyUrl() {
   return process.env.CLASSIFIED_PROXY_URL?.trim() || null;
 }
 
-async function fetchHtml(url: string, retries = 2): Promise<string | null> {
+export async function fetchHtml(url: string, retries = 2): Promise<string | null> {
   const proxyUrl = getProxyUrl();
   const finalUrl = proxyUrl ? `${proxyUrl}?url=${encodeURIComponent(url)}` : url;
 

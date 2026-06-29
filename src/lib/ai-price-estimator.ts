@@ -8,8 +8,8 @@
 //  4. If AI is unavailable or returns nothing usable, fall back to the
 //     deterministic formula (count * unit price).
 
-import { askOpenRouter } from "@/lib/openrouter";
-import { scrapeDivarCity, scrapeSheypoorCity, type ScrapedAd } from "@/lib/classified-scraper";
+import { fetchAIResponse } from "@/lib/ai-provider-manager";
+import { gatherComparables, comparablesToText, type Comparable } from "@/lib/market-comparables";
 import {
   ESTIMATOR_FIELDS,
   computeEstimate,
@@ -23,13 +23,6 @@ const GAME_LABEL: Record<EstimatorGame, string> = {
   fortnite: "فورتنایت (Fortnite)",
 };
 
-// Search queries tuned per game to surface comparable account listings.
-const MARKET_QUERY: Record<EstimatorGame, string> = {
-  cod_mobile: "اکانت کالاف دیوتی موبایل",
-  clash_royale: "اکانت کلش رویال",
-  fortnite: "اکانت فورتنایت",
-};
-
 export interface AiEstimateResult {
   priceToman: number;
   /** Fair range to display (min/max around the point estimate). */
@@ -39,6 +32,10 @@ export interface AiEstimateResult {
   /** "ai" when the model produced the price, "formula" when it fell back. */
   source: "ai" | "formula";
   comparablesCount: number;
+  /** Distinct market sources the comparables came from (divar, sheypoor, torob, ...). */
+  sources: string[];
+  /** Which AI provider/model produced the price (for transparency). */
+  aiModel?: string;
 }
 
 /** Turn the entered numeric stats into a readable Persian description. */
@@ -51,36 +48,6 @@ function describeAccount(game: EstimatorGame, values: Record<string, number>): s
     }
   }
   return lines.length ? lines.join("\n") : "- اطلاعاتی وارد نشده است";
-}
-
-/** Fetch a handful of comparable market ads (best-effort; never throws). */
-async function fetchComparables(game: EstimatorGame, limit = 8): Promise<ScrapedAd[]> {
-  const query = MARKET_QUERY[game];
-  const results: ScrapedAd[] = [];
-  try {
-    // Tehran tends to have the most listings; keep it to one city for speed.
-    const divar = await scrapeDivarCity("tehran", { limit, query }).catch(() => []);
-    results.push(...divar);
-  } catch (err) {
-    logger.warn({ err, game }, "Divar comparables fetch failed");
-  }
-  if (results.length < 4) {
-    try {
-      const sheypoor = await scrapeSheypoorCity("tehran", { limit, query }).catch(() => []);
-      results.push(...sheypoor);
-    } catch (err) {
-      logger.warn({ err, game }, "Sheypoor comparables fetch failed");
-    }
-  }
-  // Only keep ads that actually have a price (useful as a comparable).
-  return results.filter((a) => a.price).slice(0, limit);
-}
-
-function comparablesToText(ads: ScrapedAd[]): string {
-  if (!ads.length) return "هیچ آگهی مشابهی در حال حاضر یافت نشد.";
-  return ads
-    .map((a, i) => `${i + 1}. ${a.title}${a.price ? ` — قیمت: ${a.price}` : ""}${a.description ? `\n   ${a.description.slice(0, 160)}` : ""}`)
-    .join("\n");
 }
 
 /** Extract the first integer Toman value from a free-form AI text. */
@@ -110,46 +77,58 @@ export async function estimateAccountPrice(params: {
   const formulaRial = computeEstimate(game, values, unitPrices);
   const formulaToman = Number(formulaRial / BigInt(10));
 
-  const fallback = (): AiEstimateResult => ({
+  const fallback = (extra?: Partial<AiEstimateResult>): AiEstimateResult => ({
     priceToman: formulaToman,
     minToman: Math.round(formulaToman * 0.85),
     maxToman: Math.round(formulaToman * 1.15),
     rationale: "این قیمت بر اساس فرمول پایه‌ی پلتفرم محاسبه شده است (ارزیابی هوشمند در دسترس نبود).",
     source: "formula",
     comparablesCount: 0,
+    sources: [],
+    ...extra,
   });
 
   try {
-    const comparables = await fetchComparables(game);
+    // Gather comparables from many Iranian sources (Divar, Sheypoor, Torob, shops).
+    const comparables: Comparable[] = await gatherComparables(game).catch(() => []);
+    const sources = [...new Set(comparables.map((c) => c.source))];
     const accountDesc = describeAccount(game, values);
 
     const systemPrompt =
-      `تو یک کارشناس قیمت‌گذاری اکانت‌های بازی موبایل در بازار ایران هستی. ` +
-      `وظیفه‌ات این است که با توجه به مشخصات اکانت و قیمت آگهی‌های واقعی و روز بازار (دیوار و شیپور)، ` +
-      `یک قیمت منصفانه و واقع‌بینانه به تومان تعیین کنی. ` +
-      `قیمت‌ها در ایران به تومان است. زیادی خوش‌بینانه یا بدبینانه قیمت نده؛ منصفانه و مطابق بازار روز باش. ` +
+      `تو یک کارشناس حرفه‌ای قیمت‌گذاری اکانت‌های بازی موبایل در بازار ایران هستی. ` +
+      `وظیفه‌ات این است که با توجه به مشخصات دقیق اکانت و قیمت آگهی‌های واقعی و روز در بازار ایران ` +
+      `(از جمله دیوار، شیپور، ترب و فروشگاه‌های تخصصی فروش اکانت)، یک قیمت منصفانه، دقیق و واقع‌بینانه به تومان تعیین کنی. ` +
+      `ارزش هر آیتم، لول اکانت، میزان ارز داخل‌بازی و کمیاب‌بودن آیتم‌ها را در نظر بگیر و با اکانت‌های هم‌رده و هم‌لول مقایسه کن. ` +
+      `قیمت‌ها در ایران به تومان است. زیادی خوش‌بینانه یا بدبینانه نباش؛ دقیقاً مطابق بازار روز قیمت بده. ` +
       `حتماً در همان ابتدای پاسخ، در یک خط، فقط به این شکل قیمت را بده: PRICE: <عدد تومان بدون جداکننده>. ` +
-      `سپس در ۲ تا ۴ جمله‌ی کوتاه فارسی دلیل قیمت را توضیح بده.`;
+      `سپس در ۲ تا ۴ جمله‌ی کوتاه فارسی دلیل قیمت را توضیح بده و در صورت امکان به مقایسه با بازار اشاره کن.`;
 
     const userPrompt =
       `بازی: ${GAME_LABEL[game]}\n\n` +
       `مشخصات اکانت برای فروش:\n${accountDesc}\n\n` +
-      `قیمت پایه‌ی تخمینی پلتفرم (صرفاً برای مرجع): ${formulaToman.toLocaleString("fa-IR")} تومان\n\n` +
-      `آگهی‌های واقعی و مشابه از بازار (دیوار/شیپور):\n${comparablesToText(comparables)}\n\n` +
-      `حالا یک قیمت منصفانه و مطابق بازار روز برای این اکانت تعیین کن.`;
+      `قیمت پایه‌ی تخمینی پلتفرم (صرفاً برای مرجع، نه لزوماً درست): ${formulaToman.toLocaleString("fa-IR")} تومان\n\n` +
+      `آگهی‌ها و قیمت‌های واقعی و روز از بازار ایران (${sources.join("، ") || "بدون داده"}):\n${comparablesToText(comparables)}\n\n` +
+      `با تکیه بر این داده‌های واقعی بازار، یک قیمت منصفانه و دقیق برای این اکانت تعیین کن.`;
 
-    const aiText = await askOpenRouter(userPrompt, systemPrompt);
-    if (!aiText) return fallback();
+    // Uses the project's multi-provider auto-switch (OpenRouter models -> Groq).
+    const ai = await fetchAIResponse(userPrompt, systemPrompt);
+    const aiText = ai?.content;
+    if (!aiText) return fallback({ comparablesCount: comparables.length, sources });
 
+    const aiModel = ai?.model ? `${ai.provider}/${ai.model}` : ai?.provider;
     const aiPrice = parseTomanFromText(aiText);
     if (!aiPrice) {
-      // AI replied but no parseable number — keep the text as rationale but use formula number.
-      const fb = fallback();
-      return { ...fb, rationale: aiText.slice(0, 600), source: "formula", comparablesCount: comparables.length };
+      return fallback({
+        rationale: aiText.slice(0, 600),
+        comparablesCount: comparables.length,
+        sources,
+        aiModel,
+      });
     }
 
     // Strip the leading "PRICE: ..." line from the rationale shown to users.
-    const rationale = aiText.replace(/^.*PRICE\s*[:=].*$/im, "").trim().slice(0, 600) ||
+    const rationale =
+      aiText.replace(/^.*PRICE\s*[:=].*$/im, "").trim().slice(0, 600) ||
       "قیمت بر اساس ارزش آیتم‌ها و مقایسه با بازار روز تعیین شد.";
 
     return {
@@ -159,6 +138,8 @@ export async function estimateAccountPrice(params: {
       rationale,
       source: "ai",
       comparablesCount: comparables.length,
+      sources,
+      aiModel,
     };
   } catch (err) {
     logger.error({ err, game }, "AI price estimation failed; using formula fallback");

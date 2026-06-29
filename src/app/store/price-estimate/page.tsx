@@ -19,6 +19,14 @@ const GAMES: Array<{ id: Game; label: string; icon: string }> = [
   { id: "fortnite", label: "فورتنایت", icon: "🛡️" },
 ];
 
+const SOURCE_LABELS: Record<string, string> = {
+  divar: "دیوار",
+  sheypoor: "شیپور",
+  torob: "ترب",
+  getgame: "فروشگاه گیم",
+  "iran-game": "ایران‌گیم",
+};
+
 const inputCls =
   "w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none transition placeholder:text-gray-600 focus:border-purple-400";
 
@@ -39,6 +47,8 @@ export default function PriceEstimatePage() {
     rationale: string;
     source: "ai" | "formula";
     comparablesCount: number;
+    sources?: string[];
+    aiModel?: string;
   } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -171,7 +181,7 @@ export default function PriceEstimatePage() {
           </button>
           {aiLoading && (
             <p className="mt-2 text-[11px] text-cyan-200/80">
-              در حال بررسی آگهی‌های واقعی دیوار و شیپور و مقایسه با اکانت شما... (چند ثانیه)
+              در حال بررسی آگهی‌های واقعی بازار ایران (دیوار، شیپور، ترب و فروشگاه‌های دیگر) و مقایسه با اکانت شما... (چند ثانیه)
             </p>
           )}
           {aiError && <p className="mt-2 text-[11px] font-bold text-red-300">{aiError}</p>}
@@ -190,6 +200,15 @@ export default function PriceEstimatePage() {
               <div className="mt-1 text-center text-[11px] text-gray-400">
                 بازه‌ی منصفانه: {toman(ai.minToman)} تا {toman(ai.maxToman)}
               </div>
+              {ai.sources && ai.sources.length > 0 && (
+                <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+                  {ai.sources.map((s) => (
+                    <span key={s} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-gray-300">
+                      {SOURCE_LABELS[s] || s}
+                    </span>
+                  ))}
+                </div>
+              )}
               {ai.rationale && (
                 <p className="mt-3 whitespace-pre-wrap text-xs leading-7 text-gray-200">{ai.rationale}</p>
               )}
