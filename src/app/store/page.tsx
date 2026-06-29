@@ -175,7 +175,7 @@ export default function StorePage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
             {items.map((it) => (
               <article key={it.id} className="flex flex-col overflow-hidden rounded-3xl border border-white/10 bg-white/[0.04] transition hover:border-purple-400/40">
-                <div className="relative aspect-square w-full overflow-hidden bg-gradient-to-br from-purple-900/40 to-cyan-900/20">
+                <Link href={`/store/${it.id}`} className="relative block aspect-square w-full overflow-hidden bg-gradient-to-br from-purple-900/40 to-cyan-900/20">
                   {it.images?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={it.images[0]} alt={it.title} className="h-full w-full object-cover" />
@@ -189,9 +189,9 @@ export default function StorePage() {
                   }`}>
                     {it.source === "official" ? "رسمی گیمنت" : "فروش کاربر"}
                   </span>
-                </div>
+                </Link>
                 <div className="flex flex-1 flex-col p-3">
-                  <h3 className="line-clamp-2 text-sm font-black leading-6">{it.title}</h3>
+                  <Link href={`/store/${it.id}`} className="line-clamp-2 text-sm font-black leading-6 hover:text-purple-200">{it.title}</Link>
                   {it.kind === "currency" && it.currencyAmount && (
                     <p className="mt-1 text-xs text-purple-300">
                       {it.currencyAmount.toLocaleString("fa-IR")} {CURRENCY_LABELS[it.currencyKind || "other"]}

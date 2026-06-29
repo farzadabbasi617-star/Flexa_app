@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import ImageUploader from "@/components/ImageUploader";
 
 type KycStatus = "none" | "pending" | "verified" | "rejected";
 
@@ -144,15 +145,22 @@ function KycGate({
         <label className="mb-1 block text-xs font-bold text-gray-400">تاریخ تولد (اختیاری)</label>
         <input className={inputCls} value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} placeholder="مثال: 1375/03/21" />
       </div>
-      <div>
-        <label className="mb-1 block text-xs font-bold text-gray-400">لینک تصویر کارت ملی</label>
-        <input className={inputCls} value={form.idCardImageUrl} onChange={(e) => setForm({ ...form, idCardImageUrl: e.target.value })} required placeholder="https://..." dir="ltr" />
-        <p className="mt-1 text-[11px] text-gray-500">تصویر را در آپلودر سایت بارگذاری و لینک آن را اینجا قرار دهید.</p>
-      </div>
-      <div>
-        <label className="mb-1 block text-xs font-bold text-gray-400">لینک سلفی با کارت ملی</label>
-        <input className={inputCls} value={form.selfieImageUrl} onChange={(e) => setForm({ ...form, selfieImageUrl: e.target.value })} required placeholder="https://..." dir="ltr" />
-      </div>
+      <ImageUploader
+        purpose="kyc"
+        max={1}
+        label="تصویر کارت ملی"
+        hint="تصویر واضح از روی کارت ملی"
+        value={form.idCardImageUrl ? [form.idCardImageUrl] : []}
+        onChange={(urls) => setForm({ ...form, idCardImageUrl: urls[0] || "" })}
+      />
+      <ImageUploader
+        purpose="kyc"
+        max={1}
+        label="سلفی با کارت ملی"
+        hint="عکس از چهره خود در حالی که کارت ملی را در دست دارید"
+        value={form.selfieImageUrl ? [form.selfieImageUrl] : []}
+        onChange={(urls) => setForm({ ...form, selfieImageUrl: urls[0] || "" })}
+      />
 
       <button disabled={submitting} className="w-full rounded-2xl bg-purple-600 py-3 text-sm font-black transition active:scale-95 hover:bg-purple-500 disabled:opacity-40">
         {submitting ? "در حال ارسال..." : "ارسال برای احراز هویت"}
@@ -162,6 +170,7 @@ function KycGate({
 }
 
 function ListingForm({ onMessage }: { onMessage: (m: { type: "ok" | "err"; text: string }) => void }) {
+  const [images, setImages] = useState<string[]>([]);
   const [form, setForm] = useState({
     kind: "currency",
     game: "",
@@ -171,7 +180,6 @@ function ListingForm({ onMessage }: { onMessage: (m: { type: "ok" | "err"; text:
     currencyKind: "gem",
     currencyAmount: "",
     stock: "1",
-    images: "",
     deliveryNotes: "",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -187,7 +195,7 @@ function ListingForm({ onMessage }: { onMessage: (m: { type: "ok" | "err"; text:
         description: form.description || undefined,
         priceToman: Number(form.priceToman),
         stock: Number(form.stock),
-        images: form.images.split(/[\n,]/).map((s) => s.trim()).filter(Boolean),
+        images,
         deliveryNotes: form.deliveryNotes || undefined,
       };
       if (form.game) payload.game = form.game;
@@ -207,7 +215,8 @@ function ListingForm({ onMessage }: { onMessage: (m: { type: "ok" | "err"; text:
         return;
       }
       onMessage({ type: "ok", text: "آگهی ثبت شد و پس از تأیید ادمین در فروشگاه نمایش داده می‌شود." });
-      setForm({ ...form, title: "", description: "", priceToman: "", currencyAmount: "", images: "", deliveryNotes: "" });
+      setForm({ ...form, title: "", description: "", priceToman: "", currencyAmount: "", deliveryNotes: "" });
+      setImages([]);
     } catch {
       onMessage({ type: "err", text: "خطای ارتباط با سرور." });
     } finally {
@@ -273,10 +282,14 @@ function ListingForm({ onMessage }: { onMessage: (m: { type: "ok" | "err"; text:
         <textarea className={`${inputCls} min-h-[90px]`} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={5000} />
       </div>
 
-      <div>
-        <label className="mb-1 block text-xs font-bold text-gray-400">لینک تصاویر (هر خط یک لینک)</label>
-        <textarea className={`${inputCls} min-h-[70px]`} value={form.images} onChange={(e) => setForm({ ...form, images: e.target.value })} placeholder="https://..." dir="ltr" />
-      </div>
+      <ImageUploader
+        purpose="listing"
+        max={8}
+        label="تصاویر آگهی"
+        hint="حداکثر ۸ تصویر. اولین تصویر به عنوان کاور نمایش داده می‌شود."
+        value={images}
+        onChange={setImages}
+      />
 
       <div>
         <label className="mb-1 block text-xs font-bold text-gray-400">اطلاعات تحویل (محرمانه — فقط بعد از خرید به خریدار نشان داده می‌شود)</label>

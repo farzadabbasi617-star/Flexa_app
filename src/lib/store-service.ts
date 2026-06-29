@@ -6,6 +6,7 @@ import {
   wallets,
   transactions,
   kycProfiles,
+  notifications,
 } from "@/db/schema";
 import { bigIntFromText } from "@/lib/money";
 import logger from "@/lib/logger";
@@ -31,6 +32,22 @@ export function computeFee(totalRial: bigint, source: "official" | "user") {
   const platformFeeRial = (totalRial * BigInt(PLATFORM_FEE_BPS)) / BigInt(10000);
   const sellerPayoutRial = totalRial - platformFeeRial;
   return { platformFeeRial, sellerPayoutRial };
+}
+
+/** Fire-and-forget order notification (never blocks the financial flow). */
+async function notify(userId: string | null | undefined, title: string, message: string, orderId: string) {
+  if (!userId) return;
+  try {
+    await db.insert(notifications).values({
+      userId,
+      type: "store_order",
+      title,
+      message,
+      link: `/store/orders`,
+    });
+  } catch (err) {
+    logger.warn({ err, userId, orderId }, "Failed to create store notification");
+  }
 }
 
 /** Whether a user is allowed to create marketplace listings (KYC verified). */
@@ -164,6 +181,13 @@ export async function createEscrowOrder(params: {
       .returning();
 
     logger.info({ orderId: order.id, buyerId, listingId, totalPriceRial: totalPriceRial.toString() }, "Store escrow order created");
+
+    // Notify outside the financial mutations but still within tx scope is fine
+    // here because notifications are best-effort and wrapped in try/catch.
+    await notify(buyerId, "سفارش ثبت شد", `سفارش «${listing.title}» ثبت و مبلغ به‌صورت امانی نگه داشته شد.`, order.id);
+    if (listing.sellerId) {
+      await notify(listing.sellerId, "سفارش جدید", `کالای «${listing.title}» شما خریداری شد. لطفاً تحویل دهید.`, order.id);
+    }
     return order;
   });
 }
@@ -193,6 +217,8 @@ export async function markDelivered(orderId: string, actorId: string, isAdmin = 
       .set({ status: "delivered", deliveredAt: new Date(), updatedAt: new Date() })
       .where(eq(storeOrders.id, orderId))
       .returning();
+
+    await notify(order.buyerId, "کالا تحویل داده شد", "فروشنده کالا را تحویل داد. لطفاً پس از بررسی، دریافت را تأیید کنید.", orderId);
     return updated;
   });
 }
@@ -266,6 +292,11 @@ export async function confirmAndRelease(orderId: string, buyerId: string) {
       .returning();
 
     logger.info({ orderId, releaseTxId }, "Store order completed & escrow released");
+
+    await notify(order.buyerId, "سفارش تکمیل شد", "خرید شما با موفقیت تکمیل شد. از خرید شما متشکریم!", orderId);
+    if (order.source === "user" && order.sellerId) {
+      await notify(order.sellerId, "پرداخت آزاد شد", "خریدار دریافت را تأیید کرد و مبلغ به کیف پول شما واریز شد.", orderId);
+    }
     return updated;
   });
 }
@@ -337,6 +368,11 @@ export async function refundOrder(orderId: string, actorId: string, reason?: str
       .returning();
 
     logger.info({ orderId, actorId, reason }, "Store order refunded");
+
+    await notify(order.buyerId, "سفارش بازپرداخت شد", "مبلغ سفارش به کیف پول شما بازگردانده شد.", orderId);
+    if (order.sellerId) {
+      await notify(order.sellerId, "سفارش بازپرداخت شد", "سفارش مربوط به کالای شما بازپرداخت شد.", orderId);
+    }
     return updated;
   });
 }
@@ -360,5 +396,9 @@ export async function openDispute(orderId: string, actorId: string, reason: stri
     .set({ status: "disputed", disputeReason: reason, updatedAt: new Date() })
     .where(eq(storeOrders.id, orderId))
     .returning();
+
+  // Notify the other party that a dispute was opened.
+  const otherParty = order.buyerId === actorId ? order.sellerId : order.buyerId;
+  await notify(otherParty, "اعتراض ثبت شد", "برای یکی از سفارش‌ها اعتراض ثبت شد و در حال بررسی توسط تیم گیمنت است.", orderId);
   return updated;
 }
