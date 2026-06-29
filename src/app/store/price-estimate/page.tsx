@@ -31,6 +31,16 @@ export default function PriceEstimatePage() {
   const [fields, setFields] = useState<Field[]>([]);
   const [values, setValues] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [ai, setAi] = useState<{
+    priceToman: number;
+    minToman: number;
+    maxToman: number;
+    rationale: string;
+    source: "ai" | "formula";
+    comparablesCount: number;
+  } | null>(null);
+  const [aiError, setAiError] = useState<string | null>(null);
 
   const loadFields = useCallback(async (g: Game) => {
     setLoading(true);
@@ -47,6 +57,8 @@ export default function PriceEstimatePage() {
 
   useEffect(() => {
     setValues({});
+    setAi(null);
+    setAiError(null);
     loadFields(game);
   }, [game, loadFields]);
 
@@ -59,6 +71,40 @@ export default function PriceEstimatePage() {
     }
     return sum;
   }, [fields, values]);
+
+  const hasInput = useMemo(
+    () => fields.some((f) => Number(values[f.key]) > 0),
+    [fields, values]
+  );
+
+  async function runAiEstimate() {
+    if (aiLoading) return;
+    setAiLoading(true);
+    setAiError(null);
+    setAi(null);
+    try {
+      const numericValues: Record<string, number> = {};
+      for (const f of fields) {
+        const n = Number(values[f.key]);
+        if (Number.isFinite(n) && n > 0) numericValues[f.key] = Math.floor(n);
+      }
+      const res = await fetch("/api/store/price-estimate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ game, values: numericValues, mode: "ai" }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAiError(data.error || "ارزیابی هوشمند ناموفق بود.");
+        return;
+      }
+      setAi(data);
+    } catch {
+      setAiError("خطای ارتباط با سرور.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
 
   return (
     <main className="min-h-[100dvh] bg-[#06060f] px-4 py-6 text-white sm:px-6 pb-28">
@@ -111,9 +157,45 @@ export default function PriceEstimatePage() {
         )}
 
         {/* Result */}
-        <div className="sticky bottom-24 mt-8 rounded-3xl border border-purple-400/30 bg-gradient-to-br from-purple-700/30 to-fuchsia-700/20 p-5 text-center shadow-2xl backdrop-blur-xl">
-          <div className="text-xs font-bold text-purple-200">قیمت تخمینی اکانت</div>
+        <div className="mt-8 rounded-3xl border border-purple-400/30 bg-gradient-to-br from-purple-700/30 to-fuchsia-700/20 p-5 text-center shadow-2xl backdrop-blur-xl">
+          <div className="text-xs font-bold text-purple-200">قیمت تخمینی پایه</div>
           <div className="mt-1 text-3xl font-black text-white">{toman(totalToman)}</div>
+
+          {/* AI smart valuation */}
+          <button
+            onClick={runAiEstimate}
+            disabled={aiLoading || !hasInput}
+            className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-600 py-3 text-sm font-black text-white shadow-lg transition active:scale-95 hover:brightness-110 disabled:opacity-40"
+          >
+            {aiLoading ? "در حال ارزیابی هوشمند با بازار روز..." : "✨ ارزیابی هوشمند با هوش مصنوعی"}
+          </button>
+          {aiLoading && (
+            <p className="mt-2 text-[11px] text-cyan-200/80">
+              در حال بررسی آگهی‌های واقعی دیوار و شیپور و مقایسه با اکانت شما... (چند ثانیه)
+            </p>
+          )}
+          {aiError && <p className="mt-2 text-[11px] font-bold text-red-300">{aiError}</p>}
+
+          {ai && (
+            <div className="mt-4 rounded-2xl border border-cyan-400/30 bg-black/30 p-4 text-right">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-cyan-200">
+                  {ai.source === "ai" ? "💡 قیمت پیشنهادی هوش مصنوعی" : "قیمت پایه (AI در دسترس نبود)"}
+                </span>
+                {ai.comparablesCount > 0 && (
+                  <span className="text-[10px] text-gray-400">بر پایه {ai.comparablesCount.toLocaleString("fa-IR")} آگهی بازار</span>
+                )}
+              </div>
+              <div className="mt-2 text-center text-2xl font-black text-cyan-100">{toman(ai.priceToman)}</div>
+              <div className="mt-1 text-center text-[11px] text-gray-400">
+                بازه‌ی منصفانه: {toman(ai.minToman)} تا {toman(ai.maxToman)}
+              </div>
+              {ai.rationale && (
+                <p className="mt-3 whitespace-pre-wrap text-xs leading-7 text-gray-200">{ai.rationale}</p>
+              )}
+            </div>
+          )}
+
           <Link
             href="/store/sell"
             className="mt-4 inline-block rounded-2xl bg-purple-600 px-6 py-2.5 text-sm font-black transition hover:bg-purple-500"
@@ -123,7 +205,7 @@ export default function PriceEstimatePage() {
         </div>
 
         <p className="mt-4 text-center text-[11px] leading-6 text-gray-500">
-          ⚠️ قیمت محاسبه‌شده تخمینی و بر اساس میانگین بازار است و ممکن است با قیمت نهایی فروش متفاوت باشد.
+          ⚠️ قیمت‌ها تخمینی هستند. ارزیابی هوشمند، آیتم‌ها و لول اکانت شما را با قیمت آگهی‌های واقعی و روز بازار (دیوار/شیپور) می‌سنجد، اما قیمت نهایی فروش ممکن است متفاوت باشد.
         </p>
       </div>
     </main>

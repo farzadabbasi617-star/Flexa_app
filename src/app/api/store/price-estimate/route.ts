@@ -8,11 +8,14 @@ import {
   isEstimatorGame,
   type EstimatorGame,
 } from "@/lib/price-estimator";
+import { estimateAccountPrice } from "@/lib/ai-price-estimator";
 import { bigIntFromText } from "@/lib/money";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
+// AI + live scraping can take a while.
+export const maxDuration = 60;
 
 // Resolve effective unit prices (admin overrides on top of defaults).
 async function resolveUnitPrices(game: EstimatorGame): Promise<Record<string, bigint>> {
@@ -48,19 +51,28 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ game, fields });
 }
 
-// POST: compute an estimate. Body: { game, values: { fieldKey: count } }
+// POST: compute an estimate.
+//   Body: { game, values: { fieldKey: count }, mode?: "formula" | "ai" }
+//   - "formula" (default): instant deterministic sum.
+//   - "ai": AI-backed fair price using live Divar/Sheypoor comparables.
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
-    const limit = await rateLimit(`price-estimate:${ip}`, 60, 60 * 1000);
-    if (!limit.success) {
-      return NextResponse.json({ error: "تعداد درخواست‌ها زیاد است." }, { status: 429 });
-    }
 
     const body = await request.json().catch(() => ({}));
     const game = String(body.game || "");
+    const mode = body.mode === "ai" ? "ai" : "formula";
     if (!isEstimatorGame(game)) {
       return NextResponse.json({ error: "بازی نامعتبر است" }, { status: 400 });
+    }
+
+    // Heavier limit for AI (scraping + model call); lighter for the formula.
+    const limit =
+      mode === "ai"
+        ? await rateLimit(`price-estimate:ai:${ip}`, 8, 60 * 1000)
+        : await rateLimit(`price-estimate:${ip}`, 60, 60 * 1000);
+    if (!limit.success) {
+      return NextResponse.json({ error: "تعداد درخواست‌ها زیاد است. کمی بعد دوباره امتحان کنید." }, { status: 429 });
     }
 
     const rawValues = (body.values && typeof body.values === "object") ? body.values : {};
@@ -71,12 +83,26 @@ export async function POST(request: NextRequest) {
     }
 
     const unit = await resolveUnitPrices(game);
-    const totalRial = computeEstimate(game, values, unit);
 
+    if (mode === "ai") {
+      const result = await estimateAccountPrice({ game, values, unitPrices: unit });
+      return NextResponse.json({
+        game,
+        priceToman: result.priceToman,
+        minToman: result.minToman,
+        maxToman: result.maxToman,
+        rationale: result.rationale,
+        source: result.source,
+        comparablesCount: result.comparablesCount,
+      });
+    }
+
+    const totalRial = computeEstimate(game, values, unit);
     return NextResponse.json({
       game,
       priceRial: totalRial.toString(),
       priceToman: Number(totalRial / BigInt(10)),
+      source: "formula",
     });
   } catch (err) {
     logger.error({ err }, "Price estimate error");
