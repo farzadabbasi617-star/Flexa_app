@@ -3,7 +3,20 @@
 import { useCallback, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 
-type Tab = "kyc" | "listings" | "orders";
+type Tab = "kyc" | "listings" | "orders" | "rates";
+
+type EstGame = "cod_mobile" | "clash_royale" | "fortnite";
+interface RateField {
+  key: string;
+  label: string;
+  unitToman: number;
+  isDefault: boolean;
+}
+const EST_GAMES: Array<{ id: EstGame; label: string }> = [
+  { id: "cod_mobile", label: "کالاف دیوتی موبایل" },
+  { id: "clash_royale", label: "کلش رویال" },
+  { id: "fortnite", label: "فورتنایت" },
+];
 
 interface KycRow {
   id: string;
@@ -47,6 +60,9 @@ export default function AdminStorePage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
+  const [rateGame, setRateGame] = useState<EstGame>("cod_mobile");
+  const [rateFields, setRateFields] = useState<RateField[]>([]);
+  const [savingRates, setSavingRates] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -57,14 +73,35 @@ export default function AdminStorePage() {
       } else if (tab === "listings") {
         const r = await fetch("/api/admin/store/listings?status=pending_review", { cache: "no-store", credentials: "include" });
         const d = await r.json(); setListings(Array.isArray(d.items) ? d.items : []);
-      } else {
+      } else if (tab === "orders") {
         const r = await fetch("/api/admin/store/orders?status=disputed", { cache: "no-store", credentials: "include" });
         const d = await r.json(); setOrders(Array.isArray(d.items) ? d.items : []);
+      } else if (tab === "rates") {
+        const r = await fetch(`/api/admin/store/estimator-rates?game=${rateGame}`, { cache: "no-store", credentials: "include" });
+        const d = await r.json(); setRateFields(Array.isArray(d.fields) ? d.fields : []);
       }
     } finally {
       setLoading(false);
     }
-  }, [tab]);
+  }, [tab, rateGame]);
+
+  async function saveRates() {
+    if (savingRates) return;
+    setSavingRates(true);
+    try {
+      const rates: Record<string, number> = {};
+      for (const f of rateFields) rates[f.key] = f.unitToman;
+      const r = await fetch("/api/admin/store/estimator-rates", {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ game: rateGame, rates }),
+      });
+      setMsg(r.ok ? "نرخ‌ها ذخیره شد" : "خطا در ذخیره");
+      if (r.ok) load();
+    } finally {
+      setSavingRates(false);
+    }
+  }
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(null), 3500); return () => clearTimeout(t); }, [msg]);
@@ -103,6 +140,7 @@ export default function AdminStorePage() {
     { id: "kyc", label: "احراز هویت" },
     { id: "listings", label: "آگهی‌های در انتظار" },
     { id: "orders", label: "اختلافات" },
+    { id: "rates", label: "نرخ تخمین قیمت" },
   ];
 
   return (
@@ -171,6 +209,41 @@ export default function AdminStorePage() {
                   </div>
                 </div>
               )))}
+
+              {tab === "rates" && (
+                <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="mb-4 flex flex-wrap gap-2">
+                    {EST_GAMES.map((g) => (
+                      <button key={g.id} onClick={() => setRateGame(g.id)} className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${rateGame === g.id ? "bg-purple-600" : "border border-white/10 bg-white/5 text-gray-300"}`}>
+                        {g.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="mb-3 text-xs text-gray-400">قیمت هر واحد (به تومان). قیمت نهایی = تعداد × نرخ هر فیلد.</p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    {rateFields.map((f, idx) => (
+                      <div key={f.key}>
+                        <label className="mb-1 block text-xs font-bold text-gray-300">
+                          {f.label} {f.isDefault && <span className="text-[10px] text-gray-500">(پیش‌فرض)</span>}
+                        </label>
+                        <input
+                          className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm outline-none focus:border-purple-400"
+                          value={f.unitToman}
+                          inputMode="numeric"
+                          dir="ltr"
+                          onChange={(e) => {
+                            const v = Number(e.target.value.replace(/[^\d]/g, "")) || 0;
+                            setRateFields((prev) => prev.map((x, i) => (i === idx ? { ...x, unitToman: v } : x)));
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <button onClick={saveRates} disabled={savingRates} className="mt-5 rounded-2xl bg-purple-600 px-6 py-2.5 text-sm font-black disabled:opacity-40">
+                    {savingRates ? "در حال ذخیره..." : "ذخیره نرخ‌ها"}
+                  </button>
+                </div>
+              )}
             </div>
           )}
 

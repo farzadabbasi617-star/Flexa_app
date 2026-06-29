@@ -140,6 +140,9 @@ export default function StorePage() {
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <Link href="/store/price-estimate" className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold transition hover:bg-white/10">
+                🧮 تخمین قیمت
+              </Link>
               <Link href="/store/orders" className="rounded-2xl border border-white/15 bg-white/5 px-4 py-2.5 text-sm font-bold transition hover:bg-white/10">
                 📦 سفارش‌های من
               </Link>

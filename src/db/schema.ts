@@ -854,3 +854,18 @@ export const storeOrders = pgTable("store_orders", {
   listingIdx: index("store_orders_listing_idx").on(table.listingId),
   statusIdx: index("store_orders_status_idx").on(table.status),
 }));
+
+// =========================================================================
+// PRICE ESTIMATOR (admin-configurable per-game, per-field unit prices in RIAL)
+// =========================================================================
+export const priceEstimatorRates = pgTable("price_estimator_rates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  game: gameEnum("game").notNull(),
+  // Field key, e.g. "level", "cp", "gun_legendary". Matches the field defs in lib.
+  fieldKey: varchar("field_key", { length: 60 }).notNull(),
+  // Unit price in RIAL per 1 unit of this field (multiplied by the entered count).
+  unitPriceRial: numeric("unit_price_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  gameFieldUnique: uniqueIndex("price_estimator_rates_game_field_idx").on(table.game, table.fieldKey),
+}));
