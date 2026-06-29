@@ -18,7 +18,6 @@ export default function Navbar() {
   const navItems = [
     { href: "/", label: t.nav.home, icon: "🏠" },
     { href: "/tournaments", label: t.nav.tournaments, icon: "🏆" },
-    { href: "/ai-avatar", label: lang === "fa" ? "گیم‌یار" : "AI Avatar", icon: "🤖" },
     { href: "/leaderboard", label: t.nav.leaderboard, icon: "📊" },
     { href: "/judging", label: t.nav.judging, icon: "⚖️" },
     { href: "/teams", label: t.teamsPage.title, icon: "🛡️" },
