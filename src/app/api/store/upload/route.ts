@@ -7,7 +7,7 @@ import logger from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 // Slightly smaller direct cap than admin uploads (data-URLs are stored inline).
-const MAX_DIRECT_SIZE = 1.0 * 1024 * 1024;
+const MAX_DIRECT_SIZE = 1.6 * 1024 * 1024;
 const MAX_CLOUD_SIZE = 6 * 1024 * 1024;
 const ALLOWED_PURPOSES = new Set(["listing", "kyc"]);
 
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     if (file.size > MAX_DIRECT_SIZE) {
       return NextResponse.json(
-        { error: "بدون تنظیم Cloudinary، حجم تصویر باید کمتر از ۱ مگابایت باشد." },
+        { error: "حجم تصویر زیاد است. لطفاً تصویر کوچک‌تری انتخاب کنید." },
         { status: 400 }
       );
     }

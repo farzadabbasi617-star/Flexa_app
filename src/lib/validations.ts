@@ -67,7 +67,19 @@ const nationalIdSchema = z.preprocess(
   z.string().refine(isValidIranianNationalId, "کد ملی وارد شده معتبر نیست")
 );
 
-const httpUrl = z.string().trim().url("آدرس تصویر معتبر نیست").max(500);
+// Accepts either a normal http(s) image URL (e.g. Cloudinary) OR an inline
+// base64 data-image URL (used as a fallback when Cloudinary isn't configured,
+// e.g. uploading the national-ID card / selfie / listing photos from the phone
+// gallery). Data URLs are long, so they get a much larger length cap.
+const imageRefSchema = z
+  .string()
+  .trim()
+  .min(1, "تصویر الزامی است")
+  .max(10_000_000, "حجم تصویر بیش از حد مجاز است")
+  .refine(
+    (v) => /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(v) || /^https?:\/\//i.test(v),
+    "آدرس تصویر معتبر نیست"
+  );
 
 export const KycSubmitSchema = z.object({
   fullName: z.string().trim().min(3, "نام و نام خانوادگی الزامی است").max(150),
@@ -78,8 +90,8 @@ export const KycSubmitSchema = z.object({
     .regex(/^\d{4}[/-]\d{1,2}[/-]\d{1,2}$/, "تاریخ تولد معتبر نیست (مثال: 1375/03/21)")
     .optional()
     .or(z.literal("").transform(() => undefined)),
-  idCardImageUrl: httpUrl,
-  selfieImageUrl: httpUrl,
+  idCardImageUrl: imageRefSchema,
+  selfieImageUrl: imageRefSchema,
 });
 
 export const KycReviewSchema = z.object({
@@ -108,7 +120,7 @@ export const StoreListingCreateSchema = z
     currencyKind: z.enum(CURRENCY_KINDS).optional(),
     currencyAmount: z.coerce.number().int().min(1).max(100_000_000).optional(),
     stock: z.coerce.number().int().min(1, "موجودی حداقل ۱").max(100000).default(1),
-    images: z.array(httpUrl).max(8, "حداکثر ۸ تصویر").default([]),
+    images: z.array(imageRefSchema).max(8, "حداکثر ۸ تصویر").default([]),
     deliveryNotes: z.string().trim().max(5000).optional(),
     warrantyDays: z.coerce.number().int().min(0).max(365).optional(),
   })

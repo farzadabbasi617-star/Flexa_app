@@ -28,6 +28,58 @@ export default function ImageUploader({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Downscale + re-encode the picked image to a JPEG so gallery photos
+  // (often 3-8MB, sometimes HEIC) fit under the upload limit and are a format
+  // the server accepts. Falls back to the original file if anything fails.
+  async function compressImage(file: File, targetBytes = 900 * 1024): Promise<File> {
+    if (typeof document === "undefined") return file;
+    try {
+      const dataUrl: string = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result));
+        fr.onerror = () => reject(new Error("read failed"));
+        fr.readAsDataURL(file);
+      });
+      const img: HTMLImageElement = await new Promise((resolve, reject) => {
+        const i = new Image();
+        i.onload = () => resolve(i);
+        i.onerror = () => reject(new Error("decode failed"));
+        i.src = dataUrl;
+      });
+
+      const maxDim = 1600;
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = Math.min(maxDim / width, maxDim / height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return file;
+      ctx.drawImage(img, 0, 0, width, height);
+
+      // Try decreasing quality until under the target size.
+      for (const q of [0.82, 0.7, 0.6, 0.5, 0.4]) {
+        const blob: Blob | null = await new Promise((resolve) =>
+          canvas.toBlob((b) => resolve(b), "image/jpeg", q)
+        );
+        if (blob && blob.size <= targetBytes) {
+          return new File([blob], (file.name.replace(/\.[^.]+$/, "") || "image") + ".jpg", { type: "image/jpeg" });
+        }
+        // Keep the smallest produced even if still slightly over.
+        if (blob && q === 0.4) {
+          return new File([blob], (file.name.replace(/\.[^.]+$/, "") || "image") + ".jpg", { type: "image/jpeg" });
+        }
+      }
+      return file;
+    } catch {
+      return file; // server-side limits will catch anything too large
+    }
+  }
+
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
     setError(null);
@@ -40,7 +92,8 @@ export default function ImageUploader({
     setBusy(true);
     const uploaded: string[] = [];
     try {
-      for (const file of toUpload) {
+      for (const original of toUpload) {
+        const file = await compressImage(original);
         const fd = new FormData();
         fd.append("file", file);
         fd.append("purpose", purpose);

@@ -81,15 +81,15 @@ export const ESTIMATOR_FIELDS: Record<EstimatorGame, EstimatorField[]> = {
   // Mirrors the exact vg-store fields (9 item fields) + region & security
   // modifiers that strongly drive real market price.
   cod_mobile: [
-    num("level", "لول اکانت", 3000, { min: 50, hint: "حداقل لول ۵۰ · هر لول" }),
-    num("cp", "تعداد CP", 30, { min: 0, hint: "سی‌پی باقی‌مانده · هر CP" }),
-    num("gun_epic", "تعداد گان اپیک (کادر بنفش)", 30000, { min: 0, hint: "حداقل ۵ گان اپیک" }),
-    num("gun_legendary_free", "تعداد گان لجندری رایگان (کادر طلایی)", 30000, { min: 0 }),
-    num("gun_legendary_paid", "تعداد گان لجندری غیررایگان (کادر طلایی)", 500000, { min: 0 }),
-    num("gun_mythic", "تعداد گان متیک غیررایگان (کادر قرمز)", 2000000, { min: 0 }),
-    num("skin_epic", "تعداد اسکین اپیک (لباس کادر بنفش)", 25000, { min: 0 }),
-    num("skin_legendary", "تعداد اسکین لجندری (لباس کادر طلایی)", 150000, { min: 0 }),
-    num("skin_mythic", "تعداد اسکین متیک (لباس کادر قرمز)", 1500000, { min: 0 }),
+    num("level", "لول اکانت", 2000, { min: 50, hint: "حداقل لول ۵۰ · هر لول" }),
+    num("cp", "تعداد CP", 22, { min: 0, hint: "سی‌پی باقی‌مانده · هر CP" }),
+    num("gun_epic", "تعداد گان اپیک (کادر بنفش)", 22000, { min: 0, hint: "حداقل ۵ گان اپیک" }),
+    num("gun_legendary_free", "تعداد گان لجندری رایگان (کادر طلایی)", 22000, { min: 0 }),
+    num("gun_legendary_paid", "تعداد گان لجندری غیررایگان (کادر طلایی)", 380000, { min: 0 }),
+    num("gun_mythic", "تعداد گان متیک غیررایگان (کادر قرمز)", 1600000, { min: 0 }),
+    num("skin_epic", "تعداد اسکین اپیک (لباس کادر بنفش)", 18000, { min: 0 }),
+    num("skin_legendary", "تعداد اسکین لجندری (لباس کادر طلایی)", 110000, { min: 0 }),
+    num("skin_mythic", "تعداد اسکین متیک (لباس کادر قرمز)", 1200000, { min: 0 }),
     choice(
       "region",
       "ریجن اکانت",
@@ -104,10 +104,10 @@ export const ESTIMATOR_FIELDS: Record<EstimatorGame, EstimatorField[]> = {
       "security",
       "وضعیت امنیت/سیو",
       [
-        { value: "raw_gmail", label: "جیمیل خام / تک‌سیو امن", multiplier: 1.1 },
-        { value: "two_save", label: "دو سیو", multiplier: 0.9 },
-        { value: "three_save", label: "سه سیو یا بیشتر", multiplier: 0.7 },
-        { value: "locked_email", label: "ایمیل غیرقابل تغییر", multiplier: 0.6 },
+        { value: "raw_gmail", label: "جیمیل خام / تک‌سیو امن", multiplier: 1.0 },
+        { value: "two_save", label: "دو سیو", multiplier: 0.85 },
+        { value: "three_save", label: "سه سیو یا بیشتر", multiplier: 0.65 },
+        { value: "locked_email", label: "ایمیل غیرقابل تغییر", multiplier: 0.55 },
       ],
       "هرچه سیو کمتر و ایمیل قابل تغییر باشد، امن‌تر و گران‌تر"
     ),
@@ -115,15 +115,15 @@ export const ESTIMATOR_FIELDS: Record<EstimatorGame, EstimatorField[]> = {
 
   // ── Clash Royale ─────────────────────────────────────────────────────
   clash_royale: [
-    num("king_level", "لول کینگ (King Level)", 25000, { min: 1, hint: "هر لول کینگ" }),
-    num("max_cards", "تعداد کارت مکس‌شده (Lvl 14/15)", 30000, { min: 0 }),
-    num("evolution_cards", "تعداد کارت Evolution", 120000, { min: 0 }),
-    num("champion_cards", "تعداد کارت چمپیون باز شده", 80000, { min: 0 }),
-    num("legendary_cards", "تعداد کارت لجندری", 10000, { min: 0 }),
-    num("trophies", "بیشترین جام (Best Trophy)", 50, { min: 0 }),
-    num("emotes", "تعداد ایموت کمیاب", 15000, { min: 0 }),
-    num("tower_skins", "تعداد اسکین تاور (Tower Skin)", 40000, { min: 0, hint: "حداکثر ۱۰۰" }),
-    num("gems", "تعداد جم باقی‌مانده", 90, { min: 0, hint: "هر ۱۰۰۰ جم حدود ۹۰٬۰۰۰ تومان" }),
+    num("king_level", "لول کینگ (King Level)", 20000, { min: 1, hint: "هر لول کینگ" }),
+    num("max_cards", "تعداد کارت مکس‌شده (Lvl 14/15)", 24000, { min: 0 }),
+    num("evolution_cards", "تعداد کارت Evolution", 95000, { min: 0 }),
+    num("champion_cards", "تعداد کارت چمپیون باز شده", 65000, { min: 0 }),
+    num("legendary_cards", "تعداد کارت لجندری", 8000, { min: 0 }),
+    num("trophies", "بیشترین جام (Best Trophy)", 40, { min: 0 }),
+    num("emotes", "تعداد ایموت کمیاب", 12000, { min: 0 }),
+    num("tower_skins", "تعداد اسکین تاور (Tower Skin)", 32000, { min: 0, hint: "حداکثر ۱۰۰" }),
+    num("gems", "تعداد جم باقی‌مانده", 72, { min: 0, hint: "هر ۱۰۰۰ جم حدود ۷۲٬۰۰۰ تومان" }),
     choice(
       "access",
       "وضعیت دسترسی",
@@ -137,23 +137,23 @@ export const ESTIMATOR_FIELDS: Record<EstimatorGame, EstimatorField[]> = {
 
   // ── Fortnite ─────────────────────────────────────────────────────────
   fortnite: [
-    num("og_skins", "تعداد اسکین OG/کمیاب", 600000, {
+    num("og_skins", "تعداد اسکین OG/کمیاب", 480000, {
       min: 0,
       hint: "مثل Black Knight، Renegade Raider، Galaxy، Ikonik، Travis Scott",
     }),
-    num("old_battlepasses", "تعداد بتل‌پس قدیمی (فصل‌های ابتدایی)", 80000, { min: 0 }),
-    num("rare_emotes", "تعداد ایموت کمیاب (Emote)", 80000, { min: 0 }),
-    num("rare_pickaxes", "تعداد کلنگ کمیاب (Pickaxe)", 40000, { min: 0 }),
-    num("total_skins", "تعداد کل اسکین", 12000, { min: 0 }),
-    num("vbucks", "موجودی وی‌باکس (V-Bucks)", 1, { min: 0, hint: "هر ۱۰۰۰ وی‌باکس حدود ۱٬۰۰۰٬۰۰۰ تومان" }),
-    num("level", "لول اکانت", 200, { min: 1, hint: "اثر کم بر قیمت" }),
+    num("old_battlepasses", "تعداد بتل‌پس قدیمی (فصل‌های ابتدایی)", 65000, { min: 0 }),
+    num("rare_emotes", "تعداد ایموت کمیاب (Emote)", 65000, { min: 0 }),
+    num("rare_pickaxes", "تعداد کلنگ کمیاب (Pickaxe)", 32000, { min: 0 }),
+    num("total_skins", "تعداد کل اسکین", 9000, { min: 0 }),
+    num("vbucks", "موجودی وی‌باکس (V-Bucks)", 80, { min: 0, hint: "هر ۱۰۰۰ وی‌باکس حدود ۸۰٬۰۰۰ تومان" }),
+    num("level", "لول اکانت", 150, { min: 1, hint: "اثر کم بر قیمت" }),
     choice(
       "full_access",
       "نوع دسترسی",
       [
-        { value: "full", label: "فول‌اکسس (قابل تغییر ایمیل)", multiplier: 1.1 },
-        { value: "mail_access", label: "میل‌اکسس (ایمیل در دسترس)", multiplier: 0.85 },
-        { value: "no_access", label: "بدون دسترسی ایمیل", multiplier: 0.6 },
+        { value: "full", label: "فول‌اکسس (قابل تغییر ایمیل)", multiplier: 1.0 },
+        { value: "mail_access", label: "میل‌اکسس (ایمیل در دسترس)", multiplier: 0.8 },
+        { value: "no_access", label: "بدون دسترسی ایمیل", multiplier: 0.55 },
       ]
     ),
     choice(
