@@ -1,15 +1,13 @@
 // Expert pricing "knowledge base" for the AI account-price estimator.
 //
-// This encodes the real pricing logic used by specialist Iranian account
-// shops (e.g. vg-store, arzangem, getgame): a base value from level/free
-// progression, PLUS the added value of paid/rare items, MULTIPLIED by rarity,
-// security, region and market-day factors, MINUS commission. It also carries
-// the per-game importance ordering and a set of few-shot example accounts with
-// realistic Toman prices so the model values like a real specialist.
+// This encodes the pricing logic for second-hand game accounts: a base value
+// from level/free progression, PLUS the added value of paid/rare items,
+// MULTIPLIED by rarity, security and region factors, MINUS commission. It also
+// carries the per-game importance ordering and a set of few-shot example
+// accounts with realistic Toman prices so the model values like a real expert.
 //
 // IMPORTANT: the Toman figures in the examples are *relative anchors*, not
-// guaranteed live prices. The model must always adjust to the live market and
-// to any real comparable ads it is given.
+// guaranteed live prices. The model should adjust to current market conditions.
 
 import type { EstimatorGame } from "@/lib/price-estimator";
 

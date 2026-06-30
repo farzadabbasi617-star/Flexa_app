@@ -6,10 +6,9 @@
 //   - "number" fields: the user enters a count; price contribution = count * unit.
 //   - "choice"  fields: the user picks an option; each option carries a
 //                       multiplier that scales the WHOLE estimate (e.g. number
-//                       of saves / region / ban history / full-access). This
-//                       mirrors how specialist Iranian shops (e.g. vg-store)
-//                       price accounts: items add value, but security/region
-//                       act as multipliers on the final number.
+//                       of saves / region / ban history / full-access):
+//                       items add value, but security/region act as
+//                       multipliers on the final number.
 
 export type EstimatorGame = "cod_mobile" | "clash_royale" | "fortnite";
 
@@ -78,7 +77,7 @@ const choice = (
 
 export const ESTIMATOR_FIELDS: Record<EstimatorGame, EstimatorField[]> = {
   // ── Call of Duty Mobile ──────────────────────────────────────────────
-  // Mirrors the exact vg-store fields (9 item fields) + region & security
+  // Standard CODM fields (9 item fields) + region & security
   // modifiers that strongly drive real market price.
   cod_mobile: [
     num("level", "لول اکانت", 2000, { min: 50, hint: "حداقل لول ۵۰ · هر لول" }),

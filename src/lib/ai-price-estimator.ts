@@ -2,9 +2,9 @@
 //
 // Strategy:
 //  1. Build a human-readable description of the account from the entered stats.
-//  2. Scrape a few live comparable ads from Divar/Sheypoor for the same game.
+//  2. Gather a few comparable reference prices for the same game (best-effort).
 //  3. Ask the AI model to weigh the account's items/level/currency against those
-//     real market listings and return a fair price (in Toman) + a short rationale.
+//     references and return a fair price (in Toman) + a short rationale.
 //  4. If AI is unavailable or returns nothing usable, fall back to the
 //     deterministic formula (count * unit price).
 

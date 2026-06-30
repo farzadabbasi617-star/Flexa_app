@@ -1,6 +1,6 @@
-// Gathers comparable account/price listings from multiple Iranian sources, not
-// just Divar/Sheypoor. Each source is best-effort and isolated so one failing
-// site never breaks the rest. Easy to extend: add an entry to SOURCES.
+// Gathers comparable account/price listings from multiple Iranian sources.
+// Each source is best-effort and isolated so one failing site never breaks the
+// rest. Easy to extend: add an entry to SOURCES.
 
 import {
   scrapeDivarCity,
