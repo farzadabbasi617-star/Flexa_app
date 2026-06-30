@@ -192,9 +192,11 @@ export default function PriceEstimatePage() {
                 <span className="text-xs font-bold text-cyan-200">
                   {ai.source === "ai" ? "💡 قیمت پیشنهادی هوش مصنوعی" : "قیمت پایه (AI در دسترس نبود)"}
                 </span>
-                {ai.comparablesCount > 0 && (
-                  <span className="text-[10px] text-gray-400">بر پایه {ai.comparablesCount.toLocaleString("fa-IR")} آگهی بازار</span>
-                )}
+                <span className="text-[10px] text-gray-400">
+                  {ai.comparablesCount > 0
+                    ? `بر پایه ${ai.comparablesCount.toLocaleString("fa-IR")} آگهی بازار`
+                    : "بر پایه تحلیل هوش مصنوعی از بازار روز"}
+                </span>
               </div>
               <div className="mt-2 text-center text-2xl font-black text-cyan-100">{toman(ai.priceToman)}</div>
               <div className="mt-1 text-center text-[11px] text-gray-400">

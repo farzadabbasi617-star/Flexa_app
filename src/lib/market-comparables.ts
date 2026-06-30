@@ -77,35 +77,58 @@ async function fetchShop(name: string, url: string, limit: number): Promise<Comp
 }
 
 /**
+/** Wrap a promise with a hard timeout so one slow/blocked source can't stall us. */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise<T>((resolve) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (!done) {
+        done = true;
+        resolve(fallback);
+      }
+    }, ms);
+    p.then((v) => {
+      if (!done) {
+        done = true;
+        clearTimeout(timer);
+        resolve(v);
+      }
+    }).catch(() => {
+      if (!done) {
+        done = true;
+        clearTimeout(timer);
+        resolve(fallback);
+      }
+    });
+  });
+}
+
+/**
  * Collect comparables from all sources in parallel. Returns a flat, de-duplicated
- * list capped at `max`. Never throws.
+ * list capped at `max`. Never throws and never blocks longer than `perSourceMs`.
+ *
+ * NOTE: Divar/Sheypoor geo-block non-Iran servers, so from a foreign host these
+ * will simply time out and return []. The estimator then relies on the AI model's
+ * market knowledge. Set CLASSIFIED_PROXY_URL (Iran proxy) to enable live scraping.
  */
-export async function gatherComparables(game: EstimatorGame, max = 18): Promise<Comparable[]> {
+export async function gatherComparables(game: EstimatorGame, max = 18, perSourceMs = 6000): Promise<Comparable[]> {
   const term = SEARCH_TERMS[game];
   const per = 8;
 
   const tasks: Array<Promise<Comparable[]>> = [
-    scrapeDivarCity("tehran", { limit: per, query: term })
-      .then((ads) => ads.map((a) => adToComparable(a, "divar")))
-      .catch((err) => {
-        logger.warn({ err, game }, "divar comparables failed");
-        return [];
-      }),
-    scrapeSheypoorCity("tehran", { limit: per, query: term })
-      .then((ads) => ads.map((a) => adToComparable(a, "sheypoor")))
-      .catch((err) => {
-        logger.warn({ err, game }, "sheypoor comparables failed");
-        return [];
-      }),
-    fetchTorob(game, per).catch((err) => {
-      logger.warn({ err, game }, "torob comparables failed");
-      return [];
-    }),
+    withTimeout(
+      scrapeDivarCity("tehran", { limit: per, query: term }).then((ads) => ads.map((a) => adToComparable(a, "divar"))),
+      perSourceMs,
+      []
+    ),
+    withTimeout(
+      scrapeSheypoorCity("tehran", { limit: per, query: term }).then((ads) => ads.map((a) => adToComparable(a, "sheypoor"))),
+      perSourceMs,
+      []
+    ),
+    withTimeout(fetchTorob(game, per), perSourceMs, []),
     ...SHOP_SOURCES.map((s) =>
-      fetchShop(s.name, s.url(encodeURIComponent(term)), 6).catch((err) => {
-        logger.warn({ err, game, source: s.name }, "shop comparables failed");
-        return [];
-      })
+      withTimeout(fetchShop(s.name, s.url(encodeURIComponent(term)), 6), perSourceMs, [])
     ),
   ];
 
