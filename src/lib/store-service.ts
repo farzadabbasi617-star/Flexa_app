@@ -9,6 +9,7 @@ import {
   notifications,
 } from "@/db/schema";
 import { bigIntFromText } from "@/lib/money";
+import { getSellerStats } from "@/lib/seller-reputation";
 import logger from "@/lib/logger";
 
 /**
@@ -25,11 +26,12 @@ export class StoreError extends Error {
   }
 }
 
-export function computeFee(totalRial: bigint, source: "official" | "user") {
+export function computeFee(totalRial: bigint, source: "official" | "user", feeBps: number = PLATFORM_FEE_BPS) {
   if (source === "official") {
     return { platformFeeRial: BigInt(0), sellerPayoutRial: BigInt(0) };
   }
-  const platformFeeRial = (totalRial * BigInt(PLATFORM_FEE_BPS)) / BigInt(10000);
+  const bps = Number.isFinite(feeBps) && feeBps >= 0 ? Math.floor(feeBps) : PLATFORM_FEE_BPS;
+  const platformFeeRial = (totalRial * BigInt(bps)) / BigInt(10000);
   const sellerPayoutRial = totalRial - platformFeeRial;
   return { platformFeeRial, sellerPayoutRial };
 }
@@ -117,7 +119,17 @@ export async function createEscrowOrder(params: {
     if (totalPriceRial <= BigInt(0)) throw new StoreError("قیمت نامعتبر است", 400);
 
     const source = listing.source as "official" | "user";
-    const { platformFeeRial, sellerPayoutRial } = computeFee(totalPriceRial, source);
+    // Tiered commission: a higher-reputation seller pays a lower platform fee.
+    let feeBps = PLATFORM_FEE_BPS;
+    if (source === "user" && listing.sellerId) {
+      try {
+        const stats = await getSellerStats(listing.sellerId);
+        feeBps = stats.feeBps;
+      } catch {
+        // keep default fee on any failure
+      }
+    }
+    const { platformFeeRial, sellerPayoutRial } = computeFee(totalPriceRial, source, feeBps);
 
     // Lock & debit buyer wallet.
     const buyerWallet = await getOrCreateWalletTx(tx, buyerId);

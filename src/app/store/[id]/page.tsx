@@ -16,9 +16,28 @@ interface Listing {
   currencyAmount: number | null;
   stock: number;
   soldCount: number;
+  warrantyDays?: number;
   images: string[];
+  sellerId: string | null;
   sellerName: string | null;
   sellerVerified: boolean | null;
+}
+
+interface SellerInfo {
+  stats: {
+    avgRating: number;
+    reviewCount: number;
+    completedSales: number;
+    tierLabel: string;
+  };
+}
+
+interface Review {
+  id: string;
+  rating: number;
+  comment: string | null;
+  buyerName: string | null;
+  createdAt: string;
 }
 
 const KIND_LABELS: Record<string, string> = {
@@ -49,11 +68,26 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const [qty, setQty] = useState(1);
   const [buying, setBuying] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [seller, setSeller] = useState<SellerInfo | null>(null);
+  const [reviews, setReviews] = useState<Review[]>([]);
 
   useEffect(() => {
     fetch(`/api/store/listings/${id}`, { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject(r.status)))
-      .then((d) => setListing(d.listing))
+      .then((d) => {
+        setListing(d.listing);
+        // For user listings, load the seller's reputation + reviews.
+        if (d.listing?.source === "user" && d.listing?.sellerId) {
+          fetch(`/api/store/seller/${d.listing.sellerId}`, { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((s) => s && setSeller(s))
+            .catch(() => {});
+          fetch(`/api/store/reviews?sellerId=${d.listing.sellerId}`, { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : { items: [] }))
+            .then((s) => setReviews(Array.isArray(s.items) ? s.items : []))
+            .catch(() => {});
+        }
+      })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [id]);
@@ -86,6 +120,34 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       setMsg({ type: "err", text: "خطای ارتباط با سرور." });
     } finally {
       setBuying(false);
+    }
+  }
+
+  async function reportListing() {
+    if (!listing) return;
+    const reasonKey = window.prompt(
+      "دلیل گزارش را با شماره انتخاب کنید:\n1) کلاهبرداری\n2) آگهی جعلی\n3) قیمت نادرست\n4) محتوای نامناسب\n5) اکانت سرقتی\n6) سایر"
+    );
+    const map: Record<string, string> = {
+      "1": "fraud", "2": "fake", "3": "wrong_price", "4": "inappropriate", "5": "stolen_account", "6": "other",
+    };
+    const reason = map[String(reasonKey || "").trim()];
+    if (!reason) return;
+    const details = window.prompt("توضیح (اختیاری):") || undefined;
+    try {
+      const res = await fetch("/api/store/reports", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ listingId: listing.id, sellerId: listing.sellerId, reason, details }),
+      });
+      if (res.status === 401) {
+        setMsg({ type: "err", text: "برای گزارش ابتدا وارد شوید." });
+        return;
+      }
+      setMsg(res.ok ? { type: "ok", text: "گزارش شما ثبت شد و بررسی می‌شود." } : { type: "err", text: "ثبت گزارش ناموفق بود." });
+    } catch {
+      setMsg({ type: "err", text: "خطای ارتباط." });
     }
   }
 
@@ -162,10 +224,28 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             )}
 
             {listing.source === "user" && (
-              <p className="mt-2 text-sm text-gray-400">
-                فروشنده: <span className="font-bold text-gray-200">{listing.sellerName || "کاربر"}</span>
-                {listing.sellerVerified && <span className="mr-1 text-green-400">✔ احراز‌شده</span>}
-              </p>
+              <div className="mt-3 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">
+                    فروشنده: <span className="font-bold text-gray-100">{listing.sellerName || "کاربر"}</span>
+                    {listing.sellerVerified && <span className="mr-1 text-green-400">✔ احراز‌شده</span>}
+                  </span>
+                  {seller && (
+                    <span className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-black text-amber-300 ring-1 ring-amber-500/30">
+                      {seller.stats.tierLabel}
+                    </span>
+                  )}
+                </div>
+                {seller && (
+                  <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-400">
+                    <span className="text-amber-300">
+                      {seller.stats.avgRating > 0 ? `★ ${seller.stats.avgRating.toLocaleString("fa-IR")}` : "بدون امتیاز"}
+                      {seller.stats.reviewCount > 0 && ` (${seller.stats.reviewCount.toLocaleString("fa-IR")} نظر)`}
+                    </span>
+                    <span>· {seller.stats.completedSales.toLocaleString("fa-IR")} فروش موفق</span>
+                  </div>
+                )}
+              </div>
             )}
 
             <div className="mt-4 text-3xl font-black text-purple-200">{toman(listing.priceToman)}</div>
@@ -173,6 +253,11 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               {listing.stock > 0 ? `موجودی: ${listing.stock.toLocaleString("fa-IR")}` : "ناموجود"}
               {listing.soldCount > 0 && ` · ${listing.soldCount.toLocaleString("fa-IR")} فروش`}
             </p>
+            {listing.warrantyDays ? (
+              <p className="mt-2 inline-flex items-center gap-1 rounded-full bg-green-500/15 px-3 py-1 text-xs font-black text-green-300 ring-1 ring-green-500/30">
+                🛡️ {listing.warrantyDays.toLocaleString("fa-IR")} روز گارانتی
+              </p>
+            ) : null}
 
             {listing.description && (
               <div className="mt-4 whitespace-pre-wrap rounded-2xl border border-white/10 bg-white/[0.03] p-4 text-sm leading-7 text-gray-200">
@@ -199,8 +284,32 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             <div className="mt-4 rounded-2xl bg-cyan-500/10 p-3 text-xs leading-6 text-cyan-200 ring-1 ring-cyan-400/30">
               🛡️ پرداخت شما به‌صورت امانی نزد گیمنت نگه داشته می‌شود و فقط پس از تأیید دریافت، به فروشنده پرداخت می‌شود.
             </div>
+
+            {listing.source === "user" && (
+              <button onClick={reportListing} className="mt-3 text-xs font-bold text-gray-500 underline hover:text-red-300">
+                🚩 گزارش این آگهی
+              </button>
+            )}
           </div>
         </div>
+
+        {/* Seller reviews */}
+        {listing.source === "user" && reviews.length > 0 && (
+          <div className="mt-8">
+            <h2 className="mb-3 text-lg font-black">نظرات خریداران درباره‌ی این فروشنده</h2>
+            <div className="space-y-3">
+              {reviews.map((r) => (
+                <div key={r.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-bold text-gray-200">{r.buyerName || "خریدار"}</span>
+                    <span className="text-amber-300">{"★".repeat(r.rating)}<span className="text-gray-600">{"★".repeat(5 - r.rating)}</span></span>
+                  </div>
+                  {r.comment && <p className="mt-2 text-sm leading-7 text-gray-300">{r.comment}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {msg && (

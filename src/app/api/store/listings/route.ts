@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { storeListings, users } from "@/db/schema";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, lte, sql } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
 import { StoreListingCreateSchema } from "@/lib/validations";
 import { canUserSell } from "@/lib/store-service";
@@ -19,6 +19,10 @@ export async function GET(request: NextRequest) {
     const currencyKind = searchParams.get("currencyKind"); // gem | cp | uc | vbucks | ...
     const game = searchParams.get("game");
     const source = searchParams.get("source"); // official | user
+    const q = (searchParams.get("q") || "").trim().slice(0, 80);
+    const sort = searchParams.get("sort") || "newest"; // newest | cheapest | expensive | bestselling
+    const minToman = Number(searchParams.get("minToman") || "");
+    const maxToman = Number(searchParams.get("maxToman") || "");
     const page = Math.max(1, Number(searchParams.get("page") || "1"));
     const pageSize = Math.min(48, Math.max(1, Number(searchParams.get("pageSize") || "24")));
 
@@ -33,6 +37,25 @@ export async function GET(request: NextRequest) {
     if (source === "official" || source === "user") {
       conditions.push(eq(storeListings.source, source));
     }
+    if (q) {
+      conditions.push(ilike(storeListings.title, `%${q}%`));
+    }
+    // Price range filter (Toman -> Rial).
+    if (Number.isFinite(minToman) && minToman > 0) {
+      conditions.push(gte(storeListings.priceRial, String(BigInt(Math.floor(minToman)) * BigInt(10))));
+    }
+    if (Number.isFinite(maxToman) && maxToman > 0) {
+      conditions.push(lte(storeListings.priceRial, String(BigInt(Math.floor(maxToman)) * BigInt(10))));
+    }
+
+    const orderBy =
+      sort === "cheapest"
+        ? asc(storeListings.priceRial)
+        : sort === "expensive"
+          ? desc(storeListings.priceRial)
+          : sort === "bestselling"
+            ? desc(storeListings.soldCount)
+            : desc(storeListings.createdAt);
 
     const rows = await db
       .select({
@@ -47,6 +70,7 @@ export async function GET(request: NextRequest) {
         currencyAmount: storeListings.currencyAmount,
         stock: storeListings.stock,
         soldCount: storeListings.soldCount,
+        warrantyDays: storeListings.warrantyDays,
         images: storeListings.images,
         createdAt: storeListings.createdAt,
         sellerId: storeListings.sellerId,
@@ -55,7 +79,7 @@ export async function GET(request: NextRequest) {
       .from(storeListings)
       .leftJoin(users, eq(users.id, storeListings.sellerId))
       .where(and(...conditions))
-      .orderBy(desc(storeListings.createdAt))
+      .orderBy(orderBy)
       .limit(pageSize)
       .offset((page - 1) * pageSize);
 
@@ -117,6 +141,7 @@ export async function POST(request: NextRequest) {
         stock: d.stock,
         images: d.images,
         deliveryNotes: d.deliveryNotes ?? null,
+        warrantyDays: d.warrantyDays ?? 0,
         status: "pending_review",
       })
       .returning({ id: storeListings.id, status: storeListings.status });

@@ -110,6 +110,7 @@ export const StoreListingCreateSchema = z
     stock: z.coerce.number().int().min(1, "موجودی حداقل ۱").max(100000).default(1),
     images: z.array(httpUrl).max(8, "حداکثر ۸ تصویر").default([]),
     deliveryNotes: z.string().trim().max(5000).optional(),
+    warrantyDays: z.coerce.number().int().min(0).max(365).optional(),
   })
   .refine(
     (d) => d.kind !== "currency" || (d.currencyKind && d.currencyAmount),

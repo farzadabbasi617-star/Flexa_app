@@ -3,7 +3,18 @@
 import { useCallback, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 
-type Tab = "kyc" | "listings" | "orders" | "rates";
+type Tab = "kyc" | "listings" | "orders" | "reports" | "rates";
+
+interface ReportRow {
+  id: string;
+  reason: string;
+  reasonLabel: string;
+  details: string | null;
+  status: string;
+  listingId: string | null;
+  listingTitle: string | null;
+  reporterName: string | null;
+}
 
 type EstGame = "cod_mobile" | "clash_royale" | "fortnite";
 interface RateField {
@@ -63,6 +74,7 @@ export default function AdminStorePage() {
   const [rateGame, setRateGame] = useState<EstGame>("cod_mobile");
   const [rateFields, setRateFields] = useState<RateField[]>([]);
   const [savingRates, setSavingRates] = useState(false);
+  const [reports, setReports] = useState<ReportRow[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -76,6 +88,9 @@ export default function AdminStorePage() {
       } else if (tab === "orders") {
         const r = await fetch("/api/admin/store/orders?status=disputed", { cache: "no-store", credentials: "include" });
         const d = await r.json(); setOrders(Array.isArray(d.items) ? d.items : []);
+      } else if (tab === "reports") {
+        const r = await fetch("/api/admin/store/reports?status=open", { cache: "no-store", credentials: "include" });
+        const d = await r.json(); setReports(Array.isArray(d.items) ? d.items : []);
       } else if (tab === "rates") {
         const r = await fetch(`/api/admin/store/estimator-rates?game=${rateGame}`, { cache: "no-store", credentials: "include" });
         const d = await r.json(); setRateFields(Array.isArray(d.fields) ? d.fields : []);
@@ -84,6 +99,16 @@ export default function AdminStorePage() {
       setLoading(false);
     }
   }, [tab, rateGame]);
+
+  async function resolveReport(id: string, status: "resolved" | "dismissed") {
+    const adminNote = window.prompt("یادداشت (اختیاری):") || undefined;
+    const r = await fetch("/api/admin/store/reports", {
+      method: "PATCH", credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, status, adminNote }),
+    });
+    setMsg(r.ok ? "انجام شد" : "خطا"); load();
+  }
 
   async function saveRates() {
     if (savingRates) return;
@@ -140,6 +165,7 @@ export default function AdminStorePage() {
     { id: "kyc", label: "احراز هویت" },
     { id: "listings", label: "آگهی‌های در انتظار" },
     { id: "orders", label: "اختلافات" },
+    { id: "reports", label: "گزارش‌ها" },
     { id: "rates", label: "نرخ تخمین قیمت" },
   ];
 
@@ -205,6 +231,28 @@ export default function AdminStorePage() {
                     <div className="flex gap-2">
                       <button onClick={() => resolveOrder(o.id, "refund_buyer")} className="rounded-xl bg-purple-600 px-3 py-1.5 text-xs font-black">بازپرداخت خریدار</button>
                       <button onClick={() => resolveOrder(o.id, "release_seller")} className="rounded-xl bg-green-600 px-3 py-1.5 text-xs font-black">آزادسازی به فروشنده</button>
+                    </div>
+                  </div>
+                </div>
+              )))}
+
+              {tab === "reports" && (reports.length === 0 ? <Empty /> : reports.map((rep) => (
+                <div key={rep.id} className="rounded-3xl border border-red-500/30 bg-red-500/5 p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div>
+                      <h3 className="font-black">{rep.reasonLabel}</h3>
+                      <p className="mt-1 text-xs text-gray-400">
+                        گزارش‌دهنده: {rep.reporterName || "—"}
+                        {rep.listingTitle && ` · آگهی: ${rep.listingTitle}`}
+                      </p>
+                      {rep.details && <p className="mt-2 rounded-xl bg-black/40 p-2 text-xs text-red-200">{rep.details}</p>}
+                      {rep.listingId && (
+                        <a href={`/store/${rep.listingId}`} target="_blank" rel="noreferrer" className="mt-2 inline-block text-xs text-cyan-300 underline">مشاهده آگهی</a>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => resolveReport(rep.id, "resolved")} className="rounded-xl bg-green-600 px-3 py-1.5 text-xs font-black">رسیدگی شد</button>
+                      <button onClick={() => resolveReport(rep.id, "dismissed")} className="rounded-xl bg-gray-600 px-3 py-1.5 text-xs font-black">رد گزارش</button>
                     </div>
                   </div>
                 </div>

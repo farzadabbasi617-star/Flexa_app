@@ -25,6 +25,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         currencyAmount: storeListings.currencyAmount,
         stock: storeListings.stock,
         soldCount: storeListings.soldCount,
+        warrantyDays: storeListings.warrantyDays,
         images: storeListings.images,
         status: storeListings.status,
         createdAt: storeListings.createdAt,

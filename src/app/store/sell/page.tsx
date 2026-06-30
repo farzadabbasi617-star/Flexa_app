@@ -180,6 +180,7 @@ function ListingForm({ onMessage }: { onMessage: (m: { type: "ok" | "err"; text:
     currencyKind: "gem",
     currencyAmount: "",
     stock: "1",
+    warrantyDays: "",
     deliveryNotes: "",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -197,6 +198,7 @@ function ListingForm({ onMessage }: { onMessage: (m: { type: "ok" | "err"; text:
         stock: Number(form.stock),
         images,
         deliveryNotes: form.deliveryNotes || undefined,
+        warrantyDays: form.warrantyDays ? Number(form.warrantyDays) : undefined,
       };
       if (form.game) payload.game = form.game;
       if (form.kind === "currency") {
@@ -275,6 +277,12 @@ function ListingForm({ onMessage }: { onMessage: (m: { type: "ok" | "err"; text:
           <input className={inputCls} value={form.stock} onChange={(e) => setForm({ ...form, stock: e.target.value })} inputMode="numeric" disabled={form.kind === "account"} />
           {form.kind === "account" && <p className="mt-1 text-[11px] text-gray-500">برای اکانت، موجودی همیشه ۱ است.</p>}
         </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-xs font-bold text-gray-400">مدت گارانتی (روز) — اختیاری</label>
+        <input className={inputCls} value={form.warrantyDays} onChange={(e) => setForm({ ...form, warrantyDays: e.target.value.replace(/[^\d]/g, "") })} inputMode="numeric" placeholder="مثال: 7 (در صورت نداشتن، خالی بگذارید)" dir="ltr" />
+        <p className="mt-1 text-[11px] text-gray-500">گارانتی باعث افزایش اعتماد خریدار و شانس فروش می‌شود.</p>
       </div>
 
       <div>

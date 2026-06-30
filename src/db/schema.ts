@@ -65,6 +65,10 @@ export const storeListingStatusEnum = pgEnum("store_listing_status", [
   "draft", "pending_review", "active", "paused", "sold_out", "rejected", "archived"
 ]);
 
+export const storeReportStatusEnum = pgEnum("store_report_status", [
+  "open", "reviewing", "resolved", "dismissed"
+]);
+
 export const storeOrderStatusEnum = pgEnum("store_order_status", [
   "pending_payment", // order created, awaiting wallet debit
   "paid_escrow",     // buyer paid, funds held by platform
@@ -810,6 +814,8 @@ export const storeListings = pgTable("store_listings", {
   images: jsonb("images").notNull().default('[]'),
   // Account-specific protected details revealed only after a completed order.
   deliveryNotes: text("delivery_notes"),
+  // Warranty/guarantee window in days shown to buyers (0 = none).
+  warrantyDays: integer("warranty_days").notNull().default(0),
   status: storeListingStatusEnum("status").notNull().default("pending_review"),
   rejectionReason: text("rejection_reason"),
   reviewedBy: uuid("reviewed_by").references(() => users.id),
@@ -868,4 +874,41 @@ export const priceEstimatorRates = pgTable("price_estimator_rates", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   gameFieldUnique: uniqueIndex("price_estimator_rates_game_field_idx").on(table.game, table.fieldKey),
+}));
+
+// =========================================================================
+// STORE: seller reviews & abuse reports (trust & safety)
+// =========================================================================
+
+// One review per completed order, left by the buyer about the seller.
+export const sellerReviews = pgTable("seller_reviews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orderId: uuid("order_id").notNull().references(() => storeOrders.id).unique(),
+  sellerId: uuid("seller_id").notNull().references(() => users.id),
+  buyerId: uuid("buyer_id").notNull().references(() => users.id),
+  rating: integer("rating").notNull(), // 1..5
+  comment: text("comment"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  orderUnique: uniqueIndex("seller_reviews_order_idx").on(table.orderId),
+  sellerIdx: index("seller_reviews_seller_idx").on(table.sellerId),
+}));
+
+// Abuse reports against a listing/seller/order, reviewed by admins.
+export const storeReports = pgTable("store_reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  reporterId: uuid("reporter_id").notNull().references(() => users.id),
+  listingId: uuid("listing_id").references(() => storeListings.id),
+  sellerId: uuid("seller_id").references(() => users.id),
+  orderId: uuid("order_id").references(() => storeOrders.id),
+  reason: varchar("reason", { length: 80 }).notNull(),
+  details: text("details"),
+  status: storeReportStatusEnum("status").notNull().default("open"),
+  adminNote: text("admin_note"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index("store_reports_status_idx").on(table.status),
+  listingIdx: index("store_reports_listing_idx").on(table.listingId),
 }));

@@ -18,6 +18,7 @@ interface Listing {
   currencyAmount: number | null;
   stock: number;
   soldCount: number;
+  warrantyDays?: number;
   images: string[];
   sellerName: string | null;
 }
@@ -69,8 +70,19 @@ export default function StorePage() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<FilterId>("all");
   const [source, setSource] = useState<"all" | Source>("all");
+  const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [sort, setSort] = useState<"newest" | "cheapest" | "expensive" | "bestselling">("newest");
+  const [minToman, setMinToman] = useState("");
+  const [maxToman, setMaxToman] = useState("");
   const [buyingId, setBuyingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+
+  // Debounce the search box so we don't hit the API on every keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 400);
+    return () => clearTimeout(t);
+  }, [search]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -78,6 +90,10 @@ export default function StorePage() {
     const active = FILTERS.find((f) => f.id === filter);
     if (active && active.param) params.set(active.param, filter);
     if (source !== "all") params.set("source", source);
+    if (debouncedSearch) params.set("q", debouncedSearch);
+    if (sort !== "newest") params.set("sort", sort);
+    if (minToman) params.set("minToman", minToman);
+    if (maxToman) params.set("maxToman", maxToman);
     try {
       const res = await fetch(`/api/store/listings?${params.toString()}`, { cache: "no-store" });
       const data = await res.json();
@@ -87,7 +103,7 @@ export default function StorePage() {
     } finally {
       setLoading(false);
     }
-  }, [filter, source]);
+  }, [filter, source, debouncedSearch, sort, minToman, maxToman]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -189,6 +205,45 @@ export default function StorePage() {
           ))}
         </div>
 
+        {/* Search + sort + price range */}
+        <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="جستجو در عنوان آگهی‌ها..."
+            className="min-w-0 flex-1 rounded-2xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm outline-none transition placeholder:text-gray-600 focus:border-purple-400"
+          />
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as typeof sort)}
+            className="rounded-2xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-purple-400"
+          >
+            <option value="newest">جدیدترین</option>
+            <option value="cheapest">ارزان‌ترین</option>
+            <option value="expensive">گران‌ترین</option>
+            <option value="bestselling">پرفروش‌ترین</option>
+          </select>
+          <div className="flex items-center gap-2">
+            <input
+              value={minToman}
+              onChange={(e) => setMinToman(e.target.value.replace(/[^\d]/g, ""))}
+              placeholder="از (تومان)"
+              inputMode="numeric"
+              dir="ltr"
+              className="w-28 rounded-2xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-purple-400"
+            />
+            <span className="text-gray-500">—</span>
+            <input
+              value={maxToman}
+              onChange={(e) => setMaxToman(e.target.value.replace(/[^\d]/g, ""))}
+              placeholder="تا (تومان)"
+              inputMode="numeric"
+              dir="ltr"
+              className="w-28 rounded-2xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm outline-none focus:border-purple-400"
+            />
+          </div>
+        </div>
+
         {/* Grid */}
         {loading ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
@@ -236,6 +291,11 @@ export default function StorePage() {
                   {it.source === "user" && it.sellerName && (
                     <p className="mt-1 text-[10px] text-gray-500">فروشنده: {it.sellerName}</p>
                   )}
+                  {it.warrantyDays ? (
+                    <span className="mt-1 inline-flex w-fit items-center gap-1 rounded-full bg-green-500/15 px-2 py-0.5 text-[10px] font-black text-green-300 ring-1 ring-green-500/30">
+                      🛡️ {it.warrantyDays.toLocaleString("fa-IR")} روز گارانتی
+                    </span>
+                  ) : null}
                   <div className="mt-auto pt-3">
                     <div className="text-base font-black text-purple-200">{toman(it.priceToman)}</div>
                     <button

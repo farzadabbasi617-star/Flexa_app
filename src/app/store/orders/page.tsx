@@ -11,6 +11,7 @@ interface Order {
   quantity: number;
   totalPriceToman: number;
   status: string;
+  sellerId: string | null;
   iAmBuyer: boolean;
   iAmSeller: boolean;
   createdAt: string;
@@ -78,6 +79,28 @@ export default function OrdersPage() {
     }
   }
 
+  async function submitReview(id: string) {
+    const ratingStr = window.prompt("امتیاز شما به فروشنده (۱ تا ۵):");
+    const rating = Math.round(Number(ratingStr));
+    if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+      setMsg({ type: "err", text: "امتیاز باید بین ۱ تا ۵ باشد." });
+      return;
+    }
+    const comment = window.prompt("نظر شما (اختیاری):") || undefined;
+    try {
+      const res = await fetch("/api/store/reviews", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ orderId: id, rating, comment }),
+      });
+      const data = await res.json();
+      setMsg(res.ok ? { type: "ok", text: "نظر شما ثبت شد. ممنون!" } : { type: "err", text: data.error || "ثبت نظر ناموفق بود." });
+    } catch {
+      setMsg({ type: "err", text: "خطای ارتباط." });
+    }
+  }
+
   async function showDelivery(id: string) {
     try {
       const res = await fetch(`/api/store/orders/${id}`, { cache: "no-store", credentials: "include" });
@@ -137,6 +160,9 @@ export default function OrdersPage() {
                     )}
                     {o.iAmBuyer && ["delivered", "completed"].includes(o.status) && (
                       <button onClick={() => showDelivery(o.id)} className="rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black">نمایش اطلاعات تحویل</button>
+                    )}
+                    {o.iAmBuyer && o.status === "completed" && o.sellerId && (
+                      <button onClick={() => submitReview(o.id)} className="rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-black">★ ثبت نظر و امتیاز</button>
                     )}
                   </div>
 
