@@ -19,6 +19,11 @@ const AIAssistant = dynamic(() => import("./AIAssistant"), {
   loading: () => null,
 });
 
+const SplashScreen = dynamic(() => import("./SplashScreen"), {
+  ssr: false,
+  loading: () => null,
+});
+
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const { dir, lang } = useLanguage();
 
@@ -29,6 +34,7 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
 
   return (
     <>
+      <SplashScreen />
       <ThemeRuntime />
       {children}
       <AIAssistant />

@@ -1,10 +1,12 @@
-const CACHE_NAME = 'gament-v1';
+// Bump this version whenever cached assets/icons change. Bumping it forces the
+// activate handler below to delete ALL older caches, which clears any stale
+// app icon / manifest a previous version may have cached.
+const CACHE_NAME = 'gament-v3';
 
 const STATIC_ASSETS = [
   '/',
-  '/manifest.json',
-  '/icons/icon-192.svg',
-  '/icons/icon-512.svg',
+  '/icons/gament-icon-192.png',
+  '/icons/gament-icon-512.png',
 ];
 
 // Install
@@ -36,6 +38,18 @@ self.addEventListener('fetch', (event) => {
   
   // Skip API calls - always go to network
   if (event.request.url.includes('/api/')) return;
+
+  // Always fetch the manifest & icons fresh so the app icon never gets stuck on
+  // a previously-cached (e.g. old arena) version.
+  if (
+    event.request.url.includes('/manifest.json') ||
+    event.request.url.includes('/icons/')
+  ) {
+    event.respondWith(
+      fetch(event.request).catch(() => caches.match(event.request))
+    );
+    return;
+  }
 
   event.respondWith(
     fetch(event.request)
