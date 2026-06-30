@@ -33,12 +33,14 @@ export async function GET(request: NextRequest) {
   const stored: Record<string, bigint> = {};
   for (const r of rows) stored[r.fieldKey] = bigIntFromText(r.unitPriceRial);
 
-  const fields = ESTIMATOR_FIELDS[game as EstimatorGame].map((f) => ({
-    key: f.key,
-    label: f.label,
-    unitToman: Number((stored[f.key] ?? BigInt(f.defaultUnitRial)) / BigInt(10)),
-    isDefault: !(f.key in stored),
-  }));
+  const fields = ESTIMATOR_FIELDS[game as EstimatorGame]
+    .filter((f) => f.kind === "number") // only numeric fields have an editable unit price
+    .map((f) => ({
+      key: f.key,
+      label: f.label,
+      unitToman: Number((stored[f.key] ?? BigInt(f.defaultUnitRial ?? 0)) / BigInt(10)),
+      isDefault: !(f.key in stored),
+    }));
 
   return NextResponse.json({ game, fields });
 }
@@ -58,7 +60,8 @@ export async function PUT(request: NextRequest) {
 
     let updated = 0;
     for (const [fieldKey, tomanValue] of Object.entries(rates)) {
-      if (!getFieldDef(game as EstimatorGame, fieldKey)) continue; // ignore unknown fields
+      const def = getFieldDef(game as EstimatorGame, fieldKey);
+      if (!def || def.kind !== "number") continue; // ignore unknown / non-numeric fields
       const rial = parseTomanToRial(String(tomanValue));
       const value = rial < BigInt(0) ? "0" : rial.toString();
 

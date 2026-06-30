@@ -16,6 +16,7 @@ import {
   computeEstimate,
   type EstimatorGame,
 } from "@/lib/price-estimator";
+import { buildEstimatorSystemPrompt } from "@/lib/price-estimator-knowledge";
 import logger from "@/lib/logger";
 
 const GAME_LABEL: Record<EstimatorGame, string> = {
@@ -39,11 +40,17 @@ export interface AiEstimateResult {
   aiModel?: string;
 }
 
-/** Turn the entered numeric stats into a readable Persian description. */
-function describeAccount(game: EstimatorGame, values: Record<string, number>): string {
+/** Turn the entered stats (numbers + selected options) into a readable Persian description. */
+function describeAccount(game: EstimatorGame, values: Record<string, number | string>): string {
   const lines: string[] = [];
   for (const field of ESTIMATOR_FIELDS[game]) {
-    const n = values[field.key];
+    const raw = values[field.key];
+    if (field.kind === "choice") {
+      const opt = field.options?.find((o) => o.value === raw) ?? field.options?.find((o) => o.value === field.defaultValue);
+      if (opt) lines.push(`- ${field.label}: ${opt.label}`);
+      continue;
+    }
+    const n = Number(raw);
     if (Number.isFinite(n) && n > 0) {
       lines.push(`- ${field.label}: ${Math.floor(n).toLocaleString("fa-IR")}`);
     }
@@ -69,7 +76,7 @@ function parseTomanFromText(text: string): number | null {
  */
 export async function estimateAccountPrice(params: {
   game: EstimatorGame;
-  values: Record<string, number>;
+  values: Record<string, number | string>;
   unitPrices: Record<string, bigint>;
 }): Promise<AiEstimateResult> {
   const { game, values, unitPrices } = params;
@@ -120,17 +127,8 @@ export async function estimateAccountPrice(params: {
 
     const hasMarketData = comparables.length > 0;
 
-    const systemPrompt =
-      `تو یک کارشناس حرفه‌ای قیمت‌گذاری اکانت‌های بازی موبایل در بازار ایران هستی و قیمت‌های روز ` +
-      `بازار ایران (دیوار، شیپور، ترب و فروشگاه‌های تخصصی فروش اکانت) را به‌خوبی می‌شناسی. ` +
-      `وظیفه‌ات این است که برای اکانت داده‌شده یک قیمت منصفانه، دقیق و واقع‌بینانه به تومان تعیین کنی. ` +
-      `ارزش هر آیتم، لول اکانت، میزان ارز داخل‌بازی و کمیاب‌بودن آیتم‌ها را در نظر بگیر و با اکانت‌های هم‌رده و هم‌لول مقایسه کن. ` +
-      `قیمت‌ها در ایران به تومان است. زیادی خوش‌بینانه یا بدبینانه نباش؛ دقیقاً مطابق بازار روز قیمت بده. ` +
-      (hasMarketData
-        ? `از داده‌های واقعی بازار که در ادامه می‌آید استفاده کن. `
-        : `داده‌ی زنده‌ای از آگهی‌ها در دسترس نیست، پس بر اساس دانش به‌روز خودت از قیمت بازار ایران قیمت‌گذاری کن. `) +
-      `حتماً در همان ابتدای پاسخ، در یک خط، فقط به این شکل قیمت را بده: PRICE: <عدد تومان بدون جداکننده>. ` +
-      `سپس در ۲ تا ۴ جمله‌ی کوتاه فارسی دلیل قیمت را توضیح بده.`;
+    // Full expert pricing knowledge (logic + per-game importance + few-shot examples).
+    const systemPrompt = buildEstimatorSystemPrompt(game, hasMarketData);
 
     const marketBlock = hasMarketData
       ? `آگهی‌ها و قیمت‌های واقعی و روز از بازار ایران (${sources.join("، ")}):\n${comparablesToText(comparables)}\n\n`

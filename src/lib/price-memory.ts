@@ -29,22 +29,48 @@ function bucket(value: number): number {
   return Math.round(value / 5000) * 5000;
 }
 
+// Map a field value to a comparable number. For numeric fields this is the
+// number itself; for choice fields it's the selected option index (so distinct
+// regions / security states never collide in the signature).
+function fieldNumeric(
+  game: EstimatorGame,
+  key: string,
+  values: Record<string, number | string>
+): number {
+  const field = ESTIMATOR_FIELDS[game].find((f) => f.key === key);
+  if (field?.kind === "choice" && field.options?.length) {
+    const sel = values[key] ?? field.defaultValue;
+    const idx = field.options.findIndex((o) => o.value === sel);
+    return idx < 0 ? 0 : idx;
+  }
+  return Number(values[key]) || 0;
+}
+
 /** Build a stable signature string from the account stats for a given game. */
-export function buildSignature(game: EstimatorGame, values: Record<string, number>): string {
+export function buildSignature(game: EstimatorGame, values: Record<string, number | string>): string {
   const parts: string[] = [];
   for (const field of ESTIMATOR_FIELDS[game]) {
-    const v = Number(values[field.key]) || 0;
-    parts.push(`${field.key}:${bucket(v)}`);
+    const v = fieldNumeric(game, field.key, values);
+    // Choice fields keep their exact option index; numeric fields are bucketed.
+    parts.push(`${field.key}:${field.kind === "choice" ? v : bucket(v)}`);
   }
   return parts.join("|");
 }
 
 /** Weighted similarity distance between two stat maps (lower = more similar). */
-function distance(game: EstimatorGame, a: Record<string, number>, b: Record<string, number>): number {
+function distance(
+  game: EstimatorGame,
+  a: Record<string, number | string>,
+  b: Record<string, number | string>
+): number {
   let sum = 0;
   for (const field of ESTIMATOR_FIELDS[game]) {
-    const av = Number(a[field.key]) || 0;
-    const bv = Number(b[field.key]) || 0;
+    const av = fieldNumeric(game, field.key, a);
+    const bv = fieldNumeric(game, field.key, b);
+    if (field.kind === "choice") {
+      sum += av === bv ? 0 : 1; // choice mismatch = maximally different on that axis
+      continue;
+    }
     const denom = Math.max(av, bv, 1);
     sum += Math.abs(av - bv) / denom; // 0 (identical) .. 1 (very different) per field
   }
@@ -57,7 +83,7 @@ function distance(game: EstimatorGame, a: Record<string, number>, b: Record<stri
  */
 export async function lookupMemory(
   game: EstimatorGame,
-  values: Record<string, number>
+  values: Record<string, number | string>
 ): Promise<MemoryHit | null> {
   try {
     // Pull recent rows for this game (cap for performance), then rank by similarity.
@@ -77,7 +103,7 @@ export async function lookupMemory(
     // Score each row by similarity; keep close matches.
     const scored = rows
       .map((r) => {
-        const stats = (r.stats && typeof r.stats === "object" ? r.stats : {}) as Record<string, number>;
+        const stats = (r.stats && typeof r.stats === "object" ? r.stats : {}) as Record<string, number | string>;
         return {
           price: Number(r.priceToman) || 0,
           origin: r.origin,
@@ -125,7 +151,7 @@ export async function lookupMemory(
 /** Remember a valuation/sale so future similar accounts can be priced fast. */
 export async function rememberPrice(params: {
   game: EstimatorGame;
-  values: Record<string, number>;
+  values: Record<string, number | string>;
   priceToman: number;
   origin: "ai" | "sale";
 }): Promise<void> {

@@ -20,7 +20,9 @@ export const maxDuration = 60;
 // Resolve effective unit prices (admin overrides on top of defaults).
 async function resolveUnitPrices(game: EstimatorGame): Promise<Record<string, bigint>> {
   const map: Record<string, bigint> = {};
-  for (const f of ESTIMATOR_FIELDS[game]) map[f.key] = BigInt(f.defaultUnitRial);
+  for (const f of ESTIMATOR_FIELDS[game]) {
+    if (f.kind === "number") map[f.key] = BigInt(f.defaultUnitRial ?? 0);
+  }
   try {
     const rows = await db
       .select({ fieldKey: priceEstimatorRates.fieldKey, unitPriceRial: priceEstimatorRates.unitPriceRial })
@@ -44,9 +46,13 @@ export async function GET(request: NextRequest) {
   const fields = ESTIMATOR_FIELDS[game].map((f) => ({
     key: f.key,
     label: f.label,
-    min: f.min,
+    kind: f.kind,
+    min: f.min ?? 0,
     hint: f.hint ?? null,
-    unitToman: Number(unit[f.key] / BigInt(10)),
+    // Number fields: per-unit price (toman). Choice fields don't add value directly.
+    unitToman: f.kind === "number" ? Number((unit[f.key] ?? BigInt(0)) / BigInt(10)) : 0,
+    options: f.kind === "choice" ? (f.options ?? []) : undefined,
+    defaultValue: f.kind === "choice" ? (f.defaultValue ?? f.options?.[0]?.value) : undefined,
   }));
   return NextResponse.json({ game, fields });
 }
@@ -76,8 +82,15 @@ export async function POST(request: NextRequest) {
     }
 
     const rawValues = (body.values && typeof body.values === "object") ? body.values : {};
-    const values: Record<string, number> = {};
+    const values: Record<string, number | string> = {};
     for (const f of ESTIMATOR_FIELDS[game]) {
+      if (f.kind === "choice") {
+        // Validate the selected option; fall back to the default.
+        const sel = String(rawValues[f.key] ?? "");
+        const ok = f.options?.some((o) => o.value === sel);
+        values[f.key] = ok ? sel : (f.defaultValue ?? f.options?.[0]?.value ?? "");
+        continue;
+      }
       const n = Number(rawValues[f.key]);
       values[f.key] = Number.isFinite(n) && n > 0 ? Math.min(Math.floor(n), 100_000_000) : 0;
     }
