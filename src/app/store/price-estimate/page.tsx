@@ -28,17 +28,6 @@ const GAMES: Array<{ id: Game; label: string; icon: string }> = [
   { id: "fortnite", label: "فورتنایت", icon: "🛡️" },
 ];
 
-const SOURCE_LABELS: Record<string, string> = {
-  divar: "دیوار",
-  sheypoor: "شیپور",
-  torob: "ترب",
-  getgame: "فروشگاه گیم",
-  arzangem: "ارزان‌جم",
-  subgame: "ساب‌گیم",
-  teleplayer: "تله‌پلیر",
-  "iran-game": "ایران‌گیم",
-  memory: "اکانت‌های مشابه",
-};
 
 const inputCls =
   "w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm outline-none transition placeholder:text-gray-600 focus:border-purple-400";
@@ -60,8 +49,6 @@ export default function PriceEstimatePage() {
     rationale: string;
     source: "memory" | "ai" | "formula";
     comparablesCount: number;
-    sources?: string[];
-    aiModel?: string;
   } | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
 
@@ -153,7 +140,7 @@ export default function PriceEstimatePage() {
         <Link href="/store" className="text-sm text-gray-400 hover:text-white">← بازگشت به فروشگاه</Link>
         <h1 className="mt-3 text-2xl font-black sm:text-3xl">🧮 تخمین قیمت اکانت</h1>
         <p className="mt-2 text-sm text-gray-400">
-          مشخصات اکانت خود را وارد کنید تا قیمت تخمینی دریافت کنید. برای قیمت دقیق‌تر و مطابق بازار روز، دکمه‌ی «ارزیابی هوشمند» را بزنید.
+          مشخصات اکانت خود را وارد کنید تا قیمت تخمینی دریافت کنید. برای قیمت دقیق‌تر دکمه‌ی «ارزیابی هوشمند» را بزنید.
         </p>
 
         {/* Game selector */}
@@ -250,46 +237,24 @@ export default function PriceEstimatePage() {
             disabled={aiLoading || !hasInput}
             className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-600 py-3 text-sm font-black text-white shadow-lg transition active:scale-95 hover:brightness-110 disabled:opacity-40"
           >
-            {aiLoading ? "در حال ارزیابی هوشمند با بازار روز..." : "✨ ارزیابی هوشمند با هوش مصنوعی"}
+            {aiLoading ? "در حال ارزیابی هوشمند..." : "✨ ارزیابی هوشمند با هوش مصنوعی"}
           </button>
           {aiLoading && (
             <p className="mt-2 text-[11px] text-cyan-200/80">
-              در حال بررسی آگهی‌های واقعی بازار ایران و مقایسه با اکانت شما... (چند ثانیه)
+              در حال محاسبه‌ی دقیق قیمت اکانت شما... (چند ثانیه)
             </p>
           )}
           {aiError && <p className="mt-2 text-[11px] font-bold text-red-300">{aiError}</p>}
 
           {ai && (
             <div className="mt-4 rounded-2xl border border-cyan-400/30 bg-black/30 p-4 text-right">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-cyan-200">
-                  {ai.source === "memory"
-                    ? "🧠 قیمت بر پایه اکانت‌های مشابه"
-                    : ai.source === "ai"
-                      ? "💡 قیمت پیشنهادی هوش مصنوعی"
-                      : "قیمت پایه (AI در دسترس نبود)"}
-                </span>
-                <span className="text-[10px] text-gray-400">
-                  {ai.source === "memory"
-                    ? `بر پایه ${ai.comparablesCount.toLocaleString("fa-IR")} اکانت مشابه`
-                    : ai.comparablesCount > 0
-                      ? `بر پایه ${ai.comparablesCount.toLocaleString("fa-IR")} آگهی بازار`
-                      : "بر پایه تحلیل هوش مصنوعی از بازار روز"}
-                </span>
+              <div className="text-center text-xs font-bold text-cyan-200">
+                {ai.source === "formula" ? "قیمت تخمینی" : "💡 قیمت پیشنهادی هوشمند"}
               </div>
               <div className="mt-2 text-center text-2xl font-black text-cyan-100">{toman(ai.priceToman)}</div>
               <div className="mt-1 text-center text-[11px] text-gray-400">
                 بازه‌ی منصفانه: {toman(ai.minToman)} تا {toman(ai.maxToman)}
               </div>
-              {ai.sources && ai.sources.length > 0 && (
-                <div className="mt-2 flex flex-wrap justify-center gap-1.5">
-                  {ai.sources.map((s) => (
-                    <span key={s} className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-bold text-gray-300">
-                      {SOURCE_LABELS[s] || s}
-                    </span>
-                  ))}
-                </div>
-              )}
               {ai.rationale && (
                 <p className="mt-3 whitespace-pre-wrap text-xs leading-7 text-gray-200">{ai.rationale}</p>
               )}
@@ -305,7 +270,7 @@ export default function PriceEstimatePage() {
         </div>
 
         <p className="mt-4 text-center text-[11px] leading-6 text-gray-500">
-          ⚠️ قیمت‌ها تخمینی هستند. ارزیابی هوشمند، آیتم‌ها و وضعیت اکانت شما (ریجن، سیو، دسترسی) را با قیمت بازار روز می‌سنجد، اما قیمت نهایی فروش ممکن است متفاوت باشد.
+          ⚠️ قیمت‌ها صرفاً تخمینی هستند و قیمت نهایی فروش ممکن است متفاوت باشد.
         </p>
       </div>
     </main>

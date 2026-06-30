@@ -81,22 +81,22 @@ export const ESTIMATOR_FIELDS: Record<EstimatorGame, EstimatorField[]> = {
   // Mirrors the exact vg-store fields (9 item fields) + region & security
   // modifiers that strongly drive real market price.
   cod_mobile: [
-    num("level", "لول اکانت", 1000, { min: 50, hint: "حداقل لول ۵۰ · هر لول" }),
-    num("cp", "تعداد CP", 20, { min: 0, hint: "سی‌پی باقی‌مانده · هر CP" }),
-    num("gun_epic", "تعداد گان اپیک (کادر بنفش)", 8000, { min: 0, hint: "حداقل ۵ گان اپیک" }),
-    num("gun_legendary_free", "تعداد گان لجندری رایگان (کادر طلایی)", 15000, { min: 0 }),
-    num("gun_legendary_paid", "تعداد گان لجندری غیررایگان (کادر طلایی)", 45000, { min: 0 }),
-    num("gun_mythic", "تعداد گان متیک غیررایگان (کادر قرمز)", 120000, { min: 0 }),
-    num("skin_epic", "تعداد اسکین اپیک (لباس کادر بنفش)", 6000, { min: 0 }),
-    num("skin_legendary", "تعداد اسکین لجندری (لباس کادر طلایی)", 25000, { min: 0 }),
-    num("skin_mythic", "تعداد اسکین متیک (لباس کادر قرمز)", 90000, { min: 0 }),
+    num("level", "لول اکانت", 3000, { min: 50, hint: "حداقل لول ۵۰ · هر لول" }),
+    num("cp", "تعداد CP", 30, { min: 0, hint: "سی‌پی باقی‌مانده · هر CP" }),
+    num("gun_epic", "تعداد گان اپیک (کادر بنفش)", 30000, { min: 0, hint: "حداقل ۵ گان اپیک" }),
+    num("gun_legendary_free", "تعداد گان لجندری رایگان (کادر طلایی)", 30000, { min: 0 }),
+    num("gun_legendary_paid", "تعداد گان لجندری غیررایگان (کادر طلایی)", 500000, { min: 0 }),
+    num("gun_mythic", "تعداد گان متیک غیررایگان (کادر قرمز)", 2000000, { min: 0 }),
+    num("skin_epic", "تعداد اسکین اپیک (لباس کادر بنفش)", 25000, { min: 0 }),
+    num("skin_legendary", "تعداد اسکین لجندری (لباس کادر طلایی)", 150000, { min: 0 }),
+    num("skin_mythic", "تعداد اسکین متیک (لباس کادر قرمز)", 1500000, { min: 0 }),
     choice(
       "region",
       "ریجن اکانت",
       [
-        { value: "global", label: "گلوبال (Activision)", multiplier: 1.0 },
-        { value: "india", label: "هند (خوش‌فروش‌تر)", multiplier: 1.08 },
-        { value: "garena", label: "گارنا (Garena)", multiplier: 0.85 },
+        { value: "global", label: "گلوبال", multiplier: 1.0 },
+        { value: "india", label: "هند (خوش‌فروش‌تر)", multiplier: 1.1 },
+        { value: "garena", label: "گارنا", multiplier: 0.8 },
       ],
       "ریجن هند معمولاً خوش‌فروش‌تر است"
     ),
@@ -104,10 +104,10 @@ export const ESTIMATOR_FIELDS: Record<EstimatorGame, EstimatorField[]> = {
       "security",
       "وضعیت امنیت/سیو",
       [
-        { value: "raw_gmail", label: "جیمیل خام / تک‌سیو امن", multiplier: 1.0 },
-        { value: "two_save", label: "دو سیو", multiplier: 0.8 },
-        { value: "three_save", label: "سه سیو یا بیشتر", multiplier: 0.6 },
-        { value: "locked_email", label: "ایمیل غیرقابل تغییر", multiplier: 0.55 },
+        { value: "raw_gmail", label: "جیمیل خام / تک‌سیو امن", multiplier: 1.1 },
+        { value: "two_save", label: "دو سیو", multiplier: 0.9 },
+        { value: "three_save", label: "سه سیو یا بیشتر", multiplier: 0.7 },
+        { value: "locked_email", label: "ایمیل غیرقابل تغییر", multiplier: 0.6 },
       ],
       "هرچه سیو کمتر و ایمیل قابل تغییر باشد، امن‌تر و گران‌تر"
     ),
@@ -116,35 +116,44 @@ export const ESTIMATOR_FIELDS: Record<EstimatorGame, EstimatorField[]> = {
   // ── Clash Royale ─────────────────────────────────────────────────────
   clash_royale: [
     num("king_level", "لول کینگ (King Level)", 25000, { min: 1, hint: "هر لول کینگ" }),
-    num("max_cards", "تعداد کارت مکس‌شده (Lvl 15/Elite)", 9000, { min: 0 }),
-    num("evolution_cards", "تعداد کارت Evolution", 14000, { min: 0 }),
-    num("champion_cards", "تعداد کارت چمپیون باز شده", 12000, { min: 0 }),
-    num("legendary_cards", "تعداد کارت لجندری", 5000, { min: 0 }),
-    num("trophies", "بیشترین جام (Best Trophy)", 60, { min: 0 }),
-    num("emotes", "تعداد ایموت کمیاب", 3000, { min: 0 }),
-    num("tower_skins", "تعداد اسکین تاور (Tower Skin)", 9000, { min: 0, hint: "حداکثر ۱۰۰" }),
-    num("gems", "تعداد جم باقی‌مانده", 30, { min: 0 }),
+    num("max_cards", "تعداد کارت مکس‌شده (Lvl 14/15)", 30000, { min: 0 }),
+    num("evolution_cards", "تعداد کارت Evolution", 120000, { min: 0 }),
+    num("champion_cards", "تعداد کارت چمپیون باز شده", 80000, { min: 0 }),
+    num("legendary_cards", "تعداد کارت لجندری", 10000, { min: 0 }),
+    num("trophies", "بیشترین جام (Best Trophy)", 50, { min: 0 }),
+    num("emotes", "تعداد ایموت کمیاب", 15000, { min: 0 }),
+    num("tower_skins", "تعداد اسکین تاور (Tower Skin)", 40000, { min: 0, hint: "حداکثر ۱۰۰" }),
+    num("gems", "تعداد جم باقی‌مانده", 90, { min: 0, hint: "هر ۱۰۰۰ جم حدود ۹۰٬۰۰۰ تومان" }),
+    choice(
+      "access",
+      "وضعیت دسترسی",
+      [
+        { value: "transferable", label: "ایمیل قابل تحویل و تغییر", multiplier: 1.0 },
+        { value: "limited", label: "تغییر ایمیل سخت/زمان‌بر", multiplier: 0.85 },
+        { value: "no_email", label: "بدون دسترسی ایمیل اصلی", multiplier: 0.5 },
+      ]
+    ),
   ],
 
   // ── Fortnite ─────────────────────────────────────────────────────────
   fortnite: [
-    num("og_skins", "تعداد اسکین OG/کمیاب", 250000, {
+    num("og_skins", "تعداد اسکین OG/کمیاب", 600000, {
       min: 0,
       hint: "مثل Black Knight، Renegade Raider، Galaxy، Ikonik، Travis Scott",
     }),
-    num("old_battlepasses", "تعداد بتل‌پس قدیمی (فصل‌های ابتدایی)", 70000, { min: 0 }),
-    num("rare_pickaxes", "تعداد کلنگ کمیاب (Pickaxe)", 15000, { min: 0 }),
-    num("rare_emotes", "تعداد ایموت کمیاب (Emote)", 12000, { min: 0 }),
+    num("old_battlepasses", "تعداد بتل‌پس قدیمی (فصل‌های ابتدایی)", 80000, { min: 0 }),
+    num("rare_emotes", "تعداد ایموت کمیاب (Emote)", 80000, { min: 0 }),
+    num("rare_pickaxes", "تعداد کلنگ کمیاب (Pickaxe)", 40000, { min: 0 }),
     num("total_skins", "تعداد کل اسکین", 12000, { min: 0 }),
-    num("vbucks", "موجودی وی‌باکس (V-Bucks)", 80, { min: 0 }),
-    num("level", "لول اکانت", 300, { min: 1, hint: "اثر کم بر قیمت" }),
+    num("vbucks", "موجودی وی‌باکس (V-Bucks)", 1, { min: 0, hint: "هر ۱۰۰۰ وی‌باکس حدود ۱٬۰۰۰٬۰۰۰ تومان" }),
+    num("level", "لول اکانت", 200, { min: 1, hint: "اثر کم بر قیمت" }),
     choice(
       "full_access",
       "نوع دسترسی",
       [
-        { value: "full", label: "فول‌اکسس Epic (قابل تغییر ایمیل)", multiplier: 1.0 },
-        { value: "mail_access", label: "میل‌اکسس (ایمیل در دسترس)", multiplier: 0.8 },
-        { value: "no_access", label: "بدون دسترسی ایمیل", multiplier: 0.55 },
+        { value: "full", label: "فول‌اکسس (قابل تغییر ایمیل)", multiplier: 1.1 },
+        { value: "mail_access", label: "میل‌اکسس (ایمیل در دسترس)", multiplier: 0.85 },
+        { value: "no_access", label: "بدون دسترسی ایمیل", multiplier: 0.6 },
       ]
     ),
     choice(
@@ -152,9 +161,9 @@ export const ESTIMATOR_FIELDS: Record<EstimatorGame, EstimatorField[]> = {
       "قابلیت لینک پلتفرم",
       [
         { value: "psn_linkable", label: "قابل لینک به PSN/Xbox", multiplier: 1.0 },
-        { value: "no_psn", label: "بدون قابلیت لینک PSN", multiplier: 0.55 },
+        { value: "no_psn", label: "قفل‌شده / بدون قابلیت لینک PSN", multiplier: 0.65 },
       ],
-      "خریدار ایرانی اغلب PS دارد؛ نبود لینک PSN قیمت را پایین می‌آورد"
+      "خریدار ایرانی اغلب PS دارد؛ نبود امکان لینک PSN قیمت را پایین می‌آورد"
     ),
   ],
 };

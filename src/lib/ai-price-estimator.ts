@@ -58,6 +58,31 @@ function describeAccount(game: EstimatorGame, values: Record<string, number | st
   return lines.length ? lines.join("\n") : "- اطلاعاتی وارد نشده است";
 }
 
+/**
+ * Remove any third-party source / shop names from the rationale shown to the
+ * user, so the explanation never reveals where prices were referenced from.
+ */
+function sanitizeRationale(text: string): string {
+  let out = text;
+  // Known site/source names (and their Persian spellings) — never surfaced.
+  const names = [
+    /دیوار/g,
+    /شیپور/g,
+    /\bترب\b/g,
+    /وی[‌ ]?جی[‌ ]?استور/g,
+    /vg[- ]?store/gi,
+    /arzangem|ارزان[‌ ]?جم/gi,
+    /subgame|ساب[‌ ]?گیم/gi,
+    /teleplayer|تله[‌ ]?پلیر/gi,
+    /getgame|گت[‌ ]?گیم/gi,
+    /divar|sheypoor|torob/gi,
+  ];
+  for (const re of names) out = out.replace(re, "بازار");
+  // Collapse phrases like "بر اساس آگهی‌های بازار/بازار" left behind.
+  out = out.replace(/(بازار)([،\s]+بازار)+/g, "$1");
+  return out;
+}
+
 /** Extract the first integer Toman value from a free-form AI text. */
 function parseTomanFromText(text: string): number | null {
   // Prefer an explicit JSON-ish "price": number
@@ -131,7 +156,7 @@ export async function estimateAccountPrice(params: {
     const systemPrompt = buildEstimatorSystemPrompt(game, hasMarketData);
 
     const marketBlock = hasMarketData
-      ? `آگهی‌ها و قیمت‌های واقعی و روز از بازار ایران (${sources.join("، ")}):\n${comparablesToText(comparables)}\n\n`
+      ? `قیمت‌های مرجع روز بازار ایران برای اکانت‌های مشابه:\n${comparablesToText(comparables)}\n\n`
       : "";
 
     const userPrompt =
@@ -157,10 +182,11 @@ export async function estimateAccountPrice(params: {
       });
     }
 
-    // Strip the leading "PRICE: ..." line from the rationale shown to users.
+    // Strip the leading "PRICE: ..." line + any source/site names from the
+    // rationale shown to users (we never reveal where prices are referenced from).
     const rationale =
-      aiText.replace(/^.*PRICE\s*[:=].*$/im, "").trim().slice(0, 600) ||
-      "قیمت بر اساس ارزش آیتم‌ها و مقایسه با بازار روز تعیین شد.";
+      sanitizeRationale(aiText.replace(/^.*PRICE\s*[:=].*$/im, "")).trim().slice(0, 600) ||
+      "قیمت بر اساس ارزش آیتم‌ها و وضعیت اکانت تعیین شد.";
 
     // Remember this AI valuation so similar future accounts get a fast estimate.
     void rememberPrice({ game, values, priceToman: aiPrice, origin: "ai" });

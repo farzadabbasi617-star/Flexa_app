@@ -107,8 +107,6 @@ export async function POST(request: NextRequest) {
         rationale: result.rationale,
         source: result.source,
         comparablesCount: result.comparablesCount,
-        sources: result.sources,
-        aiModel: result.aiModel,
       });
     }
 
