@@ -69,6 +69,15 @@ export const storeReportStatusEnum = pgEnum("store_report_status", [
   "open", "reviewing", "resolved", "dismissed"
 ]);
 
+// Price-negotiation offers a buyer makes on a listing.
+export const storeOfferStatusEnum = pgEnum("store_offer_status", [
+  "pending",   // waiting for the seller to respond
+  "accepted",  // seller accepted -> an escrow order is created
+  "rejected",  // seller rejected
+  "withdrawn", // buyer cancelled their offer
+  "expired"    // offer timed out
+]);
+
 export const storeOrderStatusEnum = pgEnum("store_order_status", [
   "pending_payment", // order created, awaiting wallet debit
   "paid_escrow",     // buyer paid, funds held by platform
@@ -932,4 +941,33 @@ export const priceMemory = pgTable("price_memory", {
 }, (table) => ({
   gameSigIdx: index("price_memory_game_sig_idx").on(table.game, table.signature),
   gameOriginIdx: index("price_memory_game_origin_idx").on(table.game, table.origin),
+}));
+
+// =========================================================================
+// STORE: price-negotiation offers
+// A buyer proposes a price on a user listing; the seller accepts (which creates
+// an escrow order at the agreed price) or rejects. Lets buyers haggle within
+// the estimated price range instead of paying a fixed sticker price.
+// =========================================================================
+export const storeOffers = pgTable("store_offers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  listingId: uuid("listing_id").notNull().references(() => storeListings.id),
+  buyerId: uuid("buyer_id").notNull().references(() => users.id),
+  sellerId: uuid("seller_id").notNull().references(() => users.id),
+  // Proposed unit price in RIAL (stored like all other money fields).
+  offerPriceRial: numeric("offer_price_rial", { precision: 20, scale: 0 }).notNull(),
+  // Snapshot of the listing's sticker price when the offer was made.
+  listingPriceRial: numeric("listing_price_rial", { precision: 20, scale: 0 }).notNull(),
+  message: text("message"),
+  status: storeOfferStatusEnum("status").notNull().default("pending"),
+  // Set when accepted: the escrow order that was created from this offer.
+  orderId: uuid("order_id").references(() => storeOrders.id),
+  respondedAt: timestamp("responded_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  listingIdx: index("store_offers_listing_idx").on(table.listingId),
+  buyerIdx: index("store_offers_buyer_idx").on(table.buyerId),
+  sellerStatusIdx: index("store_offers_seller_status_idx").on(table.sellerId, table.status),
 }));

@@ -56,7 +56,21 @@ const CURRENCY_ICONS: Record<string, string> = {
   vbucks: "/icons/currencies/vbucks.png",
 };
 
-function toman(n: number) { return `${n.toLocaleString("fa-IR")} تومان`; }
+function toman(n: number) { return `${Math.round(n).toLocaleString("fa-IR")} تومان`; }
+
+function roundNice(n: number, dir: "down" | "up" | "near" = "near"): number {
+  if (n <= 0) return 0;
+  let step = 1000;
+  if (n >= 50_000_000) step = 1_000_000;
+  else if (n >= 10_000_000) step = 500_000;
+  else if (n >= 2_000_000) step = 100_000;
+  else if (n >= 500_000) step = 50_000;
+  else if (n >= 100_000) step = 10_000;
+  else step = 5_000;
+  const q = n / step;
+  const r = dir === "down" ? Math.floor(q) : dir === "up" ? Math.ceil(q) : Math.round(q);
+  return Math.max(step, r * step);
+}
 
 export default function ListingDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -70,6 +84,11 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [seller, setSeller] = useState<SellerInfo | null>(null);
   const [reviews, setReviews] = useState<Review[]>([]);
+  // Price-offer (negotiation) state.
+  const [showOffer, setShowOffer] = useState(false);
+  const [offerToman, setOfferToman] = useState("");
+  const [offerMsg, setOfferMsg] = useState("");
+  const [sendingOffer, setSendingOffer] = useState(false);
 
   useEffect(() => {
     fetch(`/api/store/listings/${id}`, { cache: "no-store" })
@@ -120,6 +139,42 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
       setMsg({ type: "err", text: "خطای ارتباط با سرور." });
     } finally {
       setBuying(false);
+    }
+  }
+
+  async function sendOffer() {
+    if (!listing || sendingOffer) return;
+    const amount = Number(offerToman);
+    if (!Number.isFinite(amount) || amount < 1000) {
+      setMsg({ type: "err", text: "مبلغ پیشنهادی معتبر نیست." });
+      return;
+    }
+    setSendingOffer(true);
+    try {
+      const res = await fetch("/api/store/offers", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ listingId: listing.id, offerToman: Math.floor(amount), message: offerMsg || undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (res.status === 401) {
+          setMsg({ type: "err", text: "برای پیشنهاد قیمت ابتدا وارد شوید." });
+          setTimeout(() => router.push("/login"), 1200);
+        } else {
+          setMsg({ type: "err", text: data.error || "ثبت پیشنهاد ناموفق بود." });
+        }
+        return;
+      }
+      setMsg({ type: "ok", text: "پیشنهاد شما برای فروشنده ارسال شد. نتیجه را در «سفارش‌ها» می‌بینید." });
+      setShowOffer(false);
+      setOfferToman("");
+      setOfferMsg("");
+    } catch {
+      setMsg({ type: "err", text: "خطای ارتباط با سرور." });
+    } finally {
+      setSendingOffer(false);
     }
   }
 
@@ -278,6 +333,62 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                 <button onClick={buy} disabled={buying} className="flex-1 rounded-2xl bg-purple-600 py-3.5 text-sm font-black shadow-lg shadow-purple-700/30 transition active:scale-95 hover:bg-purple-500 disabled:opacity-40">
                   {buying ? "در حال ثبت..." : `خرید · ${toman(totalToman)}`}
                 </button>
+              </div>
+            )}
+
+            {/* Price negotiation (only for user listings) */}
+            {listing.source === "user" && listing.stock > 0 && (
+              <div className="mt-3">
+                {!showOffer ? (
+                  <button
+                    onClick={() => {
+                      setShowOffer(true);
+                      // Suggest a starting offer around 90% of the sticker price.
+                      if (!offerToman) setOfferToman(String(Math.round((listing.priceToman * 0.9) / 1000) * 1000));
+                    }}
+                    className="w-full rounded-2xl border border-cyan-400/40 bg-cyan-500/10 py-3 text-sm font-black text-cyan-200 transition hover:bg-cyan-500/20"
+                  >
+                    💬 پیشنهاد قیمت به فروشنده
+                  </button>
+                ) : (
+                  <div className="rounded-2xl border border-cyan-400/30 bg-black/30 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-black text-cyan-200">پیشنهاد قیمت شما</span>
+                      <button onClick={() => setShowOffer(false)} className="text-xs text-gray-400 hover:text-white">بستن ✕</button>
+                    </div>
+                    <p className="mt-1 text-[11px] text-gray-400">
+                      بازه‌ی پیشنهادی: {toman(roundNice(listing.priceToman * 0.8, "down"))} تا {toman(listing.priceToman)}
+                    </p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <input
+                        value={offerToman}
+                        onChange={(e) => setOfferToman(e.target.value.replace(/[^\d]/g, ""))}
+                        inputMode="numeric"
+                        dir="ltr"
+                        placeholder="مبلغ به تومان"
+                        className="w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-3 text-sm text-left outline-none focus:border-cyan-400"
+                      />
+                      <span className="shrink-0 text-xs text-gray-400">تومان</span>
+                    </div>
+                    <textarea
+                      value={offerMsg}
+                      onChange={(e) => setOfferMsg(e.target.value.slice(0, 500))}
+                      placeholder="پیام برای فروشنده (اختیاری)"
+                      rows={2}
+                      className="mt-2 w-full rounded-2xl border border-white/10 bg-black/40 px-4 py-2.5 text-sm outline-none focus:border-cyan-400"
+                    />
+                    <button
+                      onClick={sendOffer}
+                      disabled={sendingOffer}
+                      className="mt-3 w-full rounded-2xl bg-gradient-to-r from-cyan-500 to-purple-600 py-3 text-sm font-black text-white transition active:scale-95 hover:brightness-110 disabled:opacity-40"
+                    >
+                      {sendingOffer ? "در حال ارسال..." : "ارسال پیشنهاد"}
+                    </button>
+                    <p className="mt-2 text-[11px] leading-5 text-gray-500">
+                      فروشنده می‌تواند پیشنهاد شما را بپذیرد یا رد کند. اگر بپذیرد، سفارش با همان مبلغ ثبت و از کیف پول شما کسر می‌شود.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import {
   storeListings,
   storeOrders,
+  storeOffers,
   wallets,
   transactions,
   kycProfiles,
@@ -95,10 +96,14 @@ export async function createEscrowOrder(params: {
   listingId: string;
   quantity: number;
   buyerNote?: string;
+  /** Optional agreed unit price (RIAL), e.g. from an accepted offer. */
+  overrideUnitPriceRial?: bigint;
+  /** Optional existing transaction handle (used when accepting an offer). */
+  tx?: Tx;
 }) {
-  const { buyerId, listingId, quantity, buyerNote } = params;
+  const { buyerId, listingId, quantity, buyerNote, overrideUnitPriceRial, tx: outerTx } = params;
 
-  return db.transaction(async (tx) => {
+  const run = async (tx: Tx) => {
     // Lock listing to prevent overselling under concurrency.
     const [listing] = await tx
       .select()
@@ -114,7 +119,10 @@ export async function createEscrowOrder(params: {
     }
     if (listing.stock < quantity) throw new StoreError("موجودی کافی نیست", 409);
 
-    const unitPriceRial = bigIntFromText(listing.priceRial);
+    const unitPriceRial =
+      overrideUnitPriceRial && overrideUnitPriceRial > BigInt(0)
+        ? overrideUnitPriceRial
+        : bigIntFromText(listing.priceRial);
     const totalPriceRial = unitPriceRial * BigInt(quantity);
     if (totalPriceRial <= BigInt(0)) throw new StoreError("قیمت نامعتبر است", 400);
 
@@ -201,7 +209,10 @@ export async function createEscrowOrder(params: {
       await notify(listing.sellerId, "سفارش جدید", `کالای «${listing.title}» شما خریداری شد. لطفاً تحویل دهید.`, order.id);
     }
     return order;
-  });
+  };
+
+  // Reuse an existing transaction (offer-accept) or open a fresh one.
+  return outerTx ? run(outerTx) : db.transaction(run);
 }
 
 /** Seller (or platform) marks the order as delivered. */
@@ -413,4 +424,170 @@ export async function openDispute(orderId: string, actorId: string, reason: stri
   const otherParty = order.buyerId === actorId ? order.sellerId : order.buyerId;
   await notify(otherParty, "اعتراض ثبت شد", "برای یکی از سفارش‌ها اعتراض ثبت شد و در حال بررسی توسط تیم گیمنت است.", orderId);
   return updated;
+}
+
+// =========================================================================
+// PRICE-NEGOTIATION OFFERS
+// =========================================================================
+
+/** Default window (hours) before a pending offer auto-expires. */
+const OFFER_TTL_HOURS = 72;
+
+/**
+ * Buyer makes a price offer on a user listing. Validates the listing is an
+ * active P2P listing the buyer doesn't own, then records a pending offer.
+ */
+export async function createOffer(params: {
+  buyerId: string;
+  listingId: string;
+  offerToman: number;
+  message?: string;
+}) {
+  const { buyerId, listingId, offerToman, message } = params;
+
+  const [listing] = await db
+    .select()
+    .from(storeListings)
+    .where(eq(storeListings.id, listingId))
+    .limit(1);
+
+  if (!listing) throw new StoreError("آگهی یافت نشد", 404);
+  if (listing.source !== "user" || !listing.sellerId) {
+    throw new StoreError("پیشنهاد قیمت فقط برای آگهی‌های کاربران ممکن است", 409);
+  }
+  if (listing.status !== "active") throw new StoreError("این آگهی فعال نیست", 409);
+  if (listing.sellerId === buyerId) throw new StoreError("نمی‌توانید برای کالای خودتان پیشنهاد بدهید", 409);
+  if (listing.stock < 1) throw new StoreError("موجودی کافی نیست", 409);
+
+  const offerRial = BigInt(Math.floor(offerToman)) * BigInt(10);
+  if (offerRial <= BigInt(0)) throw new StoreError("مبلغ پیشنهادی نامعتبر است", 400);
+
+  // Prevent spamming the same seller: cap active pending offers per buyer/listing.
+  const existing = await db
+    .select({ id: storeOffers.id })
+    .from(storeOffers)
+    .where(
+      and(
+        eq(storeOffers.listingId, listingId),
+        eq(storeOffers.buyerId, buyerId),
+        eq(storeOffers.status, "pending")
+      )
+    );
+  if (existing.length > 0) {
+    throw new StoreError("شما یک پیشنهاد در حال بررسی برای این آگهی دارید", 409);
+  }
+
+  const expiresAt = new Date(Date.now() + OFFER_TTL_HOURS * 60 * 60 * 1000);
+
+  const [offer] = await db
+    .insert(storeOffers)
+    .values({
+      listingId,
+      buyerId,
+      sellerId: listing.sellerId,
+      offerPriceRial: offerRial.toString(),
+      listingPriceRial: listing.priceRial,
+      message: message ?? null,
+      status: "pending",
+      expiresAt,
+    })
+    .returning();
+
+  await notify(
+    listing.sellerId,
+    "پیشنهاد قیمت جدید",
+    `برای «${listing.title}» یک پیشنهاد قیمت ${offerToman.toLocaleString("fa-IR")} تومانی دریافت کردید.`,
+    offer.id
+  );
+
+  return offer;
+}
+
+/**
+ * Seller responds to a pending offer.
+ *  - "accept": atomically creates an escrow order at the offered price (debits
+ *    the buyer's wallet), and rejects all other pending offers on the listing.
+ *  - "reject": marks the offer rejected.
+ *  - "withdraw" (buyer only): cancels their own pending offer.
+ */
+export async function respondToOffer(params: {
+  offerId: string;
+  actorId: string;
+  action: "accept" | "reject" | "withdraw";
+}) {
+  const { offerId, actorId, action } = params;
+
+  return db.transaction(async (tx) => {
+    const [offer] = await tx
+      .select()
+      .from(storeOffers)
+      .where(eq(storeOffers.id, offerId))
+      .for("update")
+      .limit(1);
+    if (!offer) throw new StoreError("پیشنهاد یافت نشد", 404);
+    if (offer.status !== "pending") throw new StoreError("این پیشنهاد قبلاً بررسی شده است", 409);
+
+    const isSeller = offer.sellerId === actorId;
+    const isBuyer = offer.buyerId === actorId;
+
+    if (action === "withdraw") {
+      if (!isBuyer) throw new StoreError("شما اجازه این عمل را ندارید", 403);
+      const [updated] = await tx
+        .update(storeOffers)
+        .set({ status: "withdrawn", respondedAt: new Date(), updatedAt: new Date() })
+        .where(eq(storeOffers.id, offerId))
+        .returning();
+      return { offer: updated, order: null };
+    }
+
+    if (!isSeller) throw new StoreError("شما اجازه این عمل را ندارید", 403);
+
+    if (offer.expiresAt && offer.expiresAt.getTime() < Date.now()) {
+      await tx
+        .update(storeOffers)
+        .set({ status: "expired", respondedAt: new Date(), updatedAt: new Date() })
+        .where(eq(storeOffers.id, offerId));
+      throw new StoreError("این پیشنهاد منقضی شده است", 409);
+    }
+
+    if (action === "reject") {
+      const [updated] = await tx
+        .update(storeOffers)
+        .set({ status: "rejected", respondedAt: new Date(), updatedAt: new Date() })
+        .where(eq(storeOffers.id, offerId))
+        .returning();
+      await notify(offer.buyerId, "پیشنهاد رد شد", "فروشنده پیشنهاد قیمت شما را رد کرد.", offerId);
+      return { offer: updated, order: null };
+    }
+
+    // action === "accept" — create the escrow order at the agreed price.
+    const order = await createEscrowOrder({
+      buyerId: offer.buyerId,
+      listingId: offer.listingId,
+      quantity: 1,
+      buyerNote: "خرید از طریق پیشنهاد قیمت پذیرفته‌شده",
+      overrideUnitPriceRial: BigInt(offer.offerPriceRial),
+      tx,
+    });
+
+    const [updated] = await tx
+      .update(storeOffers)
+      .set({ status: "accepted", orderId: order.id, respondedAt: new Date(), updatedAt: new Date() })
+      .where(eq(storeOffers.id, offerId))
+      .returning();
+
+    // Auto-reject any other pending offers on the same listing.
+    await tx
+      .update(storeOffers)
+      .set({ status: "rejected", respondedAt: new Date(), updatedAt: new Date() })
+      .where(
+        and(
+          eq(storeOffers.listingId, offer.listingId),
+          eq(storeOffers.status, "pending")
+        )
+      );
+
+    await notify(offer.buyerId, "پیشنهاد پذیرفته شد", "فروشنده پیشنهاد شما را پذیرفت و سفارش ثبت شد.", order.id);
+    return { offer: updated, order };
+  });
 }

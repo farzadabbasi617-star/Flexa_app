@@ -36,6 +36,21 @@ function toman(n: number) {
   return `${Math.round(n).toLocaleString("fa-IR")} تومان`;
 }
 
+// Round to a "nice" human-friendly number so the displayed range looks like a price.
+function roundNice(n: number, dir: "down" | "up" | "near" = "near"): number {
+  if (n <= 0) return 0;
+  let step = 1000;
+  if (n >= 50_000_000) step = 1_000_000;
+  else if (n >= 10_000_000) step = 500_000;
+  else if (n >= 2_000_000) step = 100_000;
+  else if (n >= 500_000) step = 50_000;
+  else if (n >= 100_000) step = 10_000;
+  else step = 5_000;
+  const q = n / step;
+  const r = dir === "down" ? Math.floor(q) : dir === "up" ? Math.ceil(q) : Math.round(q);
+  return Math.max(step, r * step);
+}
+
 export default function PriceEstimatePage() {
   const [game, setGame] = useState<Game>("cod_mobile");
   const [fields, setFields] = useState<Field[]>([]);
@@ -228,8 +243,13 @@ export default function PriceEstimatePage() {
 
         {/* Result */}
         <div className="mt-6 rounded-3xl border border-purple-400/30 bg-gradient-to-br from-purple-700/30 to-fuchsia-700/20 p-5 text-center shadow-2xl backdrop-blur-xl">
-          <div className="text-xs font-bold text-purple-200">قیمت تخمینی پایه</div>
-          <div className="mt-1 text-3xl font-black text-white">{toman(totalToman)}</div>
+          <div className="text-xs font-bold text-purple-200">بازه‌ی قیمت پیشنهادی</div>
+          <div className="mt-1 text-2xl font-black text-white sm:text-3xl">
+            {toman(roundNice(totalToman * 0.85, "down"))}
+            <span className="mx-2 text-base font-bold text-purple-300">تا</span>
+            {toman(roundNice(totalToman * 1.2, "up"))}
+          </div>
+          <div className="mt-1 text-[11px] text-purple-200/70">پیشنهاد میانه: {toman(totalToman)}</div>
 
           {/* AI smart valuation */}
           <button
@@ -249,11 +269,15 @@ export default function PriceEstimatePage() {
           {ai && (
             <div className="mt-4 rounded-2xl border border-cyan-400/30 bg-black/30 p-4 text-right">
               <div className="text-center text-xs font-bold text-cyan-200">
-                {ai.source === "formula" ? "قیمت تخمینی" : "💡 قیمت پیشنهادی هوشمند"}
+                {ai.source === "formula" ? "بازه‌ی قیمت تخمینی" : "💡 بازه‌ی قیمت پیشنهادی هوشمند"}
               </div>
-              <div className="mt-2 text-center text-2xl font-black text-cyan-100">{toman(ai.priceToman)}</div>
+              <div className="mt-2 text-center text-xl font-black text-cyan-100 sm:text-2xl">
+                {toman(ai.minToman)}
+                <span className="mx-2 text-sm font-bold text-cyan-300/80">تا</span>
+                {toman(ai.maxToman)}
+              </div>
               <div className="mt-1 text-center text-[11px] text-gray-400">
-                بازه‌ی منصفانه: {toman(ai.minToman)} تا {toman(ai.maxToman)}
+                پیشنهاد میانه: {toman(ai.priceToman)}
               </div>
               {ai.rationale && (
                 <p className="mt-3 whitespace-pre-wrap text-xs leading-7 text-gray-200">{ai.rationale}</p>

@@ -83,6 +83,38 @@ function sanitizeRationale(text: string): string {
   return out;
 }
 
+/**
+ * Round a Toman amount to a "nice" human-friendly number so the displayed
+ * range looks like a price (e.g. 2,350,000 not 2,347,812).
+ */
+function roundNice(n: number, dir: "down" | "up" | "near" = "near"): number {
+  if (n <= 0) return 0;
+  // Pick a rounding step based on magnitude.
+  let step = 1000;
+  if (n >= 50_000_000) step = 1_000_000;
+  else if (n >= 10_000_000) step = 500_000;
+  else if (n >= 2_000_000) step = 100_000;
+  else if (n >= 500_000) step = 50_000;
+  else if (n >= 100_000) step = 10_000;
+  else step = 5_000;
+  const q = n / step;
+  const r = dir === "down" ? Math.floor(q) : dir === "up" ? Math.ceil(q) : Math.round(q);
+  return Math.max(step, r * step) ;
+}
+
+/**
+ * Build a fair price RANGE around a point estimate. We deliberately return a
+ * range (not a single number) so the buyer can offer a price within it and the
+ * seller can accept or reject. Range is ~15% below to ~20% above the midpoint,
+ * snapped to nice round numbers.
+ */
+function priceRange(midToman: number): { minToman: number; maxToman: number } {
+  const min = roundNice(midToman * 0.85, "down");
+  const max = roundNice(midToman * 1.2, "up");
+  // Guarantee min < max even for tiny numbers.
+  return { minToman: Math.min(min, max), maxToman: Math.max(min, max, min + 1000) };
+}
+
 /** Extract the first integer Toman value from a free-form AI text. */
 function parseTomanFromText(text: string): number | null {
   // Prefer an explicit JSON-ish "price": number
@@ -112,9 +144,8 @@ export async function estimateAccountPrice(params: {
 
   const fallback = (extra?: Partial<AiEstimateResult>): AiEstimateResult => ({
     priceToman: formulaToman,
-    minToman: Math.round(formulaToman * 0.85),
-    maxToman: Math.round(formulaToman * 1.15),
-    rationale: "این قیمت بر اساس فرمول پایه‌ی پلتفرم محاسبه شده است (ارزیابی هوشمند در دسترس نبود).",
+    ...priceRange(formulaToman),
+    rationale: "این بازه بر اساس فرمول پایه‌ی پلتفرم محاسبه شده است (ارزیابی هوشمند در دسترس نبود).",
     source: "formula",
     comparablesCount: 0,
     sources: [],
@@ -128,12 +159,11 @@ export async function estimateAccountPrice(params: {
     if (hit) {
       const rationale =
         hit.saleCount > 0
-          ? `این قیمت بر اساس ${hit.sampleCount.toLocaleString("fa-IR")} اکانت مشابه (شامل ${hit.saleCount.toLocaleString("fa-IR")} فروش واقعی) تخمین زده شده است.`
-          : `این قیمت بر اساس ${hit.sampleCount.toLocaleString("fa-IR")} اکانت مشابه که قبلاً ارزیابی شده‌اند تخمین زده شده است.`;
+          ? `این بازه بر اساس ${hit.sampleCount.toLocaleString("fa-IR")} اکانت مشابه (شامل ${hit.saleCount.toLocaleString("fa-IR")} فروش واقعی) تخمین زده شده است.`
+          : `این بازه بر اساس ${hit.sampleCount.toLocaleString("fa-IR")} اکانت مشابه که قبلاً ارزیابی شده‌اند تخمین زده شده است.`;
       return {
         priceToman: hit.priceToman,
-        minToman: hit.minToman,
-        maxToman: hit.maxToman,
+        ...priceRange(hit.priceToman),
         rationale,
         source: "memory",
         comparablesCount: hit.sampleCount,
@@ -193,8 +223,7 @@ export async function estimateAccountPrice(params: {
 
     return {
       priceToman: aiPrice,
-      minToman: Math.round(aiPrice * 0.9),
-      maxToman: Math.round(aiPrice * 1.12),
+      ...priceRange(aiPrice),
       rationale,
       source: "ai",
       comparablesCount: comparables.length,

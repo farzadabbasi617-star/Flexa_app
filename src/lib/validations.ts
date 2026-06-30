@@ -133,6 +133,16 @@ export const StoreOrderActionSchema = z.object({
   reason: z.string().trim().max(1000).optional(),
 });
 
+export const StoreOfferCreateSchema = z.object({
+  listingId: z.string().uuid("شناسه آگهی معتبر نیست"),
+  offerToman: priceTomanSchema,
+  message: z.string().trim().max(500).optional(),
+});
+
+export const StoreOfferActionSchema = z.object({
+  action: z.enum(["accept", "reject", "withdraw"]),
+});
+
 export const StoreListingReviewSchema = z.object({
   decision: z.enum(["approve", "reject"]),
   rejectionReason: z.string().trim().max(500).optional(),
