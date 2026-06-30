@@ -10,6 +10,7 @@
 
 import { fetchAIResponse } from "@/lib/ai-provider-manager";
 import { gatherComparables, comparablesToText, type Comparable } from "@/lib/market-comparables";
+import { lookupMemory, rememberPrice } from "@/lib/price-memory";
 import {
   ESTIMATOR_FIELDS,
   computeEstimate,
@@ -29,8 +30,8 @@ export interface AiEstimateResult {
   minToman: number;
   maxToman: number;
   rationale: string;
-  /** "ai" when the model produced the price, "formula" when it fell back. */
-  source: "ai" | "formula";
+  /** "memory" = matched similar past valuations/sales, "ai" = model, "formula" = fallback. */
+  source: "memory" | "ai" | "formula";
   comparablesCount: number;
   /** Distinct market sources the comparables came from (divar, sheypoor, torob, ...). */
   sources: string[];
@@ -88,8 +89,31 @@ export async function estimateAccountPrice(params: {
     ...extra,
   });
 
+  // 1) FAST PATH — learning memory: if we've valued/sold similar accounts before,
+  //    return a grounded estimate instantly (no scraping, no model call).
   try {
-    // Gather comparables from many Iranian sources (Divar, Sheypoor, Torob, shops).
+    const hit = await lookupMemory(game, values);
+    if (hit) {
+      const rationale =
+        hit.saleCount > 0
+          ? `این قیمت بر اساس ${hit.sampleCount.toLocaleString("fa-IR")} اکانت مشابه (شامل ${hit.saleCount.toLocaleString("fa-IR")} فروش واقعی) تخمین زده شده است.`
+          : `این قیمت بر اساس ${hit.sampleCount.toLocaleString("fa-IR")} اکانت مشابه که قبلاً ارزیابی شده‌اند تخمین زده شده است.`;
+      return {
+        priceToman: hit.priceToman,
+        minToman: hit.minToman,
+        maxToman: hit.maxToman,
+        rationale,
+        source: "memory",
+        comparablesCount: hit.sampleCount,
+        sources: ["memory"],
+      };
+    }
+  } catch {
+    // ignore memory errors; fall through to AI
+  }
+
+  try {
+    // 2) Gather comparables from reachable Iranian shops (best-effort).
     const comparables: Comparable[] = await gatherComparables(game).catch(() => []);
     const sources = [...new Set(comparables.map((c) => c.source))];
     const accountDesc = describeAccount(game, values);
@@ -139,6 +163,9 @@ export async function estimateAccountPrice(params: {
     const rationale =
       aiText.replace(/^.*PRICE\s*[:=].*$/im, "").trim().slice(0, 600) ||
       "قیمت بر اساس ارزش آیتم‌ها و مقایسه با بازار روز تعیین شد.";
+
+    // Remember this AI valuation so similar future accounts get a fast estimate.
+    void rememberPrice({ game, values, priceToman: aiPrice, origin: "ai" });
 
     return {
       priceToman: aiPrice,

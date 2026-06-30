@@ -53,9 +53,13 @@ async function fetchTorob(game: EstimatorGame, limit: number): Promise<Comparabl
 
 // A couple of well-known Iranian game-account shops can be probed generically.
 // We only parse public search/category HTML for title+price text.
+// These Iranian shops are reachable from foreign hosts (unlike Divar/Sheypoor),
+// though some render prices via JS so results may be partial.
 const SHOP_SOURCES: Array<{ name: string; url: (q: string) => string }> = [
+  { name: "arzangem", url: (q) => `https://arzangem.com/?s=${q}` },
+  { name: "subgame", url: (q) => `https://subgame.ir/?s=${q}` },
+  { name: "teleplayer", url: (q) => `https://teleplayer.org/?s=${q}` },
   { name: "getgame", url: (q) => `https://getgame.ir/?s=${q}` },
-  { name: "iran-game", url: (q) => `https://iran-game.com/?s=${q}` },
 ];
 
 async function fetchShop(name: string, url: string, limit: number): Promise<Comparable[]> {

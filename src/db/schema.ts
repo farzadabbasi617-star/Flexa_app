@@ -912,3 +912,24 @@ export const storeReports = pgTable("store_reports", {
   statusIdx: index("store_reports_status_idx").on(table.status),
   listingIdx: index("store_reports_listing_idx").on(table.listingId),
 }));
+
+// =========================================================================
+// PRICE MEMORY (learning cache): remembers what similar accounts were valued /
+// sold at, so future similar accounts get a fast, grounded estimate.
+// =========================================================================
+export const priceMemory = pgTable("price_memory", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  game: gameEnum("game").notNull(),
+  // Bucketed signature of the account (e.g. "lvl:300|cp:2000|gun_legendary_paid:3")
+  // used to match similar accounts quickly.
+  signature: varchar("signature", { length: 400 }).notNull(),
+  // Raw stats snapshot for richer similarity / auditing.
+  stats: jsonb("stats").notNull().default('{}'),
+  priceToman: numeric("price_toman", { precision: 20, scale: 0 }).notNull(),
+  // "sale" = real completed order (most trusted), "ai" = AI estimate.
+  origin: varchar("origin", { length: 20 }).notNull().default("ai"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  gameSigIdx: index("price_memory_game_sig_idx").on(table.game, table.signature),
+  gameOriginIdx: index("price_memory_game_origin_idx").on(table.game, table.origin),
+}));

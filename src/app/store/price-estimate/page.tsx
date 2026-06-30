@@ -45,7 +45,7 @@ export default function PriceEstimatePage() {
     minToman: number;
     maxToman: number;
     rationale: string;
-    source: "ai" | "formula";
+    source: "memory" | "ai" | "formula";
     comparablesCount: number;
     sources?: string[];
     aiModel?: string;
@@ -190,12 +190,18 @@ export default function PriceEstimatePage() {
             <div className="mt-4 rounded-2xl border border-cyan-400/30 bg-black/30 p-4 text-right">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-cyan-200">
-                  {ai.source === "ai" ? "💡 قیمت پیشنهادی هوش مصنوعی" : "قیمت پایه (AI در دسترس نبود)"}
+                  {ai.source === "memory"
+                    ? "🧠 قیمت بر پایه اکانت‌های مشابه"
+                    : ai.source === "ai"
+                      ? "💡 قیمت پیشنهادی هوش مصنوعی"
+                      : "قیمت پایه (AI در دسترس نبود)"}
                 </span>
                 <span className="text-[10px] text-gray-400">
-                  {ai.comparablesCount > 0
-                    ? `بر پایه ${ai.comparablesCount.toLocaleString("fa-IR")} آگهی بازار`
-                    : "بر پایه تحلیل هوش مصنوعی از بازار روز"}
+                  {ai.source === "memory"
+                    ? `بر پایه ${ai.comparablesCount.toLocaleString("fa-IR")} اکانت مشابه`
+                    : ai.comparablesCount > 0
+                      ? `بر پایه ${ai.comparablesCount.toLocaleString("fa-IR")} آگهی بازار`
+                      : "بر پایه تحلیل هوش مصنوعی از بازار روز"}
                 </span>
               </div>
               <div className="mt-2 text-center text-2xl font-black text-cyan-100">{toman(ai.priceToman)}</div>
