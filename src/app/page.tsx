@@ -382,28 +382,6 @@ export default async function LuxuryHomePage() {
       </div>
 
       <BottomNav />
-
-      <style jsx global>{`
-        .glass-panel {
-          background: rgba(18, 18, 43, 0.9);
-          backdrop-filter: blur(24px);
-          -webkit-backdrop-filter: blur(24px);
-        }
-        .en-font {
-          font-family: "Arial Black", Impact, system-ui, sans-serif;
-          letter-spacing: -0.045em;
-        }
-        .num-en {
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-        }
-        .hero-art {
-          background:
-            radial-gradient(circle at 78% 22%, rgba(188, 0, 255, 0.55), transparent 18%),
-            radial-gradient(circle at 20% 12%, rgba(0, 210, 255, 0.16), transparent 22%),
-            radial-gradient(circle at 50% 108%, rgba(255, 255, 255, 0.10), transparent 34%),
-            linear-gradient(135deg, #14101d 0%, #0b0b12 45%, #1c0630 100%);
-        }
-      `}</style>
     </main>
   );
 }
