@@ -1,9 +1,7 @@
-"use client";
-
-import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 import DailyQuests from "@/components/DailyQuests";
+import { SITE_URL } from "@/lib/seo";
 
 interface SiteImage {
   slug: string;
@@ -83,48 +81,69 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-export default function LuxuryHomePage() {
-  const [images, setImages] = useState<SiteImage[]>([]);
-  const [tournaments, setTournaments] = useState<TournamentPreview[]>([]);
-  const [honors, setHonors] = useState<HonorPreview[]>([]);
+async function getImages(): Promise<SiteImage[]> {
+  try {
+    const res = await fetch(`${SITE_URL}/api/public/images`, { next: { revalidate: 300 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
 
-  useEffect(() => {
-    fetch("/api/public/images", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => setImages(Array.isArray(data) ? data : []))
-      .catch(() => setImages([]));
+async function getTournaments(): Promise<TournamentPreview[]> {
+  try {
+    const res = await fetch(`${SITE_URL}/api/tournaments?limit=6`, { next: { revalidate: 60 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
+  } catch {
+    return [];
+  }
+}
 
-    fetch("/api/tournaments?limit=6", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => setTournaments(Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : []))
-      .catch(() => setTournaments([]));
+async function getHonors(): Promise<HonorPreview[]> {
+  try {
+    const res = await fetch(`${SITE_URL}/api/honors`, { next: { revalidate: 300 } });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return Array.isArray(data) ? data.filter((item: HonorPreview) => item).slice(0, 3) : [];
+  } catch {
+    return [];
+  }
+}
 
-    fetch("/api/honors", { cache: "no-store" })
-      .then((res) => res.json())
-      .then((data) => setHonors(Array.isArray(data) ? data.filter((item) => item.type === "news").slice(0, 3) : []))
-      .catch(() => setHonors([]));
-  }, []);
+export default async function LuxuryHomePage() {
+  const [images, tournaments, honors] = await Promise.all([
+    getImages(),
+    getTournaments(),
+    getHonors(),
+  ]);
 
-  const imageMap = useMemo(() => {
-    const byCategory: Record<string, SiteImage> = {};
-    const bySlug: Record<string, SiteImage> = {};
-    for (const image of images) {
-      bySlug[image.slug] = image;
-      if (!byCategory[image.category]) byCategory[image.category] = image;
-    }
-    return { byCategory, bySlug };
-  }, [images]);
+  const bySlug: Record<string, SiteImage> = {};
+  const byCategory: Record<string, SiteImage> = {};
+  for (const image of images) {
+    bySlug[image.slug] = image;
+    if (!byCategory[image.category]) byCategory[image.category] = image;
+  }
 
-  const heroImage = imageMap.bySlug["home-hero"] || imageMap.byCategory.hero;
+  const heroImage = bySlug["home-hero"] || byCategory["hero"];
   const featuredTournament = tournaments[0];
   const featuredHonor = honors[0];
 
   return (
-    <main className="min-h-screen text-white relative overflow-x-hidden selection:bg-purple-500/30 bg-[#050508]" dir="rtl">
+    <main
+      className="min-h-screen text-white relative overflow-x-hidden selection:bg-purple-500/30 bg-[#050508]"
+      dir="rtl"
+    >
       <div className="fixed inset-0 pointer-events-none bg-[radial-gradient(circle_at_75%_0%,rgba(168,85,247,.28),transparent_34%),radial-gradient(circle_at_15%_18%,rgba(34,211,238,.14),transparent_32%),linear-gradient(140deg,#050508,#0b0b12_46%,#080411)]" />
       <div className="fixed inset-0 pointer-events-none opacity-[.08] bg-[linear-gradient(115deg,transparent_0_18%,rgba(255,255,255,.4)_18%_19%,transparent_19%_42%,rgba(255,255,255,.25)_42%_43%,transparent_43%)]" />
 
-      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8" style={{ paddingBottom: "var(--bottom-nav-space)" }}>
+      <div
+        className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 pt-6 sm:pt-8"
+        style={{ paddingBottom: "var(--bottom-nav-space)" }}
+      >
         <header className="flex items-center justify-between gap-4 mb-7 sm:mb-10">
           <Link href="/" className="flex items-center gap-3 min-w-0">
             <img
@@ -133,14 +152,24 @@ export default function LuxuryHomePage() {
               className="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-[0_0_18px_rgba(188,0,255,.55)] shrink-0"
             />
             <div className="min-w-0">
-              <div className="text-[10px] sm:text-xs font-black text-cyan-300 tracking-[0.24em] mb-1">GAMENT ESPORTS</div>
+              <div className="text-[10px] sm:text-xs font-black text-cyan-300 tracking-[0.24em] mb-1">
+                GAMENT ESPORTS
+              </div>
               <h1 className="text-xl sm:text-3xl font-black leading-tight truncate">گیمنت</h1>
             </div>
           </Link>
 
           <div className="flex items-center gap-2">
-            <Link href="/honors" className="hidden sm:inline-flex px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-xs font-black hover:border-purple-300/40">اخبار</Link>
-            <Link href="/wallet" className="grid place-items-center w-12 h-12 rounded-2xl bg-purple-500/12 border border-purple-300/20 active:scale-95">
+            <Link
+              href="/honors"
+              className="hidden sm:inline-flex px-4 py-3 rounded-2xl bg-white/5 border border-white/10 text-xs font-black hover:border-purple-300/40"
+            >
+              اخبار
+            </Link>
+            <Link
+              href="/wallet"
+              className="grid place-items-center w-12 h-12 rounded-2xl bg-purple-500/12 border border-purple-300/20 active:scale-95"
+            >
               <img src="/icons/wallet_icon.png" alt="کیف پول" className="w-8 h-8 object-contain" />
             </Link>
           </div>
@@ -149,7 +178,13 @@ export default function LuxuryHomePage() {
         <section className="grid grid-cols-1 lg:grid-cols-[1.15fr_.85fr] gap-5 sm:gap-6 mb-10 sm:mb-14">
           <div className="relative overflow-hidden rounded-[34px] sm:rounded-[44px] border border-purple-300/20 min-h-[430px] sm:min-h-[510px] bg-[#0d0b16] shadow-[0_0_70px_rgba(124,58,237,.18)]">
             <div className="absolute inset-0 hero-art" />
-            {heroImage && <img src={heroImage.url} alt={heroImage.altText || heroImage.title} className="absolute inset-0 w-full h-full object-cover opacity-55 scale-105" />}
+            {heroImage && (
+              <img
+                src={heroImage.url}
+                alt={heroImage.altText || heroImage.title}
+                className="absolute inset-0 w-full h-full object-cover opacity-55 scale-105"
+              />
+            )}
             <div className="absolute inset-0 bg-gradient-to-t from-[#050508] via-[#050508]/60 to-transparent" />
             <div className="absolute -top-20 -left-16 w-72 h-72 rounded-full bg-purple-600/20 blur-3xl" />
             <div className="absolute top-10 right-8 w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl" />
@@ -166,8 +201,15 @@ export default function LuxuryHomePage() {
                 ثبت‌نام سریع، کیف پول امن، چک‌این، لابی اختصاصی، ثبت نتیجه، داوری قابل پیگیری و اخبار گیمینگ در یک پلتفرم فارسی.
               </p>
               <div className="flex flex-col sm:flex-row gap-3 mt-7">
-                <Link href="/tournaments" className="gaming-btn text-sm sm:text-base px-6 py-4">ورود به تورنومنت‌ها</Link>
-                <Link href="/register" className="px-6 py-4 rounded-2xl bg-white/7 border border-white/10 text-sm sm:text-base font-black text-center hover:border-cyan-300/40 active:scale-95 transition">ساخت حساب رایگان</Link>
+                <Link href="/tournaments" className="gaming-btn text-sm sm:text-base px-6 py-4">
+                  ورود به تورنومنت‌ها
+                </Link>
+                <Link
+                  href="/register"
+                  className="px-6 py-4 rounded-2xl bg-white/7 border border-white/10 text-sm sm:text-base font-black text-center hover:border-cyan-300/40 active:scale-95 transition"
+                >
+                  ساخت حساب رایگان
+                </Link>
               </div>
 
               <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-8 max-w-xl">
@@ -176,7 +218,10 @@ export default function LuxuryHomePage() {
                   ["AI", "داوری هوشمند"],
                   ["۲۴/۷", "پشتیبانی"],
                 ].map(([value, label]) => (
-                  <div key={label} className="rounded-2xl bg-white/[.06] border border-white/10 p-3 text-center backdrop-blur-md">
+                  <div
+                    key={label}
+                    className="rounded-2xl bg-white/[.06] border border-white/10 p-3 text-center backdrop-blur-md"
+                  >
                     <div className="text-lg sm:text-2xl font-black text-purple-200">{value}</div>
                     <div className="text-[10px] text-gray-400 mt-1">{label}</div>
                   </div>
@@ -186,30 +231,61 @@ export default function LuxuryHomePage() {
           </div>
 
           <aside className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-            <Link href={featuredTournament ? `/tournaments/${featuredTournament.id}` : "/tournaments"} className="relative overflow-hidden rounded-[30px] border border-cyan-300/15 bg-gradient-to-br from-cyan-950/30 to-[#0d0b16] p-5 min-h-[205px] group active:scale-[.99] transition">
+            <Link
+              href={featuredTournament ? `/tournaments/${featuredTournament.id}` : "/tournaments"}
+              className="relative overflow-hidden rounded-[30px] border border-cyan-300/15 bg-gradient-to-br from-cyan-950/30 to-[#0d0b16] p-5 min-h-[205px] group active:scale-[.99] transition"
+            >
               <div className="absolute -top-14 -left-14 w-44 h-44 rounded-full bg-cyan-400/15 blur-3xl" />
               <div className="relative">
-                <div className="text-[10px] font-black tracking-[0.24em] text-cyan-300 mb-3">NEXT TOURNAMENT</div>
-                <h3 className="text-xl font-black leading-8 line-clamp-2">{featuredTournament?.name || "تورنومنت‌های فعال گیمنت"}</h3>
+                <div className="text-[10px] font-black tracking-[0.24em] text-cyan-300 mb-3">
+                  NEXT TOURNAMENT
+                </div>
+                <h3 className="text-xl font-black leading-8 line-clamp-2">
+                  {featuredTournament?.name || "تورنومنت‌های فعال گیمنت"}
+                </h3>
                 <p className="text-xs text-gray-400 mt-3 leading-6">
-                  {featuredTournament ? `${gameLabel(featuredTournament.game)} • شروع: ${formatDate(featuredTournament.startDate)}` : "روم‌های فعال را ببین و وارد رقابت شو."}
+                  {featuredTournament
+                    ? `${gameLabel(featuredTournament.game)} • شروع: ${formatDate(featuredTournament.startDate)}`
+                    : "روم‌های فعال را ببین و وارد رقابت شو."}
                 </p>
                 {featuredTournament && (
                   <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
-                    <span className="rounded-xl bg-white/5 border border-white/10 px-3 py-2">{(featuredTournament.registeredCount || 0).toLocaleString("fa-IR")}/{(featuredTournament.maxPlayers || 0).toLocaleString("fa-IR")} نفر</span>
-                    <span className="rounded-xl bg-white/5 border border-white/10 px-3 py-2">{featuredTournament.entryFee || "رایگان"}</span>
+                    <span className="rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+                      {(featuredTournament.registeredCount || 0).toLocaleString("fa-IR")}/
+                      {(featuredTournament.maxPlayers || 0).toLocaleString("fa-IR")} نفر
+                    </span>
+                    <span className="rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+                      {featuredTournament.entryFee || "رایگان"}
+                    </span>
                   </div>
                 )}
               </div>
             </Link>
 
-            <Link href={featuredHonor ? `/honors/${featuredHonor.id}` : "/honors"} className="relative overflow-hidden rounded-[30px] border border-purple-300/15 bg-gradient-to-br from-purple-950/35 to-[#0d0b16] min-h-[205px] group active:scale-[.99] transition flex items-end">
-              {featuredHonor?.image && <img src={featuredHonor.image} alt={featuredHonor.title} className="absolute inset-0 w-full h-full object-cover opacity-45 group-hover:scale-105 transition duration-700" />}
+            <Link
+              href={featuredHonor ? `/honors/${featuredHonor.id}` : "/honors"}
+              className="relative overflow-hidden rounded-[30px] border border-purple-300/15 bg-gradient-to-br from-purple-950/35 to-[#0d0b16] min-h-[205px] group active:scale-[.99] transition flex items-end"
+            >
+              {featuredHonor?.image && (
+                <img
+                  src={featuredHonor.image}
+                  alt={featuredHonor.title}
+                  className="absolute inset-0 w-full h-full object-cover opacity-45 group-hover:scale-105 transition duration-700"
+                />
+              )}
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" />
               <div className="relative p-5">
-                <div className="text-[10px] font-black tracking-[0.24em] text-purple-300 mb-3">LATEST NEWS</div>
-                <h3 className="text-lg sm:text-xl font-black leading-7 line-clamp-2">{featuredHonor?.title || "آخرین اخبار گیمینگ"}</h3>
-                <p className="text-xs text-gray-300 mt-3 line-clamp-2 leading-6">{featuredHonor?.summary || featuredHonor?.description || "اخبار کالاف، کلش، فورتنایت و رویدادهای گیمینگ را دنبال کن."}</p>
+                <div className="text-[10px] font-black tracking-[0.24em] text-purple-300 mb-3">
+                  LATEST NEWS
+                </div>
+                <h3 className="text-lg sm:text-xl font-black leading-7 line-clamp-2">
+                  {featuredHonor?.title || "آخرین اخبار گیمینگ"}
+                </h3>
+                <p className="text-xs text-gray-300 mt-3 line-clamp-2 leading-6">
+                  {featuredHonor?.summary ||
+                    featuredHonor?.description ||
+                    "اخبار کالاف، کلش، فورتنایت و رویدادهای گیمینگ را دنبال کن."}
+                </p>
               </div>
             </Link>
           </aside>
@@ -218,31 +294,63 @@ export default function LuxuryHomePage() {
         <section className="mb-10 sm:mb-14">
           <div className="flex items-center justify-between mb-4 sm:mb-6">
             <div>
-              <div className="text-[10px] font-black text-purple-300 tracking-[0.28em] mb-1">CHOOSE YOUR GAME</div>
+              <div className="text-[10px] font-black text-purple-300 tracking-[0.28em] mb-1">
+                CHOOSE YOUR GAME
+              </div>
               <h3 className="text-2xl sm:text-3xl font-black">بازی محبوبت را انتخاب کن</h3>
             </div>
-            <Link href="/tournaments" className="text-xs font-black text-cyan-300">همه روم‌ها ←</Link>
+            <Link href="/tournaments" className="text-xs font-black text-cyan-300">
+              همه روم‌ها ←
+            </Link>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
             {GAMES.map((game) => {
-              const gameImage = imageMap.bySlug[`game-card-${game.id}`] || imageMap.byCategory[game.id];
+              const gameImage = bySlug[`game-card-${game.id}`] || byCategory[game.id];
               return (
-                <Link key={game.id} href={`/tournaments?game=${game.id}`} className="group block active:scale-[.985] transition-transform">
-                  <article className="relative overflow-hidden rounded-[30px] border border-white/10 min-h-[190px] p-5 flex flex-col justify-between" style={{ background: game.bg, boxShadow: `0 0 42px ${game.glow}` }}>
-                    {gameImage && <img src={gameImage.url} alt={gameImage.altText || gameImage.title} className="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:scale-110 transition duration-700" />}
+                <Link
+                  key={game.id}
+                  href={`/tournaments?game=${game.id}`}
+                  className="group block active:scale-[.985] transition-transform"
+                >
+                  <article
+                    className="relative overflow-hidden rounded-[30px] border border-white/10 min-h-[190px] p-5 flex flex-col justify-between"
+                    style={{
+                      background: game.bg,
+                      boxShadow: `0 0 42px ${game.glow}`,
+                    }}
+                  >
+                    {gameImage && (
+                      <img
+                        src={gameImage.url}
+                        alt={gameImage.altText || gameImage.title}
+                        className="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:scale-110 transition duration-700"
+                      />
+                    )}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
                     <div className="relative flex items-center justify-between">
-                      <div className={`w-16 h-16 rounded-3xl bg-gradient-to-br ${game.accent} p-0.5 shadow-2xl`}>
+                      <div
+                        className={`w-16 h-16 rounded-3xl bg-gradient-to-br ${game.accent} p-0.5 shadow-2xl`}
+                      >
                         <div className="w-full h-full rounded-[22px] bg-black/45 flex items-center justify-center">
-                          <img src={imageMap.bySlug[`icon-${game.id}`]?.url || game.icon} alt={game.faName} className="w-11 h-11 object-contain" />
+                          <img
+                            src={bySlug[`icon-${game.id}`]?.url || game.icon}
+                            alt={game.faName}
+                            className="w-11 h-11 object-contain"
+                          />
                         </div>
                       </div>
-                      <span className="text-[10px] font-black text-white/45 tracking-[.25em]">ROOMS</span>
+                      <span className="text-[10px] font-black text-white/45 tracking-[.25em]">
+                        ROOMS
+                      </span>
                     </div>
                     <div className="relative text-right mt-8">
-                      <h4 className="text-3xl font-black en-font italic leading-none">{game.name}</h4>
-                      <p className="text-xs text-gray-300 mt-3">روم‌ها و تورنومنت‌های {game.faName}</p>
+                      <h4 className="text-3xl font-black en-font italic leading-none">
+                        {game.name}
+                      </h4>
+                      <p className="text-xs text-gray-300 mt-3">
+                        روم‌ها و تورنومنت‌های {game.faName}
+                      </p>
                     </div>
                   </article>
                 </Link>
@@ -254,13 +362,19 @@ export default function LuxuryHomePage() {
         <section className="grid grid-cols-1 lg:grid-cols-[.9fr_1.1fr] gap-5 mb-10 sm:mb-14">
           <div className="rounded-[30px] border border-white/10 bg-white/[.04] p-5 sm:p-6">
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-300/20 flex items-center justify-center text-2xl">🤖</div>
+              <div className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-300/20 flex items-center justify-center text-2xl">
+                🤖
+              </div>
               <div>
                 <h3 className="font-black">داوری و راهنمای هوشمند</h3>
-                <p className="text-xs text-gray-500 mt-1">ثبت نتیجه، اعتراض و تحلیل ریسک با زیرساخت AI</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  ثبت نتیجه، اعتراض و تحلیل ریسک با زیرساخت AI
+                </p>
               </div>
             </div>
-            <p className="text-sm text-gray-300 leading-8">گیمنت برای مدیریت رقابت سالم ساخته شده؛ از ثبت‌نام تا اعلام نتیجه، همه مسیر شفاف و قابل پیگیری است.</p>
+            <p className="text-sm text-gray-300 leading-8">
+              گیمنت برای مدیریت رقابت سالم ساخته شده؛ از ثبت‌نام تا اعلام نتیجه، همه مسیر شفاف و قابل پیگیری است.
+            </p>
           </div>
 
           <DailyQuests />
@@ -270,9 +384,18 @@ export default function LuxuryHomePage() {
       <BottomNav />
 
       <style jsx global>{`
-        .glass-panel { background: rgba(18, 18, 43, 0.9); backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
-        .en-font { font-family: "Arial Black", Impact, system-ui, sans-serif; letter-spacing: -0.045em; }
-        .num-en { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+        .glass-panel {
+          background: rgba(18, 18, 43, 0.9);
+          backdrop-filter: blur(24px);
+          -webkit-backdrop-filter: blur(24px);
+        }
+        .en-font {
+          font-family: "Arial Black", Impact, system-ui, sans-serif;
+          letter-spacing: -0.045em;
+        }
+        .num-en {
+          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        }
         .hero-art {
           background:
             radial-gradient(circle at 78% 22%, rgba(188, 0, 255, 0.55), transparent 18%),
