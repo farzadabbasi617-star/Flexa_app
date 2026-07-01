@@ -7,6 +7,7 @@ import { QueryProvider } from "@/components/QueryProvider";
 import { LayoutWrapper } from "@/components/LayoutWrapper";
 import BrandFooter from "@/components/BrandFooter";
 import { SITE_NAME, SITE_URL, absoluteUrl, SOCIAL_LINKS, CONTACT_EMAIL } from "@/lib/seo";
+import Script from "next/script";
 
 export const viewport: Viewport = {
   themeColor: "#a855f7",
@@ -59,6 +60,16 @@ export const metadata: Metadata = {
   },
   alternates: {
     canonical: SITE_URL,
+  },
+  icons: {
+    icon: [
+      { url: "/icons/gament-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/gament-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      { url: "/icons/gament-icon-180.png", sizes: "180x180" },
+    ],
+    shortcut: "/icons/gament-icon-192.png",
   },
   robots: {
     index: true,

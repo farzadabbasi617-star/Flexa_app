@@ -10,31 +10,70 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+
+  // فشرده‌سازی
+  compress: true,
+
+  // بهینه‌سازی تصاویر
+  images: {
+    formats: ["image/avif", "image/webp"],
+    minimumCacheTTL: 86400,
+    deviceSizes: [390, 768, 1024, 1280, 1920],
+  },
+
   async headers() {
     return [
+      // هدرهای امنیتی برای همه مسیرها
       {
         source: "/:path*",
         headers: securityHeaders,
       },
+      // فایل‌های استاتیک Next.js — کش بلندمدت (immutable)
       {
-        source: "/news/:path*",
+        source: "/_next/static/:path*",
         headers: [
           ...securityHeaders,
           { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
         ],
       },
+      // آیکون‌ها — کش یه روزه (نه بلندمدت تا لوگو گیر نکنه)
       {
         source: "/icons/:path*",
         headers: [
           ...securityHeaders,
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          { key: "Cache-Control", value: "public, max-age=86400, must-revalidate" },
         ],
       },
+      // manifest
+      {
+        source: "/manifest.json",
+        headers: [
+          ...securityHeaders,
+          { key: "Cache-Control", value: "public, max-age=3600, must-revalidate" },
+        ],
+      },
+      // service worker — هرگز کش نشه
+      {
+        source: "/sw.js",
+        headers: [
+          ...securityHeaders,
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+        ],
+      },
+      // تصاویر عمومی
       {
         source: "/avatars/:path*",
         headers: [
           ...securityHeaders,
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
+          { key: "Cache-Control", value: "public, max-age=604800, stale-while-revalidate=86400" },
+        ],
+      },
+      // صفحات HTML — کش کوتاه با revalidate
+      {
+        source: "/((?!_next|api|icons|avatars|manifest|sw).*)",
+        headers: [
+          ...securityHeaders,
         ],
       },
     ];
