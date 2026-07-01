@@ -4,6 +4,25 @@ export const SITE_URL = "https://www.gament1.ir";
 export const SITE_NAME = "Gament | گیمنت";
 export const DEFAULT_OG_IMAGE = "/icons/gament-icon-192.png";
 
+// Official brand profiles. Fill these in with your REAL, active handles — each
+// should link back to the site. They power the Organization `sameAs` entity web
+// (the single biggest brand-disambiguation signal for Google). Leave a value
+// empty ("") to omit it; empty/placeholder entries are filtered out.
+const RAW_SOCIAL_LINKS: string[] = [
+  // "https://www.instagram.com/your_handle",
+  // "https://t.me/your_channel",
+  // "https://www.aparat.com/your_channel",
+  // "https://www.youtube.com/@your_channel",
+  // "https://x.com/your_handle",
+  // "https://www.linkedin.com/company/your_company",
+];
+export const SOCIAL_LINKS: string[] = RAW_SOCIAL_LINKS.filter(
+  (u) => u && !u.includes("your_")
+);
+
+// Contact email on the brand's own domain (stronger trust signal than gmail).
+export const CONTACT_EMAIL = "support@gament1.ir";
+
 export function absoluteUrl(path = "/") {
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
   return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;

@@ -5,7 +5,8 @@ import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { QueryProvider } from "@/components/QueryProvider";
 import { LayoutWrapper } from "@/components/LayoutWrapper";
-import { SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/seo";
+import BrandFooter from "@/components/BrandFooter";
+import { SITE_NAME, SITE_URL, absoluteUrl, SOCIAL_LINKS, CONTACT_EMAIL } from "@/lib/seo";
 
 export const viewport: Viewport = {
   themeColor: "#a855f7",
@@ -17,7 +18,7 @@ export const viewport: Viewport = {
 
 const title = "گیمنت | Gament — پلتفرم هوشمند تورنومنت گیمینگ";
 const description =
-  "گیمنت (Gament) پلتفرم حرفه‌ای برگزاری و مدیریت تورنومنت‌های آنلاین کالاف دیوتی موبایل، فورتنایت و کلش رویال با داوری هوشمند، جدول رتبه‌بندی و جوایز واقعی است.";
+  "گیمنت (Gament) برند و پلتفرم ایرانی برگزاری و مدیریت تورنومنت‌های آنلاین کالاف دیوتی موبایل، فورتنایت و کلش رویال با داوری هوشمند، جدول رتبه‌بندی، فروشگاه امن اکانت و جوایز واقعی است. وب‌سایت رسمی گیمنت: www.gament1.ir";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -93,33 +94,58 @@ export const metadata: Metadata = {
   },
 };
 
-const organizationJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "Organization",
-  name: SITE_NAME,
-  alternateName: ["Gament", "گیمنت"],
-  url: SITE_URL,
-  logo: absoluteUrl("/icons/gament-logo-square.png"),
-};
+// One connected entity graph (linked via @id) so Google treats the
+// Organization, WebSite and WebApplication as a single brand entity — the
+// strongest signal for ranking the brand query «گیمنت» to the official site.
+const ORG_ID = `${SITE_URL}/#organization`;
+const SITE_ID = `${SITE_URL}/#website`;
 
-const websiteJsonLd = {
+const structuredData = {
   "@context": "https://schema.org",
-  "@type": "WebSite",
-  name: SITE_NAME,
-  alternateName: ["Gament", "گیمنت"],
-  url: SITE_URL,
-  inLanguage: "fa-IR",
-};
-
-const webApplicationJsonLd = {
-  "@context": "https://schema.org",
-  "@type": "WebApplication",
-  name: SITE_NAME,
-  url: SITE_URL,
-  applicationCategory: "GameApplication",
-  operatingSystem: "Web, Android, iOS",
-  inLanguage: "fa-IR",
-  description,
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": ORG_ID,
+      name: "گیمنت",
+      alternateName: ["Gament", "گیمنت", "Gament1", "گیمنت اسپورت"],
+      url: SITE_URL,
+      logo: {
+        "@type": "ImageObject",
+        url: absoluteUrl("/icons/gament-logo-square.png"),
+        width: 512,
+        height: 512,
+      },
+      image: absoluteUrl("/icons/gament-logo-square.png"),
+      description:
+        "گیمنت (Gament) یک برند و پلتفرم آنلاین برای برگزاری و شرکت در تورنومنت‌های گیمینگ و ورزش‌های الکترونیک در ایران است.",
+      email: CONTACT_EMAIL,
+      foundingDate: "2025",
+      ...(SOCIAL_LINKS.length ? { sameAs: SOCIAL_LINKS } : {}),
+    },
+    {
+      "@type": "WebSite",
+      "@id": SITE_ID,
+      url: SITE_URL,
+      name: "گیمنت",
+      alternateName: ["Gament", "گیمنت", "Gament1"],
+      inLanguage: "fa-IR",
+      publisher: { "@id": ORG_ID },
+      about: { "@id": ORG_ID },
+    },
+    {
+      "@type": "WebApplication",
+      "@id": `${SITE_URL}/#webapp`,
+      name: "گیمنت",
+      alternateName: ["Gament", "گیمنت"],
+      url: SITE_URL,
+      applicationCategory: "GameApplication",
+      operatingSystem: "Web, Android, iOS",
+      inLanguage: "fa-IR",
+      description,
+      publisher: { "@id": ORG_ID },
+      offers: { "@type": "Offer", price: "0", priceCurrency: "IRR" },
+    },
+  ],
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
@@ -132,15 +158,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="icon" href="/icons/gament-icon-192.png" />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(organizationJsonLd) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }}
-        />
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(webApplicationJsonLd) }}
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
         />
         {/* Load Telegram WebApp Javascript library securely */}
         <script src="https://telegram.org/js/telegram-web-app.js" async></script>
@@ -153,6 +171,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             </LanguageProvider>
           </AuthProvider>
         </QueryProvider>
+        <BrandFooter />
       </body>
     </html>
   );
