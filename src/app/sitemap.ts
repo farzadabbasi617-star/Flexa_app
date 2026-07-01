@@ -18,6 +18,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     { path: '/games', priority: 0.88, freq: 'weekly' as const },
     { path: '/leaderboard', priority: 0.92, freq: 'daily' as const },
     { path: '/judging', priority: 0.88, freq: 'daily' as const },
+    { path: '/store', priority: 0.9, freq: 'daily' as const },
+    { path: '/store/price-estimate', priority: 0.84, freq: 'weekly' as const },
+    { path: '/store/sell', priority: 0.7, freq: 'weekly' as const },
     { path: '/teams', priority: 0.82, freq: 'weekly' as const },
     { path: '/achievements', priority: 0.78, freq: 'weekly' as const },
     { path: '/honors', priority: 0.75, freq: 'weekly' as const },
@@ -63,10 +66,31 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   if (!process.env.DATABASE_URL) return routes;
 
   try {
-    const [{ db }, { tournaments, teams, players, honors }] = await Promise.all([
+    const [{ db }, { tournaments, teams, players, honors, storeListings }] = await Promise.all([
       import('@/db'),
       import('@/db/schema'),
     ]);
+
+    // ==================== آگهی‌های فعال فروشگاه ====================
+    try {
+      const listings = await db
+        .select({ id: storeListings.id, updatedAt: storeListings.updatedAt })
+        .from(storeListings)
+        .where(eq(storeListings.status, 'active'))
+        .orderBy(desc(storeListings.updatedAt))
+        .limit(300);
+
+      listings.forEach((l) => {
+        routes.push({
+          url: `${baseUrl}/store/${l.id}`,
+          lastModified: l.updatedAt || now,
+          changeFrequency: 'daily',
+          priority: 0.7,
+        });
+      });
+    } catch (e) {
+      console.error('[SITEMAP] store listings error:', e);
+    }
 
     // ==================== تورنمنت‌ها ====================
     const activeTournaments = await db

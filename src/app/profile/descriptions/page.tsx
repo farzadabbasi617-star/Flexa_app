@@ -1,5 +1,40 @@
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import { SITE_URL } from "@/lib/seo";
+
+// Real FAQ used both for the on-page accordion and the FAQPage rich-result schema.
+const faqs = [
+  {
+    question: "گیمنت چیست و چه کاری انجام می‌دهد؟",
+    answer:
+      "گیمنت یک پلتفرم ایرانی برای برگزاری و شرکت در تورنومنت‌های گیمینگ است. می‌توانی روم‌های فعال بازی‌هایی مثل کالاف دیوتی موبایل، فورتنایت و کلش رویال را ببینی، در آن‌ها ثبت‌نام کنی، با داوری قابل‌پیگیری برای رتبه و جایزه رقابت کنی و در فروشگاه امن، اکانت و ارز بازی خرید و فروش کنی.",
+  },
+  {
+    question: "چطور در یک تورنومنت ثبت‌نام کنم؟",
+    answer:
+      "ابتدا حساب بساز و پروفایل بازیکن را کامل کن. سپس از صفحه‌ی تورنومنت‌ها بازی مورد نظر را فیلتر کن، ظرفیت، ورودی، جایزه و قوانین مسابقه را بررسی کن و روی ثبت‌نام بزن. در زمان اعلام‌شده وارد لابی می‌شوی و نتیجه را ثبت می‌کنی.",
+  },
+  {
+    question: "داوری هوشمند گیمنت چطور کار می‌کند؟",
+    answer:
+      "در گیمنت ثبت نتیجه، بررسی مدارک (اسکرین‌شات/ویدیو) و رسیدگی به اعتراض‌ها به‌صورت شفاف و قابل‌پیگیری انجام می‌شود. این مسیر کمک می‌کند تصمیم نهایی درباره‌ی برنده و جایزه دقیق‌تر و منصفانه‌تر باشد.",
+  },
+  {
+    question: "آیا خرید و فروش اکانت در گیمنت امن است؟",
+    answer:
+      "بله. فروشگاه گیمنت از خرید امانی (اسکرو) استفاده می‌کند؛ یعنی مبلغ خریدار تا زمان تأیید تحویل نزد پلتفرم نگه داشته می‌شود و بعد به فروشنده پرداخت می‌گردد. فروشندگان احراز هویت می‌شوند و خریدار می‌تواند قیمت پیشنهاد بدهد تا فروشنده قبول یا رد کند.",
+  },
+  {
+    question: "چطور قیمت اکانت بازی‌ام را بفهمم؟",
+    answer:
+      "از ابزار «تخمین قیمت اکانت» در فروشگاه استفاده کن. با وارد کردن آیتم‌ها، لول، ریجن و وضعیت امنیت اکانت، یک بازه‌ی قیمت منصفانه بر اساس بازار به تو پیشنهاد می‌شود.",
+  },
+  {
+    question: "برای برداشت جایزه چه باید بکنم؟",
+    answer:
+      "جوایز و درآمد فروش به کیف پول حساب کاربری‌ات اضافه می‌شود و از بخش کیف پول می‌توانی درخواست برداشت بدهی. راهنمای کامل در صفحه‌ی راهنمای کیف پول موجود است.",
+  },
+];
 
 const gameLinks = [
   {
@@ -23,8 +58,28 @@ const gameLinks = [
 ];
 
 export default function ProfileDescriptionsPage() {
+  const faqJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: faqs.map((f) => ({
+      "@type": "Question",
+      name: f.question,
+      acceptedAnswer: { "@type": "Answer", text: f.answer },
+    })),
+  };
+  const breadcrumbJsonLd = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "گیمنت", item: SITE_URL },
+      { "@type": "ListItem", position: 2, name: "توضیحات و راهنما", item: `${SITE_URL}/profile/descriptions` },
+    ],
+  };
+
   return (
     <div className="min-h-screen bg-[#050508] text-white relative overflow-x-hidden">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,_rgba(92,0,160,.68)_0%,_rgba(32,0,56,.42)_34%,_transparent_72%)]" />
         <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-purple-700/20 blur-[80px]" />
@@ -46,6 +101,12 @@ export default function ProfileDescriptionsPage() {
             </h1>
             <p className="text-sm sm:text-base leading-8 text-gray-300">
               گیمنت پلتفرم ایرانی مدیریت و شرکت در تورنومنت‌های گیمینگ است؛ روم‌های فعال را ببین، قوانین و جوایز را بررسی کن، ثبت‌نام کن و با سیستم داوری قابل پیگیری برای رتبه و جایزه رقابت کن.
+            </p>
+            <p className="text-sm sm:text-base leading-8 text-gray-300 mt-4">
+              فرقی نمی‌کند بازیکن کالاف دیوتی موبایل باشی، فورتنایت یا کلش رویال؛ گیمنت همه‌چیز را در یک مسیر شفاف جمع کرده است:
+              ثبت‌نام سریع در مسابقه، قوانین روشن، لابی منظم، ثبت نتیجه و داوری هوشمند، جدول رتبه‌بندی بازیکنان و تیم‌ها،
+              تالار افتخارات برای اخبار و دستاوردها، و یک فروشگاه امن برای خرید و فروش اکانت و ارز بازی با پرداخت امانی.
+              هدف گیمنت ساختن یک فضای رقابتی سالم، قابل‌اعتماد و حرفه‌ای برای جامعه‌ی گیمرهای ایرانی است.
             </p>
             <div className="flex flex-wrap gap-3 mt-6">
               <Link href="/tournaments" className="gaming-btn text-sm">مشاهده تورنومنت‌های فعال</Link>
@@ -100,6 +161,21 @@ export default function ProfileDescriptionsPage() {
           </article>
         </section>
 
+        <section className="glass-panel rounded-3xl p-5 sm:p-6 border border-white/10 text-right mb-6">
+          <h2 className="text-xl sm:text-2xl font-black mb-5">سوالات پرتکرار درباره‌ی گیمنت</h2>
+          <div className="space-y-3">
+            {faqs.map((f) => (
+              <details key={f.question} className="group rounded-2xl bg-white/5 border border-white/10 p-4 open:border-purple-400/30">
+                <summary className="cursor-pointer list-none flex items-center justify-between gap-3 font-black text-white">
+                  <span>{f.question}</span>
+                  <span className="text-purple-300 transition-transform group-open:rotate-45">＋</span>
+                </summary>
+                <p className="mt-3 text-sm leading-7 text-gray-300">{f.answer}</p>
+              </details>
+            ))}
+          </div>
+        </section>
+
         <section className="glass-panel rounded-3xl p-5 sm:p-6 border border-white/10 text-right">
           <h2 className="text-xl sm:text-2xl font-black mb-4">دسترسی سریع به بخش‌های مهم</h2>
           <div className="flex flex-wrap gap-3">
@@ -108,6 +184,8 @@ export default function ProfileDescriptionsPage() {
             <Link href="/players" className="px-4 py-2 rounded-full bg-white/5 text-gray-300 text-sm font-black border border-white/10">بازیکنان</Link>
             <Link href="/teams" className="px-4 py-2 rounded-full bg-white/5 text-gray-300 text-sm font-black border border-white/10">تیم‌های گیمینگ</Link>
             <Link href="/honors" className="px-4 py-2 rounded-full bg-white/5 text-gray-300 text-sm font-black border border-white/10">تالار افتخارات</Link>
+            <Link href="/store" className="px-4 py-2 rounded-full bg-white/5 text-gray-300 text-sm font-black border border-white/10">فروشگاه اکانت</Link>
+            <Link href="/store/price-estimate" className="px-4 py-2 rounded-full bg-white/5 text-gray-300 text-sm font-black border border-white/10">تخمین قیمت اکانت</Link>
             <Link href="/rules" className="px-4 py-2 rounded-full bg-white/5 text-gray-300 text-sm font-black border border-white/10">قوانین مسابقات</Link>
           </div>
         </section>
