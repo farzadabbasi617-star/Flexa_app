@@ -1,13 +1,9 @@
 import type { ReactNode } from "react";
 import { createPageMetadata } from "@/lib/seo";
-
 export const metadata = createPageMetadata({
-  title: "مسابقات بازی‌های محبوب",
-  description: "صفحات اختصاصی مسابقات و تورنومنت‌های کالاف دیوتی موبایل، فورتنایت و کلش رویال در گیمنت.",
-  path: "/games",
-  keywords: ["مسابقات گیمینگ", "تورنومنت بازی", "کالاف موبایل", "فورتنایت", "کلش رویال"],
+  title:"بازی‌های گیمنت | کالاف موبایل، فورتنایت، کلش رویال | تورنومنت و فروشگاه",
+  description:"صفحه‌های اختصاصی بازی‌های گیمنت — تورنومنت کالاف دیوتی موبایل، فورتنایت و کلش رویال. خرید و فروش اکانت، CP، جم، V-Bucks و مسابقات آنلاین در یک پلتفرم فارسی.",
+  path:"/games",
+  keywords:["بازی‌های گیمنت","کالاف دیوتی موبایل","فورتنایت","کلش رویال","تورنومنت کالاف موبایل","تورنومنت فورتنایت","تورنومنت کلش رویال","خرید اکانت کالاف موبایل","خرید اکانت فورتنایت","خرید اکانت کلش رویال","COD Mobile","Fortnite","Clash Royale","مسابقات موبایل ایران"],
 });
-
-export default function Layout({ children }: { children: ReactNode }) {
-  return children;
-}
+export default function Layout({children}:{children:ReactNode}){return children;}
