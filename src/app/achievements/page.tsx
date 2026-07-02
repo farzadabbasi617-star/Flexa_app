@@ -273,6 +273,8 @@ export default function AchievementsPage() {
                           className={`w-full h-full object-cover ${
                             achievement.unlocked ? "opacity-100" : "opacity-30 grayscale"
                           }`}
+                          loading="lazy"
+                          decoding="async"
                         />
                       </div>
 

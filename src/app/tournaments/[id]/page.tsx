@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
+import { useCountdown } from "@/hooks/useCountdown";
 
 interface Player {
   id: string;
@@ -80,42 +81,6 @@ const MATCH_STATUS_STYLES = {
   completed: { color: "text-neon-green", bg: "bg-green-900/30" },
   disputed: { color: "text-neon-pink", bg: "bg-red-900/30" },
 };
-
-function useCountdown(targetDate?: string | null) {
-  const [value, setValue] = useState("");
-  const [expired, setExpired] = useState(false);
-
-  useEffect(() => {
-    if (!targetDate) {
-      setValue("");
-      setExpired(false);
-      return;
-    }
-
-    function update() {
-      const diff = new Date(targetDate!).getTime() - Date.now();
-      if (diff <= 0) {
-        setValue("شروع شده");
-        setExpired(true);
-        return;
-      }
-      const days = Math.floor(diff / 86400000);
-      const hours = Math.floor((diff % 86400000) / 3600000);
-      const minutes = Math.floor((diff % 3600000) / 60000);
-      const seconds = Math.floor((diff % 60000) / 1000);
-      if (days > 0) setValue(`${days.toLocaleString("fa-IR")} روز و ${hours.toLocaleString("fa-IR")} ساعت`);
-      else if (hours > 0) setValue(`${hours.toLocaleString("fa-IR")} ساعت و ${minutes.toLocaleString("fa-IR")} دقیقه`);
-      else setValue(`${minutes.toLocaleString("fa-IR")}:${seconds.toString().padStart(2, "0")}`);
-      setExpired(false);
-    }
-
-    update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, [targetDate]);
-
-  return { value, expired };
-}
 
 export default function TournamentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
@@ -360,7 +325,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* Tournament Header */}
         <div className="gaming-card p-6 sm:p-8 mb-8 overflow-hidden relative">
-          {tournament.bannerUrl && <img src={tournament.bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" />}
+          {tournament.bannerUrl && <img src={tournament.bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" loading="lazy" decoding="async" />}
           <div className="relative flex flex-col sm:flex-row items-start gap-6">
             <div className="text-6xl">{gameData.icon}</div>
             <div className="flex-1">

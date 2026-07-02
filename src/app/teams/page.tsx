@@ -187,7 +187,7 @@ export default function TeamsPage() {
               >
                 <div className="flex items-center gap-4 mb-3">
                   <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-neon-purple to-neon-blue flex items-center justify-center text-xl font-bold overflow-hidden">
-                    {team.logoUrl ? <img src={team.logoUrl} alt={team.name} className="w-full h-full object-cover" /> : team.tag}
+                    {team.logoUrl ? <img src={team.logoUrl} alt={team.name} className="w-full h-full object-cover" loading="lazy" decoding="async" /> : team.tag}
                   </div>
                   <div>
                     <h3 className="font-bold group-hover:text-neon-blue transition-colors">

@@ -28,17 +28,25 @@ function useCountdown(target: string | null) {
   const [value, setValue] = useState("");
   useEffect(() => {
     if (!target) return;
+    let timer: ReturnType<typeof setInterval> | null = null;
     function update() {
       const diff = new Date(target!).getTime() - Date.now();
-      if (diff <= 0) { setValue("شروع شده"); return; }
+      if (diff <= 0) {
+        setValue("شروع شده");
+        // Stop ticking once started — otherwise this kept firing an
+        // identical setState every second forever, forcing pointless
+        // re-renders for the rest of the page's lifetime.
+        if (timer) clearInterval(timer);
+        return;
+      }
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
       const s = Math.floor((diff % 60000) / 1000);
       setValue(`${h.toLocaleString("fa-IR")}:${m.toString().padStart(2,"0")}:${s.toString().padStart(2,"0")}`);
     }
     update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
+    timer = setInterval(update, 1000);
+    return () => { if (timer) clearInterval(timer); };
   }, [target]);
   return value;
 }
@@ -77,18 +85,27 @@ export default function TournamentLobby() {
     return tournament.registrations.find((r) => r.registration.visibleUserId === user.id || r.player?.visibleUserId === user.id) || null;
   }, [tournament, user]);
 
+  // Ticks every second so `credentialsVisible` below re-evaluates as time
+  // passes, instead of only recomputing when `tournament`/`user` change
+  // (which previously meant a user could stay on the page past the
+  // reveal time without ever seeing the room credentials appear).
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
   const canViewLobby = Boolean(isAdmin || myRegistration);
   const credentialsVisible = useMemo(() => {
     if (!tournament) return false;
     if (isAdmin) return true;
     if (!myRegistration) return false;
 
-    const now = Date.now();
     if (tournament.roomVisibleAt && now >= new Date(tournament.roomVisibleAt).getTime()) return true;
     if (tournament.startDate && now >= new Date(tournament.startDate).getTime() - 30 * 60 * 1000) return true;
     if (tournament.status === "in_progress") return true;
     return false;
-  }, [isAdmin, myRegistration, tournament]);
+  }, [isAdmin, myRegistration, tournament, now]);
 
   const copyToClipboard = async (text: string, type: string) => {
     await navigator.clipboard.writeText(text);

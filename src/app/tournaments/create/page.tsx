@@ -457,7 +457,7 @@ export default function CreateTournamentPage() {
                       form.bannerUrl === image.url ? "border-neon-purple ring-2 ring-purple-500/30" : "border-gaming-border"
                     }`}
                   >
-                    <img src={image.url} alt={image.altText || image.title} className="w-full h-full object-cover" />
+                    <img src={image.url} alt={image.altText || image.title} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                     <span className="absolute inset-x-0 bottom-0 bg-black/55 text-[10px] p-1 truncate">{image.title}</span>
                   </button>
                 ))}
@@ -465,7 +465,7 @@ export default function CreateTournamentPage() {
             ) : (
               <p className="text-xs text-gray-500 leading-6">هنوز تصویری در پنل رسانه ثبت نشده. از /admin/images می‌توانی تصویرهای دسته tournament یا کارت همان بازی اضافه کنی.</p>
             )}
-            {form.bannerUrl && <img src={form.bannerUrl} alt="پیش‌نمایش" className="mt-4 h-36 w-full object-cover rounded-2xl border border-white/10" />}
+            {form.bannerUrl && <img src={form.bannerUrl} alt="پیش‌نمایش" className="mt-4 h-36 w-full object-cover rounded-2xl border border-white/10" loading="lazy" decoding="async" />}
           </div>
 
           <div className="gaming-card p-5 border-neon-purple/20">

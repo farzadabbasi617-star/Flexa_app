@@ -141,10 +141,17 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
     };
   }, [id]);
 
+  const honorId = honor?.id;
+  const honorHtmlUrl = honor?.htmlUrl;
+
   useEffect(() => {
-    if (!honor || honor.htmlUrl) return;
+    // Deliberately depends only on the primitive id/htmlUrl (not the whole
+    // `honor` object) since this effect itself updates `honor` via
+    // setHonor below — depending on the full object would re-trigger the
+    // view-count POST on every stats update and create a request loop.
+    if (!honorId || honorHtmlUrl) return;
     let cancelled = false;
-    fetch(`/api/honors/${honor.id}/engagement`, {
+    fetch(`/api/honors/${honorId}/engagement`, {
       method: "POST",
       headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({ action: "view" }),
@@ -156,7 +163,7 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
       })
       .catch(() => undefined);
     return () => { cancelled = true; };
-  }, [honor?.id, honor?.htmlUrl]);
+  }, [honorId, honorHtmlUrl]);
 
   async function toggleLike() {
     if (!honor || engagementBusy) return;
@@ -221,7 +228,7 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
       )}
       <div className="relative min-h-[300px] overflow-hidden">
         {honor?.image ? (
-          <img src={honor.image} alt={honor.imageAlt || honor.title} className="absolute inset-0 w-full h-full object-cover opacity-80" />
+          <img src={honor.image} alt={honor.imageAlt || honor.title} className="absolute inset-0 w-full h-full object-cover opacity-80" loading="lazy" decoding="async" />
         ) : (
           <div className="absolute inset-0 bg-gradient-to-br from-purple-950 via-[#050508] to-cyan-950" />
         )}

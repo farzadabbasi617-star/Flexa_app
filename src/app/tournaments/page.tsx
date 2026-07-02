@@ -106,7 +106,7 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
                 : "bg-[#111114] text-gray-400 border-white/5 hover:border-white/10 active:bg-[#18181c]"
             }`}
           >
-            <img src={g.icon} alt={g.name} className="w-4 h-4 object-contain shrink-0" />
+            <img src={g.icon} alt={g.name} className="w-4 h-4 object-contain shrink-0" loading="lazy" decoding="async" />
             <span>{g.name}</span>
           </button>
         ))}
@@ -143,7 +143,7 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
                   <div className="flex items-center gap-3">
                     {/* Uniform Square Game Logo inside glowing container */}
                     <div className="w-12 h-12 rounded-2xl bg-[#111114] border border-white/10 flex items-center justify-center p-2 sm:p-2.5 shadow-[0_0_20px_rgba(168,85,247,0.12)] shrink-0">
-                      <img src={meta.icon} alt={L(meta.fa, meta.en)} className="w-full h-full object-contain" />
+                      <img src={meta.icon} alt={L(meta.fa, meta.en)} className="w-full h-full object-contain" loading="lazy" decoding="async" />
                     </div>
                     <div className="text-right">
                       <h2 className="text-xl sm:text-2xl font-black text-white">{L(meta.fa, meta.en)}</h2>
@@ -212,7 +212,7 @@ export default function TournamentsPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6" dir="rtl">
           <div className="text-right">
             <h1 className="text-2xl sm:text-3xl font-black flex items-center gap-2.5 justify-start">
-              <img src="/icons/honors_icon.png" alt="Tournaments" className="w-8 h-8 object-contain drop-shadow-[0_0_8px_#bc00ff] shrink-0" />
+              <img src="/icons/honors_icon.png" alt="Tournaments" className="w-8 h-8 object-contain drop-shadow-[0_0_8px_#bc00ff] shrink-0" loading="lazy" decoding="async" />
               <span className="bg-gradient-to-l from-purple-400 to-cyan-300 bg-clip-text text-transparent">{L("تورنومنت‌ها", "Tournaments")}</span>
             </h1>
             <p className="text-gray-400 mt-1.5 text-xs">

@@ -392,7 +392,7 @@ export default function ProfilePage() {
                 <div className="text-[9px] font-black text-purple-400 tracking-[0.2em] uppercase leading-none">GAMENT ATHLETE LICENSE</div>
                 <div className="text-[10px] text-gray-500 font-bold mt-1 leading-none">کارت هویت رسمی بازیکن</div>
               </div>
-              <img src="/icons/gament-icon-192.png" alt="Gament Logo" className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(188,0,255,0.4)]" />
+              <img src="/icons/gament-icon-192.png" alt="Gament Logo" className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(188,0,255,0.4)]" loading="lazy" decoding="async" />
             </div>
 
             {/* Body of the Card */}
@@ -447,11 +447,11 @@ export default function ProfilePage() {
         {/* Settings tabs */}
         <section className="grid grid-cols-2 gap-3 mb-8" dir="rtl">
           <Link href="/profile/user" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-purple-500/20 rounded-2xl py-4 hover:border-purple-500/40 active:scale-95 transition-transform">
-            <img src="/icons/profile_icon.png" alt="پروفایل" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" />
+            <img src="/icons/profile_icon.png" alt="پروفایل" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black text-purple-200">پروفایل</span>
           </Link>
           <Link href="/wallet" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-purple-500/20 rounded-2xl py-4 hover:border-purple-500/40 active:scale-95 transition-transform">
-            <img src="/icons/wallet_icon.png" alt="کیف پول" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" />
+            <img src="/icons/wallet_icon.png" alt="کیف پول" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black text-purple-200">کیف پول</span>
           </Link>
           <Link href="/profile/descriptions" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-cyan-500/20 rounded-2xl py-4 hover:border-cyan-500/40 active:scale-95 transition-transform">

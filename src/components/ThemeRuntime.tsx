@@ -8,7 +8,12 @@ export default function ThemeRuntime() {
   useEffect(() => {
     async function loadBackground() {
       try {
-        const res = await fetch("/api/public/background", { cache: "no-store" });
+        // Was `cache: "no-store"`, which forced a fresh network request (and
+        // therefore a fresh DB hit server-side) on every single page load
+        // across the whole site since this component lives in the root
+        // layout. The background image changes rarely, so let the browser
+        // reuse the server's Cache-Control (see the route handler) instead.
+        const res = await fetch("/api/public/background");
         const data = await res.json();
         if (data?.url) {
           setBgImage(data.url);

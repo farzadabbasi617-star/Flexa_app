@@ -382,7 +382,7 @@ function JudgingContent() {
                       <div key={item.id} className="bg-dark-700 rounded-2xl border border-white/5 overflow-hidden">
                         {isImage ? (
                           <a href={item.fileUrl} target="_blank" rel="noreferrer">
-                            <img src={item.fileUrl} alt={item.description || "مدرک مسابقه"} className="w-full h-40 object-cover" />
+                            <img src={item.fileUrl} alt={item.description || "مدرک مسابقه"} className="w-full h-40 object-cover" loading="lazy" decoding="async" />
                           </a>
                         ) : (
                           <a href={item.fileUrl} target="_blank" rel="noreferrer" className="block p-5 text-neon-blue text-sm font-bold break-all">

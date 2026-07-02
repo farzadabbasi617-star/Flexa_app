@@ -235,7 +235,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             <div className="relative aspect-square w-full overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-purple-900/40 to-cyan-900/20">
               {images[activeImg] ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={images[activeImg]} alt={listing.title} className="h-full w-full object-cover" />
+                <img src={images[activeImg]} alt={listing.title} className="h-full w-full object-cover" loading="lazy" decoding="async" />
               ) : (
                 <div className="grid h-full w-full place-items-center text-7xl opacity-50">🛍️</div>
               )}
@@ -248,7 +248,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                 {images.map((img, i) => (
                   <button key={i} onClick={() => setActiveImg(i)} className={`h-16 w-16 shrink-0 overflow-hidden rounded-2xl border ${activeImg === i ? "border-purple-400" : "border-white/10"}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img} alt="" className="h-full w-full object-cover" />
+                    <img src={img} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
                   </button>
                 ))}
               </div>
@@ -261,7 +261,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
               <span className="inline-flex items-center gap-1.5 rounded-full bg-white/10 py-1 pl-3 pr-1.5 font-bold">
                 {listing.kind === "currency" && CURRENCY_ICONS[listing.currencyKind || ""] && (
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={CURRENCY_ICONS[listing.currencyKind || ""]} alt="" className="h-5 w-5 shrink-0 rounded object-cover" />
+                  <img src={CURRENCY_ICONS[listing.currencyKind || ""]} alt="" className="h-5 w-5 shrink-0 rounded object-cover" loading="lazy" decoding="async" />
                 )}
                 {listing.kind === "currency"
                   ? CURRENCY_LABELS[listing.currencyKind || "other"]

@@ -91,7 +91,7 @@ export default async function GameLandingPage({ params }: { params: Promise<{ sl
 
               <div className="relative mx-auto w-56 h-56 sm:w-72 sm:h-72 rounded-[3rem] bg-white/5 border border-white/10 grid place-items-center shadow-[0_0_80px_rgba(168,85,247,.2)]">
                 <div className={`absolute inset-6 rounded-[2.5rem] bg-gradient-to-br ${game.accent} opacity-20 blur-2xl`} />
-                <img src={game.icon} alt={game.title} className="relative w-36 h-36 sm:w-44 sm:h-44 object-contain drop-shadow-[0_0_28px_rgba(255,255,255,.18)]" />
+                <img src={game.icon} alt={game.title} className="relative w-36 h-36 sm:w-44 sm:h-44 object-contain drop-shadow-[0_0_28px_rgba(255,255,255,.18)]" loading="lazy" decoding="async" />
               </div>
             </div>
           </div>

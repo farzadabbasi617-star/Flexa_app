@@ -183,7 +183,7 @@ export default function StorePage() {
             >
               {f.img ? (
                 // eslint-disable-next-line @next/next/no-img-element
-                <img src={f.img} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" />
+                <img src={f.img} alt="" className="h-6 w-6 shrink-0 rounded-md object-cover" loading="lazy" decoding="async" />
               ) : (
                 <span className="inline-grid h-6 w-6 shrink-0 place-items-center text-base">{f.emoji}</span>
               )}
@@ -263,7 +263,7 @@ export default function StorePage() {
                 <Link href={`/store/${it.id}`} className="relative block aspect-square w-full overflow-hidden bg-gradient-to-br from-purple-900/40 to-cyan-900/20">
                   {it.images?.[0] ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={it.images[0]} alt={it.title} className="h-full w-full object-cover" />
+                    <img src={it.images[0]} alt={it.title} className="h-full w-full object-cover" loading="lazy" decoding="async" />
                   ) : (
                     <div className="grid h-full w-full place-items-center text-5xl opacity-60">
                       {KIND_ICONS[it.kind] || "🛍️"}
@@ -281,7 +281,7 @@ export default function StorePage() {
                     <span className="mt-1.5 inline-flex w-fit items-center gap-1.5 rounded-full bg-purple-500/20 py-0.5 pl-2.5 pr-1 text-[11px] font-black text-purple-200 ring-1 ring-purple-400/30">
                       {CURRENCY_ICONS[it.currencyKind || ""] ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={CURRENCY_ICONS[it.currencyKind || ""]} alt="" className="h-4 w-4 shrink-0 rounded object-cover" />
+                        <img src={CURRENCY_ICONS[it.currencyKind || ""]} alt="" className="h-4 w-4 shrink-0 rounded object-cover" loading="lazy" decoding="async" />
                       ) : (
                         <span>💎</span>
                       )}

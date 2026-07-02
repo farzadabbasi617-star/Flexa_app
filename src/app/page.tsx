@@ -174,7 +174,7 @@ export default async function LuxuryHomePage() {
               href="/wallet"
               className="grid place-items-center w-12 h-12 rounded-2xl bg-purple-500/12 border border-purple-300/20 active:scale-95"
             >
-              <img src="/icons/wallet_icon.png" alt="کیف پول" className="w-8 h-8 object-contain" />
+              <img src="/icons/wallet_icon.png" alt="کیف پول" className="w-8 h-8 object-contain" loading="lazy" decoding="async" />
             </Link>
           </div>
         </header>
@@ -275,6 +275,8 @@ export default async function LuxuryHomePage() {
                     src={featuredHonor.image}
                     alt={featuredHonor.title}
                     className="absolute inset-0 w-full h-full object-cover opacity-45 group-hover:scale-105 transition duration-700"
+                    loading="lazy"
+                    decoding="async"
                   />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" />
@@ -331,6 +333,8 @@ export default async function LuxuryHomePage() {
                             src={gameImage.url}
                             alt={gameImage.altText || gameImage.title}
                             className="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:scale-110 transition duration-700"
+                            loading="lazy"
+                            decoding="async"
                           />
                         )}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
@@ -343,6 +347,8 @@ export default async function LuxuryHomePage() {
                                 src={bySlug[`icon-${game.id}`]?.url || game.icon}
                                 alt={game.faName}
                                 className="w-11 h-11 object-contain"
+                                loading="lazy"
+                                decoding="async"
                               />
                             </div>
                           </div>

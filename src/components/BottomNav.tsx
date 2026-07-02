@@ -33,7 +33,12 @@ export default function BottomNav() {
   const [icons, setIcons] = useState<SiteImage[]>([]);
 
   useEffect(() => {
-    fetch("/api/public/images?category=icon", { cache: "no-store" })
+    // Was `cache: "no-store"`, which bypassed the server's Cache-Control
+    // (see /api/public/images) on every mount. BottomNav is rendered on
+    // nearly every page, so this needlessly forced a fresh fetch (and, when
+    // the in-memory TTL cache missed, a DB query) site-wide instead of
+    // letting the browser reuse the cached response.
+    fetch("/api/public/images?category=icon")
       .then((res) => res.json())
       .then((data) => setIcons(Array.isArray(data) ? data : []))
       .catch(() => setIcons([]));

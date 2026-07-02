@@ -29,6 +29,13 @@ export default function GlobalCardFX() {
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduceMotion) return;
 
+    // Fine/hover-capable pointer (mouse/trackpad) only. Touch devices never
+    // fire pointermove the way this effect needs, so skip binding entirely
+    // there instead of silently attaching no-op listeners + extra DOM nodes
+    // (glare overlay, inline styles) to every card for nothing.
+    const hasFinePointer = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
+    if (!hasFinePointer) return;
+
     const bound = new WeakSet<Element>();
 
     function isManaged(el: Element) {
@@ -68,8 +75,19 @@ export default function GlobalCardFX() {
 
       const glare = ensureGlare(el);
 
-      function handleMove(e: PointerEvent) {
-        if (e.pointerType === "touch") return;
+      // rAF-throttle pointermove: reading getBoundingClientRect() and then
+      // writing transform/background on every raw pointermove event (which
+      // can fire 60-120+ times/sec) causes layout thrashing. Coalescing to
+      // at most one measure+write per animation frame keeps this smooth
+      // even with many cards mounted (e.g. the admin console, leaderboard).
+      let rafId = 0;
+      let pendingEvent: PointerEvent | null = null;
+
+      function flush() {
+        rafId = 0;
+        const e = pendingEvent;
+        pendingEvent = null;
+        if (!e) return;
         const rect = el.getBoundingClientRect();
         const px = (e.clientX - rect.left) / rect.width;
         const py = (e.clientY - rect.top) / rect.height;
@@ -81,7 +99,18 @@ export default function GlobalCardFX() {
         glare.style.background = `radial-gradient(circle at ${px * 100}% ${py * 100}%, rgba(255,255,255,.18), transparent 55%)`;
       }
 
+      function handleMove(e: PointerEvent) {
+        if (e.pointerType === "touch") return;
+        pendingEvent = e;
+        if (!rafId) rafId = requestAnimationFrame(flush);
+      }
+
       function handleLeave() {
+        if (rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+          pendingEvent = null;
+        }
         el.style.transition = "transform .35s cubic-bezier(.22,1,.36,1)";
         el.style.transform = "perspective(900px) rotateX(0deg) rotateY(0deg) translateZ(0px)";
         glare.style.opacity = "0";

@@ -314,7 +314,7 @@ export default function AdminImagesPage() {
               {form.url && (
                 <div className="sm:col-span-2">
                   <p className="text-xs text-gray-500 mb-1">{lang === "fa" ? "پیش‌نمایش:" : "Preview:"}</p>
-                  <img src={form.url} alt="Preview" className="w-full max-h-48 rounded-lg object-cover border border-gaming-border" />
+                  <img src={form.url} alt="Preview" className="w-full max-h-48 rounded-lg object-cover border border-gaming-border" loading="lazy" decoding="async" />
                 </div>
               )}
               <div>
@@ -394,7 +394,7 @@ export default function AdminImagesPage() {
               <div key={img.id} className={`gaming-card overflow-hidden ${!img.isActive ? "opacity-50" : ""}`}>
                 {/* Image Preview */}
                 <div className="h-40 bg-dark-700 relative">
-                  <img src={img.url} alt={img.altText || img.title} className="w-full h-full object-cover" />
+                  <img src={img.url} alt={img.altText || img.title} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                   <div className="absolute top-2 start-2 flex gap-1">
                     <span className="text-xs px-2 py-0.5 rounded-full bg-dark-800/80 text-neon-purple font-bold">
                       {CATEGORIES.find((c) => c.value === img.category)?.label[lang === "fa" ? "fa" : "en"] || img.category}

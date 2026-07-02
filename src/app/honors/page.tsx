@@ -197,7 +197,7 @@ export default function HonorsPage() {
                 className="group relative block overflow-hidden rounded-[32px] border border-white/10 h-[300px] active:scale-[0.985] transition-all hover:border-purple-400/40 shadow-[0_0_45px_rgba(168,85,247,.14)]"
               >
                 {activeFeatured.image ? (
-                  <img src={activeFeatured.image} alt={activeFeatured.imageAlt || activeFeatured.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <img src={activeFeatured.image} alt={activeFeatured.imageAlt || activeFeatured.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" loading="lazy" decoding="async" />
                 ) : (
                   <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-[#12081f] to-cyan-950" />
                 )}

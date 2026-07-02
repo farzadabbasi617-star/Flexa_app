@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, use, useEffect, useMemo, useState } from "react";
+import { FormEvent, use, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
@@ -43,7 +43,7 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ name: "", tag: "", logoUrl: "", description: "" });
 
-  async function load() {
+  const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -62,11 +62,11 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
     } finally {
       setLoading(false);
     }
-  }
+  }, [id]);
 
   useEffect(() => {
     load();
-  }, [id]);
+  }, [load]);
 
   const isOwner = Boolean(user && data?.team.ownerId === user.id);
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
@@ -144,10 +144,10 @@ export default function TeamDetailPage({ params }: { params: Promise<{ id: strin
         {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 my-5 text-sm">{error}</div>}
 
         <section className="gaming-card p-6 sm:p-8 mt-5 mb-8 overflow-hidden relative">
-          {data.team.logoUrl && <img src={data.team.logoUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-15" />}
+          {data.team.logoUrl && <img src={data.team.logoUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-15" loading="lazy" decoding="async" />}
           <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-6">
             <div className="w-28 h-28 rounded-3xl bg-gradient-to-br from-purple-600 to-cyan-500 grid place-items-center text-3xl font-black shadow-[0_0_40px_rgba(168,85,247,.25)]">
-              {data.team.logoUrl ? <img src={data.team.logoUrl} alt={data.team.name} className="w-full h-full object-cover rounded-3xl" /> : data.team.tag}
+              {data.team.logoUrl ? <img src={data.team.logoUrl} alt={data.team.name} className="w-full h-full object-cover rounded-3xl" loading="lazy" decoding="async" /> : data.team.tag}
             </div>
             <div className="flex-1 text-center sm:text-right">
               <h1 className="text-3xl sm:text-4xl font-black">{data.team.name}</h1>

@@ -1,9 +1,10 @@
 "use client";
 
-import React, { memo, useEffect, useMemo, useState } from "react";
+import React, { memo, useMemo } from "react";
 import Link from "next/link";
 import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import TiltCard from "@/components/fx/TiltCard";
+import { useCountdown } from "@/hooks/useCountdown";
 
 interface Tournament {
   id: string;
@@ -23,44 +24,6 @@ interface Props {
   t: Tournament;
   walletBalanceToman?: number | null;
   isLoggedIn?: boolean;
-}
-
-function useCountdown(targetDate: string | null) {
-  const [value, setValue] = useState("");
-  const [expired, setExpired] = useState(false);
-
-  useEffect(() => {
-    if (!targetDate) {
-      setValue("");
-      setExpired(false);
-      return;
-    }
-
-    function update() {
-      const diff = new Date(targetDate!).getTime() - Date.now();
-      if (diff <= 0) {
-        setValue("شروع شده");
-        setExpired(true);
-        return;
-      }
-
-      const days = Math.floor(diff / 86400000);
-      const hours = Math.floor((diff % 86400000) / 3600000);
-      const minutes = Math.floor((diff % 3600000) / 60000);
-      const seconds = Math.floor((diff % 60000) / 1000);
-
-      if (days > 0) setValue(`${days.toLocaleString("fa-IR")} روز و ${hours.toLocaleString("fa-IR")} ساعت`);
-      else if (hours > 0) setValue(`${hours.toLocaleString("fa-IR")} ساعت و ${minutes.toLocaleString("fa-IR")} دقیقه`);
-      else setValue(`${minutes.toLocaleString("fa-IR")}:${seconds.toString().padStart(2, "0")}`);
-      setExpired(false);
-    }
-
-    update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, [targetDate]);
-
-  return { value, expired };
 }
 
 const GAME_FALLBACK: Record<string, string> = {
@@ -98,12 +61,6 @@ const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false
 
   // تبدیل خودکار لینک تصویر
   const bannerUrl = getDirectImageUrl(t.bannerUrl);
-
-  // برای دیباگ - می‌توانی در کنسول مرورگر چک کنی
-  if (process.env.NODE_ENV === 'development' && t.bannerUrl) {
-    console.log('Original bannerUrl:', t.bannerUrl);
-    console.log('Converted bannerUrl:', bannerUrl);
-  }
 
   const entryFeeInfo = useMemo(() => {
     const rial = parseTomanToRial(t.entryFee || "");

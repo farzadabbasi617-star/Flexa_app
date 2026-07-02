@@ -487,7 +487,7 @@ export default function WalletPage() {
                     <div className="w-16 h-16 rounded-2xl bg-black/30 border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
                       {depositReceiptPreview ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={depositReceiptPreview} alt="پیش‌نمایش فیش واریز" className="w-full h-full object-cover" />
+                        <img src={depositReceiptPreview} alt="پیش‌نمایش فیش واریز" className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : <span className="text-3xl">🧾</span>}
                     </div>
                     <div className="min-w-0">
