@@ -129,6 +129,13 @@ export async function POST(request: NextRequest) {
       logger.warn({ err, tournamentId: created.id }, "Failed to publish admin-created tournament to Telegram channel");
     });
 
+    // === n8n Integration: Fire tournament.created event ===
+    import("@/lib/n8n").then(({ notifyN8nTournamentCreated }) => {
+      notifyN8nTournamentCreated(created).catch((err) =>
+        logger.warn({ err, tournamentId: created.id }, "n8n tournament.created trigger failed")
+      );
+    });
+
     return NextResponse.json(created, { status: 201 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to create tournament";

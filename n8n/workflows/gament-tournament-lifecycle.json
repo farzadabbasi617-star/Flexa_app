@@ -1,0 +1,206 @@
+{
+  "name": "Gament - Tournament Lifecycle (Created + Reminders)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "gament-tournament-created",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-created",
+      "name": "Tournament Created Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [180, 320],
+      "webhookId": "gament-tournament-created"
+    },
+    {
+      "parameters": {
+        "functionCode": "const data = items[0].json.data || items[0].json;\n\n// Format beautiful Persian message\nconst gameLabels = {\n  cod_mobile: '🎯 کالاف موبایل',\n  fortnite: '🏗️ فورتنایت',\n  clash_royale: '👑 کلش رویال'\n};\n\nconst game = gameLabels[data.game] || data.game;\nconst start = data.startDate ? new Date(data.startDate) : null;\nconst startStr = start \n  ? start.toLocaleString('fa-IR', { dateStyle: 'medium', timeStyle: 'short', timeZone: 'Asia/Tehran' })\n  : 'اعلام می‌شود';\n\nconst text = [\n  '🏆 <b>تورنومنت جدید در گیمنت</b>',\n  '',\n  `🔥 <b>${data.name}</b>`,\n  `🎮 بازی: <b>${game}</b>`,\n  data.gameMode ? `🕹 مود: ${data.gameMode}` : '',\n  `👥 ظرفیت: <b>${data.maxPlayers || 16} نفر</b>`,\n  `💳 ورودی: <b>${data.entryFee || 'رایگان'}</b>`,\n  data.prizePool ? `🎁 جایزه: <b>${data.prizePool}</b>` : '',\n  `⏰ شروع: <b>${startStr}</b>`,\n  '',\n  'برای ثبت‌نام و جزئیات بیشتر وارد اپ شوید 👇'\n].filter(Boolean).join('\\n');\n\nreturn [{\n  json: {\n    ...data,\n    telegramText: text,\n    channelId: process.env.TELEGRAM_CHANNEL_ID || '@Gament_games',\n    appUrl: process.env.APP_URL || 'https://www.gament1.ir'\n  }\n}];"
+      },
+      "id": "format-message",
+      "name": "Format Tournament Message",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [420, 320]
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.channelId }}",
+        "text": "={{ $json.telegramText }}",
+        "additionalFields": {
+          "parseMode": "HTML",
+          "disableWebPagePreview": false,
+          "replyMarkup": "={{ JSON.stringify({ inline_keyboard: [[ { text: \"🏆 ثبت‌نام در تورنومنت\", url: $json.appUrl + \"/tournaments/\" + $json.id } ]] }) }}"
+        }
+      },
+      "id": "post-to-channel",
+      "name": "Post to Gament Channel",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [660, 320],
+      "credentials": {
+        "telegramApi": {
+          "id": "gament-telegram",
+          "name": "Gament Telegram Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.startDate }}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "id": "has-start-date",
+      "name": "Has Start Date?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [420, 500]
+    },
+    {
+      "parameters": {
+        "functionCode": "const start = new Date(items[0].json.startDate);\nconst now = new Date();\nconst diffHours = (start.getTime() - now.getTime()) / (1000 * 60 * 60);\n\nreturn [{\n  json: {\n    ...items[0].json,\n    hoursUntilStart: Math.round(diffHours),\n    shouldSchedule24h: diffHours > 26,\n    shouldSchedule1h: diffHours > 3\n  }\n}];"
+      },
+      "id": "calculate-times",
+      "name": "Calculate Reminder Times",
+      "type": "n8n-nodes-base.function",
+      "typeVersion": 1,
+      "position": [680, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.shouldSchedule24h }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "schedule-24h",
+      "name": "Schedule 24h Reminder?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [920, 420]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ $json.shouldSchedule1h }}",
+              "value2": true
+            }
+          ]
+        }
+      },
+      "id": "schedule-1h",
+      "name": "Schedule 1h Reminder?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [920, 580]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseData": "{ \"ok\": true, \"message\": \"Tournament received and announced\" }"
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [900, 320]
+    }
+  ],
+  "connections": {
+    "Tournament Created Webhook": {
+      "main": [
+        [
+          {
+            "node": "Format Tournament Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Tournament Message": {
+      "main": [
+        [
+          {
+            "node": "Post to Gament Channel",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Has Start Date?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Post to Gament Channel": {
+      "main": [
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Start Date?": {
+      "main": [
+        [
+          {
+            "node": "Calculate Reminder Times",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Success Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Calculate Reminder Times": {
+      "main": [
+        [
+          {
+            "node": "Schedule 24h Reminder?",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Schedule 1h Reminder?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "timezone": "Asia/Tehran",
+    "executionOrder": "v1"
+  },
+  "meta": {
+    "instanceId": "gament-n8n-lifecycle"
+  },
+  "tags": ["gament", "tournament", "telegram", "lifecycle"]
+}
