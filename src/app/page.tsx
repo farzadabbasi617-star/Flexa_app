@@ -1,6 +1,10 @@
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 import DailyQuests from "@/components/DailyQuests";
+import HeroScene from "@/components/fx/HeroScene";
+import TiltCard from "@/components/fx/TiltCard";
+import Reveal from "@/components/fx/Reveal";
+import MagneticButton from "@/components/fx/MagneticButton";
 import { SITE_URL } from "@/lib/seo";
 
 interface SiteImage {
@@ -176,40 +180,36 @@ export default async function LuxuryHomePage() {
         </header>
 
         <section className="grid grid-cols-1 lg:grid-cols-[1.15fr_.85fr] gap-5 sm:gap-6 mb-10 sm:mb-14">
-          <div className="relative overflow-hidden rounded-[34px] sm:rounded-[44px] border border-purple-300/20 min-h-[430px] sm:min-h-[510px] bg-[#0d0b16] shadow-[0_0_70px_rgba(124,58,237,.18)]">
-            <div className="absolute inset-0 hero-art" />
-            {heroImage && (
-              <img
-                src={heroImage.url}
-                alt={heroImage.altText || heroImage.title}
-                className="absolute inset-0 w-full h-full object-cover opacity-55 scale-105"
-              />
-            )}
-            <div className="absolute inset-0 bg-gradient-to-t from-[#050508] via-[#050508]/60 to-transparent" />
-            <div className="absolute -top-20 -left-16 w-72 h-72 rounded-full bg-purple-600/20 blur-3xl" />
-            <div className="absolute top-10 right-8 w-24 h-24 rounded-full bg-cyan-400/10 blur-2xl" />
-
+          <HeroScene
+            heroImage={heroImage?.url}
+            heroAlt={heroImage?.altText || heroImage?.title}
+            className="rounded-[34px] sm:rounded-[44px] border border-purple-300/20 min-h-[430px] sm:min-h-[510px] bg-[#0d0b16] shadow-[0_0_70px_rgba(124,58,237,.18)]"
+          >
             <div className="relative h-full flex flex-col justify-end p-6 sm:p-9">
-              <div className="inline-flex w-fit items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/15 border border-purple-300/20 text-[10px] font-black text-purple-100 mb-5">
+              <div className="inline-flex w-fit items-center gap-2 px-3 py-1.5 rounded-full bg-purple-500/15 border border-purple-300/20 text-[10px] font-black text-purple-100 mb-5 animate-slide-up">
                 <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
                 فصل جدید رقابت‌ها فعال است
               </div>
-              <h2 className="text-4xl sm:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight max-w-3xl">
+              <h2 className="text-4xl sm:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight max-w-3xl animate-slide-up [animation-delay:80ms] [animation-fill-mode:backwards]">
                 آرنای حرفه‌ای<br />تورنومنت‌های موبایل
               </h2>
-              <p className="text-sm sm:text-base text-gray-300 leading-8 mt-5 max-w-2xl">
+              <p className="text-sm sm:text-base text-gray-300 leading-8 mt-5 max-w-2xl animate-slide-up [animation-delay:160ms] [animation-fill-mode:backwards]">
                 ثبت‌نام سریع، کیف پول امن، چک‌این، لابی اختصاصی، ثبت نتیجه، داوری قابل پیگیری و اخبار گیمینگ در یک پلتفرم فارسی.
               </p>
-              <div className="flex flex-col sm:flex-row gap-3 mt-7">
-                <Link href="/tournaments" className="gaming-btn text-sm sm:text-base px-6 py-4">
-                  ورود به تورنومنت‌ها
-                </Link>
-                <Link
-                  href="/register"
-                  className="px-6 py-4 rounded-2xl bg-white/7 border border-white/10 text-sm sm:text-base font-black text-center hover:border-cyan-300/40 active:scale-95 transition"
-                >
-                  ساخت حساب رایگان
-                </Link>
+              <div className="flex flex-col sm:flex-row gap-3 mt-7 animate-slide-up [animation-delay:240ms] [animation-fill-mode:backwards]">
+                <MagneticButton>
+                  <Link href="/tournaments" className="gaming-btn text-sm sm:text-base px-6 py-4">
+                    ورود به تورنومنت‌ها
+                  </Link>
+                </MagneticButton>
+                <MagneticButton>
+                  <Link
+                    href="/register"
+                    className="block px-6 py-4 rounded-2xl bg-white/7 border border-white/10 text-sm sm:text-base font-black text-center hover:border-cyan-300/40 active:scale-95 transition"
+                  >
+                    ساخت حساب رایگان
+                  </Link>
+                </MagneticButton>
               </div>
 
               <div className="grid grid-cols-3 gap-2 sm:gap-3 mt-8 max-w-xl">
@@ -217,10 +217,11 @@ export default async function LuxuryHomePage() {
                   ["۳", "بازی اصلی"],
                   ["AI", "داوری هوشمند"],
                   ["۲۴/۷", "پشتیبانی"],
-                ].map(([value, label]) => (
+                ].map(([value, label], i) => (
                   <div
                     key={label}
-                    className="rounded-2xl bg-white/[.06] border border-white/10 p-3 text-center backdrop-blur-md"
+                    className="rounded-2xl bg-white/[.06] border border-white/10 p-3 text-center backdrop-blur-md animate-slide-up [animation-fill-mode:backwards]"
+                    style={{ animationDelay: `${320 + i * 90}ms` }}
                   >
                     <div className="text-lg sm:text-2xl font-black text-purple-200">{value}</div>
                     <div className="text-[10px] text-gray-400 mt-1">{label}</div>
@@ -228,71 +229,75 @@ export default async function LuxuryHomePage() {
                 ))}
               </div>
             </div>
-          </div>
+          </HeroScene>
 
           <aside className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-            <Link
-              href={featuredTournament ? `/tournaments/${featuredTournament.id}` : "/tournaments"}
-              className="relative overflow-hidden rounded-[30px] border border-cyan-300/15 bg-gradient-to-br from-cyan-950/30 to-[#0d0b16] p-5 min-h-[205px] group active:scale-[.99] transition"
-            >
-              <div className="absolute -top-14 -left-14 w-44 h-44 rounded-full bg-cyan-400/15 blur-3xl" />
-              <div className="relative">
-                <div className="text-[10px] font-black tracking-[0.24em] text-cyan-300 mb-3">
-                  NEXT TOURNAMENT
-                </div>
-                <h3 className="text-xl font-black leading-8 line-clamp-2">
-                  {featuredTournament?.name || "تورنومنت‌های فعال گیمنت"}
-                </h3>
-                <p className="text-xs text-gray-400 mt-3 leading-6">
-                  {featuredTournament
-                    ? `${gameLabel(featuredTournament.game)} • شروع: ${formatDate(featuredTournament.startDate)}`
-                    : "روم‌های فعال را ببین و وارد رقابت شو."}
-                </p>
-                {featuredTournament && (
-                  <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
-                    <span className="rounded-xl bg-white/5 border border-white/10 px-3 py-2">
-                      {(featuredTournament.registeredCount || 0).toLocaleString("fa-IR")}/
-                      {(featuredTournament.maxPlayers || 0).toLocaleString("fa-IR")} نفر
-                    </span>
-                    <span className="rounded-xl bg-white/5 border border-white/10 px-3 py-2">
-                      {featuredTournament.entryFee || "رایگان"}
-                    </span>
+            <TiltCard maxTilt={7} liftZ={12} className="rounded-[30px]">
+              <Link
+                href={featuredTournament ? `/tournaments/${featuredTournament.id}` : "/tournaments"}
+                className="relative block overflow-hidden rounded-[30px] border border-cyan-300/15 bg-gradient-to-br from-cyan-950/30 to-[#0d0b16] p-5 min-h-[205px] group active:scale-[.99] transition"
+              >
+                <div className="absolute -top-14 -left-14 w-44 h-44 rounded-full bg-cyan-400/15 blur-3xl" />
+                <div className="relative" style={{ transform: "translateZ(24px)" }}>
+                  <div className="text-[10px] font-black tracking-[0.24em] text-cyan-300 mb-3">
+                    NEXT TOURNAMENT
                   </div>
-                )}
-              </div>
-            </Link>
-
-            <Link
-              href={featuredHonor ? `/honors/${featuredHonor.id}` : "/honors"}
-              className="relative overflow-hidden rounded-[30px] border border-purple-300/15 bg-gradient-to-br from-purple-950/35 to-[#0d0b16] min-h-[205px] group active:scale-[.99] transition flex items-end"
-            >
-              {featuredHonor?.image && (
-                <img
-                  src={featuredHonor.image}
-                  alt={featuredHonor.title}
-                  className="absolute inset-0 w-full h-full object-cover opacity-45 group-hover:scale-105 transition duration-700"
-                />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" />
-              <div className="relative p-5">
-                <div className="text-[10px] font-black tracking-[0.24em] text-purple-300 mb-3">
-                  LATEST NEWS
+                  <h3 className="text-xl font-black leading-8 line-clamp-2">
+                    {featuredTournament?.name || "تورنومنت‌های فعال گیمنت"}
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-3 leading-6">
+                    {featuredTournament
+                      ? `${gameLabel(featuredTournament.game)} • شروع: ${formatDate(featuredTournament.startDate)}`
+                      : "روم‌های فعال را ببین و وارد رقابت شو."}
+                  </p>
+                  {featuredTournament && (
+                    <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
+                      <span className="rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+                        {(featuredTournament.registeredCount || 0).toLocaleString("fa-IR")}/
+                        {(featuredTournament.maxPlayers || 0).toLocaleString("fa-IR")} نفر
+                      </span>
+                      <span className="rounded-xl bg-white/5 border border-white/10 px-3 py-2">
+                        {featuredTournament.entryFee || "رایگان"}
+                      </span>
+                    </div>
+                  )}
                 </div>
-                <h3 className="text-lg sm:text-xl font-black leading-7 line-clamp-2">
-                  {featuredHonor?.title || "آخرین اخبار گیمینگ"}
-                </h3>
-                <p className="text-xs text-gray-300 mt-3 line-clamp-2 leading-6">
-                  {featuredHonor?.summary ||
-                    featuredHonor?.description ||
-                    "اخبار کالاف، کلش، فورتنایت و رویدادهای گیمینگ را دنبال کن."}
-                </p>
-              </div>
-            </Link>
+              </Link>
+            </TiltCard>
+
+            <TiltCard maxTilt={7} liftZ={12} className="rounded-[30px]">
+              <Link
+                href={featuredHonor ? `/honors/${featuredHonor.id}` : "/honors"}
+                className="relative overflow-hidden rounded-[30px] border border-purple-300/15 bg-gradient-to-br from-purple-950/35 to-[#0d0b16] min-h-[205px] group active:scale-[.99] transition flex items-end"
+              >
+                {featuredHonor?.image && (
+                  <img
+                    src={featuredHonor.image}
+                    alt={featuredHonor.title}
+                    className="absolute inset-0 w-full h-full object-cover opacity-45 group-hover:scale-105 transition duration-700"
+                  />
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" />
+                <div className="relative p-5" style={{ transform: "translateZ(24px)" }}>
+                  <div className="text-[10px] font-black tracking-[0.24em] text-purple-300 mb-3">
+                    LATEST NEWS
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-black leading-7 line-clamp-2">
+                    {featuredHonor?.title || "آخرین اخبار گیمینگ"}
+                  </h3>
+                  <p className="text-xs text-gray-300 mt-3 line-clamp-2 leading-6">
+                    {featuredHonor?.summary ||
+                      featuredHonor?.description ||
+                      "اخبار کالاف، کلش، فورتنایت و رویدادهای گیمینگ را دنبال کن."}
+                  </p>
+                </div>
+              </Link>
+            </TiltCard>
           </aside>
         </section>
 
         <section className="mb-10 sm:mb-14">
-          <div className="flex items-center justify-between mb-4 sm:mb-6">
+          <Reveal className="flex items-center justify-between mb-4 sm:mb-6">
             <div>
               <div className="text-[10px] font-black text-purple-300 tracking-[0.28em] mb-1">
                 CHOOSE YOUR GAME
@@ -302,82 +307,89 @@ export default async function LuxuryHomePage() {
             <Link href="/tournaments" className="text-xs font-black text-cyan-300">
               همه روم‌ها ←
             </Link>
-          </div>
+          </Reveal>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
-            {GAMES.map((game) => {
+            {GAMES.map((game, i) => {
               const gameImage = bySlug[`game-card-${game.id}`] || byCategory[game.id];
               return (
-                <Link
-                  key={game.id}
-                  href={`/tournaments?game=${game.id}`}
-                  className="group block active:scale-[.985] transition-transform"
-                >
-                  <article
-                    className="relative overflow-hidden rounded-[30px] border border-white/10 min-h-[190px] p-5 flex flex-col justify-between"
-                    style={{
-                      background: game.bg,
-                      boxShadow: `0 0 42px ${game.glow}`,
-                    }}
-                  >
-                    {gameImage && (
-                      <img
-                        src={gameImage.url}
-                        alt={gameImage.altText || gameImage.title}
-                        className="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:scale-110 transition duration-700"
-                      />
-                    )}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
-                    <div className="relative flex items-center justify-between">
-                      <div
-                        className={`w-16 h-16 rounded-3xl bg-gradient-to-br ${game.accent} p-0.5 shadow-2xl`}
+                <Reveal key={game.id} delay={i * 0.08} from="up" distance={22}>
+                  <TiltCard maxTilt={9} liftZ={16} className="rounded-[30px]">
+                    <Link
+                      href={`/tournaments?game=${game.id}`}
+                      className="group block active:scale-[.985] transition-transform"
+                    >
+                      <article
+                        className="relative overflow-hidden rounded-[30px] border border-white/10 min-h-[190px] p-5 flex flex-col justify-between"
+                        style={{
+                          background: game.bg,
+                          boxShadow: `0 0 42px ${game.glow}`,
+                        }}
                       >
-                        <div className="w-full h-full rounded-[22px] bg-black/45 flex items-center justify-center">
+                        {gameImage && (
                           <img
-                            src={bySlug[`icon-${game.id}`]?.url || game.icon}
-                            alt={game.faName}
-                            className="w-11 h-11 object-contain"
+                            src={gameImage.url}
+                            alt={gameImage.altText || gameImage.title}
+                            className="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:scale-110 transition duration-700"
                           />
+                        )}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                        <div className="relative flex items-center justify-between" style={{ transform: "translateZ(30px)" }}>
+                          <div
+                            className={`w-16 h-16 rounded-3xl bg-gradient-to-br ${game.accent} p-0.5 shadow-2xl`}
+                          >
+                            <div className="w-full h-full rounded-[22px] bg-black/45 flex items-center justify-center">
+                              <img
+                                src={bySlug[`icon-${game.id}`]?.url || game.icon}
+                                alt={game.faName}
+                                className="w-11 h-11 object-contain"
+                              />
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-black text-white/45 tracking-[.25em]">
+                            ROOMS
+                          </span>
                         </div>
-                      </div>
-                      <span className="text-[10px] font-black text-white/45 tracking-[.25em]">
-                        ROOMS
-                      </span>
-                    </div>
-                    <div className="relative text-right mt-8">
-                      <h4 className="text-3xl font-black en-font italic leading-none">
-                        {game.name}
-                      </h4>
-                      <p className="text-xs text-gray-300 mt-3">
-                        روم‌ها و تورنومنت‌های {game.faName}
-                      </p>
-                    </div>
-                  </article>
-                </Link>
+                        <div className="relative text-right mt-8" style={{ transform: "translateZ(20px)" }}>
+                          <h4 className="text-3xl font-black en-font italic leading-none">
+                            {game.name}
+                          </h4>
+                          <p className="text-xs text-gray-300 mt-3">
+                            روم‌ها و تورنومنت‌های {game.faName}
+                          </p>
+                        </div>
+                      </article>
+                    </Link>
+                  </TiltCard>
+                </Reveal>
               );
             })}
           </div>
         </section>
 
         <section className="grid grid-cols-1 lg:grid-cols-[.9fr_1.1fr] gap-5 mb-10 sm:mb-14">
-          <div className="rounded-[30px] border border-white/10 bg-white/[.04] p-5 sm:p-6">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-300/20 flex items-center justify-center text-2xl">
-                🤖
+          <Reveal from="right">
+            <div className="rounded-[30px] border border-white/10 bg-white/[.04] p-5 sm:p-6">
+              <div className="flex items-center gap-3 mb-5">
+                <div className="w-12 h-12 rounded-2xl bg-purple-500/15 border border-purple-300/20 flex items-center justify-center text-2xl">
+                  🤖
+                </div>
+                <div>
+                  <h3 className="font-black">داوری و راهنمای هوشمند</h3>
+                  <p className="text-xs text-gray-500 mt-1">
+                    ثبت نتیجه، اعتراض و تحلیل ریسک با زیرساخت AI
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-black">داوری و راهنمای هوشمند</h3>
-                <p className="text-xs text-gray-500 mt-1">
-                  ثبت نتیجه، اعتراض و تحلیل ریسک با زیرساخت AI
-                </p>
-              </div>
+              <p className="text-sm text-gray-300 leading-8">
+                گیمنت برای مدیریت رقابت سالم ساخته شده؛ از ثبت‌نام تا اعلام نتیجه، همه مسیر شفاف و قابل پیگیری است.
+              </p>
             </div>
-            <p className="text-sm text-gray-300 leading-8">
-              گیمنت برای مدیریت رقابت سالم ساخته شده؛ از ثبت‌نام تا اعلام نتیجه، همه مسیر شفاف و قابل پیگیری است.
-            </p>
-          </div>
+          </Reveal>
 
-          <DailyQuests />
+          <Reveal from="left" delay={0.1}>
+            <DailyQuests />
+          </Reveal>
         </section>
       </div>
 

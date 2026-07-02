@@ -24,6 +24,21 @@ const SplashScreen = dynamic(() => import("./SplashScreen"), {
   loading: () => null,
 });
 
+const PageTransition = dynamic(() => import("./fx/PageTransition"), {
+  ssr: false,
+  loading: () => null,
+});
+
+const GlobalCardFX = dynamic(() => import("./fx/GlobalCardFX"), {
+  ssr: false,
+  loading: () => null,
+});
+
+const AmbientBackdrop = dynamic(() => import("./fx/AmbientBackdrop"), {
+  ssr: false,
+  loading: () => null,
+});
+
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const { dir, lang } = useLanguage();
 
@@ -36,7 +51,9 @@ export function LayoutWrapper({ children }: { children: ReactNode }) {
     <>
       <SplashScreen />
       <ThemeRuntime />
-      {children}
+      <AmbientBackdrop />
+      <GlobalCardFX />
+      <PageTransition>{children}</PageTransition>
       <AIAssistant />
       <PWAInstall />
     </>

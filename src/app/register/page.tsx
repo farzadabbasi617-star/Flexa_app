@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import AnimatedGamentLogo from "@/components/AnimatedGamentLogo";
+import TiltCard from "@/components/fx/TiltCard";
+import ParticleField from "@/components/fx/ParticleField";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizePhoneNumber } from "@/lib/phone";
@@ -71,10 +73,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="min-h-screen bg-dark-900">
+    <div className="min-h-screen bg-dark-900 relative overflow-hidden">
+      <ParticleField count={34} className="opacity-50 z-0" />
+      <div className="relative z-10">
       <Navbar />
 
       <div className="max-w-lg mx-auto px-4 py-6 sm:py-12" style={{ paddingBottom: "calc(24px + var(--safe-bottom))" }}>
+        <TiltCard maxTilt={4} liftZ={10} glare={false} className="rounded-2xl">
         <div className="gaming-card p-5 sm:p-8">
           {/* Header */}
           <div className="text-center mb-6 sm:mb-8">
@@ -220,6 +225,8 @@ export default function RegisterPage() {
             </Link>
           </div>
         </div>
+        </TiltCard>
+      </div>
       </div>
     </div>
   );

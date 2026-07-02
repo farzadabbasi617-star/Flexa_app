@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import TournamentCardLuxury from "@/components/TournamentCardLuxury";
+import Reveal from "@/components/fx/Reveal";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -137,7 +138,7 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
             const modes = Array.from(modeMap.entries()).sort(([a], [b]) => a.localeCompare(b, "fa"));
 
             return (
-              <section key={gameId} className="relative">
+              <Reveal as="section" key={gameId} className="relative" distance={22}>
                 <div className="flex items-center justify-between gap-4 mb-5" dir="rtl">
                   <div className="flex items-center gap-3">
                     {/* Uniform Square Game Logo inside glowing container */}
@@ -177,7 +178,7 @@ function TournamentsContent({ canCreate, walletBalanceToman, isLoggedIn }: { can
                     </div>
                   ))}
                 </div>
-              </section>
+              </Reveal>
             );
           })}
         </div>

@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import TiltCard from "@/components/fx/TiltCard";
+import Reveal from "@/components/fx/Reveal";
+import ParticleField from "@/components/fx/ParticleField";
 
 type HonorType = "all" | "winner" | "levelup" | "news";
 type HonorFilterIcon = "all" | "winner" | "levelup" | "news";
@@ -115,13 +118,14 @@ export default function HonorsPage() {
   return (
     <div className="min-h-screen bg-[#050508] text-white">
       {/* Luxurious Header */}
-      <div className="relative pt-8 pb-10 px-6 bg-gradient-to-b from-purple-950/40 via-[#050508] to-[#050508]">
-        <div className="max-w-[480px] mx-auto text-center">
-          <div className="inline-block px-5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs tracking-[2px] mb-4">
+      <div className="relative pt-8 pb-10 px-6 bg-gradient-to-b from-purple-950/40 via-[#050508] to-[#050508] overflow-hidden">
+        <ParticleField count={30} className="opacity-60" />
+        <div className="max-w-[480px] mx-auto text-center relative">
+          <div className="inline-block px-5 py-1.5 rounded-full bg-white/5 border border-white/10 text-xs tracking-[2px] mb-4 animate-slide-up">
             GAMENT ELITE
           </div>
-          <h1 className="text-6xl font-black tracking-[-3px] mb-2">تالار افتخارات</h1>
-          <p className="text-white/60">قهرمانان، قهرمانی‌ها و درخشش‌ها</p>
+          <h1 className="text-6xl font-black tracking-[-3px] mb-2 animate-slide-up [animation-delay:80ms] [animation-fill-mode:backwards]">تالار افتخارات</h1>
+          <p className="text-white/60 animate-slide-up [animation-delay:160ms] [animation-fill-mode:backwards]">قهرمانان، قهرمانی‌ها و درخشش‌ها</p>
         </div>
       </div>
 
@@ -186,34 +190,36 @@ export default function HonorsPage() {
               )}
             </div>
 
-            <Link
-              key={activeFeatured.id}
-              href={`/honors/${activeFeatured.id}`}
-              className="group relative block overflow-hidden rounded-[32px] border border-white/10 h-[300px] active:scale-[0.985] transition-all hover:border-purple-400/40 shadow-[0_0_45px_rgba(168,85,247,.14)]"
-            >
-              {activeFeatured.image ? (
-                <img src={activeFeatured.image} alt={activeFeatured.imageAlt || activeFeatured.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
-              ) : (
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-[#12081f] to-cyan-950" />
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/10" />
-              <div className="absolute top-4 right-4 flex items-center gap-2">
-                <span className="text-[10px] font-black px-3 py-1 rounded-full bg-purple-600/35 border border-purple-300/25 backdrop-blur-md">خبر ویژه</span>
-                {activeFeatured.game && (
-                  <span className="text-[10px] font-black px-3 py-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-md">
-                    {GAME_FILTERS.find((g) => g.id === activeFeatured.game)?.label || activeFeatured.game}
-                  </span>
+            <TiltCard maxTilt={5} liftZ={16} className="rounded-[32px]">
+              <Link
+                key={activeFeatured.id}
+                href={`/honors/${activeFeatured.id}`}
+                className="group relative block overflow-hidden rounded-[32px] border border-white/10 h-[300px] active:scale-[0.985] transition-all hover:border-purple-400/40 shadow-[0_0_45px_rgba(168,85,247,.14)]"
+              >
+                {activeFeatured.image ? (
+                  <img src={activeFeatured.image} alt={activeFeatured.imageAlt || activeFeatured.title} className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                ) : (
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-900 via-[#12081f] to-cyan-950" />
                 )}
-              </div>
-              <div className="absolute bottom-0 inset-x-0 p-6 text-white" dir="rtl">
-                <div className="text-[10px] text-cyan-300 font-black mb-2">{activeFeatured.readTimeMinutes ? `${activeFeatured.readTimeMinutes} دقیقه مطالعه • ` : ""}{activeFeatured.time}</div>
-                <h2 className="font-black text-2xl sm:text-3xl leading-tight mb-3 line-clamp-2">{activeFeatured.title}</h2>
-                <p className="text-sm text-white/75 leading-6 line-clamp-2">{activeFeatured.summary || activeFeatured.description}</p>
-                <div className="mt-4 inline-flex text-xs font-black text-purple-100 bg-white/10 border border-white/10 rounded-full px-4 py-2 backdrop-blur-md">
-                  مشاهده خبر ←
+                <div className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/55 to-black/10" />
+                <div className="absolute top-4 right-4 flex items-center gap-2" style={{ transform: "translateZ(26px)" }}>
+                  <span className="text-[10px] font-black px-3 py-1 rounded-full bg-purple-600/35 border border-purple-300/25 backdrop-blur-md">خبر ویژه</span>
+                  {activeFeatured.game && (
+                    <span className="text-[10px] font-black px-3 py-1 rounded-full bg-black/40 border border-white/10 backdrop-blur-md">
+                      {GAME_FILTERS.find((g) => g.id === activeFeatured.game)?.label || activeFeatured.game}
+                    </span>
+                  )}
                 </div>
-              </div>
-            </Link>
+                <div className="absolute bottom-0 inset-x-0 p-6 text-white" dir="rtl" style={{ transform: "translateZ(20px)" }}>
+                  <div className="text-[10px] text-cyan-300 font-black mb-2">{activeFeatured.readTimeMinutes ? `${activeFeatured.readTimeMinutes} دقیقه مطالعه • ` : ""}{activeFeatured.time}</div>
+                  <h2 className="font-black text-2xl sm:text-3xl leading-tight mb-3 line-clamp-2">{activeFeatured.title}</h2>
+                  <p className="text-sm text-white/75 leading-6 line-clamp-2">{activeFeatured.summary || activeFeatured.description}</p>
+                  <div className="mt-4 inline-flex text-xs font-black text-purple-100 bg-white/10 border border-white/10 rounded-full px-4 py-2 backdrop-blur-md">
+                    مشاهده خبر ←
+                  </div>
+                </div>
+              </Link>
+            </TiltCard>
           </section>
         )}
 
@@ -222,56 +228,59 @@ export default function HonorsPage() {
           {loading ? (
             <div className="text-center py-12 text-white/50">در حال بارگذاری...</div>
           ) : filteredHonors.length > 0 ? (
-            filteredHonors.map((honor) => (
-              <Link
-                key={honor.id}
-                href={`/honors/${honor.id}`}
-                className="block glass-panel rounded-[28px] overflow-hidden border border-white/10 active:scale-[0.985] transition-all hover:border-purple-400/30"
-              >
-                <div className="relative h-36 overflow-hidden">
-                  {honor.image ? (
-                    <img src={honor.image} alt={honor.imageAlt || honor.title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
-                  ) : (
-                    <div className="absolute inset-0 bg-gradient-to-br from-purple-700 to-cyan-600 flex items-center justify-center text-6xl">{honor.icon}</div>
-                  )}
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
-                  <div className="absolute top-3 right-3 flex items-center gap-2">
-                    <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-black/45 border border-white/10 backdrop-blur-md">
-                      {honor.type === "news" ? "خبر گیمنت" : "افتخار"}
-                    </span>
-                    {honor.game && <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-purple-600/40 border border-purple-300/20 backdrop-blur-md">{GAME_FILTERS.find((g) => g.id === honor.game)?.label || honor.game}</span>}
-                  </div>
-                  <div className="absolute bottom-3 left-3 text-[10px] text-white/70 bg-black/35 px-2 py-1 rounded-full backdrop-blur-md">
-                    {honor.readTimeMinutes ? `${honor.readTimeMinutes} دقیقه مطالعه • ` : ""}{honor.time}
-                  </div>
-                </div>
-
-                <div className="p-4 text-right" dir="rtl">
-                  <h2 className="font-black text-lg leading-7 mb-2 line-clamp-2">{honor.title}</h2>
-                  <p className="text-xs text-white/65 leading-6 mb-3 line-clamp-2">{honor.summary || honor.description}</p>
-                  {honor.seoKeywords?.length ? (
-                    <div className="flex flex-wrap gap-1.5 mb-3">
-                      {honor.seoKeywords.slice(0, 3).map((tag) => <span key={tag} className="text-[9px] px-2 py-1 rounded-full bg-white/5 text-purple-200 border border-white/10">#{tag}</span>)}
-                    </div>
-                  ) : null}
-                  <div className="flex items-center justify-between gap-3 text-xs">
-                    <div className="text-purple-400 truncate">
-                      {honor.username && `@${honor.username}`}
-                      {honor.level && ` • سطح ${honor.level}`}
-                      {honor.prize && ` • ${honor.prize}`}
-                    </div>
-                    <div className="flex items-center gap-2 text-white/45 shrink-0">
-                      {honor.type === "news" && (
-                        <>
-                          <span className="inline-flex items-center gap-1">♡ {(honor.likesCount || 0).toLocaleString("fa-IR")}</span>
-                          <span className="inline-flex items-center gap-1">👁 {(honor.viewsCount || 0).toLocaleString("fa-IR")}</span>
-                        </>
+            filteredHonors.map((honor, i) => (
+              <Reveal key={honor.id} delay={Math.min(i, 6) * 0.05} distance={20}>
+                <TiltCard maxTilt={5} liftZ={10}>
+                  <Link
+                    href={`/honors/${honor.id}`}
+                    className="block glass-panel rounded-[28px] overflow-hidden border border-white/10 active:scale-[0.985] transition-all hover:border-purple-400/30"
+                  >
+                    <div className="relative h-36 overflow-hidden">
+                      {honor.image ? (
+                        <img src={honor.image} alt={honor.imageAlt || honor.title} className="absolute inset-0 w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div className="absolute inset-0 bg-gradient-to-br from-purple-700 to-cyan-600 flex items-center justify-center text-6xl">{honor.icon}</div>
                       )}
-                      <span>ادامه خبر ←</span>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                      <div className="absolute top-3 right-3 flex items-center gap-2">
+                        <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-black/45 border border-white/10 backdrop-blur-md">
+                          {honor.type === "news" ? "خبر گیمنت" : "افتخار"}
+                        </span>
+                        {honor.game && <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-purple-600/40 border border-purple-300/20 backdrop-blur-md">{GAME_FILTERS.find((g) => g.id === honor.game)?.label || honor.game}</span>}
+                      </div>
+                      <div className="absolute bottom-3 left-3 text-[10px] text-white/70 bg-black/35 px-2 py-1 rounded-full backdrop-blur-md">
+                        {honor.readTimeMinutes ? `${honor.readTimeMinutes} دقیقه مطالعه • ` : ""}{honor.time}
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </Link>
+
+                    <div className="p-4 text-right" dir="rtl">
+                      <h2 className="font-black text-lg leading-7 mb-2 line-clamp-2">{honor.title}</h2>
+                      <p className="text-xs text-white/65 leading-6 mb-3 line-clamp-2">{honor.summary || honor.description}</p>
+                      {honor.seoKeywords?.length ? (
+                        <div className="flex flex-wrap gap-1.5 mb-3">
+                          {honor.seoKeywords.slice(0, 3).map((tag) => <span key={tag} className="text-[9px] px-2 py-1 rounded-full bg-white/5 text-purple-200 border border-white/10">#{tag}</span>)}
+                        </div>
+                      ) : null}
+                      <div className="flex items-center justify-between gap-3 text-xs">
+                        <div className="text-purple-400 truncate">
+                          {honor.username && `@${honor.username}`}
+                          {honor.level && ` • سطح ${honor.level}`}
+                          {honor.prize && ` • ${honor.prize}`}
+                        </div>
+                        <div className="flex items-center gap-2 text-white/45 shrink-0">
+                          {honor.type === "news" && (
+                            <>
+                              <span className="inline-flex items-center gap-1">♡ {(honor.likesCount || 0).toLocaleString("fa-IR")}</span>
+                              <span className="inline-flex items-center gap-1">👁 {(honor.viewsCount || 0).toLocaleString("fa-IR")}</span>
+                            </>
+                          )}
+                          <span>ادامه خبر ←</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
+                </TiltCard>
+              </Reveal>
             ))
           ) : (
             <div className="text-center py-10 text-white/50">موردی برای نمایش وجود ندارد</div>
