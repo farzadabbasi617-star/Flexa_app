@@ -99,6 +99,11 @@ export async function POST(request: NextRequest) {
           role: requestedRole,
           isVerified: true,
           phoneVerifiedAt: new Date(),
+          // Admin-created accounts skip the self-serve email OTP step
+          // entirely (the admin already vouches for the account), so mark
+          // it verified immediately — otherwise this user would be locked
+          // out of login by the emailVerifiedAt check.
+          emailVerifiedAt: new Date(),
           termsAcceptedAt: new Date(),
           termsVersion: TERMS_VERSION,
         })

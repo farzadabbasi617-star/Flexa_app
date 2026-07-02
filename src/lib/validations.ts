@@ -1,9 +1,17 @@
 import { z } from "zod";
 import { normalizeLoginIdentifier, normalizePhoneNumber } from "@/lib/phone";
 
-const optionalEmail = z.preprocess(
-  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
-  z.string().trim().email("ایمیل وارد شده معتبر نیست").optional()
+// Email is now required at registration: the mobile number is still
+// mandatory (used as an identifier/contact + login), but the OTP that
+// confirms the account is sent to this address instead of by SMS.
+//
+// Coerces a missing/non-string value to an empty string first (instead of
+// passing `undefined` straight into z.string(), which would surface zod's
+// generic English "expected string, received undefined" message instead of
+// our Persian "ایمیل الزامی است" one).
+const requiredEmail = z.preprocess(
+  (value) => (typeof value === "string" ? value.trim().toLowerCase() : ""),
+  z.string().min(1, "ایمیل الزامی است").email("ایمیل وارد شده معتبر نیست")
 );
 
 export const RegisterSchema = z.object({
@@ -17,10 +25,19 @@ export const RegisterSchema = z.object({
     (value) => (typeof value === "string" ? normalizePhoneNumber(value) : value),
     z.string().regex(/^09\d{9}$/, "شماره موبایل معتبر نیست (مثال: 09123456789)")
   ),
-  email: optionalEmail,
+  email: requiredEmail,
   password: z.string().min(6, "رمز عبور باید حداقل ۶ کاراکتر باشد"),
   displayName: z.string().trim().min(2, "نام نمایشی الزامی است").max(100),
   termsAccepted: z.boolean().refine((value) => value === true, "پذیرش قوانین و مقررات گیمنت الزامی است"),
+});
+
+export const EmailOtpRequestSchema = z.object({
+  email: requiredEmail,
+});
+
+export const EmailOtpVerifySchema = z.object({
+  email: requiredEmail,
+  code: z.string().trim().regex(/^\d{6}$/, "کد تایید باید ۶ رقم باشد"),
 });
 
 export const LoginSchema = z.object({

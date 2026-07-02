@@ -8,6 +8,7 @@ interface User {
   email: string | null;
   phoneNumber: string;
   phoneVerifiedAt: string | null;
+  emailVerifiedAt?: string | null;
   username: string;
   displayName: string;
   gamentId: string;
@@ -29,7 +30,7 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string; pendingVerification?: boolean; email?: string }>;
   register: (
     phoneNumber: string,
     email: string,
@@ -37,7 +38,9 @@ interface AuthContextType {
     password: string,
     displayName: string,
     termsAccepted: boolean
-  ) => Promise<{ success: boolean; error?: string }>;
+  ) => Promise<{ success: boolean; pendingVerification?: boolean; email?: string; error?: string }>;
+  verifyEmailOtp: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
+  resendEmailOtp: (email: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -115,7 +118,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const data = await res.json();
 
       if (!res.ok) {
-        return { success: false, error: data.error || "ورود ناموفق بود" };
+        return {
+          success: false,
+          error: data.error || "ورود ناموفق بود",
+          pendingVerification: data.pendingVerification,
+          email: data.email,
+        };
       }
 
       setUser(data.user);
@@ -139,7 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders },
         credentials: "include",
-        body: JSON.stringify({ phoneNumber, email: email || undefined, username, password, displayName, termsAccepted }),
+        body: JSON.stringify({ phoneNumber, email, username, password, displayName, termsAccepted }),
       });
 
       const data = await res.json();
@@ -148,8 +156,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, error: data.error || "ثبت‌نام با خطا مواجه شد" };
       }
 
+      // Registration no longer logs the user in directly — an email OTP
+      // must be confirmed first via verifyEmailOtp().
+      return { success: true, pendingVerification: true, email: data.email };
+    } catch {
+      return { success: false, error: "خطای ارتباط با سرور. اتصال اینترنت را بررسی کنید." };
+    }
+  }
+
+  async function verifyEmailOtp(email: string, code: string) {
+    try {
+      const res = await fetch("/api/auth/verify-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...csrfHeaders },
+        credentials: "include",
+        body: JSON.stringify({ email, code }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return { success: false, error: data.error || "تایید کد ناموفق بود" };
+      }
+
       setUser(data.user);
       queryClient.setQueryData(["auth-session"], data.user);
+      return { success: true };
+    } catch {
+      return { success: false, error: "خطای ارتباط با سرور. اتصال اینترنت را بررسی کنید." };
+    }
+  }
+
+  async function resendEmailOtp(email: string) {
+    try {
+      const res = await fetch("/api/auth/resend-email-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...csrfHeaders },
+        credentials: "include",
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        return { success: false, error: data.error || "ارسال مجدد کد ناموفق بود" };
+      }
+
       return { success: true };
     } catch {
       return { success: false, error: "خطای ارتباط با سرور. اتصال اینترنت را بررسی کنید." };
@@ -177,6 +229,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading: isSessionLoading,
         login,
         register,
+        verifyEmailOtp,
+        resendEmailOtp,
         logout,
         refreshUser,
       }}

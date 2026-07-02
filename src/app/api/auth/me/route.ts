@@ -27,6 +27,7 @@ export async function GET(request: NextRequest) {
         email: user.email,
         phoneNumber: user.phoneNumber,
         phoneVerifiedAt: user.phoneVerifiedAt,
+        emailVerifiedAt: user.emailVerifiedAt,
         username: user.username,
         displayName: user.displayName,
         gamentId: user.gamentId,

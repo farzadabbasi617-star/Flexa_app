@@ -118,6 +118,11 @@ export const users = pgTable("users", {
   phoneVerifiedAt: timestamp("phone_verified_at"),
   username: varchar("username", { length: 100 }).unique(),
   email: varchar("email", { length: 255 }).unique(),
+  // Registration now sends the OTP to email (not SMS), while the mobile
+  // number is still collected and required. This tracks when that email
+  // OTP was confirmed — separate from `isVerified`, which is a broader
+  // "trusted account" flag also set by the store's KYC review flow.
+  emailVerifiedAt: timestamp("email_verified_at"),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   gamentId: varchar("gament_id", { length: 20 }).notNull().unique(),
   displayName: varchar("display_name", { length: 100 }).notNull(),

@@ -63,6 +63,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "شماره موبایل/نام کاربری یا رمز عبور اشتباه است" }, { status: 401 });
     }
 
+    // The account exists and the password is correct, but registration's
+    // email OTP step was never completed. Block login here too — otherwise
+    // a user could skip email verification entirely by just logging in
+    // with the password they set during signup.
+    if (!user.emailVerifiedAt) {
+      logger.warn({ userId: user.id }, "Login blocked: email not verified");
+      return NextResponse.json(
+        {
+          error: "ابتدا باید ایمیل خود را تایید کنید.",
+          pendingVerification: true,
+          email: user.email,
+        },
+        { status: 403 }
+      );
+    }
+
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
 
     const token = await createSession(user.id, ip, userAgent);
@@ -73,6 +89,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         phoneNumber: user.phoneNumber,
         phoneVerifiedAt: user.phoneVerifiedAt,
+        emailVerifiedAt: user.emailVerifiedAt,
         username: user.username,
         displayName: user.displayName,
         gamentId: user.gamentId,

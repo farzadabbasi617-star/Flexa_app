@@ -27,6 +27,14 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | `0008_add_honors.sql` | Adds the persistent `honors` table for the Hall of Fame public page, admin approval flow and AI honor suggestions. |
 | `0009_sync_core_schema.sql` | Adds missing core tables/columns for databases created from the early partial migration. |
 | `0010_harden_registration_integrity.sql` | Adds unique indexes that prevent duplicate tournament registrations per player/user under concurrent requests. |
+| `0019_add_email_verification.sql` | Adds `users.email_verified_at`, backfilled for existing rows. Required for the email-OTP registration/login flow (see below). |
+
+> **Email verification (required before deploying the email-OTP auth flow):**
+> Run `0019_add_email_verification.sql` and set `RESEND_API_KEY` (and
+> optionally `RESEND_FROM_EMAIL`) in your environment. Without a configured
+> Resend key, `EmailService` still generates and stores the OTP (so nothing
+> crashes) but doesn't actually deliver an email — the code is only returned
+> to the client in non-production environments for local testing.
 
 > Note: the rate limiter **fails open** — if this table is missing or the DB
 > errors, requests are still allowed (and the issue is logged), so forgetting

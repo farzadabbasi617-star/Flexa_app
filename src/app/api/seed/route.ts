@@ -24,6 +24,10 @@ export async function POST(request: NextRequest) {
         displayName: name,
         phoneNumber: `09${Math.floor(100000000 + Math.random() * 900000000)}`,
         gamentId: `FLX-S-${i}-${Math.floor(Math.random() * 1000)}`,
+        // Seed users are demo data (not real signups) and this password
+        // hash isn't even a valid one for login, so mark them pre-verified
+        // to keep them usable for tournament fixtures/testing.
+        emailVerifiedAt: new Date(),
       })))
       .returning();
 

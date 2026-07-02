@@ -3,9 +3,10 @@ import crypto from "crypto";
 import { db } from "@/db";
 import { players, users, wallets } from "@/db/schema";
 import { eq, or, ilike } from "drizzle-orm";
-import { hashPassword, createSession } from "@/lib/auth";
+import { hashPassword } from "@/lib/auth";
 import { RegisterSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
+import { EmailService } from "@/lib/email-service";
 import logger from "@/lib/logger";
 import { TERMS_VERSION } from "@/lib/terms";
 
@@ -29,10 +30,10 @@ async function generateUniqueGamentId() {
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
-    const userAgent = request.headers.get("user-agent") || "unknown";
 
-    // SMS/OTP is intentionally not required yet. We store the mobile number now
-    // and can verify it later when the SMS provider is purchased and enabled.
+    // Mobile number is still required (used as an identifier/contact and for
+    // login), but the account is confirmed via an emailed OTP instead of SMS
+    // — no SMS panel/provider needed.
 
     // 1. Rate limit — protect against signup spam / abuse.
     const limit = await rateLimit(`register:${ip}`, 5, 60 * 60 * 1000); // 5 / hour / IP
@@ -57,104 +58,114 @@ export async function POST(request: NextRequest) {
 
     // 3. Uniqueness check using ilike for case-insensitive checks
     const existing = await db
-      .select({ id: users.id, email: users.email, username: users.username, phoneNumber: users.phoneNumber })
+      .select({ id: users.id, email: users.email, username: users.username, phoneNumber: users.phoneNumber, emailVerifiedAt: users.emailVerifiedAt })
       .from(users)
-      .where(
-        email
-          ? or(ilike(users.email, email), ilike(users.username, username), eq(users.phoneNumber, phoneNumber))
-          : or(ilike(users.username, username), eq(users.phoneNumber, phoneNumber))
-      );
+      .where(or(ilike(users.email, email), ilike(users.username, username), eq(users.phoneNumber, phoneNumber)));
 
-    if (email && existing.some((u) => u.email === email)) {
+    const existingByEmail = existing.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    const reclaimingStaleAccount = Boolean(existingByEmail && !existingByEmail.emailVerifiedAt);
+
+    if (existingByEmail && !reclaimingStaleAccount) {
       return NextResponse.json({ error: "ایمیل قبلاً ثبت شده است" }, { status: 409 });
     }
-    if (existing.some((u) => u.username === username)) {
+    if (existing.some((u) => u.username === username && u.id !== existingByEmail?.id)) {
       return NextResponse.json({ error: "نام کاربری قبلاً انتخاب شده است" }, { status: 409 });
     }
-    if (existing.some((u) => u.phoneNumber === phoneNumber)) {
+    if (existing.some((u) => u.phoneNumber === phoneNumber && u.id !== existingByEmail?.id)) {
       return NextResponse.json({ error: "شماره موبایل قبلاً ثبت شده است" }, { status: 409 });
     }
 
     // 4. Hash password.
     const hashedPassword = await hashPassword(password);
-    const gamentId = await generateUniqueGamentId();
 
-    // 5. Create user + player profile + empty wallet atomically.
+    // 5. Create (or reclaim an abandoned, never-verified) user + player
+    // profile + empty wallet atomically. No session cookie yet — the
+    // account only becomes usable after the email OTP is confirmed via
+    // /api/auth/verify-email.
     const user = await db.transaction(async (tx) => {
-      const [created] = await tx
-        .insert(users)
-        .values({
-          phoneNumber,
-          gamentId,
-          username,
-          passwordHash: hashedPassword,
-          displayName,
-          email: email || null,
-          // The number is saved but not verified until SMS/OTP is enabled.
-          phoneVerifiedAt: null,
-          isVerified: false,
-          termsAcceptedAt: new Date(),
-          termsVersion: TERMS_VERSION,
-        })
-        .returning();
+      let created;
 
-      await tx.insert(players).values({
-        visibleUserId: created.id,
-        username: created.username!,
-        displayName: created.displayName,
-        email: created.email,
-      });
+      if (reclaimingStaleAccount && existingByEmail) {
+        // A previous signup attempt with this email never completed OTP
+        // verification. Rather than leaving an orphaned, permanently
+        // unverified row (or failing the FK-referenced delete of its
+        // players/wallets rows), overwrite it in place with the new
+        // registration details.
+        [created] = await tx
+          .update(users)
+          .set({
+            phoneNumber,
+            username,
+            passwordHash: hashedPassword,
+            displayName,
+            email,
+            phoneVerifiedAt: null,
+            emailVerifiedAt: null,
+            isVerified: false,
+            termsAcceptedAt: new Date(),
+            termsVersion: TERMS_VERSION,
+          })
+          .where(eq(users.id, existingByEmail.id))
+          .returning();
 
-      await tx.insert(wallets).values({
-        userId: created.id,
-        balance: "0",
-        currency: "RIAL",
-      });
+        await tx
+          .update(players)
+          .set({
+            username: created.username!,
+            displayName: created.displayName,
+            email: created.email,
+          })
+          .where(eq(players.visibleUserId, created.id));
+      } else {
+        const gamentId = await generateUniqueGamentId();
+        [created] = await tx
+          .insert(users)
+          .values({
+            phoneNumber,
+            gamentId,
+            username,
+            passwordHash: hashedPassword,
+            displayName,
+            email,
+            phoneVerifiedAt: null,
+            emailVerifiedAt: null,
+            isVerified: false,
+            termsAcceptedAt: new Date(),
+            termsVersion: TERMS_VERSION,
+          })
+          .returning();
+
+        await tx.insert(players).values({
+          visibleUserId: created.id,
+          username: created.username!,
+          displayName: created.displayName,
+          email: created.email,
+        });
+
+        await tx.insert(wallets).values({
+          userId: created.id,
+          balance: "0",
+          currency: "RIAL",
+        });
+      }
 
       return created;
     });
 
-    // 6. Create session.
-    const token = await createSession(user.id, ip, userAgent);
+    // 6. Send the email OTP. If email delivery is not configured, the OTP
+    // is still generated (see EmailService) so the account can be verified
+    // manually in development.
+    await EmailService.sendVerificationCode(user.email!);
 
-    const response = NextResponse.json(
+    logger.info({ userId: user.id, authMode: "email_otp_pending" }, "User registered, awaiting email verification");
+
+    return NextResponse.json(
       {
-        user: {
-          id: user.id,
-          email: user.email,
-          phoneNumber: user.phoneNumber,
-          phoneVerifiedAt: user.phoneVerifiedAt,
-          username: user.username,
-          displayName: user.displayName,
-          gamentId: user.gamentId,
-          role: user.role,
-          avatarUrl: user.avatarUrl,
-          isVerified: user.isVerified,
-          level: user.level,
-          rankPoints: user.rankPoints,
-          xp: user.xp,
-          clashRoyaleId: user.clashRoyaleId,
-          clashRoyaleUsername: user.clashRoyaleUsername,
-          codMobileId: user.codMobileId,
-          codMobileUsername: user.codMobileUsername,
-          fortniteId: user.fortniteId,
-          fortniteUsername: user.fortniteUsername,
-          metadata: user.metadata,
-        },
+        pendingVerification: true,
+        email: user.email,
       },
       { status: 201 }
     );
-
-    response.cookies.set("session", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30,
-      path: "/",
-    });
-
-    logger.info({ userId: user.id, authMode: "password_without_sms" }, "User registered successfully");
-    return response;
   } catch (err) {
     // Log full detail server-side for debugging, but never leak secrets to the client.
     logger.error({ err }, "Registration error");

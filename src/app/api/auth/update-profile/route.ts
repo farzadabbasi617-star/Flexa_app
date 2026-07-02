@@ -72,6 +72,7 @@ export async function PATCH(request: NextRequest) {
         email: updated.email,
         phoneNumber: updated.phoneNumber,
         phoneVerifiedAt: updated.phoneVerifiedAt,
+        emailVerifiedAt: updated.emailVerifiedAt,
         username: updated.username,
         displayName: updated.displayName,
         gamentId: updated.gamentId,

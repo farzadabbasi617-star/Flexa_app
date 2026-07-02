@@ -87,6 +87,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Linked user not found" }, { status: 404 });
     }
 
+    // Defense in depth: linking Telegram already requires an authenticated
+    // (and therefore already email-verified) session, so this should be
+    // unreachable for an unverified account. Still, block it explicitly so
+    // this endpoint alone can never be used to bypass email verification.
+    if (!user.emailVerifiedAt) {
+      return NextResponse.json(
+        { error: "ابتدا باید ایمیل حساب گیمنت خود را تایید کنید.", linked: true, requiresEmailVerification: true },
+        { status: 403 }
+      );
+    }
+
     // Log the user login time
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
 
@@ -101,6 +112,7 @@ export async function POST(request: NextRequest) {
         email: user.email,
         phoneNumber: user.phoneNumber,
         phoneVerifiedAt: user.phoneVerifiedAt,
+        emailVerifiedAt: user.emailVerifiedAt,
         username: user.username,
         displayName: user.displayName,
         gamentId: user.gamentId,
