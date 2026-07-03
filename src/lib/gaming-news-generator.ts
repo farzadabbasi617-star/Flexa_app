@@ -185,19 +185,16 @@ async function fetchDiscordNewsItems(): Promise<NewsItem[]> {
 }
 
 async function collectGamingNewsItems() {
-  const [googleResults, discordResults] = await Promise.all([
-    Promise.all(NEWS_QUERIES.map((entry) => fetchGoogleNewsItems(entry.query, entry.game))),
-    fetchDiscordNewsItems()
-  ]);
+  const discordResults = await fetchDiscordNewsItems();
 
-  const results = [...discordResults, ...googleResults.flat()];
-  const seen = new Set<string>();
-  return results.filter((item) => {
-    const key = `${item.title.toLowerCase().slice(0, 50)}|${item.imageUrl || item.link}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  }).slice(0, 15);
+  // اگر دیسکورد خالی بود، برای اینکه سایت خالی نماند از منابع وب استفاده کن
+  // در غیر این صورت فقط از دیسکورد استفاده کن
+  if (discordResults.length > 0) {
+    return discordResults.slice(0, 15);
+  }
+
+  const googleResults = await Promise.all(NEWS_QUERIES.map((entry) => fetchGoogleNewsItems(entry.query, entry.game)));
+  return googleResults.flat().slice(0, 10);
 }
 
 async function hasGenerated(dedupeKey: string) {
