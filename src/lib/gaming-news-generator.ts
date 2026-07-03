@@ -116,12 +116,19 @@ async function fetchGoogleNewsItems(query: string, game: NewsItem["game"]): Prom
       const pubDate = extractTag(block, "pubDate") || null;
       const source = extractTag(block, "source") || "Google News";
       
-      // تلاش برای پیدا کردن تصویر از داخل تگ description یا media
+      // بهبود استخراج تصویر از منابع مختلف
       let imageUrl = "";
+      const description = extractTag(block, "description");
+      const imgInDescription = description.match(/src="([^"]+)"/i) || description.match(/url="([^"]+)"/i);
+      
       const imgMatch = block.match(/<media:content[^>]+url="([^"]+)"/i) || 
                        block.match(/<enclosure[^>]+url="([^"]+)"/i) ||
-                       block.match(/&lt;img[^&]+src="([^"]+)"/i);
-      if (imgMatch) imageUrl = imgMatch[1];
+                       (imgInDescription ? imgInDescription : null);
+                       
+      if (imgMatch) {
+        imageUrl = imgMatch[1];
+        if (imageUrl.startsWith("//")) imageUrl = "https:" + imageUrl;
+      }
 
       return { title, link, source, pubDate, game, imageUrl };
     }).filter((item) => item.title && item.link);
@@ -292,30 +299,30 @@ export async function generateDailyGamingNews({ force = false } = {}) {
     ? items.map((item, index) => `${index + 1}. [${item.game}] ${item.title} — ${item.source} — ${item.pubDate || "no date"} — ${item.link}`).join("\n")
     : "No external RSS items were available. Create a safe evergreen gaming news analysis without pretending a specific breaking event happened.";
 
-  const prompt = `تو سردبیر ارشد بخش اخبار سایت Gament (گیمنت) هستی. بر اساس منابع معتبر زیر، یک خبر تحلیلی-خبری فوق‌العاده حرفه‌ای و "بشدت سئوشده" بساز.
+  const prompt = `تو سردبیر ارشد و تحلیل‌گر حرفه‌ای دنیای گیم در سایت Gament هستی. وظیفه تو تولید یک "مقاله خبری جامع، عمیق و بشدت سئوشده" است. 
 
 منابع واکشی‌شده:
 ${sourcesText}
 
-دستورالعمل حیاتی برای محتوا:
-۱. SEO سنگین: حتماً از کلمات کلیدی روبرو در متن و تیتر استفاده کن: ${SEO_KEYWORDS}.
-۲. لحن: تخصصی، هیجان‌انگیز و مناسب گیمرهای رقابتی.
-۳. ساختار:
-   - تیتر: باید شامل نام بازی و یک کلمه جذاب سئویی باشد (مثلاً: آپدیت جدید کالاف دیوتی موبایل؛ بررسی تغییرات سیزن...).
-   - لید: در دو جمله بگو چه تغییری در "متا" یا "گیم‌پلی" ایجاد شده.
-   - بدنه: ۳ پاراگراف تحلیل فنی. پاراگراف دوم حتماً درباره این باشد که این خبر چه تاثیری در تورنومنت‌های گیمنت دارد.
-۴. تصویر: برای فیلد imageAlt، یک توصیف عالی بنویس که شامل کلمات کلیدی باشد.
-۵. عدم تکرار: اگر محتوا شبیه اخبار قبلی است، روی "استراتژی برد" در این آپدیت تمرکز کن.
+قوانین سخت‌گیرانه برای تولید محتوا:
+۱. طول متن: متن باید بسیار مفصل و با جزئیات کامل باشد (حداقل ۴ تا ۵ پاراگراف طولانی، حدود ۴۵۰ کلمه).
+۲. SEO فوق‌سنگین: کلمات کلیدی ${SEO_KEYWORDS} را حداقل ۳ بار در طول متن به صورت کاملاً طبیعی تکرار کن.
+۳. ساختار ژورنالیستی:
+   - تیتر: بسیار جذاب، کلیک‌خور و سئوشده.
+   - لید (Summary): یک پاراگراف جذاب که خواننده را ترغیب به خواندن کل مطلب کند.
+   - بدنه (Description): شامل تحلیل تغییرات تفنگ‌ها، کاراکترها، مپ‌ها و متا (Meta) بازی باشد. حتماً بنویس که این تغییرات برای بازیکنان تورنومنت‌های گیمنت چه سودی دارد یا چه استراتژی را باید تغییر دهند.
+۴. تصویر: در فیلد imageAlt، توصیف دقیق و سئوشده‌ای از تصویر بنویس.
+۵. لحن: مقتدر، حرفه‌ای و در عین حال صمیمی برای جامعه گیمرها.
 
-خروجی فقط JSON معتبر طبق این Schema باشد:
+خروجی فقط و فقط JSON معتبر باشد:
 {
-  "title": "تیتر جذاب و سئو شده فارسی",
-  "summary": "خلاصه کوتاه برای شبکه‌های اجتماعی",
-  "description": "متن کامل مقاله (حداقل ۳۵۰ کلمه)",
+  "title": "تیتر حرفه‌ای و طولانی سئو شده",
+  "summary": "لید خبری جذاب (حداقل ۳ جمله)",
+  "description": "متن کامل مقاله (بسیار پرمحتوا و طولانی، با رعایت اصول پاراگراف‌بندی)",
   "game": "clash_royale" | "cod_mobile" | "fortnite",
-  "icon": "ایموجی مناسب",
-  "imageAlt": "متن جایگزین تصویر با کلمات کلیدی",
-  "seoKeywords": ["لیست ۸ کلمه کلیدی اصلی"]
+  "icon": "ایموجی مرتبط",
+  "imageAlt": "توضیح تصویر برای گوگل سئو",
+  "seoKeywords": ["۸ کلمه کلیدی تخصصی"]
 }`;
 
   const systemPrompt = gamentSystemPrompt("honors", "Respond ONLY with valid JSON. No markdown. Never invent fake breaking news.");

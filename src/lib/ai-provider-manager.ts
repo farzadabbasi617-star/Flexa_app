@@ -124,7 +124,7 @@ async function callProviderModel(
       body: JSON.stringify({
         model,
         temperature: 0.55,
-        max_tokens: 800,
+        max_tokens: 1800,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userContent },
