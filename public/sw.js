@@ -1,5 +1,7 @@
-// gament-v4: clears all previous caches including stale arena icons
-const CACHE_NAME = 'gament-v4';
+// gament-v5: forces every client to drop any previously cached knight/arena
+// icon (icons/manifest are fetched network-first anyway, but bumping the
+// cache name also forces old cached HTML/asset entries out immediately).
+const CACHE_NAME = 'gament-v5';
 
 const PRECACHE = [
   '/icons/gament-icon-192.png',
