@@ -22,7 +22,6 @@ const navItems = [
 ];
 
 const customIcons: Record<string, string> = {
-  arena: "/icons/arena_icon.png",
   rankings: "/icons/rankings_icon.png",
   honors: "/icons/honors_icon.png",
   profile: "/icons/settings_icon.png",
