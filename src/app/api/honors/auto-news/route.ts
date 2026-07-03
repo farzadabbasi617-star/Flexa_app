@@ -21,9 +21,12 @@ export async function GET(request: NextRequest) {
     const force = request.nextUrl.searchParams.get("force") === "true";
     const result = await generateDailyGamingNews({ force });
     return NextResponse.json({ ok: true, ...result });
-  } catch (err) {
-    logger.error({ err }, "Auto honors news endpoint failed");
-    return NextResponse.json({ error: "Auto news generation failed" }, { status: 500 });
+  } catch (err: any) {
+    logger.error({ err: err?.message || err, stack: err?.stack }, "Auto honors news endpoint failed");
+    return NextResponse.json({ 
+      error: "Auto news generation failed", 
+      details: err?.message || "Unknown error" 
+    }, { status: 500 });
   }
 }
 

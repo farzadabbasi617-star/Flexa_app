@@ -214,15 +214,28 @@ Schema:
 }`;
 
   const systemPrompt = gamentSystemPrompt("honors", "Respond ONLY with valid JSON. No markdown. Never invent fake breaking news.");
-  const ai = await fetchAIResponse(prompt, systemPrompt);
+  const ai = await fetchAIResponse(prompt, systemPrompt).catch(err => {
+    logger.error({ err }, "AI Fetch failed in news generator");
+    return null;
+  });
+
   const parsed = ai ? safeParseAIJson<GeneratedNews>(ai.content) : null;
-  const news = parsed?.title && parsed?.description ? parsed : localFallbackNews(items);
-  const game = String(news.game || items[0]?.game || "cod_mobile").slice(0, 50);
-  const title = shortText(String(news.title), 90);
-  const description = String(news.description).trim();
+  const news = (parsed?.title && parsed?.description) ? parsed : localFallbackNews(items);
+  
+  // Ensure strings to prevent SVG encoding errors
+  const game = String(news.game || (items.length > 0 ? items[0].game : "cod_mobile")).slice(0, 50);
+  const title = shortText(String(news.title || "اخبار جدید گیمینگ"), 90);
+  const description = String(news.description || "در حال حاضر جزییات بیشتری در دسترس نیست.").trim();
   const summary = shortText(String(news.summary || description.split("\n")[0] || title), 190);
   const icon = String(news.icon || GAME_BRAND[game]?.icon || "📰").slice(0, 20);
-  const imageUrl = createLightweightNewsImage(title, game, icon);
+  
+  let imageUrl = "";
+  try {
+    imageUrl = createLightweightNewsImage(title, game, icon);
+  } catch (err) {
+    logger.error({ err }, "SVG Generation failed");
+    imageUrl = ""; // Fallback to empty or a default static URL
+  }
   const seoKeywords = Array.isArray(news.seoKeywords) ? news.seoKeywords.map((k) => shortText(String(k), 40)).slice(0, 8) : [];
 
   const [created] = await db.insert(honors).values({
