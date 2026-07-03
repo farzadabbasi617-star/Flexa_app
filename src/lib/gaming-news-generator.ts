@@ -25,10 +25,12 @@ type GeneratedNews = {
 };
 
 const NEWS_QUERIES: Array<{ game: NewsItem["game"]; query: string }> = [
-  { game: "clash_royale", query: "Clash Royale update balance changes esports" },
-  { game: "cod_mobile", query: "Call of Duty Mobile season update esports" },
-  { game: "fortnite", query: "Fortnite update patch notes esports" },
+  { game: "clash_royale", query: "site:supercell.com Clash Royale news OR site:royaleapi.com update" },
+  { game: "cod_mobile", query: "site:callofduty.com mobile season update OR site:charlieintel.com codm" },
+  { game: "fortnite", query: "site:fortnite.com news OR site:fnbr.co fortnite update" },
 ];
+
+const SEO_KEYWORDS = "گیمنت، Gament، خرید سی پی کالاف دیوتی موبایل، جم کلش رویال، تورنومنت گیمینگ رایگان، مسابقات آنلاین موبایل، اکانت فورتنایت، جایزه نقدی گیمینگ";
 
 const GAME_BRAND: Record<string, { label: string; icon: string; from: string; to: string; accent: string }> = {
   clash_royale: { label: "کلش رویال", icon: "👑", from: "#083344", to: "#1d4ed8", accent: "#22d3ee" },
@@ -194,32 +196,30 @@ export async function generateDailyGamingNews({ force = false } = {}) {
     ? items.map((item, index) => `${index + 1}. [${item.game}] ${item.title} — ${item.source} — ${item.pubDate || "no date"} — ${item.link}`).join("\n")
     : "No external RSS items were available. Create a safe evergreen gaming news analysis without pretending a specific breaking event happened.";
 
-  const prompt = `تو خبرنگار فارسی گیمنت هستی. بر اساس منابع زیر، یک خبر فارسی حرفه‌ای و سئوشده برای تالار افتخارات Gament بساز.
+  const prompt = `تو سردبیر ارشد بخش اخبار سایت Gament (گیمنت) هستی. بر اساس منابع معتبر زیر، یک خبر تحلیلی-خبری فوق‌العاده حرفه‌ای و "بشدت سئوشده" بساز.
 
-منابع واقعی RSS/Google News:
+منابع واکشی‌شده:
 ${sourcesText}
 
-چارچوب و لحن:
-- تیتر کوتاه، واضح، کنجکاوی‌برانگیز و SEO محور باشد؛ نه اغراق زرد و نه خشک.
-- لحن صمیمی، خبری و حرفه‌ای باشد؛ برای گیمر ایرانی قابل فهم و جذاب.
-- پاراگراف اول لید خبری باشد: چه اتفاقی افتاده و چرا برای بازیکن مهم است.
-- پاراگراف دوم تحلیل کاربردی برای تورنومنت‌ها، متا، تمرین یا رقابت باشد.
-- پاراگراف آخر جمع‌بندی کوتاه با ارتباط طبیعی به گیمنت و تورنومنت گیمینگ باشد.
-- اگر منبع واقعی وجود دارد، خبر باید به همان منابع تکیه کند و چیزی را قطعی‌تر از منبع ننویسد.
-- اگر منابع کافی نبودند، خبر را به شکل تحلیل کلی/evergreen بنویس و خبر فوری جعلی نساز.
-- کلمات کلیدی را طبیعی استفاده کن: گیمنت، gament، تورنومنت گیمینگ، کالاف دیوتی موبایل، کلش رویال، فورتنایت.
-- از ایموجی زیاد استفاده نکن؛ نهایتاً یک حس خبری/گیمینگ کافی است.
-- خروجی فقط JSON معتبر باشد.
+دستورالعمل حیاتی برای محتوا:
+۱. SEO سنگین: حتماً از کلمات کلیدی روبرو در متن و تیتر استفاده کن: ${SEO_KEYWORDS}.
+۲. لحن: تخصصی، هیجان‌انگیز و مناسب گیمرهای رقابتی.
+۳. ساختار:
+   - تیتر: باید شامل نام بازی و یک کلمه جذاب سئویی باشد (مثلاً: آپدیت جدید کالاف دیوتی موبایل؛ بررسی تغییرات سیزن...).
+   - لید: در دو جمله بگو چه تغییری در "متا" یا "گیم‌پلی" ایجاد شده.
+   - بدنه: ۳ پاراگراف تحلیل فنی. پاراگراف دوم حتماً درباره این باشد که این خبر چه تاثیری در تورنومنت‌های گیمنت دارد.
+۴. تصویر: برای فیلد imageAlt، یک توصیف عالی بنویس که شامل کلمات کلیدی باشد.
+۵. عدم تکرار: اگر محتوا شبیه اخبار قبلی است، روی "استراتژی برد" در این آپدیت تمرکز کن.
 
-Schema:
+خروجی فقط JSON معتبر طبق این Schema باشد:
 {
-  "title": "عنوان کوتاه فارسی و مناسب SEO، حداکثر ۷۵ کاراکتر",
-  "summary": "لید/خلاصه ۱ تا ۲ جمله‌ای برای کارت خبر، حداکثر ۱۸۰ کاراکتر",
-  "description": "۳ پاراگراف فارسی کامل، خوش‌خوان، خبری و کاربردی",
+  "title": "تیتر جذاب و سئو شده فارسی",
+  "summary": "خلاصه کوتاه برای شبکه‌های اجتماعی",
+  "description": "متن کامل مقاله (حداقل ۳۵۰ کلمه)",
   "game": "clash_royale" | "cod_mobile" | "fortnite",
-  "icon": "📰" | "🔥" | "👑" | "⚡",
-  "imageAlt": "متن alt فارسی برای تصویر خبر",
-  "seoKeywords": ["..."]
+  "icon": "ایموجی مناسب",
+  "imageAlt": "متن جایگزین تصویر با کلمات کلیدی",
+  "seoKeywords": ["لیست ۸ کلمه کلیدی اصلی"]
 }`;
 
   const systemPrompt = gamentSystemPrompt("honors", "Respond ONLY with valid JSON. No markdown. Never invent fake breaking news.");
