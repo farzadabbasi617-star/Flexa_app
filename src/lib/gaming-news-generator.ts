@@ -247,39 +247,44 @@ Schema:
   }
   const seoKeywords = Array.isArray(news.seoKeywords) ? news.seoKeywords.map((k) => shortText(String(k), 40)).slice(0, 8) : [];
 
-  const [created] = await db.insert(honors).values({
-    type: "news",
-    title,
-    description,
-    icon,
-    imageUrl,
-    game,
-    status: "approved",
-    highlight: false,
-    publishedAt: new Date(),
-    source: "ai_news",
-    metadata: {
-      summary,
-      imageAlt: news.imageAlt || title,
-      readTimeMinutes: readingTimeMinutes(description),
+  try {
+    const [created] = await db.insert(honors).values({
+      type: "news",
+      title,
+      description,
+      icon,
+      imageUrl,
+      game,
+      status: "approved",
+      highlight: false,
+      publishedAt: new Date(),
+      source: "ai_news",
+      metadata: {
+        summary,
+        imageAlt: news.imageAlt || title,
+        readTimeMinutes: readingTimeMinutes(description),
+        provider: ai?.provider || "local_fallback",
+        model: ai?.model || null,
+        sources: items,
+        seoKeywords,
+        dedupeKey: key,
+        contentFramework: "gament_news_v2",
+      },
+    }).returning();
+
+    await markGenerated(key);
+    logger.info({ honorId: created.id, title: created.title, sources: items.length }, "Generated daily gaming news");
+
+    return {
+      generated: true,
+      honorId: created.id,
+      title: created.title,
+      game: created.game,
+      sources: items.length,
       provider: ai?.provider || "local_fallback",
-      model: ai?.model || null,
-      sources: items,
-      seoKeywords,
-      dedupeKey: key,
-      contentFramework: "gament_news_v2",
-    },
-  }).returning();
-
-  await markGenerated(key);
-  logger.info({ honorId: created.id, title: created.title, sources: items.length }, "Generated daily gaming news");
-
-  return {
-    generated: true,
-    honorId: created.id,
-    title: created.title,
-    game: created.game,
-    sources: items.length,
-    provider: ai?.provider || "local_fallback",
-  };
+    };
+  } catch (err: any) {
+    logger.error({ err: err?.message || err, key }, "Failed to insert news into honors table");
+    throw err;
+  }
 }
