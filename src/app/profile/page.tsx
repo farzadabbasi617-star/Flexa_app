@@ -455,24 +455,24 @@ export default function ProfilePage() {
             <span className="text-xs font-black text-purple-200">کیف پول</span>
           </Link>
           <Link href="/profile/descriptions" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-cyan-500/20 rounded-2xl py-4 hover:border-cyan-500/40 active:scale-95 transition-transform">
-            <span>📘</span>
+            <img src="/icons/profile_descriptions.png" alt="توضیحات" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#00d2ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black text-cyan-200">توضیحات</span>
           </Link>
           <Link href="/profile/security" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-white/10 rounded-2xl py-4 hover:border-white/20 active:scale-95 transition-transform">
-            <span>🔐</span>
+            <img src="/icons/profile_security.png" alt="امنیت حساب" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black">امنیت حساب</span>
           </Link>
           <Link href="/profile/privacy" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-white/10 rounded-2xl py-4 hover:border-white/20 active:scale-95 transition-transform">
-            <span>🛡️</span>
+            <img src="/icons/profile_privacy.png" alt="حریم خصوصی" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black">حریم خصوصی</span>
           </Link>
           <Link href="/support" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-white/10 rounded-2xl py-4 hover:border-white/20 active:scale-95 transition-transform">
-            <span>🎧</span>
+            <img src="/icons/profile_support_center.png" alt="پشتیبانی" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black">پشتیبانی</span>
           </Link>
           {isAdmin && (
             <Link href="/admin" className="col-span-2 flex items-center justify-center gap-2 bg-[#111114] border border-fuchsia-500/20 rounded-2xl py-4 hover:border-fuchsia-500/40 active:scale-95 transition-transform">
-              <span>👑</span>
+              <img src="/icons/profile_super_admin.png" alt="پنل مدیریت ارشد" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#e879f9]" loading="lazy" decoding="async" />
               <span className="text-xs font-black text-fuchsia-300">ورود به پنل مدیریت ارشد</span>
             </Link>
           )}
