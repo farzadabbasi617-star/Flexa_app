@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { normalizeLoginIdentifier, normalizePhoneNumber } from "@/lib/phone";
+import { isRealEmail } from "@/lib/disposable-email";
 
 // Email is now required at registration: the mobile number is still
 // mandatory (used as an identifier/contact + login), but the OTP that
@@ -11,8 +12,26 @@ import { normalizeLoginIdentifier, normalizePhoneNumber } from "@/lib/phone";
 // our Persian "ایمیل الزامی است" one).
 const requiredEmail = z.preprocess(
   (value) => (typeof value === "string" ? value.trim().toLowerCase() : ""),
-  z.string().min(1, "ایمیل الزامی است").email("ایمیل وارد شده معتبر نیست")
+  z
+    .string()
+    .min(1, "ایمیل الزامی است")
+    .email("ایمیل وارد شده معتبر نیست")
+    .refine(isRealEmail, "استفاده از ایمیل‌های موقت/یک‌بارمصرف مجاز نیست. لطفاً یک ایمیل واقعی وارد کنید")
 );
+
+// Strong password policy: at least 10 characters, one uppercase letter, one
+// lowercase letter, one digit and one special character. Enforced both on
+// the client (for instant feedback) and here on the server (source of
+// truth) so the rule can never be bypassed by calling the API directly.
+export const PASSWORD_MIN_LENGTH = 10;
+export const passwordSchema = z
+  .string()
+  .min(PASSWORD_MIN_LENGTH, `رمز عبور باید حداقل ${PASSWORD_MIN_LENGTH} کاراکتر باشد`)
+  .max(128, "رمز عبور بیش از حد طولانی است")
+  .regex(/[a-z]/, "رمز عبور باید حداقل یک حرف کوچک انگلیسی داشته باشد")
+  .regex(/[A-Z]/, "رمز عبور باید حداقل یک حرف بزرگ انگلیسی داشته باشد")
+  .regex(/[0-9]/, "رمز عبور باید حداقل یک عدد داشته باشد")
+  .regex(/[^a-zA-Z0-9]/, "رمز عبور باید حداقل یک کاراکتر خاص (مثل !@#$%) داشته باشد");
 
 export const RegisterSchema = z.object({
   username: z
@@ -26,8 +45,9 @@ export const RegisterSchema = z.object({
     z.string().regex(/^09\d{9}$/, "شماره موبایل معتبر نیست (مثال: 09123456789)")
   ),
   email: requiredEmail,
-  password: z.string().min(6, "رمز عبور باید حداقل ۶ کاراکتر باشد"),
-  displayName: z.string().trim().min(2, "نام نمایشی الزامی است").max(100),
+  password: passwordSchema,
+  firstName: z.string().trim().min(2, "نام الزامی است").max(50, "نام بیش از حد طولانی است"),
+  lastName: z.string().trim().min(2, "نام خانوادگی الزامی است").max(50, "نام خانوادگی بیش از حد طولانی است"),
   termsAccepted: z.boolean().refine((value) => value === true, "پذیرش قوانین و مقررات گیمنت الزامی است"),
 });
 
@@ -47,6 +67,7 @@ export const LoginSchema = z.object({
     .min(1, "شماره موبایل، ایمیل یا نام کاربری الزامی است")
     .transform(normalizeLoginIdentifier),
   password: z.string().min(1, "رمز عبور الزامی است"),
+  rememberMe: z.boolean().optional().default(false),
 });
 
 export const AIAnalyzePlayerSchema = z.object({

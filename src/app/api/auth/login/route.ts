@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { eq, or, ilike } from "drizzle-orm";
-import { verifyPassword, createSession } from "@/lib/auth";
+import { verifyPassword, createSession, sessionCookieMaxAge } from "@/lib/auth";
 import { LoginSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
@@ -26,6 +26,7 @@ export async function POST(request: NextRequest) {
     const validation = LoginSchema.safeParse({
       identifier: body.emailOrUsername ?? body.identifier,
       password: body.password,
+      rememberMe: body.rememberMe,
     });
 
     if (!validation.success) {
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { identifier, password } = validation.data;
+    const { identifier, password, rememberMe } = validation.data;
 
     // Use ilike for case-insensitive username and email search
     const [user] = await db
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     await db.update(users).set({ lastLoginAt: new Date() }).where(eq(users.id, user.id));
 
-    const token = await createSession(user.id, ip, userAgent);
+    const token = await createSession(user.id, ip, userAgent, rememberMe);
 
     const response = NextResponse.json({
       user: {
@@ -113,11 +114,11 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 60 * 60 * 24 * 30,
+      maxAge: sessionCookieMaxAge(rememberMe),
       path: "/",
     });
 
-    logger.info({ userId: user.id, authMode: "password_without_sms" }, "User logged in successfully");
+    logger.info({ userId: user.id, authMode: "password_without_sms", rememberMe }, "User logged in successfully");
     return response;
   } catch (err) {
     logger.error({ err }, "Login error");

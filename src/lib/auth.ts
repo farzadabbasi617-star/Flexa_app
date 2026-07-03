@@ -70,10 +70,23 @@ export async function requireRole(request: NextRequest, allowed: string[]) {
   return { user, error: null, status: 200 };
 }
 
-export async function createSession(userId: string, ip: string, userAgent: string): Promise<string> {
+// "Remember me" controls how long the session lives server-side (and, via
+// the `SESSION_COOKIE_MAX_AGE` helper below, whether the browser cookie is
+// persistent or cleared when the browser closes). Unchecked logins still
+// get a real session — just a much shorter-lived one — instead of forcing
+// a re-login every few minutes.
+export const REMEMBER_ME_SESSION_DAYS = 30;
+export const DEFAULT_SESSION_DAYS = 1;
+
+export async function createSession(
+  userId: string,
+  ip: string,
+  userAgent: string,
+  rememberMe = true
+): Promise<string> {
   const token = generateToken();
   const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 30);
+  expiresAt.setDate(expiresAt.getDate() + (rememberMe ? REMEMBER_ME_SESSION_DAYS : DEFAULT_SESSION_DAYS));
 
   await db.insert(sessions).values({
     userId,
@@ -84,6 +97,15 @@ export async function createSession(userId: string, ip: string, userAgent: strin
   });
 
   return token;
+}
+
+/**
+ * Cookie `maxAge` (seconds) for a session, or `undefined` when "remember me"
+ * is off — omitting `maxAge`/`expires` makes it a browser session cookie
+ * that's cleared automatically when the browser closes.
+ */
+export function sessionCookieMaxAge(rememberMe: boolean): number | undefined {
+  return rememberMe ? 60 * 60 * 24 * REMEMBER_ME_SESSION_DAYS : undefined;
 }
 
 export async function validateSession(token: string, currentIp: string, currentUserAgent: string, request?: NextRequest) {

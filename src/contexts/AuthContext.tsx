@@ -30,13 +30,14 @@ interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  login: (identifier: string, password: string) => Promise<{ success: boolean; error?: string; pendingVerification?: boolean; email?: string }>;
+  login: (identifier: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; error?: string; pendingVerification?: boolean; email?: string }>;
   register: (
     phoneNumber: string,
     email: string,
     username: string,
     password: string,
-    displayName: string,
+    firstName: string,
+    lastName: string,
     termsAccepted: boolean
   ) => Promise<{ success: boolean; pendingVerification?: boolean; email?: string; error?: string }>;
   verifyEmailOtp: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
@@ -106,13 +107,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [sessionData, user, isSessionLoading, queryClient, refetchSession]);
 
-  async function login(identifier: string, password: string) {
+  async function login(identifier: string, password: string, rememberMe = true) {
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders },
         credentials: "include",
-        body: JSON.stringify({ emailOrUsername: identifier, password }),
+        body: JSON.stringify({ emailOrUsername: identifier, password, rememberMe }),
       });
 
       const data = await res.json();
@@ -139,7 +140,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     username: string,
     password: string,
-    displayName: string,
+    firstName: string,
+    lastName: string,
     termsAccepted: boolean
   ) {
     try {
@@ -147,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders },
         credentials: "include",
-        body: JSON.stringify({ phoneNumber, email, username, password, displayName, termsAccepted }),
+        body: JSON.stringify({ phoneNumber, email, username, password, firstName, lastName, termsAccepted }),
       });
 
       const data = await res.json();

@@ -28,6 +28,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | `0009_sync_core_schema.sql` | Adds missing core tables/columns for databases created from the early partial migration. |
 | `0010_harden_registration_integrity.sql` | Adds unique indexes that prevent duplicate tournament registrations per player/user under concurrent requests. |
 | `0019_add_email_verification.sql` | Adds `users.email_verified_at`, backfilled for existing rows. Required for the email-OTP registration/login flow (see below). |
+| `0020_add_first_last_name.sql` | Adds `users.first_name` and `users.last_name`, backfilled by splitting the existing `display_name`. Required for the "first name + last name" registration fields. |
 
 > **Email verification (required before deploying the email-OTP auth flow):**
 > Run `0019_add_email_verification.sql` and set `RESEND_API_KEY` (and

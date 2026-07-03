@@ -23,6 +23,7 @@
     "argon2": "^0.44.0",
     "drizzle-orm": "0.45.2",
     "framer-motion": "^12.42.2",
+    "mailchecker": "^6.0.20",
     "next": "^16.2.10",
     "pg": "8.20.0",
     "pino": "^10.3.1",

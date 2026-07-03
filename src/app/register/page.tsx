@@ -10,6 +10,8 @@ import ParticleField from "@/components/fx/ParticleField";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { normalizePhoneNumber } from "@/lib/phone";
+import { isPasswordStrong } from "@/lib/password-strength";
+import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 
 export default function RegisterPage() {
   const { t, lang } = useLanguage();
@@ -19,7 +21,8 @@ export default function RegisterPage() {
     phoneNumber: "",
     email: "",
     username: "",
-    displayName: "",
+    firstName: "",
+    lastName: "",
     password: "",
     confirmPassword: "",
     termsAccepted: false,
@@ -51,13 +54,27 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!form.firstName.trim()) {
+      setError(lang === "fa" ? "نام الزامی است" : "First name is required");
+      return;
+    }
+
+    if (!form.lastName.trim()) {
+      setError(lang === "fa" ? "نام خانوادگی الزامی است" : "Last name is required");
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
       setError(lang === "fa" ? "رمز عبور و تکرار آن یکسان نیستند" : "Passwords do not match");
       return;
     }
 
-    if (form.password.length < 6) {
-      setError(lang === "fa" ? "رمز عبور باید حداقل ۶ کاراکتر باشد" : "Password must be at least 6 characters");
+    if (!isPasswordStrong(form.password)) {
+      setError(
+        lang === "fa"
+          ? "رمز عبور به اندازه کافی قوی نیست. شرایط زیر فرم را کامل کنید."
+          : "Password is not strong enough. Please meet all the requirements below."
+      );
       return;
     }
 
@@ -73,7 +90,8 @@ export default function RegisterPage() {
       form.email.trim(),
       form.username.trim(),
       form.password,
-      form.displayName.trim(),
+      form.firstName.trim(),
+      form.lastName.trim(),
       form.termsAccepted
     );
 
@@ -280,7 +298,9 @@ export default function RegisterPage() {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
               />
               <p className="text-[11px] text-gray-500 mt-1.5">
-                {lang === "fa" ? "کد تایید حساب به این ایمیل ارسال می‌شود." : "The account verification code is sent to this email."}
+                {lang === "fa"
+                  ? "کد تایید حساب به این ایمیل ارسال می‌شود. لطفاً از یک ایمیل واقعی و همیشگی استفاده کنید — ایمیل‌های موقت/یک‌بارمصرف پذیرفته نمی‌شوند."
+                  : "The account verification code is sent to this email. Please use a real, permanent email — temporary/disposable emails are not accepted."}
               </p>
             </div>
 
@@ -299,18 +319,34 @@ export default function RegisterPage() {
               />
             </div>
 
-            <div>
-              <label className="block text-sm text-gray-400 mb-2">
-                {t.auth.displayName} *
-              </label>
-              <input
-                type="text"
-                required
-                className="gaming-input"
-                placeholder={lang === "fa" ? "مثلاً فرزاد" : "e.g., Shadow Gamer"}
-                value={form.displayName}
-                onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-              />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  {lang === "fa" ? "نام" : "First name"} *
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="gaming-input"
+                  placeholder={lang === "fa" ? "مثلاً فرزاد" : "e.g., John"}
+                  value={form.firstName}
+                  onChange={(e) => setForm({ ...form, firstName: e.target.value })}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  {lang === "fa" ? "نام خانوادگی" : "Last name"} *
+                </label>
+                <input
+                  type="text"
+                  required
+                  className="gaming-input"
+                  placeholder={lang === "fa" ? "مثلاً عباسی" : "e.g., Doe"}
+                  value={form.lastName}
+                  onChange={(e) => setForm({ ...form, lastName: e.target.value })}
+                />
+              </div>
             </div>
 
             <div>
@@ -320,11 +356,13 @@ export default function RegisterPage() {
               <input
                 type="password"
                 required
+                autoComplete="new-password"
                 className="gaming-input"
                 placeholder="••••••••"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
               />
+              <PasswordStrengthMeter password={form.password} lang={lang} />
             </div>
 
             <div>
@@ -334,11 +372,17 @@ export default function RegisterPage() {
               <input
                 type="password"
                 required
+                autoComplete="new-password"
                 className="gaming-input"
                 placeholder="••••••••"
                 value={form.confirmPassword}
                 onChange={(e) => setForm({ ...form, confirmPassword: e.target.value })}
               />
+              {form.confirmPassword && form.confirmPassword !== form.password && (
+                <p className="text-[11px] text-red-400 mt-1.5">
+                  {lang === "fa" ? "رمز عبور و تکرار آن یکسان نیستند" : "Passwords do not match"}
+                </p>
+              )}
             </div>
 
             <label className="flex items-start gap-3 bg-dark-800/70 border border-gaming-border rounded-2xl p-4 cursor-pointer select-none">
@@ -359,7 +403,12 @@ export default function RegisterPage() {
 
             <button
               type="submit"
-              disabled={loading || !form.termsAccepted}
+              disabled={
+                loading ||
+                !form.termsAccepted ||
+                !isPasswordStrong(form.password) ||
+                form.password !== form.confirmPassword
+              }
               className="gaming-btn w-full py-3 text-base disabled:opacity-50 mt-6"
             >
               {loading ? t.auth.registering : t.auth.registerButton}

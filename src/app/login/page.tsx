@@ -15,6 +15,7 @@ export default function LoginPage() {
   const { login, verifyEmailOtp, resendEmailOtp } = useAuth();
   const router = useRouter();
   const [form, setForm] = useState({ identifier: "", password: "" });
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +33,7 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
 
-    const result = await login(form.identifier.trim(), form.password);
+    const result = await login(form.identifier.trim(), form.password, rememberMe);
 
     if (result.success) {
       router.push("/");
@@ -213,6 +214,7 @@ export default function LoginPage() {
               <input
                 type="text"
                 required
+                autoComplete="username"
                 className="gaming-input"
                 placeholder={lang === "fa" ? "مثلاً 09123456789 یا ShadowGamer" : "09123456789 or ShadowGamer"}
                 value={form.identifier}
@@ -227,12 +229,25 @@ export default function LoginPage() {
               <input
                 type="password"
                 required
+                autoComplete="current-password"
                 className="gaming-input"
                 placeholder="••••••••"
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
               />
             </div>
+
+            <label className="flex items-center gap-2.5 cursor-pointer select-none w-fit">
+              <input
+                type="checkbox"
+                className="h-4 w-4 accent-purple-600"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+              />
+              <span className="text-sm text-gray-300">
+                {lang === "fa" ? "مرا به خاطر بسپار" : "Remember me"}
+              </span>
+            </label>
 
             <button
               type="submit"

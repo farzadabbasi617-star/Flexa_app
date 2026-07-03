@@ -54,7 +54,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, username, password, displayName, phoneNumber } = validation.data;
+    const { email, username, password, firstName, lastName, phoneNumber } = validation.data;
+    const displayName = `${firstName} ${lastName}`.trim();
 
     // 3. Uniqueness check using ilike for case-insensitive checks
     const existing = await db
@@ -97,6 +98,8 @@ export async function POST(request: NextRequest) {
             phoneNumber,
             username,
             passwordHash: hashedPassword,
+            firstName,
+            lastName,
             displayName,
             email,
             phoneVerifiedAt: null,
@@ -125,6 +128,8 @@ export async function POST(request: NextRequest) {
             gamentId,
             username,
             passwordHash: hashedPassword,
+            firstName,
+            lastName,
             displayName,
             email,
             phoneVerifiedAt: null,
