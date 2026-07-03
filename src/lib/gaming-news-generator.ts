@@ -12,6 +12,7 @@ type NewsItem = {
   source: string;
   pubDate: string | null;
   game: "clash_royale" | "cod_mobile" | "fortnite";
+  imageUrl?: string;
 };
 
 type GeneratedNews = {
