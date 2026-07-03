@@ -132,15 +132,64 @@ async function fetchGoogleNewsItems(query: string, game: NewsItem["game"]): Prom
   }
 }
 
+async function fetchDiscordNewsItems(): Promise<NewsItem[]> {
+  const token = process.env.DISCORD_BOT_TOKEN;
+  const channelIds = (process.env.DISCORD_CHANNEL_IDS || "").split(",").filter(Boolean);
+  
+  if (!token || channelIds.length === 0) return [];
+
+  const allMessages: NewsItem[] = [];
+
+  for (const channelId of channelIds) {
+    try {
+      const res = await fetch(`https://discord.com/api/v10/channels/${channelId.trim()}/messages?limit=5`, {
+        headers: { Authorization: `Bot ${token}` },
+        cache: "no-store",
+      });
+
+      if (!res.ok) continue;
+
+      const messages = await res.json();
+      for (const msg of messages) {
+        if (!msg.content && (!msg.attachments || msg.attachments.length === 0)) continue;
+
+        // تشخیص بازی بر اساس محتوای کانال یا کلمات کلیدی
+        let game: NewsItem["game"] = "cod_mobile";
+        const content = msg.content.toLowerCase();
+        if (content.includes("royale") || content.includes("king")) game = "clash_royale";
+        else if (content.includes("fortnite") || content.includes("build")) game = "fortnite";
+
+        allMessages.push({
+          title: msg.content.slice(0, 100),
+          link: `https://discord.com/channels/${msg.guild_id}/${channelId}/${msg.id}`,
+          source: "Discord Official",
+          pubDate: msg.timestamp,
+          game,
+          imageUrl: msg.attachments?.[0]?.url || "",
+        });
+      }
+    } catch (err) {
+      logger.warn({ err, channelId }, "Failed to fetch Discord messages");
+    }
+  }
+
+  return allMessages;
+}
+
 async function collectGamingNewsItems() {
-  const results = await Promise.all(NEWS_QUERIES.map((entry) => fetchGoogleNewsItems(entry.query, entry.game)));
+  const [googleResults, discordResults] = await Promise.all([
+    Promise.all(NEWS_QUERIES.map((entry) => fetchGoogleNewsItems(entry.query, entry.game))),
+    fetchDiscordNewsItems()
+  ]);
+
+  const results = [...discordResults, ...googleResults.flat()];
   const seen = new Set<string>();
-  return results.flat().filter((item) => {
-    const key = `${item.title.toLowerCase()}|${item.link}`;
+  return results.filter((item) => {
+    const key = `${item.title.toLowerCase().slice(0, 50)}|${item.imageUrl || item.link}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
-  }).slice(0, 12);
+  }).slice(0, 15);
 }
 
 async function hasGenerated(dedupeKey: string) {
