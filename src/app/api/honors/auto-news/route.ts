@@ -22,10 +22,19 @@ export async function GET(request: NextRequest) {
     const result = await generateDailyGamingNews({ force });
     return NextResponse.json({ ok: true, ...result });
   } catch (err: any) {
-    logger.error({ err: err?.message || err, stack: err?.stack }, "Auto honors news endpoint failed");
+    logger.error({ 
+      err: err?.message || err, 
+      stack: err?.stack,
+      code: err?.code,
+      detail: err?.detail,
+      table: err?.table
+    }, "Auto honors news endpoint failed");
+    
     return NextResponse.json({ 
       error: "Auto news generation failed", 
-      details: err?.message || "Unknown error" 
+      details: err?.message || "Unknown error",
+      dbCode: err?.code,
+      dbDetail: err?.detail
     }, { status: 500 });
   }
 }

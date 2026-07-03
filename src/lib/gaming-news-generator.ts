@@ -133,19 +133,28 @@ async function collectGamingNewsItems() {
 }
 
 async function hasGenerated(dedupeKey: string) {
-  const [row] = await db
-    .select({ id: telegramSentNotifications.id })
-    .from(telegramSentNotifications)
-    .where(eq(telegramSentNotifications.dedupeKey, dedupeKey))
-    .limit(1);
-  return Boolean(row);
+  try {
+    const [row] = await db
+      .select({ id: telegramSentNotifications.id })
+      .from(telegramSentNotifications)
+      .where(eq(telegramSentNotifications.dedupeKey, dedupeKey))
+      .limit(1);
+    return Boolean(row);
+  } catch (err) {
+    logger.warn({ err, dedupeKey }, "Failed to check hasGenerated, assuming false");
+    return false;
+  }
 }
 
 async function markGenerated(dedupeKey: string) {
-  await db
-    .insert(telegramSentNotifications)
-    .values({ dedupeKey, type: "daily_gaming_news" })
-    .onConflictDoNothing({ target: telegramSentNotifications.dedupeKey });
+  try {
+    await db
+      .insert(telegramSentNotifications)
+      .values({ dedupeKey, type: "daily_gaming_news" })
+      .onConflictDoNothing({ target: telegramSentNotifications.dedupeKey });
+  } catch (err) {
+    logger.error({ err, dedupeKey }, "Failed to markGenerated");
+  }
 }
 
 function localFallbackNews(items: NewsItem[]): GeneratedNews {
