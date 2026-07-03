@@ -294,35 +294,42 @@ export async function generateDailyGamingNews({ force = false } = {}) {
   const key = `daily-gaming-news:${today}`;
   if (!force && await hasGenerated(key)) return { generated: false, reason: "already_today" };
 
-  const items = await collectGamingNewsItems();
-  const sourcesText = items.length
-    ? items.map((item, index) => `${index + 1}. [${item.game}] ${item.title} — ${item.source} — ${item.pubDate || "no date"} — ${item.link}`).join("\n")
-    : "No external RSS items were available. Create a safe evergreen gaming news analysis without pretending a specific breaking event happened.";
+  const allItems = await collectGamingNewsItems();
+  if (allItems.length === 0) return { generated: false, reason: "no_sources" };
 
-  const prompt = `تو سردبیر ارشد و تحلیل‌گر حرفه‌ای دنیای گیم در سایت Gament هستی. وظیفه تو تولید یک "مقاله خبری جامع، عمیق و بشدت سئوشده" است. 
+  // انتخاب بازی هدف بر اساس بیشترین تعداد اخبار واکشی شده یا به صورت رندوم برای تنوع
+  const games: Array<"cod_mobile" | "clash_royale" | "fortnite"> = ["cod_mobile", "clash_royale", "fortnite"];
+  const targetGame = games[Math.floor(Math.random() * games.length)];
+  
+  const filteredItems = allItems.filter(item => item.game === targetGame);
+  const finalItems = filteredItems.length > 0 ? filteredItems : allItems.slice(0, 5);
+  const actualGame = finalItems[0].game;
 
-منابع واکشی‌شده:
+  const sourcesText = finalItems.map((item, index) => 
+    `${index + 1}. [TARGET: ${actualGame}] ${item.title} — ${item.source} — ${item.link}`
+  ).join("\n");
+
+  const prompt = `تو سردبیر ارشد و متخصص بازی "${actualGame}" در سایت Gament هستی. 
+فقط و فقط درباره بازی "${actualGame}" بنویس. 
+
+منابع اختصاصی:
 ${sourcesText}
 
-قوانین سخت‌گیرانه برای تولید محتوا:
-۱. طول متن: متن باید بسیار مفصل و با جزئیات کامل باشد (حداقل ۴ تا ۵ پاراگراف طولانی، حدود ۴۵۰ کلمه).
-۲. SEO فوق‌سنگین: کلمات کلیدی ${SEO_KEYWORDS} را حداقل ۳ بار در طول متن به صورت کاملاً طبیعی تکرار کن.
-۳. ساختار ژورنالیستی:
-   - تیتر: بسیار جذاب، کلیک‌خور و سئوشده.
-   - لید (Summary): یک پاراگراف جذاب که خواننده را ترغیب به خواندن کل مطلب کند.
-   - بدنه (Description): شامل تحلیل تغییرات تفنگ‌ها، کاراکترها، مپ‌ها و متا (Meta) بازی باشد. حتماً بنویس که این تغییرات برای بازیکنان تورنومنت‌های گیمنت چه سودی دارد یا چه استراتژی را باید تغییر دهند.
-۴. تصویر: در فیلد imageAlt، توصیف دقیق و سئوشده‌ای از تصویر بنویس.
-۵. لحن: مقتدر، حرفه‌ای و در عین حال صمیمی برای جامعه گیمرها.
+دستورالعمل حیاتی:
+۱. تمرکز مطلق: تحت هیچ شرایطی نام بازی‌های دیگر را در متن نیاور. تمام متن باید درباره ${actualGame} باشد.
+۲. طول متن: یک مقاله مفصل و تحلیلی (حداقل ۴۵۰ کلمه) بساز.
+۳. سئو طلایی: کلمات کلیدی ${SEO_KEYWORDS} را با تاکید بر ${actualGame} استفاده کن.
+۴. تحلیل اختصاصی: توضیح بده که این اخبار چه تاثیری بر استراتژی بازیکنان در "تورنومنت‌های گیمنت" دارد.
 
-خروجی فقط و فقط JSON معتبر باشد:
+خروجی فقط JSON:
 {
-  "title": "تیتر حرفه‌ای و طولانی سئو شده",
-  "summary": "لید خبری جذاب (حداقل ۳ جمله)",
-  "description": "متن کامل مقاله (بسیار پرمحتوا و طولانی، با رعایت اصول پاراگراف‌بندی)",
-  "game": "clash_royale" | "cod_mobile" | "fortnite",
-  "icon": "ایموجی مرتبط",
-  "imageAlt": "توضیح تصویر برای گوگل سئو",
-  "seoKeywords": ["۸ کلمه کلیدی تخصصی"]
+  "title": "تیتر حرفه‌ای مخصوص ${actualGame}",
+  "summary": "لید خبری جذاب",
+  "description": "متن کامل و طولانی مقاله فارسی",
+  "game": "${actualGame}",
+  "icon": "ایموجی مناسب",
+  "imageAlt": "توضیح تصویر سئو شده برای ${actualGame}",
+  "seoKeywords": ["کلمات کلیدی مرتبط"]
 }`;
 
   const systemPrompt = gamentSystemPrompt("honors", "Respond ONLY with valid JSON. No markdown. Never invent fake breaking news.");
