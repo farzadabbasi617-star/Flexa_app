@@ -100,7 +100,7 @@ async function fetchGoogleNewsItems(query: string, game: NewsItem["game"]): Prom
     const res = await fetch(url, {
       signal: controller.signal,
       headers: {
-        "User-Agent": "GamentBot/1.0 (+https://www.gament1.ir)",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         Accept: "application/rss+xml, application/xml, text/xml",
       },
       cache: "no-store",
@@ -108,12 +108,21 @@ async function fetchGoogleNewsItems(query: string, game: NewsItem["game"]): Prom
     if (!res.ok) return [];
     const xml = await res.text();
     const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
+    
     return itemBlocks.slice(0, 5).map((block) => {
       const title = extractTag(block, "title");
       const link = normalizeGoogleNewsUrl(extractTag(block, "link"));
       const pubDate = extractTag(block, "pubDate") || null;
       const source = extractTag(block, "source") || "Google News";
-      return { title, link, source, pubDate, game };
+      
+      // تلاش برای پیدا کردن تصویر از داخل تگ description یا media
+      let imageUrl = "";
+      const imgMatch = block.match(/<media:content[^>]+url="([^"]+)"/i) || 
+                       block.match(/<enclosure[^>]+url="([^"]+)"/i) ||
+                       block.match(/&lt;img[^&]+src="([^"]+)"/i);
+      if (imgMatch) imageUrl = imgMatch[1];
+
+      return { title, link, source, pubDate, game, imageUrl };
     }).filter((item) => item.title && item.link);
   } catch (err) {
     logger.warn({ err, query, game }, "Failed to fetch Google News RSS");
@@ -239,11 +248,18 @@ ${sourcesText}
   const icon = String(news.icon || GAME_BRAND[game]?.icon || "📰").slice(0, 20);
   
   let imageUrl = "";
-  try {
-    imageUrl = createLightweightNewsImage(title, game, icon);
-  } catch (err) {
-    logger.error({ err }, "SVG Generation failed");
-    imageUrl = ""; // Fallback to empty or a default static URL
+  // اولویت ۱: استفاده از تصویر واقعی واکشی شده از منبع خبر
+  const sourceWithImage = items.find(item => item.imageUrl);
+  if (sourceWithImage?.imageUrl) {
+    imageUrl = sourceWithImage.imageUrl;
+  } else {
+    // اولویت ۲: اگر تصویر منبع نبود، تولید تصویر گرافیکی حرفه‌ای
+    try {
+      imageUrl = createLightweightNewsImage(title, game, icon);
+    } catch (err) {
+      logger.error({ err }, "SVG Generation failed");
+      imageUrl = "";
+    }
   }
   const seoKeywords = Array.isArray(news.seoKeywords) ? news.seoKeywords.map((k) => shortText(String(k), 40)).slice(0, 8) : [];
 
