@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import BottomNav from "@/components/BottomNav";
 
 type Kind = "currency" | "account" | "item" | "service";
 type Source = "official" | "user";
@@ -320,6 +321,8 @@ export default function StorePage() {
           {toast.text}
         </div>
       )}
+
+      <BottomNav />
     </main>
   );
 }

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import BottomNav from "@/components/BottomNav";
 
 interface Order {
   id: string;
@@ -304,6 +305,8 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
+
+      <BottomNav />
     </main>
   );
 }

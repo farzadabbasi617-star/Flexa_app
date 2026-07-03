@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import BottomNav from "@/components/BottomNav";
 
 type Game = "cod_mobile" | "clash_royale" | "fortnite";
 
@@ -297,6 +298,8 @@ export default function PriceEstimatePage() {
           ⚠️ قیمت‌ها صرفاً تخمینی هستند و قیمت نهایی فروش ممکن است متفاوت باشد.
         </p>
       </div>
+
+      <BottomNav />
     </main>
   );
 }

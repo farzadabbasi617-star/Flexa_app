@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import ImageUploader from "@/components/ImageUploader";
+import BottomNav from "@/components/BottomNav";
 
 type KycStatus = "none" | "pending" | "verified" | "rejected";
 
@@ -71,6 +72,8 @@ export default function SellPage() {
           </div>
         )}
       </div>
+
+      <BottomNav />
     </main>
   );
 }
