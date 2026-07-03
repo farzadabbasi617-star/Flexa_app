@@ -336,10 +336,10 @@ ${sourcesText}
   });
 
   const parsed = ai ? safeParseAIJson<GeneratedNews>(ai.content) : null;
-  const news = (parsed?.title && parsed?.description) ? parsed : localFallbackNews(items);
+  const news = (parsed?.title && parsed?.description) ? parsed : localFallbackNews(finalItems);
   
   // Ensure strings to prevent SVG encoding errors
-  const game = String(news.game || (items.length > 0 ? items[0].game : "cod_mobile")).slice(0, 50);
+  const game = String(news.game || (finalItems.length > 0 ? finalItems[0].game : "cod_mobile")).slice(0, 50);
   const title = shortText(String(news.title || "اخبار جدید گیمینگ"), 90);
   const description = String(news.description || "در حال حاضر جزییات بیشتری در دسترس نیست.").trim();
   const summary = shortText(String(news.summary || description.split("\n")[0] || title), 190);
@@ -347,7 +347,7 @@ ${sourcesText}
   
   let imageUrl = "";
   // اولویت ۱: استفاده از تصویر واقعی واکشی شده از منبع خبر
-  const sourceWithImage = items.find(item => item.imageUrl);
+  const sourceWithImage = finalItems.find(item => item.imageUrl);
   if (sourceWithImage?.imageUrl) {
     imageUrl = sourceWithImage.imageUrl;
   } else {
@@ -379,7 +379,7 @@ ${sourcesText}
         readTimeMinutes: readingTimeMinutes(description),
         provider: ai?.provider || "local_fallback",
         model: ai?.model || null,
-        sources: items,
+        sources: finalItems,
         seoKeywords,
         dedupeKey: key,
         contentFramework: "gament_news_v2",
@@ -387,14 +387,14 @@ ${sourcesText}
     }).returning();
 
     await markGenerated(key);
-    logger.info({ honorId: created.id, title: created.title, sources: items.length }, "Generated daily gaming news");
+    logger.info({ honorId: created.id, title: created.title, sources: finalItems.length }, "Generated daily gaming news");
 
     return {
       generated: true,
       honorId: created.id,
       title: created.title,
       game: created.game,
-      sources: items.length,
+      sources: finalItems.length,
       provider: ai?.provider || "local_fallback",
     };
   } catch (err: any) {
