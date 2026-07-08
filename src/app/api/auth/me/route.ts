@@ -43,6 +43,10 @@ export async function GET(request: NextRequest) {
         codMobileUsername: user.codMobileUsername,
         fortniteId: user.fortniteId,
         fortniteUsername: user.fortniteUsername,
+        // Age-gate fields — used purely for UI state (disabling paid
+        // buttons). Server always re-verifies before touching the wallet.
+        birthDate: user.birthDate,
+        nationalId: user.nationalId,
         metadata: user.metadata,
       },
     });

@@ -33,6 +33,50 @@ export const passwordSchema = z
   .regex(/[0-9]/, "رمز عبور باید حداقل یک عدد داشته باشد")
   .regex(/[^a-zA-Z0-9]/, "رمز عبور باید حداقل یک کاراکتر خاص (مثل !@#$%) داشته باشد");
 
+/**
+ * Validates an Iranian national ID (کد ملی) including the checksum digit.
+ * Defined up here (before RegisterSchema) because both signup and KYC
+ * submission share it.
+ */
+export function isValidIranianNationalId(value: string): boolean {
+  const code = String(value ?? "").replace(/\D/g, "");
+  if (!/^\d{10}$/.test(code)) return false;
+  // Reject all-equal-digit codes (e.g. 0000000000) which pass the checksum but are invalid.
+  if (/^(\d)\1{9}$/.test(code)) return false;
+  const check = Number(code[9]);
+  let sum = 0;
+  for (let i = 0; i < 9; i++) sum += Number(code[i]) * (10 - i);
+  const remainder = sum % 11;
+  return remainder < 2 ? check === remainder : check === 11 - remainder;
+}
+
+const nationalIdSchema = z.preprocess(
+  (v) => (typeof v === "string" ? v.replace(/\D/g, "") : v),
+  z.string().refine(isValidIranianNationalId, "کد ملی وارد شده معتبر نیست")
+);
+
+// Birth date at signup: Gregorian ISO (YYYY-MM-DD). We ONLY accept a
+// well-formed past date; the age-gate itself (18+ enforcement for paid
+// flows) lives in `src/lib/age-gate.ts` — the schema deliberately allows
+// under-18 accounts to be created so those users can still use the free
+// side of the app. Financial flows do the age check separately.
+const registerBirthDateSchema = z.preprocess(
+  (v) => (typeof v === "string" ? v.trim() : v),
+  z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "تاریخ تولد باید به فرمت YYYY-MM-DD (میلادی) باشد")
+    .refine((v) => {
+      const [y, m, d] = v.split("-").map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      return (
+        dt.getUTCFullYear() === y &&
+        dt.getUTCMonth() === m - 1 &&
+        dt.getUTCDate() === d &&
+        dt.getTime() < Date.now()
+      );
+    }, "تاریخ تولد وارد شده معتبر نیست")
+);
+
 export const RegisterSchema = z.object({
   username: z
     .string()
@@ -48,6 +92,10 @@ export const RegisterSchema = z.object({
   password: passwordSchema,
   firstName: z.string().trim().min(2, "نام الزامی است").max(50, "نام بیش از حد طولانی است"),
   lastName: z.string().trim().min(2, "نام خانوادگی الزامی است").max(50, "نام خانوادگی بیش از حد طولانی است"),
+  // Age-gate fields (see src/lib/age-gate.ts). Collected at signup so we
+  // never have to interrupt a user mid-payment to ask for them.
+  birthDate: registerBirthDateSchema,
+  nationalId: nationalIdSchema,
   termsAccepted: z.boolean().refine((value) => value === true, "پذیرش قوانین و مقررات گیمنت الزامی است"),
 });
 
@@ -86,24 +134,6 @@ export const AIModerateSchema = z.object({
 // ===========================================================================
 // STORE / MARKETPLACE & KYC
 // ===========================================================================
-
-/** Validates an Iranian national ID (کد ملی) including the checksum digit. */
-export function isValidIranianNationalId(value: string): boolean {
-  const code = String(value ?? "").replace(/\D/g, "");
-  if (!/^\d{10}$/.test(code)) return false;
-  // Reject all-equal-digit codes (e.g. 0000000000) which pass the checksum but are invalid.
-  if (/^(\d)\1{9}$/.test(code)) return false;
-  const check = Number(code[9]);
-  let sum = 0;
-  for (let i = 0; i < 9; i++) sum += Number(code[i]) * (10 - i);
-  const remainder = sum % 11;
-  return remainder < 2 ? check === remainder : check === 11 - remainder;
-}
-
-const nationalIdSchema = z.preprocess(
-  (v) => (typeof v === "string" ? v.replace(/\D/g, "") : v),
-  z.string().refine(isValidIranianNationalId, "کد ملی وارد شده معتبر نیست")
-);
 
 // Accepts either a normal http(s) image URL (e.g. Cloudinary) OR an inline
 // base64 data-image URL (used as a fallback when Cloudinary isn't configured,

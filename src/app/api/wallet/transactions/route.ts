@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { transactions, wallets } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
+import { checkAgeGate } from "@/lib/age-gate";
 import { bigIntFromText, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
 import { isValidIranIban, sanitizeIban, sanitizeNationalId, sanitizeShortText, walletBreakdown } from "@/lib/wallet-accounting";
@@ -130,6 +131,21 @@ export async function POST(request: NextRequest) {
     if (termsError) return NextResponse.json({ error: termsError }, { status: 400 });
 
     const action = body.action === "withdrawal" ? "withdrawal" : "deposit";
+
+    // Age-gate: both deposit and withdrawal are real-money flows and are
+    // gated to adults with a registered national ID. Free features of the
+    // app remain accessible to under-18 users.
+    const gate = checkAgeGate({ birthDate: user.birthDate, nationalId: user.nationalId });
+    if (!gate.ok) {
+      return NextResponse.json(
+        {
+          error: gate.message,
+          code: "AGE_GATE_BLOCKED",
+          reason: gate.code,
+        },
+        { status: 403 }
+      );
+    }
 
     if (action === "deposit") {
       const limit = await rateLimit(`wallet:deposit:${user.id}`, 3, 10 * 60 * 1000);

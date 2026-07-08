@@ -54,14 +54,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, username, password, firstName, lastName, phoneNumber } = validation.data;
+    const { email, username, password, firstName, lastName, phoneNumber, birthDate, nationalId } = validation.data;
     const displayName = `${firstName} ${lastName}`.trim();
 
-    // 3. Uniqueness check using ilike for case-insensitive checks
+    // 3. Uniqueness check using ilike for case-insensitive checks.
+    // National ID is also checked here — each real person may only have one
+    // paid-eligible account. We look it up separately (not in the OR above)
+    // to give a specific error message.
     const existing = await db
       .select({ id: users.id, email: users.email, username: users.username, phoneNumber: users.phoneNumber, emailVerifiedAt: users.emailVerifiedAt })
       .from(users)
       .where(or(ilike(users.email, email), ilike(users.username, username), eq(users.phoneNumber, phoneNumber)));
+
+    const [existingByNationalId] = await db
+      .select({ id: users.id, email: users.email })
+      .from(users)
+      .where(eq(users.nationalId, nationalId))
+      .limit(1);
 
     const existingByEmail = existing.find((u) => u.email?.toLowerCase() === email.toLowerCase());
     const reclaimingStaleAccount = Boolean(existingByEmail && !existingByEmail.emailVerifiedAt);
@@ -74,6 +83,14 @@ export async function POST(request: NextRequest) {
     }
     if (existing.some((u) => u.phoneNumber === phoneNumber && u.id !== existingByEmail?.id)) {
       return NextResponse.json({ error: "شماره موبایل قبلاً ثبت شده است" }, { status: 409 });
+    }
+    // National-ID must be unique across the site, EXCEPT when it belongs to
+    // the same abandoned-unverified row we're about to reclaim (same email).
+    if (existingByNationalId && existingByNationalId.id !== existingByEmail?.id) {
+      return NextResponse.json(
+        { error: "این کد ملی قبلاً برای حساب دیگری ثبت شده است." },
+        { status: 409 }
+      );
     }
 
     // 4. Hash password.
@@ -102,6 +119,8 @@ export async function POST(request: NextRequest) {
             lastName,
             displayName,
             email,
+            birthDate,
+            nationalId,
             phoneVerifiedAt: null,
             emailVerifiedAt: null,
             isVerified: false,
@@ -132,6 +151,8 @@ export async function POST(request: NextRequest) {
             lastName,
             displayName,
             email,
+            birthDate,
+            nationalId,
             phoneVerifiedAt: null,
             emailVerifiedAt: null,
             isVerified: false,

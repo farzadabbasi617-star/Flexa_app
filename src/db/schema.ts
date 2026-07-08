@@ -131,6 +131,16 @@ export const users = pgTable("users", {
   firstName: varchar("first_name", { length: 100 }),
   lastName: varchar("last_name", { length: 100 }),
   displayName: varchar("display_name", { length: 100 }).notNull(),
+  // Age-gate + light identity check. Required at signup for NEW users
+  // (existing users are grandfathered as nullable). Payment-related flows —
+  // wallet top-up requests and paid tournament registrations — refuse to
+  // proceed when either is missing or when the computed age is under 18.
+  // `birthDate` is stored as an ISO date (YYYY-MM-DD, Gregorian) so age
+  // arithmetic is trivial. `nationalId` is an Iranian کد ملی (10 digits)
+  // and is unique across the site — the same document cannot be reused
+  // to farm multiple paid accounts.
+  birthDate: varchar("birth_date", { length: 10 }),
+  nationalId: varchar("national_id", { length: 10 }),
   bio: text("bio"),
   avatarUrl: varchar("avatar_url", { length: 500 }),
   role: userRoleEnum("role").notNull().default("player"),
@@ -156,6 +166,9 @@ export const users = pgTable("users", {
   phoneIdx: index("users_phone_idx").on(table.phoneNumber),
   rankIdx: index("users_rank_points_idx").on(table.rankPoints),
   gamentIdIdx: index("users_gament_id_idx").on(table.gamentId),
+  // Enforce one paid-eligible account per national ID (nullable — legacy
+  // users without a code_melli are ignored by unique-with-nulls semantics).
+  nationalIdIdx: uniqueIndex("users_national_id_idx").on(table.nationalId),
 }));
 
 // Sessions

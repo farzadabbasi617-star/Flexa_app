@@ -8,6 +8,10 @@ const validBase = {
   password: "Secret!12345",
   firstName: "Shadow",
   lastName: "Gamer",
+  // Age-gate fields (see src/lib/age-gate.ts). RegisterSchema requires them
+  // so paid flows (wallet top-up, paid tournaments) have the data they need.
+  birthDate: "2000-05-14",
+  nationalId: "0019553412", // valid Iranian NID checksum (test fixture only)
   termsAccepted: true,
 };
 
@@ -54,6 +58,57 @@ describe("RegisterSchema", () => {
     if (result.success) {
       expect(result.data.email).toBe("player@example.com");
     }
+  });
+
+  // ---- Age-gate fields ----
+  it("rejects registration when birthDate is missing", () => {
+    const { birthDate, ...withoutBirth } = validBase;
+    void birthDate;
+    const result = RegisterSchema.safeParse(withoutBirth);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects registration when birthDate is not YYYY-MM-DD", () => {
+    const result = RegisterSchema.safeParse({ ...validBase, birthDate: "14/05/2000" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects registration when birthDate is impossible (Feb 30)", () => {
+    const result = RegisterSchema.safeParse({ ...validBase, birthDate: "2000-02-30" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects registration when birthDate is in the future", () => {
+    const future = new Date();
+    future.setUTCFullYear(future.getUTCFullYear() + 1);
+    const iso = future.toISOString().slice(0, 10);
+    const result = RegisterSchema.safeParse({ ...validBase, birthDate: iso });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects registration when nationalId is missing", () => {
+    const { nationalId, ...withoutNid } = validBase;
+    void nationalId;
+    const result = RegisterSchema.safeParse(withoutNid);
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects registration with an invalid nationalId checksum", () => {
+    const result = RegisterSchema.safeParse({ ...validBase, nationalId: "1234567890" });
+    expect(result.success).toBe(false);
+  });
+
+  it("rejects registration with an all-same-digit nationalId (0000000000)", () => {
+    const result = RegisterSchema.safeParse({ ...validBase, nationalId: "0000000000" });
+    expect(result.success).toBe(false);
+  });
+
+  it("accepts under-18 birthDate at registration (age enforcement happens at the paid-action layer, not here)", () => {
+    const result = RegisterSchema.safeParse({ ...validBase, birthDate: "2015-01-01" });
+    // Signup is not itself age-gated — only paid flows are. So the schema
+    // should accept the payload; the runtime age-gate in
+    // src/lib/age-gate.ts is what blocks paid tournaments and top-ups.
+    expect(result.success).toBe(true);
   });
 });
 

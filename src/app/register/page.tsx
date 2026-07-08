@@ -12,6 +12,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { isPasswordStrong } from "@/lib/password-strength";
 import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
+import { isValidIranianNationalId } from "@/lib/validations";
+import { calculateAgeYears, MIN_ADULT_AGE, parseBirthDate } from "@/lib/age-gate";
 
 export default function RegisterPage() {
   const { t, lang } = useLanguage();
@@ -23,6 +25,8 @@ export default function RegisterPage() {
     username: "",
     firstName: "",
     lastName: "",
+    birthDate: "",
+    nationalId: "",
     password: "",
     confirmPassword: "",
     termsAccepted: false,
@@ -64,6 +68,23 @@ export default function RegisterPage() {
       return;
     }
 
+    // Birth date + national ID: required at signup so the paid flows
+    // (wallet top-up, paid tournament registration) never need to
+    // interrupt the user mid-payment to collect them later.
+    const parsedBirth = parseBirthDate(form.birthDate);
+    if (!parsedBirth) {
+      setError(
+        lang === "fa"
+          ? "تاریخ تولد الزامی است (فرمت: YYYY-MM-DD میلادی، مثلاً 2001-05-14)"
+          : "Birth date is required (format: YYYY-MM-DD, e.g. 2001-05-14)"
+      );
+      return;
+    }
+    if (!isValidIranianNationalId(form.nationalId)) {
+      setError(lang === "fa" ? "کد ملی وارد شده معتبر نیست" : "National ID is not valid");
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
       setError(lang === "fa" ? "رمز عبور و تکرار آن یکسان نیستند" : "Passwords do not match");
       return;
@@ -92,6 +113,8 @@ export default function RegisterPage() {
       form.password,
       form.firstName.trim(),
       form.lastName.trim(),
+      form.birthDate.trim(),
+      form.nationalId.replace(/\D/g, ""),
       form.termsAccepted
     );
 
@@ -346,6 +369,75 @@ export default function RegisterPage() {
                   value={form.lastName}
                   onChange={(e) => setForm({ ...form, lastName: e.target.value })}
                 />
+              </div>
+            </div>
+
+            {/* Age gate: birth date + Iranian national ID. Required at signup
+                because paid tournament registration and wallet top-up need
+                a verified 18+ user. Free features remain accessible either way. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  {lang === "fa" ? "تاریخ تولد (میلادی)" : "Birth date (Gregorian)"} *
+                </label>
+                <input
+                  type="date"
+                  required
+                  dir="ltr"
+                  max={new Date().toISOString().slice(0, 10)}
+                  className="gaming-input text-left"
+                  value={form.birthDate}
+                  onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
+                />
+                {(() => {
+                  const parsed = parseBirthDate(form.birthDate);
+                  if (!parsed) return null;
+                  const age = calculateAgeYears(parsed);
+                  const isAdult = age >= MIN_ADULT_AGE;
+                  return (
+                    <p className={`text-[11px] mt-1.5 leading-5 ${isAdult ? "text-emerald-400" : "text-amber-400"}`}>
+                      {lang === "fa" ? (
+                        <>
+                          سن: <b>{age.toLocaleString("fa-IR")} سال</b>
+                          {isAdult
+                            ? " — امکان شرکت در تورنومنت‌های پولی و شارژ کیف پول را دارید."
+                            : ` — تا رسیدن به ${MIN_ADULT_AGE} سالگی فقط می‌توانید در تورنومنت‌های رایگان شرکت کنید.`}
+                        </>
+                      ) : (
+                        <>
+                          Age: <b>{age}</b>
+                          {isAdult
+                            ? " — you can join paid tournaments and top up the wallet."
+                            : ` — until ${MIN_ADULT_AGE}, only free tournaments are available.`}
+                        </>
+                      )}
+                    </p>
+                  );
+                })()}
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  {lang === "fa" ? "کد ملی" : "National ID (کد ملی)"} *
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  required
+                  dir="ltr"
+                  maxLength={10}
+                  className="gaming-input text-left"
+                  placeholder="0012345678"
+                  value={form.nationalId}
+                  onChange={(e) =>
+                    setForm({ ...form, nationalId: e.target.value.replace(/\D/g, "").slice(0, 10) })
+                  }
+                />
+                <p className="text-[11px] text-gray-500 mt-1.5 leading-5">
+                  {lang === "fa"
+                    ? "برای احراز هویت مالی الزامی است. با شخص دیگری قابل اشتراک‌گذاری نیست."
+                    : "Required for financial identity verification. Cannot be shared with anyone else."}
+                </p>
               </div>
             </div>
 

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { registrations, players, tournaments, transactions, wallets } from "@/db/schema";
 import { and, eq, count, sql } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
+import { checkAgeGate } from "@/lib/age-gate";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
 import { evaluateUserAchievements } from "@/lib/achievement-service";
 import { notifyLinkedUserOnTelegram } from "@/lib/telegram";
@@ -94,6 +95,16 @@ export async function POST(request: NextRequest) {
       let paymentTransactionId: string | null = null;
 
       if (!isAdmin && entryFeeRial > BigInt(0)) {
+        // Age-gate: paid tournaments are for adults only, and require a
+        // registered national ID. Free tournaments are NOT affected by this
+        // block — under-18s can still enjoy the free side of the app.
+        const gate = checkAgeGate({ birthDate: user.birthDate, nationalId: user.nationalId });
+        if (!gate.ok) {
+          const err = new Error("AGE_GATE_BLOCKED");
+          (err as Error & { details?: unknown }).details = { code: gate.code, message: gate.message };
+          throw err;
+        }
+
         let [wallet] = await tx.select().from(wallets).where(eq(wallets.userId, ownerId)).limit(1);
         if (!wallet) {
           [wallet] = await tx.insert(wallets).values({ userId: ownerId, balance: "0", currency: "RIAL" }).returning();
@@ -182,6 +193,18 @@ export async function POST(request: NextRequest) {
           details,
         },
         { status: 402 }
+      );
+    }
+
+    if (message === "AGE_GATE_BLOCKED") {
+      const details = (err as Error & { details?: { code?: string; message?: string } }).details;
+      return NextResponse.json(
+        {
+          error: details?.message || "برای شرکت در تورنومنت‌های پولی باید بالای ۱۸ سال باشید.",
+          code: "AGE_GATE_BLOCKED",
+          reason: details?.code,
+        },
+        { status: 403 }
       );
     }
 

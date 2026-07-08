@@ -24,6 +24,11 @@ interface User {
   codMobileUsername: string | null;
   fortniteId: string | null;
   fortniteUsername: string | null;
+  // Age-gate fields — used by the UI to disable paid actions client-side.
+  // Server always re-checks via checkAgeGate() so the client copy is only
+  // for UX, never for authorisation.
+  birthDate?: string | null;
+  nationalId?: string | null;
   metadata?: any;
 }
 
@@ -38,6 +43,8 @@ interface AuthContextType {
     password: string,
     firstName: string,
     lastName: string,
+    birthDate: string,
+    nationalId: string,
     termsAccepted: boolean
   ) => Promise<{ success: boolean; pendingVerification?: boolean; email?: string; error?: string }>;
   verifyEmailOtp: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
@@ -142,6 +149,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     password: string,
     firstName: string,
     lastName: string,
+    birthDate: string,
+    nationalId: string,
     termsAccepted: boolean
   ) {
     try {
@@ -149,7 +158,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders },
         credentials: "include",
-        body: JSON.stringify({ phoneNumber, email, username, password, firstName, lastName, termsAccepted }),
+        body: JSON.stringify({ phoneNumber, email, username, password, firstName, lastName, birthDate, nationalId, termsAccepted }),
       });
 
       const data = await res.json();

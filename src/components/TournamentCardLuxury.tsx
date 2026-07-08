@@ -4,6 +4,8 @@ import React, { memo, useMemo } from "react";
 import Link from "next/link";
 import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { calculateDynamicTournamentPrizePool } from "@/lib/tournament-finance";
+import { checkAgeGate, MIN_ADULT_AGE } from "@/lib/age-gate";
+import { useAuth } from "@/contexts/AuthContext";
 import TiltCard from "@/components/fx/TiltCard";
 import { useCountdown } from "@/hooks/useCountdown";
 
@@ -59,6 +61,7 @@ function getDirectImageUrl(url: string | null | undefined): string | null {
 const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false }: Props) => {
   const spotsLeft = Math.max(0, t.maxPlayers - (t.registeredCount || 0));
   const { value: countdown, expired } = useCountdown(t.startDate);
+  const { user } = useAuth();
 
   // تبدیل خودکار لینک تصویر
   const bannerUrl = getDirectImageUrl(t.bannerUrl);
@@ -68,6 +71,16 @@ const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false
     const toman = rialToTomanNumber(rial);
     return { rial, toman, isPaid: rial > BigInt(0) };
   }, [t.entryFee]);
+
+  // Age-gate check — only relevant for paid tournaments. The server does
+  // its own authoritative check on submit; this is UX only (so under-18
+  // users see the button disabled with a clear message instead of
+  // discovering the block after clicking through).
+  const ageGate = useMemo(() => {
+    if (!user || !entryFeeInfo.isPaid) return { ok: true as const };
+    return checkAgeGate({ birthDate: user.birthDate, nationalId: user.nationalId });
+  }, [user, entryFeeInfo.isPaid]);
+  const ageBlocked = isLoggedIn && !t.isRegistered && entryFeeInfo.isPaid && !ageGate.ok;
 
   const prizeData = useMemo(() => {
     return calculateDynamicTournamentPrizePool({
@@ -84,6 +97,18 @@ const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false
 
   const action = t.isRegistered
     ? { href: `/tournaments/${t.id}/lobby`, label: "ورود به لابی", tone: "from-green-600 to-emerald-600" }
+    : ageBlocked
+    ? {
+        // Under-18 (or missing kyc fields) trying to enter a paid tournament
+        // — bounce them to the profile page to complete their age-gate info,
+        // or show a hard block if they really are under age.
+        href: ageGate.ok || (ageGate as { code?: string }).code === "UNDERAGE" ? "#" : "/profile",
+        label:
+          !ageGate.ok && (ageGate as { code?: string }).code === "UNDERAGE"
+            ? `فقط بالای ${MIN_ADULT_AGE.toLocaleString("fa-IR")} سال`
+            : "تکمیل اطلاعات هویتی",
+        tone: "from-slate-600 to-slate-700",
+      }
     : insufficientWallet
     ? { href: "/wallet", label: "شارژ کیف پول", tone: "from-orange-600 to-red-600" }
     : { href: `/tournaments/${t.id}`, label: entryFeeInfo.isPaid ? "ثبت‌نام پولی" : "ثبت‌نام", tone: "from-purple-600 to-blue-600" };
@@ -159,9 +184,17 @@ const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false
             )}
           </div>
 
-          {insufficientWallet && (
+          {insufficientWallet && !ageBlocked && (
             <div className="bg-red-500/10 border border-red-500/20 text-red-300 rounded-2xl p-3 text-xs leading-5">
               موجودی کیف پول کافی نیست.
+            </div>
+          )}
+
+          {ageBlocked && (
+            <div className="bg-amber-500/10 border border-amber-500/20 text-amber-200 rounded-2xl p-3 text-xs leading-6">
+              {!ageGate.ok && (ageGate as { code?: string }).code === "UNDERAGE"
+                ? `شرکت در تورنومنت‌های پولی فقط برای کاربران بالای ${MIN_ADULT_AGE.toLocaleString("fa-IR")} سال مجاز است. می‌توانید در تورنومنت‌های رایگان شرکت کنید.`
+                : "برای شرکت در تورنومنت‌های پولی باید تاریخ تولد و کد ملی خود را در پروفایل ثبت کنید."}
             </div>
           )}
 
