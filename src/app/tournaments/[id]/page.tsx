@@ -7,6 +7,7 @@ import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
+import { calculateDynamicTournamentPrizePool } from "@/lib/tournament-finance";
 import { useCountdown } from "@/hooks/useCountdown";
 
 interface Player {
@@ -304,6 +305,13 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const completedMatches = tournament.matches.filter((m) => m.status === "completed").length;
   const awaitingJudgmentCount = tournament.matches.filter((m) => m.status === "awaiting_judgment" || m.status === "disputed").length;
 
+  const prizeData = calculateDynamicTournamentPrizePool({
+    entryFee: tournament.entryFee,
+    registeredCount: tournament.registrations.length,
+    maxPlayers: tournament.maxPlayers,
+    staticPrizePool: tournament.prizePool,
+  });
+
   const roundsMap = new Map<number, Match[]>();
   tournament.matches.forEach((m) => {
     if (!roundsMap.has(m.round)) roundsMap.set(m.round, []);
@@ -349,9 +357,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                 <span className="text-gray-400">
                   👥 {tournament.registrations.length}/{tournament.maxPlayers} {t.tournamentDetail.players}
                 </span>
-                {tournament.prizePool && (
-                  <span className="text-neon-green font-bold">💰 {tournament.prizePool}</span>
-                )}
+                <span className="text-neon-green font-bold">
+                  💰 جایزه کل: {prizeData.displayPrizePool}
+                </span>
                 <span className="text-gray-400">
                   📋 {t.formats[tournament.format as keyof typeof t.formats] || tournament.format}
                 </span>
@@ -546,6 +554,92 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   )}
                 </div>
               )}
+            </div>
+
+            <div className="gaming-card p-6 lg:col-span-2 border border-yellow-500/20 bg-gradient-to-br from-yellow-500/5 via-[#111218] to-[#0f0f13]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-black text-yellow-400 flex items-center gap-2">
+                    🏆 سیستم داینامیک محاسبه و توزیع جوایز
+                  </h3>
+                  <p className="text-xs text-gray-400 mt-1 leading-6">
+                    {prizeData.isPaid
+                      ? `جایزه مسابقات بر اساس تعداد شرکت‌کنندگان محاسبه شده و پس از کسر ۲۰٪ کارمزد سایت، ۸۰٪ مابقی به‌صورت پلکانی بین نفر اول تا دهم تقسیم می‌شود.`
+                      : `این تورنومنت بدون ورودی (رایگان) بوده و جوایز طبق اعلام مدیریت/اسپانسر به‌صورت پلکانی بین نفرات برتر توزیع می‌گردد.`}
+                  </p>
+                </div>
+                <div className="bg-yellow-500/10 border border-yellow-500/30 px-4 py-2.5 rounded-2xl text-right shrink-0">
+                  <div className="text-[11px] text-yellow-500/80 font-bold">جایزه کل قابل توزیع</div>
+                  <div className="text-xl font-black text-yellow-300 mt-0.5">{prizeData.displayPrizePool}</div>
+                </div>
+              </div>
+
+              {prizeData.isPaid && (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+                  <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
+                    <div className="text-xs text-gray-400 mb-1">مجموع مبالغ ورودی جمع‌شده</div>
+                    <div className="text-base sm:text-lg font-black text-white">
+                      {prizeData.totalCollectedToman.toLocaleString("fa-IR")} تومان
+                    </div>
+                    <div className="text-[10px] text-gray-500 mt-1">
+                      {tournament.registrations.length.toLocaleString("fa-IR")} نفر × {prizeData.entryFeeToman.toLocaleString("fa-IR")} تومان
+                    </div>
+                  </div>
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-center">
+                    <div className="text-xs text-red-300 mb-1">کارمزد سایت (۲۰٪)</div>
+                    <div className="text-base sm:text-lg font-black text-red-400">
+                      {prizeData.siteCommissionToman.toLocaleString("fa-IR")} تومان
+                    </div>
+                    <div className="text-[10px] text-red-400/70 mt-1">هزینه‌های برگزاری و داوری AI</div>
+                  </div>
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-center">
+                    <div className="text-xs text-emerald-300 mb-1">مجموع جوایز بازیکنان (۸۰٪)</div>
+                    <div className="text-base sm:text-lg font-black text-emerald-400">
+                      {prizeData.netPrizePoolToman.toLocaleString("fa-IR")} تومان
+                    </div>
+                    <div className="text-[10px] text-emerald-400/70 mt-1">
+                      ظرفیت کامل: {prizeData.maxNetPrizePoolToman.toLocaleString("fa-IR")} تومان
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-right border-collapse min-w-[550px]">
+                  <thead>
+                    <tr className="border-b border-white/10 text-xs text-gray-400 bg-white/[0.02]">
+                      <th className="py-3 px-4 font-semibold">مقام</th>
+                      <th className="py-3 px-4 font-semibold">عنوان</th>
+                      <th className="py-3 px-4 font-semibold text-center">سهم از جایزه</th>
+                      <th className="py-3 px-4 font-semibold text-left">مبلغ جایزه فعلی</th>
+                      {prizeData.isPaid && (
+                        <th className="py-3 px-4 font-semibold text-left text-gray-500">در صورت تکمیل ظرفیت</th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5 text-sm">
+                    {prizeData.ladder.map((item) => (
+                      <tr key={item.rank} className="hover:bg-white/[0.03] transition-colors">
+                        <td className="py-3.5 px-4 font-bold text-yellow-400">#{item.rank.toLocaleString("fa-IR")}</td>
+                        <td className="py-3.5 px-4 font-semibold text-white">{item.label}</td>
+                        <td className="py-3.5 px-4 text-center">
+                          <span className="inline-block px-2.5 py-1 rounded-full bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 text-xs font-black">
+                            {item.percentageText}
+                          </span>
+                        </td>
+                        <td className="py-3.5 px-4 text-left font-black text-emerald-400">
+                          {item.amountToman > 0 ? `${item.amountToman.toLocaleString("fa-IR")} تومان` : "—"}
+                        </td>
+                        {prizeData.isPaid && (
+                          <td className="py-3.5 px-4 text-left font-bold text-gray-400">
+                            {item.maxAmountToman.toLocaleString("fa-IR")} تومان
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             <div className="gaming-card p-6 lg:col-span-2">

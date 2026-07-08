@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { tournaments, registrations, matches, players } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireRole } from "@/lib/auth";
-import { refundTournamentEntryFees } from "@/lib/tournament-finance";
+import { distributeTournamentPrizes, refundTournamentEntryFees } from "@/lib/tournament-finance";
 
 export const dynamic = "force-dynamic";
 
@@ -75,6 +75,9 @@ export async function PATCH(
 
       if (before?.status !== "cancelled" && status === "cancelled") {
         await refundTournamentEntryFees(tx, id, auth.user.id);
+      }
+      if (before?.status !== "completed" && status === "completed") {
+        await distributeTournamentPrizes(tx, id, auth.user.id);
       }
 
       return row;

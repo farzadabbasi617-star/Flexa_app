@@ -5,8 +5,9 @@ const validBase = {
   username: "ShadowGamer",
   phoneNumber: "09123456789",
   email: "player@example.com",
-  password: "secret123",
-  displayName: "Shadow Gamer",
+  password: "Secret!12345",
+  firstName: "Shadow",
+  lastName: "Gamer",
   termsAccepted: true,
 };
 

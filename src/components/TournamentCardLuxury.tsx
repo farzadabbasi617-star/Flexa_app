@@ -3,6 +3,7 @@
 import React, { memo, useMemo } from "react";
 import Link from "next/link";
 import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
+import { calculateDynamicTournamentPrizePool } from "@/lib/tournament-finance";
 import TiltCard from "@/components/fx/TiltCard";
 import { useCountdown } from "@/hooks/useCountdown";
 
@@ -68,6 +69,15 @@ const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false
     return { rial, toman, isPaid: rial > BigInt(0) };
   }, [t.entryFee]);
 
+  const prizeData = useMemo(() => {
+    return calculateDynamicTournamentPrizePool({
+      entryFee: t.entryFee,
+      registeredCount: t.registeredCount,
+      maxPlayers: t.maxPlayers,
+      staticPrizePool: t.prizePool,
+    });
+  }, [t.entryFee, t.registeredCount, t.maxPlayers, t.prizePool]);
+
   const insufficientWallet = Boolean(
     isLoggedIn && !t.isRegistered && entryFeeInfo.isPaid && walletBalanceToman !== null && walletBalanceToman < entryFeeInfo.toman
   );
@@ -121,15 +131,17 @@ const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false
           {/* Prize Section */}
           <div className="bg-gradient-to-r from-yellow-500/10 to-transparent border border-yellow-500/20 p-4 rounded-2xl flex items-center justify-between">
             <div>
-              <div className="text-[10px] text-yellow-500/70 font-bold mb-0.5">جایزه کل</div>
-              <div className="font-black text-yellow-400 text-lg">
-                {t.prizePool || "بدون جایزه"}
+              <div className="text-[10px] text-yellow-500/70 font-bold mb-0.5">
+                {prizeData.isPaid ? "جایزه کل (طبق شرکت‌کنندگان • تقسیم تا نفر دهم)" : "جایزه کل مسابقات"}
               </div>
-              {t.prizePool && (
-                <div className="text-[10px] text-yellow-500/60">{t.winnersCount || 1} نفر برنده</div>
-              )}
+              <div className="font-black text-yellow-400 text-lg">
+                {prizeData.displayPrizePool}
+              </div>
+              <div className="text-[10px] text-yellow-500/80 mt-0.5 font-medium leading-4">
+                {prizeData.subtitle}
+              </div>
             </div>
-            <span className="text-3xl opacity-80">🏆</span>
+            <span className="text-3xl opacity-80 shrink-0">🏆</span>
           </div>
 
           {/* Date & Countdown */}

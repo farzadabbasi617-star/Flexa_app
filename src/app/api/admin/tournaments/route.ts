@@ -4,7 +4,7 @@ import { disputes, judgments, matchEvidence, matches, registrations, tournaments
 import { count, desc, eq, inArray } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
-import { refundTournamentEntryFees } from "@/lib/tournament-finance";
+import { distributeTournamentPrizes, refundTournamentEntryFees } from "@/lib/tournament-finance";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import logger from "@/lib/logger";
 
@@ -166,6 +166,9 @@ export async function PATCH(request: NextRequest) {
 
       if (before?.status !== "cancelled" && values.status === "cancelled") {
         await refundTournamentEntryFees(tx, id, auth.user.id);
+      }
+      if (before?.status !== "completed" && values.status === "completed") {
+        await distributeTournamentPrizes(tx, id, auth.user.id);
       }
 
       return row;
