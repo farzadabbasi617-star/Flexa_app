@@ -12,6 +12,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { isPasswordStrong } from "@/lib/password-strength";
 import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
+import JalaliDatePicker from "@/components/JalaliDatePicker";
 import { isValidIranianNationalId } from "@/lib/validations";
 import { calculateAgeYears, MIN_ADULT_AGE, parseBirthDate } from "@/lib/age-gate";
 
@@ -71,12 +72,14 @@ export default function RegisterPage() {
     // Birth date + national ID: required at signup so the paid flows
     // (wallet top-up, paid tournament registration) never need to
     // interrupt the user mid-payment to collect them later.
+    // The picker gives us Gregorian ISO already; parseBirthDate simply
+    // sanity-checks it.
     const parsedBirth = parseBirthDate(form.birthDate);
     if (!parsedBirth) {
       setError(
         lang === "fa"
-          ? "تاریخ تولد الزامی است (فرمت: YYYY-MM-DD میلادی، مثلاً 2001-05-14)"
-          : "Birth date is required (format: YYYY-MM-DD, e.g. 2001-05-14)"
+          ? "لطفاً تاریخ تولد را از تقویم شمسی انتخاب کنید"
+          : "Please pick your birth date from the Jalali calendar"
       );
       return;
     }
@@ -378,16 +381,11 @@ export default function RegisterPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-2">
-                  {lang === "fa" ? "تاریخ تولد (میلادی)" : "Birth date (Gregorian)"} *
+                  {lang === "fa" ? "تاریخ تولد (شمسی)" : "Birth date (Jalali/شمسی)"} *
                 </label>
-                <input
-                  type="date"
-                  required
-                  dir="ltr"
-                  max={new Date().toISOString().slice(0, 10)}
-                  className="gaming-input text-left"
+                <JalaliDatePicker
                   value={form.birthDate}
-                  onChange={(e) => setForm({ ...form, birthDate: e.target.value })}
+                  onChange={(iso) => setForm({ ...form, birthDate: iso })}
                 />
                 {(() => {
                   const parsed = parseBirthDate(form.birthDate);
