@@ -1083,13 +1083,21 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
       inline_keyboard: [[{ text: "🕒 ورود به لیست انتظار", callback_data: `waitlist:${tournament.id}` }]],
     });
     if (result.code === "DUPLICATE") {
+      if (tournament.game === "clash_royale" && tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel) {
+        await sendMessage(chatId, "✅ شما قبلاً در 1V1 کلش رویال ثبت‌نام کرده‌اید. حالا QR یا Share Link را می‌گیریم تا حریف پیدا شود.");
+        return startClashQrSubmission(chatId, telegramId, tournament.id);
+      }
       return sendMessage(chatId, "شما قبلاً در این تورنومنت ثبت‌نام کرده‌اید.", {
         inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
       });
     }
     if (result.code === "INSUFFICIENT") {
       return sendMessage(chatId, `موجودی کیف پول کافی نیست.\nمبلغ لازم: <b>${html(formatTomanFromRial(result.finalEntryFeeRial || entryFeeRial))}</b>\nموجودی شما: <b>${html(formatTomanFromRial(result.balance || BigInt(0)))}</b>`, {
-        inline_keyboard: [[{ text: "شارژ کیف پول", url: `${APP_URL}/wallet` }], [{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
+        inline_keyboard: [
+          [{ text: "💳 ثبت فیش شارژ از همین بات", callback_data: "wallet:deposit" }],
+          [{ text: "شارژ کیف پول در وب‌اپ", url: `${APP_URL}/wallet` }],
+          [{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }],
+        ],
       });
     }
     return sendMessage(chatId, "ثبت‌نام انجام نشد.");
