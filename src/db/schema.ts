@@ -389,6 +389,13 @@ export const registrations = pgTable("registrations", {
   visibleUserId: uuid("user_id").notNull().references(() => users.id),
   seed: integer("seed"),
   checkedInAt: timestamp("checked_in_at"),
+  // Optional per-registration invite payload used for games like Clash Royale
+  // where players can share an Add Friend / Quickplay QR or link. Keeping this
+  // on the registration makes the QR tournament-specific: a player can refresh
+  // it for one paid event without changing their global profile.
+  gameInviteLink: text("game_invite_link"),
+  gameInviteQrFileId: varchar("game_invite_qr_file_id", { length: 255 }),
+  gameInviteSubmittedAt: timestamp("game_invite_submitted_at"),
   registeredAt: timestamp("registered_at").defaultNow().notNull(),
 }, (table) => ({
   tournamentIdx: index("registrations_tournament_id_idx").on(table.tournamentId),

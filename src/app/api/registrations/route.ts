@@ -23,6 +23,11 @@ function isPgUniqueViolation(error: unknown) {
   return maybe?.code === "23505" || maybe?.cause?.code === "23505";
 }
 
+function telegramBotStartLink(payload: string) {
+  const username = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
+  return `https://t.me/${username}?start=${encodeURIComponent(payload)}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;
@@ -61,6 +66,7 @@ export async function POST(request: NextRequest) {
         .select({
           id: tournaments.id,
           name: tournaments.name,
+          game: tournaments.game,
           status: tournaments.status,
           maxPlayers: tournaments.maxPlayers,
           entryFee: tournaments.entryFee,
@@ -154,20 +160,29 @@ export async function POST(request: NextRequest) {
         .values({ tournamentId, playerId, visibleUserId: ownerId })
         .returning();
 
-      return { registration: reg, entryFeeRial: entryFeeRial.toString(), paymentTransactionId, tournamentName: tournament.name, playerName: player.displayName };
+      return { registration: reg, entryFeeRial: entryFeeRial.toString(), paymentTransactionId, tournamentName: tournament.name, tournamentGame: tournament.game, playerName: player.displayName };
     });
 
     await evaluateUserAchievements(result.registration.visibleUserId).catch(() => undefined);
+    const needsClashQr = result.tournamentGame === "clash_royale" && bigIntFromText(result.entryFeeRial) > BigInt(0);
+    const appUrl = process.env.APP_URL || "https://www.gament1.ir";
+    const replyKeyboard = {
+      inline_keyboard: [
+        ...(needsClashQr ? [[{ text: "📲 ارسال QR کلش به بات", url: telegramBotStartLink(`qr_${result.registration.tournamentId}`) }]] : []),
+        [{ text: "مشاهده تورنومنت", url: `${appUrl}/tournaments/${result.registration.tournamentId}` }],
+      ],
+    };
+    const qrLine = needsClashQr ? "\n\n📲 مرحله بعد: QR یا Share Link کلش رویال را به بات بده تا حریف به‌صورت خودکار پیدا شود." : "";
     await notifyLinkedUserOnTelegram(
       result.registration.visibleUserId,
       `✅ <b>ثبت‌نام تورنومنت انجام شد</b>
 
 🏆 ${result.tournamentName}
 👤 بازیکن: <b>${result.playerName}</b>
-💳 ورودی: <b>${formatTomanFromRial(bigIntFromText(result.entryFeeRial))}</b>
+💳 ورودی: <b>${formatTomanFromRial(bigIntFromText(result.entryFeeRial))}</b>${qrLine}
 
 زمان چک‌این، لابی و نتیجه‌ها از همین ربات هم اطلاع‌رسانی می‌شود.`,
-      { inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${process.env.APP_URL || "https://www.gament1.ir"}/tournaments/${result.registration.tournamentId}` }]] }
+      replyKeyboard
     ).catch(() => undefined);
 
     return NextResponse.json(result, { status: 201 });

@@ -27,6 +27,7 @@ function commands() {
     { command: "rooms", description: "روم‌ها و تورنومنت‌های فعال" },
     { command: "my_tournaments", description: "تورنومنت‌های من، لابی و چک‌این" },
     { command: "matches", description: "مسابقات، نتیجه، مدرک و اعتراض" },
+    { command: "qr", description: "ارسال QR یا Share Link کلش رویال" },
     { command: "checkin", description: "چک‌این سریع تورنومنت" },
     { command: "support", description: "ساخت تیکت پشتیبانی" },
     { command: "my_tickets", description: "تیکت‌های من" },

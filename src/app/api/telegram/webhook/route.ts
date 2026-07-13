@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
+import jsQR from "jsqr";
+import { Jimp } from "jimp";
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews, siteSettings } from "@/db/schema";
@@ -30,6 +32,7 @@ type BotState =
   | "wallet_deposit_amount"
   | "wallet_deposit_tracking"
   | "wallet_deposit_receipt"
+  | "clash_qr_submission"
   | "dispute_reason"
   | "evidence_upload";
 
@@ -91,6 +94,8 @@ interface SessionData {
   walletDepositTracking?: string;
   disputeMatchId?: string;
   evidenceMatchId?: string;
+  qrTournamentId?: string;
+  qrRegistrationId?: string;
   selectedAdIds?: string[];
 }
 
@@ -262,18 +267,19 @@ function mainMenuKeyboard() {
         { text: "⚔️ مسابقات من", callback_data: "menu:matches" },
       ],
       [
+        { text: "📲 QR کلش", callback_data: "menu:clash_qr" },
         { text: "🎯 مأموریت‌ها", callback_data: "menu:missions" },
-        { text: "🧠 کوییز روزانه", callback_data: "menu:quiz" },
       ],
       [
-        { text: "🎧 پشتیبانی", callback_data: "menu:support" },
+        { text: "🧠 کوییز روزانه", callback_data: "menu:quiz" },
         { text: "📜 قوانین", callback_data: "menu:rules" },
       ],
       [
+        { text: "🎧 پشتیبانی", callback_data: "menu:support" },
         { text: "🔗 اتصال حساب", callback_data: "menu:link" },
-        { text: "👤 پروفایل", callback_data: "menu:profile" },
       ],
       [
+        { text: "👤 پروفایل", callback_data: "menu:profile" },
         { text: "👤 وضعیت من", callback_data: "menu:status" },
       ],
       [
@@ -357,6 +363,16 @@ async function sendMessage(chatId: number, text: string, replyMarkup?: Record<st
     text,
     parse_mode: "HTML",
     disable_web_page_preview: true,
+    reply_markup: replyMarkup,
+  });
+}
+
+async function sendPhoto(chatId: number, photo: string, caption?: string, replyMarkup?: Record<string, unknown>) {
+  return telegramApi("sendPhoto", {
+    chat_id: chatId,
+    photo,
+    caption,
+    parse_mode: "HTML",
     reply_markup: replyMarkup,
   });
 }
@@ -481,6 +497,57 @@ async function downloadTelegramPhotoAsDataUrl(fileId: string) {
     size: buffer.byteLength,
     fileName: filePath.split("/").pop() || "telegram-receipt.jpg",
   };
+}
+
+
+async function downloadTelegramPhotoAsBuffer(fileId: string, maxBytes = 2 * 1024 * 1024) {
+  const token = process.env.BOT_TOKEN?.trim();
+  if (!token) throw new Error("BOT_TOKEN is missing");
+  const fileInfo = await telegramApi("getFile", { file_id: fileId }) as { ok?: boolean; result?: { file_path?: string; file_size?: number } } | null;
+  const filePath = fileInfo?.result?.file_path;
+  if (!fileInfo?.ok || !filePath) throw new Error("TELEGRAM_FILE_NOT_FOUND");
+  const size = Number(fileInfo.result?.file_size || 0);
+  if (size > maxBytes) throw new Error("QR_TOO_LARGE");
+
+  const res = await fetch(`https://api.telegram.org/file/bot${token}/${filePath}`, { cache: "no-store" });
+  if (!res.ok) throw new Error("TELEGRAM_FILE_DOWNLOAD_FAILED");
+  const contentType = res.headers.get("content-type") || "image/jpeg";
+  if (!contentType.startsWith("image/")) throw new Error("INVALID_QR_TYPE");
+  const buffer = Buffer.from(await res.arrayBuffer());
+  if (buffer.byteLength > maxBytes) throw new Error("QR_TOO_LARGE");
+  return {
+    buffer,
+    contentType,
+    size: buffer.byteLength,
+    fileName: filePath.split("/").pop() || "telegram-qr.jpg",
+  };
+}
+
+function extractInviteReference(value?: string | null) {
+  const input = normalizeDigits(value || "").trim();
+  if (!input) return null;
+  const match = input.match(/(?:https?:\/\/|clashroyale:\/\/|supercell:\/\/|scid:\/\/)[^\s<>"']+/i);
+  const candidate = (match?.[0] || input).trim().replace(/[،,؛;.)\]]+$/g, "");
+  if (candidate.length < 4 || candidate.length > 500) return null;
+  return candidate;
+}
+
+function isHttpUrl(value?: string | null) {
+  return /^https?:\/\//i.test(String(value || "").trim());
+}
+
+async function decodeQrInviteFromTelegramPhoto(fileId: string) {
+  try {
+    const file = await downloadTelegramPhotoAsBuffer(fileId);
+    const image = await Jimp.read(file.buffer);
+    const bitmap = image.bitmap;
+    const data = new Uint8ClampedArray(bitmap.data.buffer, bitmap.data.byteOffset, bitmap.data.byteLength);
+    const decoded = jsQR(data, bitmap.width, bitmap.height);
+    return extractInviteReference(decoded?.data || "");
+  } catch (err) {
+    logger.warn({ err }, "Failed to decode Clash Royale QR from Telegram photo");
+    return null;
+  }
 }
 
 async function notifyAdminsOnWalletDeposit(user: TelegramUser, userId: string, amountRial: bigint, txId: string) {
@@ -728,6 +795,12 @@ async function handleStartPayload(chatId: number, telegramId: string, user: Tele
 
   if (payload === "link") {
     await linkCommand(chatId, user);
+    return true;
+  }
+
+  const qrTournamentId = payload.match(/^qr_([0-9a-f-]{36})$/i)?.[1];
+  if (qrTournamentId) {
+    await startClashQrSubmission(chatId, telegramId, qrTournamentId);
     return true;
   }
 
@@ -1000,8 +1073,8 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
         paymentText += `\n💳 ورودی از کیف پول کسر شد: <b>${html(formatTomanFromRial(finalEntryFeeRial))}</b>`;
       }
 
-    await tx.insert(registrations).values({ tournamentId, playerId: player.id, visibleUserId: linked.userId });
-    return { ok: true as const, paymentText };
+    const [registration] = await tx.insert(registrations).values({ tournamentId, playerId: player.id, visibleUserId: linked.userId }).returning();
+    return { ok: true as const, paymentText, registrationId: registration.id };
   });
 
   if (!result.ok) {
@@ -1024,9 +1097,21 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
   await evaluateUserAchievements(linked.userId).catch(() => undefined);
   const xpText = await rewardUserXP(linked.userId, isPaid ? 25 : 15, isPaid ? "ثبت‌نام پولی" : "ثبت‌نام تورنومنت");
 
-  await sendMessage(chatId, `✅ ثبت‌نام شما در تورنومنت انجام شد.\n\n🏆 <b>${html(tournament.name)}</b>\n🎮 ${html(gameLabel(tournament.game))}${result.paymentText}${xpText}`, {
-    inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
+  const needsClashQr = tournament.game === "clash_royale" && isPaid;
+  const qrLine = needsClashQr ? "\n\n📲 مرحله بعد: QR یا Share Link کلش رویال را برای مچ‌میکینگ خودکار ارسال کن." : "";
+  await sendMessage(chatId, `✅ ثبت‌نام شما در تورنومنت انجام شد.
+
+🏆 <b>${html(tournament.name)}</b>
+🎮 ${html(gameLabel(tournament.game))}${result.paymentText}${xpText}${qrLine}`, {
+    inline_keyboard: [
+      ...(needsClashQr ? [[{ text: "📲 ارسال QR کلش", callback_data: `qr:${tournament.id}` }]] : []),
+      [{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }],
+    ],
   });
+
+  if (needsClashQr) {
+    await startClashQrSubmission(chatId, telegramId, tournament.id, result.registrationId);
+  }
 }
 
 async function joinWaitlist(chatId: number, telegramId: string, tournamentId: string) {
@@ -1680,14 +1765,20 @@ async function myTournamentsCommand(chatId: number, telegramId: string) {
     "",
     ...rows.map((row, index) => `${index + 1}) <b>${html(row.name)}</b>\n🎮 ${html(gameLabel(row.game))} | وضعیت: <b>${html(row.status)}</b> | چک‌این: ${row.checkedInAt ? "✅" : "⬜"}`),
   ].join("\n\n");
-  const keyboard = rows.flatMap((row) => [
-    [{ text: `جزئیات: ${row.name.slice(0, 28)}`, url: `${APP_URL}/tournaments/${row.tournamentId}` }],
-    [
-      { text: "✅ چک‌این", callback_data: `checkin:${row.registrationId}` },
-      { text: "🏟 لابی", callback_data: `mylobby:${row.tournamentId}` },
-      { text: "لغو", callback_data: `cancelreg:${row.registrationId}` },
-    ],
-  ]);
+  const keyboard = rows.flatMap((row) => {
+    const result: Array<Array<Record<string, string>>> = [
+      [{ text: `جزئیات: ${row.name.slice(0, 28)}`, url: `${APP_URL}/tournaments/${row.tournamentId}` }],
+      [
+        { text: "✅ چک‌این", callback_data: `checkin:${row.registrationId}` },
+        { text: "🏟 لابی", callback_data: `mylobby:${row.tournamentId}` },
+        { text: "لغو", callback_data: `cancelreg:${row.registrationId}` },
+      ],
+    ];
+    if (row.game === "clash_royale" && !isFreeEntryFee(row.entryFee)) {
+      result.push([{ text: "📲 ارسال/به‌روزرسانی QR کلش", callback_data: `qr:${row.tournamentId}` }]);
+    }
+    return result;
+  });
   await sendMessage(chatId, text, { inline_keyboard: keyboard });
 }
 
@@ -1914,6 +2005,262 @@ async function inviteCommand(chatId: number, telegramId: string) {
   await sendMessage(chatId, `🎁 <b>لینک دعوت اختصاصی شما</b>\n\n${html(link)}\n\nدعوت‌های ثبت‌شده: <b>${value}</b>\n\nاین لینک را برای دوستات بفرست؛ در فاز جایزه، دعوت‌های معتبر امتیاز می‌گیرند.`, {
     inline_keyboard: [[{ text: "اشتراک‌گذاری", url: `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("به Gament بپیوند و توی تورنومنت‌های گیمینگ شرکت کن!")}` }]],
   });
+}
+
+
+type ClashPairParticipant = {
+  registrationId: string;
+  playerId: string;
+  userId: string;
+  playerName: string | null;
+  playerUsername: string | null;
+  playerGameId: string | null;
+  telegramId: string;
+  inviteLink: string | null;
+  qrFileId: string | null;
+  clashRoyaleId: string | null;
+  clashRoyaleUsername: string | null;
+};
+
+type CreatedClashPair = {
+  matchId: string;
+  matchNumber: number;
+  tournamentId: string;
+  tournamentName: string;
+  tournamentStartDate: Date | null;
+  player1: ClashPairParticipant;
+  player2: ClashPairParticipant;
+};
+
+function clashParticipantDisplayName(player: ClashPairParticipant) {
+  return player.playerName || player.playerUsername || player.clashRoyaleUsername || "Gament Player";
+}
+
+function clashParticipantTag(player: ClashPairParticipant) {
+  return player.clashRoyaleId || player.playerGameId || player.clashRoyaleUsername || "ثبت نشده";
+}
+
+function clashQrPromptText(tournamentName: string, existing = false) {
+  return [
+    `📲 <b>${existing ? "به‌روزرسانی" : "ارسال"} QR کلش رویال</b>`,
+    "",
+    `تورنومنت: <b>${html(tournamentName)}</b>`,
+    "",
+    "از داخل Clash Royale مسیر زیر را برو:",
+    "<code>Social → Add Friends → QR / Share Link</code>",
+    "",
+    "حالا یکی از این دو مورد را همین‌جا بفرست:",
+    "1) عکس QR Code",
+    "2) Share Link دعوت / Add Friend",
+    "",
+    "بات تلاش می‌کند QR را بخواند؛ اگر QR خوانده نشد، همان عکس QR برای حریف ارسال می‌شود. برای بهترین نتیجه، اگر لینک داری آن را هم به‌صورت متن یا کپشن بفرست.",
+  ].join("\n");
+}
+
+async function startClashQrSubmission(chatId: number, telegramId: string, tournamentId?: string, registrationId?: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(chatId, "برای ارسال QR کلش، اول حساب تلگرام را با /link به Gament وصل کن.", {
+      inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]],
+    });
+    return;
+  }
+
+  const conditions = [
+    eq(registrations.visibleUserId, linked.userId),
+    eq(tournaments.game, "clash_royale"),
+    inArray(tournaments.status, ["registration", "in_progress"]),
+  ];
+  if (tournamentId) conditions.push(eq(tournaments.id, tournamentId));
+  if (registrationId) conditions.push(eq(registrations.id, registrationId));
+
+  const rows = await db
+    .select({
+      registrationId: registrations.id,
+      tournamentId: tournaments.id,
+      tournamentName: tournaments.name,
+      tournamentStatus: tournaments.status,
+      entryFee: tournaments.entryFee,
+      submittedAt: registrations.gameInviteSubmittedAt,
+    })
+    .from(registrations)
+    .innerJoin(tournaments, eq(registrations.tournamentId, tournaments.id))
+    .where(and(...conditions))
+    .orderBy(desc(registrations.registeredAt))
+    .limit(8);
+
+  const eligible = rows.filter((row) => !isFreeEntryFee(row.entryFee));
+  if (!eligible.length) {
+    await sendMessage(
+      chatId,
+      "برای ارسال QR، باید در یک تورنومنت <b>پولی کلش رویال</b> ثبت‌نام کرده باشی و پرداخت ورودی انجام شده باشد.\n\nاگر تازه از وب‌اپ پرداخت کردی، چند ثانیه بعد دوباره /qr را بزن.",
+      { inline_keyboard: [[{ text: "🏟 روم‌های کلش", url: `${APP_URL}/tournaments?game=clash_royale` }]] }
+    );
+    return;
+  }
+
+  if (!tournamentId && !registrationId && eligible.length > 1) {
+    await sendMessage(chatId, "برای کدام تورنومنت کلش QR را ثبت می‌کنی؟", {
+      inline_keyboard: eligible.map((row) => [{ text: `${row.submittedAt ? "🔁" : "📲"} ${row.tournamentName.slice(0, 42)}`, callback_data: `qr:${row.tournamentId}` }]),
+    });
+    return;
+  }
+
+  const row = eligible[0];
+  await setSession(telegramId, "clash_qr_submission", {
+    qrTournamentId: row.tournamentId,
+    qrRegistrationId: row.registrationId,
+  });
+  await sendMessage(chatId, clashQrPromptText(row.tournamentName, Boolean(row.submittedAt)), replyKeyboard([[CANCEL_TEXT]]));
+}
+
+async function tryAutoPairClashTournament(tournamentId: string): Promise<CreatedClashPair[]> {
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM tournaments WHERE id = ${tournamentId} FOR UPDATE`);
+
+    const [tournament] = await tx
+      .select({ id: tournaments.id, name: tournaments.name, game: tournaments.game, status: tournaments.status, startDate: tournaments.startDate })
+      .from(tournaments)
+      .where(eq(tournaments.id, tournamentId))
+      .limit(1);
+
+    if (!tournament || tournament.game !== "clash_royale" || !["registration", "in_progress"].includes(tournament.status)) {
+      return [];
+    }
+
+    const existingMatches = await tx
+      .select({ player1Id: matches.player1Id, player2Id: matches.player2Id })
+      .from(matches)
+      .where(eq(matches.tournamentId, tournamentId));
+
+    const busyPlayerIds = new Set<string>();
+    for (const match of existingMatches) {
+      if (match.player1Id) busyPlayerIds.add(match.player1Id);
+      if (match.player2Id) busyPlayerIds.add(match.player2Id);
+    }
+
+    const queued = await tx
+      .select({
+        registrationId: registrations.id,
+        playerId: registrations.playerId,
+        userId: registrations.visibleUserId,
+        inviteLink: registrations.gameInviteLink,
+        qrFileId: registrations.gameInviteQrFileId,
+        playerName: players.displayName,
+        playerUsername: players.username,
+        playerGameId: players.gameId,
+        telegramId: telegramAccounts.telegramId,
+        clashRoyaleId: users.clashRoyaleId,
+        clashRoyaleUsername: users.clashRoyaleUsername,
+        submittedAt: registrations.gameInviteSubmittedAt,
+      })
+      .from(registrations)
+      .innerJoin(players, eq(registrations.playerId, players.id))
+      .innerJoin(telegramAccounts, eq(registrations.visibleUserId, telegramAccounts.userId))
+      .leftJoin(users, eq(registrations.visibleUserId, users.id))
+      .where(and(eq(registrations.tournamentId, tournamentId), sql`${registrations.gameInviteSubmittedAt} IS NOT NULL`))
+      .orderBy(registrations.gameInviteSubmittedAt, registrations.registeredAt);
+
+    const eligible = queued
+      .filter((row) => row.playerId && !busyPlayerIds.has(row.playerId))
+      .map((row) => ({
+        registrationId: row.registrationId,
+        playerId: row.playerId,
+        userId: row.userId,
+        playerName: row.playerName,
+        playerUsername: row.playerUsername,
+        playerGameId: row.playerGameId,
+        telegramId: row.telegramId,
+        inviteLink: row.inviteLink,
+        qrFileId: row.qrFileId,
+        clashRoyaleId: row.clashRoyaleId,
+        clashRoyaleUsername: row.clashRoyaleUsername,
+      } satisfies ClashPairParticipant));
+
+    if (eligible.length < 2) return [];
+
+    const [{ value: existingMatchCount }] = await tx.select({ value: count() }).from(matches).where(eq(matches.tournamentId, tournamentId));
+    let nextMatchNumber = Number(existingMatchCount || 0) + 1;
+    const createdPairs: CreatedClashPair[] = [];
+
+    while (eligible.length >= 2) {
+      const player1 = eligible.shift()!;
+      const player2 = eligible.shift()!;
+      const [match] = await tx
+        .insert(matches)
+        .values({
+          tournamentId,
+          round: 1,
+          matchNumber: nextMatchNumber,
+          player1Id: player1.playerId,
+          player2Id: player2.playerId,
+          status: "pending",
+          scheduledAt: tournament.startDate || null,
+        })
+        .returning({ id: matches.id, matchNumber: matches.matchNumber });
+
+      createdPairs.push({
+        matchId: match.id,
+        matchNumber: match.matchNumber,
+        tournamentId,
+        tournamentName: tournament.name,
+        tournamentStartDate: tournament.startDate,
+        player1,
+        player2,
+      });
+      nextMatchNumber += 1;
+      busyPlayerIds.add(player1.playerId);
+      busyPlayerIds.add(player2.playerId);
+    }
+
+    return createdPairs;
+  });
+}
+
+async function notifyClashPairSide(pair: CreatedClashPair, me: ClashPairParticipant, opponent: ClashPairParticipant) {
+  const chatId = Number(me.telegramId);
+  if (!Number.isFinite(chatId)) return;
+  const opponentLink = opponent.inviteLink;
+  const startLine = pair.tournamentStartDate
+    ? `⏰ زمان پیشنهادی/شروع: <b>${html(new Date(pair.tournamentStartDate).toLocaleString("fa-IR"))}</b>`
+    : "";
+
+  const lines = [
+    "🎯 <b>حریف کلش رویال شما پیدا شد</b>",
+    "",
+    `🏆 تورنومنت: <b>${html(pair.tournamentName)}</b>`,
+    `⚔️ مسابقه: <b>#${pair.matchNumber}</b>`,
+    startLine,
+    "",
+    `👤 حریف: <b>${html(clashParticipantDisplayName(opponent))}</b>`,
+    `🏷 Player Tag / ID: <code>${html(clashParticipantTag(opponent))}</code>`,
+    opponent.clashRoyaleUsername ? `👑 Username: <b>${html(opponent.clashRoyaleUsername)}</b>` : "",
+    opponentLink ? `🔗 Invite/QR Link: <code>${html(opponentLink)}</code>` : "🔗 لینک متنی از حریف ثبت نشده؛ QR به‌صورت عکس ارسال می‌شود.",
+    "",
+    "قدم بعدی:",
+    "1) لینک/QR حریف را در Clash Royale باز یا اسکن کن.",
+    "2) او را Add Friend کن و Friendly Battle را شروع کنید.",
+    "3) بعد از بازی نتیجه را با /matches ثبت کن.",
+  ].filter(Boolean).join("\n");
+
+  const keyboard: Array<Array<Record<string, string>>> = [];
+  if (isHttpUrl(opponentLink)) keyboard.push([{ text: "🔗 باز کردن لینک دعوت حریف", url: opponentLink! }]);
+  keyboard.push([
+    { text: "⚔️ ثبت نتیجه", callback_data: `match:${pair.matchId}` },
+    { text: "🏆 تورنومنت", url: `${APP_URL}/tournaments/${pair.tournamentId}` },
+  ]);
+
+  await sendMessage(chatId, lines, { inline_keyboard: keyboard });
+  if (opponent.qrFileId) {
+    await sendPhoto(chatId, opponent.qrFileId, `📲 QR کلش رویال حریف: ${html(clashParticipantDisplayName(opponent))}`);
+  }
+}
+
+async function notifyClashPairs(pairs: CreatedClashPair[]) {
+  for (const pair of pairs) {
+    await notifyClashPairSide(pair, pair.player1, pair.player2).catch((err) => logger.warn({ err, matchId: pair.matchId }, "Failed to notify Clash pair player1"));
+    await notifyClashPairSide(pair, pair.player2, pair.player1).catch((err) => logger.warn({ err, matchId: pair.matchId }, "Failed to notify Clash pair player2"));
+  }
 }
 
 function missionsKeyboard(status: { channelMember: boolean; linked: boolean; preReg: boolean; invites: number }) {
@@ -2579,6 +2926,10 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/support") { if (!(await ensureFeatureEnabled(chatId, "telegram_support_enabled", "پشتیبانی"))) return; return supportStartCommand(chatId, telegramId); }
   if (normalizedCommand === "/my_tickets") return myTicketsCommand(chatId, telegramId);
   if (normalizedCommand === "/matches") return matchesCommand(chatId, telegramId);
+  if (normalizedCommand === "/qr" || normalizedCommand === "/clash_qr") {
+    const tournamentId = args.join(" ").match(/[0-9a-f-]{36}/i)?.[0];
+    return startClashQrSubmission(chatId, telegramId, tournamentId);
+  }
   if (normalizedCommand === "/checkin") return checkInCommand(chatId, telegramId);
   if (normalizedCommand === "/judge") return judgeCommand(chatId, telegramId);
   if (normalizedCommand === "/health") return healthCommand(chatId, telegramId);
@@ -2636,6 +2987,73 @@ async function handleConversationMessage(message: TelegramMessage) {
 
   const session = await getSession(telegramId);
   const data = { ...session.data };
+
+  if (session.state === "clash_qr_submission") {
+    const linked = await getLinkedUserByTelegram(telegramId);
+    if (!linked?.userId || !data.qrRegistrationId || !data.qrTournamentId) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "اطلاعات QR ناقص است. دوباره /qr را بزن.", removeKeyboard());
+      return;
+    }
+
+    const [registration] = await db
+      .select({
+        registrationId: registrations.id,
+        tournamentId: registrations.tournamentId,
+        tournamentName: tournaments.name,
+        game: tournaments.game,
+        entryFee: tournaments.entryFee,
+      })
+      .from(registrations)
+      .innerJoin(tournaments, eq(registrations.tournamentId, tournaments.id))
+      .where(and(eq(registrations.id, data.qrRegistrationId), eq(registrations.visibleUserId, linked.userId)))
+      .limit(1);
+
+    if (!registration || registration.game !== "clash_royale" || isFreeEntryFee(registration.entryFee)) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "این ثبت‌نام برای QR کلش معتبر نیست یا تورنومنت پولی کلش نیست.", removeKeyboard());
+      return;
+    }
+
+    const photos = message.photo || [];
+    const bestPhoto = photos[photos.length - 1];
+    const rawInput = normalizeDigits(message.caption || message.text || "").trim();
+    const typedInvite = extractInviteReference(rawInput);
+
+    if (!bestPhoto && !typedInvite) {
+      await sendMessage(chatId, "لطفاً عکس QR کلش یا Share Link دعوت را ارسال کن. برای لغو، «لغو» را بزن.");
+      return;
+    }
+
+    const decodedInvite = bestPhoto ? await decodeQrInviteFromTelegramPhoto(bestPhoto.file_id) : null;
+    const inviteLink = typedInvite || decodedInvite;
+
+    await db
+      .update(registrations)
+      .set({
+        gameInviteLink: inviteLink || null,
+        gameInviteQrFileId: bestPhoto?.file_id || null,
+        gameInviteSubmittedAt: new Date(),
+      })
+      .where(eq(registrations.id, registration.registrationId));
+
+    await clearSession(telegramId);
+    await sendMessage(
+      chatId,
+      [
+        "✅ QR / لینک کلش شما ثبت شد.",
+        decodedInvite && !typedInvite ? "🔎 لینک داخل QR با موفقیت خوانده شد." : "",
+        !inviteLink && bestPhoto ? "ℹ️ لینک داخل QR خوانده نشد، اما خود عکس QR ذخیره شد و برای حریف ارسال می‌شود." : "",
+        "",
+        "اکنون در صف مچ‌میکینگ خودکار هستی. هر وقت یک پلیر دیگر QR بدهد، بات شما دو نفر را به هم وصل می‌کند.",
+      ].filter(Boolean).join("\n"),
+      removeKeyboard()
+    );
+
+    const pairs = await tryAutoPairClashTournament(registration.tournamentId);
+    await notifyClashPairs(pairs);
+    return;
+  }
 
 
   if (session.state === "wallet_deposit_amount") {
@@ -2943,6 +3361,8 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:wallet") return walletCommand(chatId, telegramId);
   if (data === "menu:my_tournaments") return myTournamentsCommand(chatId, telegramId);
   if (data === "menu:matches") return matchesCommand(chatId, telegramId);
+  if (data === "menu:clash_qr") return startClashQrSubmission(chatId, telegramId);
+  if (data.startsWith("qr:")) return startClashQrSubmission(chatId, telegramId, data.replace("qr:", ""));
   if (data === "menu:checkin") return checkInCommand(chatId, telegramId);
   if (data === "menu:missions") { if (!(await ensureFeatureEnabled(chatId, "telegram_missions_enabled", "مأموریت‌ها"))) return; return missionsCommand(chatId, telegramId); }
   if (data === "menu:quiz") { if (!(await ensureFeatureEnabled(chatId, "telegram_quiz_enabled", "کوییز روزانه"))) return; return quizCommand(chatId, telegramId); }

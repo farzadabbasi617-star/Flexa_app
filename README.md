@@ -126,6 +126,7 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://www.gament1.ir/ap
 - `/coupon` ثبت کد تخفیف/کمپین
 - `/shop` لینک فروشگاه/کیف پول
 - `/matches` مشاهده مسابقات و ثبت نتیجه/اعتراض تلگرامی
+- `/qr` ارسال QR/Share Link کلش رویال بعد از پرداخت ورودی و مچ‌میکینگ خودکار دو نفره
 - `/checkin` ثبت حضور در تورنومنت
 - `/support` ساخت تیکت پشتیبانی از تلگرام
 - `/invite` لینک دعوت اختصاصی
