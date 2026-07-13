@@ -14,6 +14,7 @@ import { getEntryFeeRial } from "@/lib/tournament-finance";
 import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
 import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achievement-service";
 import { LevelingService } from "@/lib/leveling-service";
+import { CLASH_1V1_CONFIG, payoutClash1v1Prize } from "@/lib/clash-1v1";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -2057,6 +2058,108 @@ function clashQrPromptText(tournamentName: string, existing = false) {
   ].join("\n");
 }
 
+async function getOrCreateClash1v1Tournament() {
+  const [existing] = await db
+    .select()
+    .from(tournaments)
+    .where(and(
+      eq(tournaments.game, CLASH_1V1_CONFIG.game),
+      eq(tournaments.status, "registration"),
+      or(eq(tournaments.categoryLabel, CLASH_1V1_CONFIG.categoryLabel), eq(tournaments.name, CLASH_1V1_CONFIG.name))
+    ))
+    .orderBy(desc(tournaments.createdAt))
+    .limit(1);
+
+  const values = {
+    name: CLASH_1V1_CONFIG.name,
+    game: CLASH_1V1_CONFIG.game,
+    format: CLASH_1V1_CONFIG.format,
+    status: CLASH_1V1_CONFIG.status,
+    description: CLASH_1V1_CONFIG.description,
+    maxPlayers: CLASH_1V1_CONFIG.maxPlayers,
+    prizePool: CLASH_1V1_CONFIG.prizePool,
+    winnersCount: 1,
+    categoryLabel: CLASH_1V1_CONFIG.categoryLabel,
+    entryFee: CLASH_1V1_CONFIG.entryFee,
+    gameMode: CLASH_1V1_CONFIG.gameMode,
+    mapName: CLASH_1V1_CONFIG.mapName,
+    serverSlots: 2,
+    prize1st: CLASH_1V1_CONFIG.prize1st,
+    prize2nd: null,
+    prize3rd: null,
+    prize4to10: null,
+    rules: CLASH_1V1_CONFIG.rules,
+    roomId: null,
+    roomPassword: null,
+    lobbyNotes: CLASH_1V1_CONFIG.lobbyNotes,
+    roomVisibleAt: null,
+    updatedAt: new Date(),
+  };
+
+  if (existing) {
+    const [updated] = await db
+      .update(tournaments)
+      .set(values)
+      .where(eq(tournaments.id, existing.id))
+      .returning();
+    return updated;
+  }
+
+  const [created] = await db
+    .insert(tournaments)
+    .values({ ...values, createdAt: new Date() })
+    .returning();
+  return created;
+}
+
+async function startClash1v1(chatId: number, telegramId: string) {
+  const tournament = await getOrCreateClash1v1Tournament();
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(
+      chatId,
+      "⚔️ <b>1V1 کلش رویال</b>\n\nبرای ثبت‌نام واقعی و پرداخت ورودی، اول حساب تلگرام را به حساب Gament وصل کن.",
+      {
+        inline_keyboard: [
+          [{ text: "🔗 اتصال حساب", callback_data: "menu:link" }],
+          [{ text: "🆕 ساخت حساب", url: `${APP_URL}/register` }],
+        ],
+      }
+    );
+    return;
+  }
+
+  const [existingRegistration] = await db
+    .select({ id: registrations.id, submittedAt: registrations.gameInviteSubmittedAt })
+    .from(registrations)
+    .where(and(eq(registrations.tournamentId, tournament.id), eq(registrations.visibleUserId, linked.userId)))
+    .limit(1);
+
+  if (existingRegistration) {
+    await startClashQrSubmission(chatId, telegramId, tournament.id, existingRegistration.id);
+    return;
+  }
+
+  await sendMessage(
+    chatId,
+    [
+      "⚔️ <b>1V1 کلش رویال</b>",
+      "",
+      `💳 ورودی هر نفر: <b>${html(CLASH_1V1_CONFIG.entryFee)}</b>`,
+      `🏆 جایزه نفر اول: <b>${html(CLASH_1V1_CONFIG.prize1st)}</b>`,
+      "",
+      "این حالت Room ID / Password ندارد؛ بعد از پرداخت، QR یا Share Link کلش رویال را می‌فرستی و بات به‌صورت خودکار یک حریف واقعی بهت معرفی می‌کند.",
+    ].join("\n"),
+    {
+      inline_keyboard: [
+        [{ text: "✅ ثبت‌نام و کسر ۵۰,۰۰۰ تومان", callback_data: `join:${tournament.id}` }],
+        [{ text: "💳 شارژ کیف پول", url: `${APP_URL}/wallet` }],
+        [{ text: "جزئیات در Gament", url: `${APP_URL}/tournaments/${tournament.id}` }],
+      ],
+    }
+  );
+}
+
 async function startClashQrSubmission(chatId: number, telegramId: string, tournamentId?: string, registrationId?: string) {
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) {
@@ -2671,7 +2774,16 @@ async function handleJudgeAction(chatId: number, telegramId: string, action: str
       if (evidence.reporterClaim === "lose") winnerId = match.player1Id === reporterPlayer?.id ? match.player2Id : match.player1Id;
     }
     await db.update(matches).set({ status: "completed", winnerId: winnerId || null, completedAt: new Date() }).where(eq(matches.id, matchId));
-    return sendMessage(chatId, "✅ نتیجه مسابقه تأیید و مسابقه تکمیل شد.");
+    let prizeText = "";
+    if (winnerId) {
+      const prize = await db.transaction(async (tx) => payoutClash1v1Prize(tx, matchId, winnerId!)).catch((err) => {
+        logger.warn({ err, matchId, winnerId }, "Failed to payout Clash 1V1 prize");
+        return { paid: false as const, reason: "error" };
+      });
+      if (prize.paid) prizeText = `\n💰 جایزه ${CLASH_1V1_CONFIG.prize1st} به کیف پول برنده واریز شد.`;
+      else if (prize.reason === "already_paid") prizeText = "\n💰 جایزه این مسابقه قبلاً پرداخت شده بود.";
+    }
+    return sendMessage(chatId, `✅ نتیجه مسابقه تأیید و مسابقه تکمیل شد.${prizeText}`);
   }
   await sendMessage(chatId, `Match ID: <code>${html(match.id)}</code>\nStatus: <b>${html(match.status)}</b>`);
 }
@@ -2954,7 +3066,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/matches") return matchesCommand(chatId, telegramId);
   if (normalizedCommand === "/qr" || normalizedCommand === "/clash_qr") {
     const tournamentId = args.join(" ").match(/[0-9a-f-]{36}/i)?.[0];
-    return startClashQrSubmission(chatId, telegramId, tournamentId);
+    return tournamentId ? startClashQrSubmission(chatId, telegramId, tournamentId) : startClash1v1(chatId, telegramId);
   }
   if (normalizedCommand === "/checkin") return checkInCommand(chatId, telegramId);
   if (normalizedCommand === "/judge") return judgeCommand(chatId, telegramId);
@@ -3387,7 +3499,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:wallet") return walletCommand(chatId, telegramId);
   if (data === "menu:my_tournaments") return myTournamentsCommand(chatId, telegramId);
   if (data === "menu:matches") return matchesCommand(chatId, telegramId);
-  if (data === "menu:clash_qr") return startClashQrSubmission(chatId, telegramId);
+  if (data === "menu:clash_qr") return startClash1v1(chatId, telegramId);
   if (data.startsWith("qr:")) return startClashQrSubmission(chatId, telegramId, data.replace("qr:", ""));
   if (data === "menu:checkin") return checkInCommand(chatId, telegramId);
   if (data === "menu:missions") { if (!(await ensureFeatureEnabled(chatId, "telegram_missions_enabled", "مأموریت‌ها"))) return; return missionsCommand(chatId, telegramId); }

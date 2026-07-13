@@ -4,6 +4,8 @@ import { matches, notifications, players } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { requireRole } from "@/lib/auth";
 import { evaluateUserAchievements } from "@/lib/achievement-service";
+import { payoutClash1v1Prize } from "@/lib/clash-1v1";
+import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
@@ -144,6 +146,10 @@ export async function PATCH(
         if (winner?.visibleUserId) await evaluateUserAchievements(winner.visibleUserId).catch(() => undefined);
         if (loser?.visibleUserId) await evaluateUserAchievements(loser.visibleUserId).catch(() => undefined);
       }
+
+      await db.transaction(async (tx) => payoutClash1v1Prize(tx, id, winnerId)).catch((err) => {
+        logger.warn({ err, matchId: id, winnerId }, "Failed to payout Clash 1V1 prize from match PATCH");
+      });
 
       await notifyMatchParticipants(
         id,
