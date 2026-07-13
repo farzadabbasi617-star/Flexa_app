@@ -168,11 +168,11 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.APP_URL || "https://www.gament1.ir";
     const replyKeyboard = {
       inline_keyboard: [
-        ...(needsClashQr ? [[{ text: "📲 ارسال QR کلش به بات", url: telegramBotStartLink(`qr_${result.registration.tournamentId}`) }]] : []),
+        ...(needsClashQr ? [[{ text: "⚔️ 1V1 کلش رویال", url: telegramBotStartLink(`qr_${result.registration.tournamentId}`) }]] : []),
         [{ text: "مشاهده تورنومنت", url: `${appUrl}/tournaments/${result.registration.tournamentId}` }],
       ],
     };
-    const qrLine = needsClashQr ? "\n\n📲 مرحله بعد: QR یا Share Link کلش رویال را به بات بده تا حریف به‌صورت خودکار پیدا شود." : "";
+    const qrLine = needsClashQr ? "\n\n📲 مرحله بعد: QR یا Share Link را به بات بده تا حریف 1V1 کلش رویال به‌صورت خودکار پیدا شود." : "";
     await notifyLinkedUserOnTelegram(
       result.registration.visibleUserId,
       `✅ <b>ثبت‌نام تورنومنت انجام شد</b>

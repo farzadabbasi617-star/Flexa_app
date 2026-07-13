@@ -267,7 +267,7 @@ function mainMenuKeyboard() {
         { text: "⚔️ مسابقات من", callback_data: "menu:matches" },
       ],
       [
-        { text: "📲 QR کلش", callback_data: "menu:clash_qr" },
+        { text: "⚔️ 1V1 کلش رویال", callback_data: "menu:clash_qr" },
         { text: "🎯 مأموریت‌ها", callback_data: "menu:missions" },
       ],
       [
@@ -1098,13 +1098,13 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
   const xpText = await rewardUserXP(linked.userId, isPaid ? 25 : 15, isPaid ? "ثبت‌نام پولی" : "ثبت‌نام تورنومنت");
 
   const needsClashQr = tournament.game === "clash_royale" && isPaid;
-  const qrLine = needsClashQr ? "\n\n📲 مرحله بعد: QR یا Share Link کلش رویال را برای مچ‌میکینگ خودکار ارسال کن." : "";
+  const qrLine = needsClashQr ? "\n\n⚔️ مرحله بعد: QR یا Share Link را برای 1V1 کلش رویال ارسال کن." : "";
   await sendMessage(chatId, `✅ ثبت‌نام شما در تورنومنت انجام شد.
 
 🏆 <b>${html(tournament.name)}</b>
 🎮 ${html(gameLabel(tournament.game))}${result.paymentText}${xpText}${qrLine}`, {
     inline_keyboard: [
-      ...(needsClashQr ? [[{ text: "📲 ارسال QR کلش", callback_data: `qr:${tournament.id}` }]] : []),
+      ...(needsClashQr ? [[{ text: "⚔️ 1V1 کلش رویال", callback_data: `qr:${tournament.id}` }]] : []),
       [{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }],
     ],
   });
@@ -1775,7 +1775,7 @@ async function myTournamentsCommand(chatId: number, telegramId: string) {
       ],
     ];
     if (row.game === "clash_royale" && !isFreeEntryFee(row.entryFee)) {
-      result.push([{ text: "📲 ارسال/به‌روزرسانی QR کلش", callback_data: `qr:${row.tournamentId}` }]);
+      result.push([{ text: "⚔️ 1V1 کلش رویال", callback_data: `qr:${row.tournamentId}` }]);
     }
     return result;
   });
@@ -2042,7 +2042,7 @@ function clashParticipantTag(player: ClashPairParticipant) {
 
 function clashQrPromptText(tournamentName: string, existing = false) {
   return [
-    `📲 <b>${existing ? "به‌روزرسانی" : "ارسال"} QR کلش رویال</b>`,
+    `⚔️ <b>${existing ? "به‌روزرسانی" : "شروع"} 1V1 کلش رویال</b>`,
     "",
     `تورنومنت: <b>${html(tournamentName)}</b>`,
     "",
@@ -2060,7 +2060,7 @@ function clashQrPromptText(tournamentName: string, existing = false) {
 async function startClashQrSubmission(chatId: number, telegramId: string, tournamentId?: string, registrationId?: string) {
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) {
-    await sendMessage(chatId, "برای ارسال QR کلش، اول حساب تلگرام را با /link به Gament وصل کن.", {
+    await sendMessage(chatId, "برای شروع 1V1 کلش رویال، اول حساب تلگرام را با /link به Gament وصل کن.", {
       inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]],
     });
     return;
@@ -2091,16 +2091,42 @@ async function startClashQrSubmission(chatId: number, telegramId: string, tourna
 
   const eligible = rows.filter((row) => !isFreeEntryFee(row.entryFee));
   if (!eligible.length) {
+    const activeClashRooms = await db
+      .select({
+        id: tournaments.id,
+        name: tournaments.name,
+        entryFee: tournaments.entryFee,
+        maxPlayers: tournaments.maxPlayers,
+        registeredCount: count(registrations.id),
+      })
+      .from(tournaments)
+      .leftJoin(registrations, eq(registrations.tournamentId, tournaments.id))
+      .where(and(eq(tournaments.game, "clash_royale"), eq(tournaments.status, "registration")))
+      .groupBy(tournaments.id)
+      .orderBy(desc(tournaments.createdAt))
+      .limit(6);
+
+    const paidRooms = activeClashRooms.filter((room) => !isFreeEntryFee(room.entryFee));
+    const keyboard: Array<Array<Record<string, string>>> = paidRooms.flatMap((room) => {
+      const title = room.name.slice(0, 32);
+      const isFull = Number(room.registeredCount || 0) >= Number(room.maxPlayers || 0);
+      return [
+        [{ text: isFull ? `ظرفیت تکمیل: ${title}` : `ثبت‌نام 1V1: ${title}`, callback_data: `join:${room.id}` }],
+        [{ text: `جزئیات: ${title}`, url: `${APP_URL}/tournaments/${room.id}` }],
+      ];
+    });
+    keyboard.push([{ text: "🏟 همه روم‌های کلش", url: `${APP_URL}/tournaments?game=clash_royale` }]);
+
     await sendMessage(
       chatId,
-      "برای ارسال QR، باید در یک تورنومنت <b>پولی کلش رویال</b> ثبت‌نام کرده باشی و پرداخت ورودی انجام شده باشد.\n\nاگر تازه از وب‌اپ پرداخت کردی، چند ثانیه بعد دوباره /qr را بزن.",
-      { inline_keyboard: [[{ text: "🏟 روم‌های کلش", url: `${APP_URL}/tournaments?game=clash_royale` }]] }
+      "⚔️ <b>1V1 کلش رویال</b>\n\nبرای واقعی شدن مچ‌میکینگ، اول باید در یک تورنومنت <b>پولی کلش رویال</b> ثبت‌نام کرده باشی و ورودی پرداخت شده باشد.\n\nبعد از ثبت‌نام، همین دکمه را بزن یا دستور /qr را بفرست تا QR/Share Link را بگیرم و حریف را اتوماتیک وصل کنم.",
+      { inline_keyboard: keyboard }
     );
     return;
   }
 
   if (!tournamentId && !registrationId && eligible.length > 1) {
-    await sendMessage(chatId, "برای کدام تورنومنت کلش QR را ثبت می‌کنی؟", {
+    await sendMessage(chatId, "برای کدام تورنومنت، 1V1 کلش رویال را شروع می‌کنی؟", {
       inline_keyboard: eligible.map((row) => [{ text: `${row.submittedAt ? "🔁" : "📲"} ${row.tournamentName.slice(0, 42)}`, callback_data: `qr:${row.tournamentId}` }]),
     });
     return;
@@ -2226,7 +2252,7 @@ async function notifyClashPairSide(pair: CreatedClashPair, me: ClashPairParticip
     : "";
 
   const lines = [
-    "🎯 <b>حریف کلش رویال شما پیدا شد</b>",
+    "⚔️ <b>حریف 1V1 کلش رویال شما پیدا شد</b>",
     "",
     `🏆 تورنومنت: <b>${html(pair.tournamentName)}</b>`,
     `⚔️ مسابقه: <b>#${pair.matchNumber}</b>`,
@@ -2252,7 +2278,7 @@ async function notifyClashPairSide(pair: CreatedClashPair, me: ClashPairParticip
 
   await sendMessage(chatId, lines, { inline_keyboard: keyboard });
   if (opponent.qrFileId) {
-    await sendPhoto(chatId, opponent.qrFileId, `📲 QR کلش رویال حریف: ${html(clashParticipantDisplayName(opponent))}`);
+    await sendPhoto(chatId, opponent.qrFileId, `⚔️ QR حریف 1V1 کلش رویال: ${html(clashParticipantDisplayName(opponent))}`);
   }
 }
 
@@ -3011,7 +3037,7 @@ async function handleConversationMessage(message: TelegramMessage) {
 
     if (!registration || registration.game !== "clash_royale" || isFreeEntryFee(registration.entryFee)) {
       await clearSession(telegramId);
-      await sendMessage(chatId, "این ثبت‌نام برای QR کلش معتبر نیست یا تورنومنت پولی کلش نیست.", removeKeyboard());
+      await sendMessage(chatId, "این ثبت‌نام برای 1V1 کلش رویال معتبر نیست یا تورنومنت پولی کلش نیست.", removeKeyboard());
       return;
     }
 
@@ -3021,7 +3047,7 @@ async function handleConversationMessage(message: TelegramMessage) {
     const typedInvite = extractInviteReference(rawInput);
 
     if (!bestPhoto && !typedInvite) {
-      await sendMessage(chatId, "لطفاً عکس QR کلش یا Share Link دعوت را ارسال کن. برای لغو، «لغو» را بزن.");
+      await sendMessage(chatId, "لطفاً عکس QR یا Share Link دعوت کلش رویال را ارسال کن. برای لغو، «لغو» را بزن.");
       return;
     }
 
@@ -3041,11 +3067,11 @@ async function handleConversationMessage(message: TelegramMessage) {
     await sendMessage(
       chatId,
       [
-        "✅ QR / لینک کلش شما ثبت شد.",
+        "✅ اطلاعات 1V1 کلش رویال شما ثبت شد.",
         decodedInvite && !typedInvite ? "🔎 لینک داخل QR با موفقیت خوانده شد." : "",
         !inviteLink && bestPhoto ? "ℹ️ لینک داخل QR خوانده نشد، اما خود عکس QR ذخیره شد و برای حریف ارسال می‌شود." : "",
         "",
-        "اکنون در صف مچ‌میکینگ خودکار هستی. هر وقت یک پلیر دیگر QR بدهد، بات شما دو نفر را به هم وصل می‌کند.",
+        "اکنون در صف 1V1 کلش رویال هستی. هر وقت یک پلیر دیگر آماده شود، بات شما دو نفر را واقعی به هم وصل می‌کند.",
       ].filter(Boolean).join("\n"),
       removeKeyboard()
     );
@@ -3442,7 +3468,10 @@ async function handleCallback(callback: TelegramCallbackQuery) {
       ],
     });
     else await sendMessage(chatId, text, mainMenuKeyboard());
+    return;
   }
+
+  await sendMessage(chatId, "این دکمه قدیمی یا نامعتبر است. منوی جدید را باز کردم؛ برای 1V1 کلش رویال روی دکمه ⚔️ بزن یا دستور /qr را ارسال کن.", mainMenuKeyboard());
 }
 
 async function handleUpdate(update: TelegramUpdate) {
