@@ -1616,7 +1616,7 @@ async function showClash1v1EntryStatus(chatId: number, telegramId: string, entry
   await startClash1v1(chatId, telegramId);
 }
 
-async function registerClash1v1Entry(chatId: number, telegramId: string): Promise<void> {
+async function registerClash1v1EntryUnsafe(chatId: number, telegramId: string): Promise<void> {
   await ensureClash1v1Schema();
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) {
@@ -1635,6 +1635,11 @@ async function registerClash1v1Entry(chatId: number, telegramId: string): Promis
   const prizeRial = (BigInt(CLASH_1V1_CONFIG.prizeToman) * BigInt(10));
 
   const result = await db.transaction(async (tx) => {
+    // Serialize paid 1V1 registration per user. This prevents two rapid button
+    // taps (or concurrent Telegram deliveries) from charging the same wallet
+    // twice before either transaction can see the other's active entry.
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtextextended(${`clash1v1:${linked.userId}`}, 0))`);
+
     const [stillActive] = await tx
       .select({ id: clash1v1Entries.id, status: clash1v1Entries.status })
       .from(clash1v1Entries)
@@ -1642,15 +1647,17 @@ async function registerClash1v1Entry(chatId: number, telegramId: string): Promis
       .limit(1);
     if (stillActive) return { ok: false as const, code: "ACTIVE", entryId: stillActive.id };
 
-    let wallet = await getOrCreateWallet(linked.userId, tx);
-    const updateResult = await tx.update(wallets)
+    const wallet = await getOrCreateWallet(linked.userId, tx);
+    const [debitedWallet] = await tx
+      .update(wallets)
       .set({
         balance: sql`${wallets.balance} - ${feeRial.toString()}`,
         updatedAt: new Date(),
       })
-      .where(and(eq(wallets.id, wallet.id), sql`${wallets.balance} >= ${feeRial.toString()}`));
+      .where(and(eq(wallets.id, wallet.id), sql`${wallets.balance} >= ${feeRial.toString()}`))
+      .returning({ id: wallets.id, balance: wallets.balance });
 
-    if (updateResult.rowCount === 0) {
+    if (!debitedWallet) {
       const [currentWallet] = await tx.select().from(wallets).where(eq(wallets.id, wallet.id)).limit(1);
       return { ok: false as const, code: "INSUFFICIENT", balance: currentWallet ? bigIntFromText(currentWallet.balance) : BigInt(0) };
     }
@@ -1708,6 +1715,39 @@ async function registerClash1v1Entry(chatId: number, telegramId: string): Promis
 
   await sendMessage(chatId, `✅ ثبت‌نام 1V1 کلش رویال انجام شد و ورودی <b>${html(CLASH_1V1_CONFIG.entryFee)}</b> از کیف پول کسر شد.\n\nحالا QR یا Share Link کلش رویال را بفرست.`);
   await promptClash1v1Qr(chatId, telegramId, result.entryId);
+}
+
+function nestedErrorCode(error: unknown, depth = 0): string | null {
+  if (!error || typeof error !== "object" || depth > 4) return null;
+  const candidate = error as { code?: unknown; cause?: unknown };
+  if (typeof candidate.code === "string" && /^[A-Z0-9_]{2,20}$/i.test(candidate.code)) return candidate.code;
+  return nestedErrorCode(candidate.cause, depth + 1);
+}
+
+async function registerClash1v1Entry(chatId: number, telegramId: string): Promise<void> {
+  try {
+    await registerClash1v1EntryUnsafe(chatId, telegramId);
+  } catch (err) {
+    const errorCode = nestedErrorCode(err) || "FLOW";
+    logger.error({ err, telegramId, flow: "clash_1v1_registration", errorCode }, "Clash 1V1 paid registration failed");
+    await sendMessage(
+      chatId,
+      [
+        "⚠️ <b>ثبت‌نام 1V1 انجام نشد</b>",
+        "",
+        "تراکنش به‌طور کامل برگشت خورد و در این تلاش وجهی از کیف پول کسر نشد.",
+        `کد پیگیری: <code>1V1-${html(errorCode)}</code>`,
+        "",
+        "یک‌بار دیگر دکمه ثبت‌نام را بزن. اگر دوباره همین کد را دیدی، آن را برای پشتیبانی بفرست.",
+      ].join("\n"),
+      {
+        inline_keyboard: [
+          [{ text: "🔁 تلاش دوباره", callback_data: "clash1v1:register" }],
+          [{ text: "🎧 پشتیبانی", callback_data: "menu:support" }],
+        ],
+      }
+    );
+  }
 }
 
 async function startClash1v1(chatId: number, telegramId: string): Promise<void> {
