@@ -47,6 +47,10 @@ export const transactionStatusEnum = pgEnum("transaction_status", [
   "pending", "completed", "failed", "cancelled"
 ]);
 
+export const clash1v1EntryStatusEnum = pgEnum("clash_1v1_entry_status", [
+  "waiting_qr", "queued", "matched", "completed", "cancelled"
+]);
+
 // --- STORE / MARKETPLACE ENUMS ---
 export const kycStatusEnum = pgEnum("kyc_status", [
   "none", "pending", "verified", "rejected"
@@ -402,6 +406,36 @@ export const registrations = pgTable("registrations", {
   playerIdIdx: index("registrations_player_id_idx").on(table.playerId),
   tournamentPlayerUnique: uniqueIndex("registrations_tournament_player_unique").on(table.tournamentId, table.playerId),
   tournamentUserUnique: uniqueIndex("registrations_tournament_user_unique").on(table.tournamentId, table.visibleUserId),
+}));
+
+// Standalone Clash Royale 1V1 paid queue entries.
+// This is intentionally separate from tournament registrations: a 1V1 queue is
+// not a room/bracket signup and the same player may buy a new entry for a new
+// duel after a previous one completes.
+export const clash1v1Entries = pgTable("clash_1v1_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tournamentId: uuid("tournament_id").notNull().references(() => tournaments.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  playerId: uuid("player_id").notNull().references(() => players.id),
+  telegramId: varchar("telegram_id", { length: 32 }).notNull(),
+  status: clash1v1EntryStatusEnum("status").notNull().default("waiting_qr"),
+  entryFeeRial: numeric("entry_fee_rial", { precision: 20, scale: 0 }).notNull().default("500000"),
+  prizeRial: numeric("prize_rial", { precision: 20, scale: 0 }).notNull().default("800000"),
+  inviteLink: text("invite_link"),
+  qrFileId: varchar("qr_file_id", { length: 255 }),
+  submittedAt: timestamp("submitted_at"),
+  matchedMatchId: uuid("matched_match_id").references(() => matches.id),
+  matchedAt: timestamp("matched_at"),
+  completedAt: timestamp("completed_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  metadata: jsonb("metadata"),
+}, (table) => ({
+  userStatusIdx: index("clash_1v1_entries_user_status_idx").on(table.userId, table.status),
+  statusSubmittedIdx: index("clash_1v1_entries_status_submitted_idx").on(table.status, table.submittedAt),
+  matchIdx: index("clash_1v1_entries_match_idx").on(table.matchedMatchId),
+  telegramIdx: index("clash_1v1_entries_telegram_idx").on(table.telegramId),
 }));
 
 // Telegram pre-registrations

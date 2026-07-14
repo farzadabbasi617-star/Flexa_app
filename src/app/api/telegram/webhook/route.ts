@@ -4,7 +4,7 @@ import jsQR from "jsqr";
 import { Jimp } from "jimp";
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews, siteSettings } from "@/db/schema";
+import { classifiedAds, classifiedScrapeLogs, clash1v1Entries, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews, siteSettings } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishHonorToTelegramChannel, publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { generateRealAssistantResponse } from "@/lib/ai-service";
@@ -34,6 +34,7 @@ type BotState =
   | "wallet_deposit_tracking"
   | "wallet_deposit_receipt"
   | "clash_qr_submission"
+  | "clash_1v1_qr_submission"
   | "dispute_reason"
   | "evidence_upload";
 
@@ -97,6 +98,7 @@ interface SessionData {
   evidenceMatchId?: string;
   qrTournamentId?: string;
   qrRegistrationId?: string;
+  clash1v1EntryId?: string;
   selectedAdIds?: string[];
 }
 
@@ -2120,8 +2122,146 @@ async function getOrCreateClash1v1Tournament() {
   return created;
 }
 
-async function startClash1v1(chatId: number, telegramId: string) {
+async function findActiveClash1v1Entry(userId: string) {
+  const [entry] = await db
+    .select({
+      id: clash1v1Entries.id,
+      status: clash1v1Entries.status,
+      tournamentId: clash1v1Entries.tournamentId,
+      inviteLink: clash1v1Entries.inviteLink,
+      qrFileId: clash1v1Entries.qrFileId,
+      matchedMatchId: clash1v1Entries.matchedMatchId,
+      createdAt: clash1v1Entries.createdAt,
+      submittedAt: clash1v1Entries.submittedAt,
+      matchedAt: clash1v1Entries.matchedAt,
+    })
+    .from(clash1v1Entries)
+    .where(and(eq(clash1v1Entries.userId, userId), inArray(clash1v1Entries.status, ["waiting_qr", "queued", "matched"])))
+    .orderBy(desc(clash1v1Entries.createdAt))
+    .limit(1);
+  return entry || null;
+}
+
+async function promptClash1v1Qr(chatId: number, telegramId: string, entryId: string): Promise<void> {
+  await setSession(telegramId, "clash_1v1_qr_submission", { clash1v1EntryId: entryId });
+  await sendMessage(chatId, clashQrPromptText(CLASH_1V1_CONFIG.name, false), replyKeyboard([[CANCEL_TEXT]]));
+}
+
+async function showClash1v1EntryStatus(chatId: number, telegramId: string, entry: Awaited<ReturnType<typeof findActiveClash1v1Entry>>): Promise<void> {
+  if (!entry) return startClash1v1(chatId, telegramId);
+  if (entry.status === "waiting_qr") {
+    await sendMessage(chatId, "✅ ورودی 1V1 کلش رویال پرداخت شده. حالا QR یا Share Link کلش رویال را بفرست تا وارد صف شوی.");
+    await promptClash1v1Qr(chatId, telegramId, entry.id);
+    return;
+  }
+  if (entry.status === "queued") {
+    await sendMessage(chatId, "⏳ شما در صف 1V1 کلش رویال هستی. به محض آماده شدن یک حریف، بات شما دو نفر را به هم وصل می‌کند.", {
+      inline_keyboard: [[{ text: "🔁 به‌روزرسانی QR / Link", callback_data: `clash1v1:qr:${entry.id}` }]],
+    });
+    return;
+  }
+  if (entry.status === "matched" && entry.matchedMatchId) {
+    await handleMatchAction(chatId, telegramId, entry.matchedMatchId);
+    return;
+  }
+  await startClash1v1(chatId, telegramId);
+}
+
+async function registerClash1v1Entry(chatId: number, telegramId: string): Promise<void> {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(chatId, "برای ثبت‌نام 1V1 کلش رویال، اول حساب تلگرام را با /link به Gament وصل کن.", {
+      inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }], [{ text: "🆕 ساخت حساب", url: `${APP_URL}/register` }]],
+    });
+    return;
+  }
+
+  const active = await findActiveClash1v1Entry(linked.userId);
+  if (active) return showClash1v1EntryStatus(chatId, telegramId, active);
+
   const tournament = await getOrCreateClash1v1Tournament();
+  const player = await getOrCreateUserPlayer(linked.userId, linked.displayName || linked.username || "Gament Player", linked.username);
+  const feeRial = (BigInt(CLASH_1V1_CONFIG.entryFeeToman) * BigInt(10));
+  const prizeRial = (BigInt(CLASH_1V1_CONFIG.prizeToman) * BigInt(10));
+
+  const result = await db.transaction(async (tx) => {
+    const [stillActive] = await tx
+      .select({ id: clash1v1Entries.id, status: clash1v1Entries.status })
+      .from(clash1v1Entries)
+      .where(and(eq(clash1v1Entries.userId, linked.userId), inArray(clash1v1Entries.status, ["waiting_qr", "queued", "matched"])))
+      .limit(1);
+    if (stillActive) return { ok: false as const, code: "ACTIVE", entryId: stillActive.id };
+
+    let wallet = await getOrCreateWallet(linked.userId, tx);
+    const updateResult = await tx.update(wallets)
+      .set({
+        balance: sql`${wallets.balance} - ${feeRial.toString()}`,
+        updatedAt: new Date(),
+      })
+      .where(and(eq(wallets.id, wallet.id), sql`${wallets.balance} >= ${feeRial.toString()}`));
+
+    if (updateResult.rowCount === 0) {
+      const [currentWallet] = await tx.select().from(wallets).where(eq(wallets.id, wallet.id)).limit(1);
+      return { ok: false as const, code: "INSUFFICIENT", balance: currentWallet ? bigIntFromText(currentWallet.balance) : BigInt(0) };
+    }
+
+    const [entry] = await tx.insert(clash1v1Entries).values({
+      tournamentId: tournament.id,
+      userId: linked.userId,
+      playerId: player.id,
+      telegramId,
+      status: "waiting_qr",
+      entryFeeRial: feeRial.toString(),
+      prizeRial: prizeRial.toString(),
+      metadata: { source: "telegram_bot", tournamentName: tournament.name },
+    }).returning();
+
+    await tx.insert(transactions).values({
+      walletId: wallet.id,
+      amount: feeRial.toString(),
+      type: "entry_fee",
+      status: "completed",
+      referenceId: `clash-1v1-entry-${entry.id}`,
+      metadata: {
+        kind: "clash_1v1_entry_fee",
+        entryId: entry.id,
+        tournamentId: tournament.id,
+        tournamentName: tournament.name,
+        playerId: player.id,
+        playerName: player.displayName,
+        userId: linked.userId,
+        telegramId,
+        prizeRial: prizeRial.toString(),
+      },
+    });
+
+    return { ok: true as const, entryId: entry.id };
+  });
+
+  if (!result.ok) {
+    if (result.code === "ACTIVE") {
+      const activeEntry = await findActiveClash1v1Entry(linked.userId);
+      return showClash1v1EntryStatus(chatId, telegramId, activeEntry);
+    }
+    if (result.code === "INSUFFICIENT") {
+      await sendMessage(chatId, `موجودی کیف پول کافی نیست.\nمبلغ لازم: <b>${html(formatTomanFromRial(feeRial))}</b>\nموجودی شما: <b>${html(formatTomanFromRial(result.balance || BigInt(0)))}</b>`, {
+        inline_keyboard: [
+          [{ text: "💳 ثبت فیش شارژ از همین بات", callback_data: "wallet:deposit" }],
+          [{ text: "شارژ کیف پول در وب‌اپ", url: `${APP_URL}/wallet` }],
+        ],
+      });
+      return;
+    }
+    await sendMessage(chatId, "ثبت‌نام 1V1 کلش رویال انجام نشد. لطفاً دوباره تلاش کن.");
+    return;
+  }
+
+  await sendMessage(chatId, `✅ ثبت‌نام 1V1 کلش رویال انجام شد و ورودی <b>${html(CLASH_1V1_CONFIG.entryFee)}</b> از کیف پول کسر شد.\n\nحالا QR یا Share Link کلش رویال را بفرست.`);
+  await promptClash1v1Qr(chatId, telegramId, result.entryId);
+}
+
+async function startClash1v1(chatId: number, telegramId: string): Promise<void> {
+  await getOrCreateClash1v1Tournament();
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) {
     await sendMessage(
@@ -2137,16 +2277,12 @@ async function startClash1v1(chatId: number, telegramId: string) {
     return;
   }
 
-  const [existingRegistration] = await db
-    .select({ id: registrations.id, submittedAt: registrations.gameInviteSubmittedAt })
-    .from(registrations)
-    .where(and(eq(registrations.tournamentId, tournament.id), eq(registrations.visibleUserId, linked.userId)))
-    .limit(1);
+  const active = await findActiveClash1v1Entry(linked.userId);
+  if (active) return showClash1v1EntryStatus(chatId, telegramId, active);
 
-  if (existingRegistration) {
-    await startClashQrSubmission(chatId, telegramId, tournament.id, existingRegistration.id);
-    return;
-  }
+  const wallet = await getOrCreateWallet(linked.userId);
+  const balance = bigIntFromText(wallet.balance);
+  const feeRial = BigInt(CLASH_1V1_CONFIG.entryFeeToman) * BigInt(10);
 
   await sendMessage(
     chatId,
@@ -2155,14 +2291,15 @@ async function startClash1v1(chatId: number, telegramId: string) {
       "",
       `💳 ورودی هر نفر: <b>${html(CLASH_1V1_CONFIG.entryFee)}</b>`,
       `🏆 جایزه نفر اول: <b>${html(CLASH_1V1_CONFIG.prize1st)}</b>`,
+      `موجودی شما: <b>${html(formatTomanFromRial(balance))}</b>`,
       "",
       "این حالت Room ID / Password ندارد؛ بعد از پرداخت، QR یا Share Link کلش رویال را می‌فرستی و بات به‌صورت خودکار یک حریف واقعی بهت معرفی می‌کند.",
     ].join("\n"),
     {
       inline_keyboard: [
-        [{ text: "✅ ثبت‌نام و کسر ۵۰,۰۰۰ تومان", callback_data: `join:${tournament.id}` }],
-        [{ text: "💳 شارژ کیف پول", url: `${APP_URL}/wallet` }],
-        [{ text: "جزئیات در Gament", url: `${APP_URL}/tournaments/${tournament.id}` }],
+        [{ text: "✅ ثبت‌نام و کسر ۵۰,۰۰۰ تومان", callback_data: "clash1v1:register" }],
+        ...(balance < feeRial ? [[{ text: "💳 ثبت فیش شارژ از همین بات", callback_data: "wallet:deposit" }]] : []),
+        [{ text: "💳 شارژ کیف پول در وب‌اپ", url: `${APP_URL}/wallet` }],
       ],
     }
   );
@@ -2249,6 +2386,84 @@ async function startClashQrSubmission(chatId: number, telegramId: string, tourna
     qrRegistrationId: row.registrationId,
   });
   await sendMessage(chatId, clashQrPromptText(row.tournamentName, Boolean(row.submittedAt)), replyKeyboard([[CANCEL_TEXT]]));
+}
+
+async function tryAutoPairClash1v1Entries(): Promise<CreatedClashPair[]> {
+  const tournament = await getOrCreateClash1v1Tournament();
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(7100171)`);
+
+    const queued = await tx
+      .select({
+        entryId: clash1v1Entries.id,
+        playerId: clash1v1Entries.playerId,
+        userId: clash1v1Entries.userId,
+        inviteLink: clash1v1Entries.inviteLink,
+        qrFileId: clash1v1Entries.qrFileId,
+        playerName: players.displayName,
+        playerUsername: players.username,
+        playerGameId: players.gameId,
+        telegramId: clash1v1Entries.telegramId,
+        clashRoyaleId: users.clashRoyaleId,
+        clashRoyaleUsername: users.clashRoyaleUsername,
+        submittedAt: clash1v1Entries.submittedAt,
+      })
+      .from(clash1v1Entries)
+      .innerJoin(players, eq(clash1v1Entries.playerId, players.id))
+      .leftJoin(users, eq(clash1v1Entries.userId, users.id))
+      .where(eq(clash1v1Entries.status, "queued"))
+      .orderBy(clash1v1Entries.submittedAt, clash1v1Entries.createdAt)
+      .limit(20);
+
+    const candidates = queued.map((row) => ({
+      registrationId: row.entryId,
+      playerId: row.playerId,
+      userId: row.userId,
+      playerName: row.playerName,
+      playerUsername: row.playerUsername,
+      playerGameId: row.playerGameId,
+      telegramId: row.telegramId,
+      inviteLink: row.inviteLink,
+      qrFileId: row.qrFileId,
+      clashRoyaleId: row.clashRoyaleId,
+      clashRoyaleUsername: row.clashRoyaleUsername,
+    } satisfies ClashPairParticipant));
+
+    const createdPairs: CreatedClashPair[] = [];
+    while (candidates.length >= 2) {
+      const player1 = candidates.shift()!;
+      const idx = candidates.findIndex((candidate) => candidate.userId !== player1.userId);
+      if (idx < 0) break;
+      const [player2] = candidates.splice(idx, 1);
+
+      const [{ value: existingMatchCount }] = await tx.select({ value: count() }).from(matches).where(eq(matches.tournamentId, tournament.id));
+      const matchNumber = Number(existingMatchCount || 0) + 1;
+      const [match] = await tx.insert(matches).values({
+        tournamentId: tournament.id,
+        round: 1,
+        matchNumber,
+        player1Id: player1.playerId,
+        player2Id: player2.playerId,
+        status: "pending",
+      }).returning({ id: matches.id, matchNumber: matches.matchNumber });
+
+      const matchedAt = new Date();
+      await tx.update(clash1v1Entries).set({ status: "matched", matchedMatchId: match.id, matchedAt, updatedAt: matchedAt }).where(eq(clash1v1Entries.id, player1.registrationId));
+      await tx.update(clash1v1Entries).set({ status: "matched", matchedMatchId: match.id, matchedAt, updatedAt: matchedAt }).where(eq(clash1v1Entries.id, player2.registrationId));
+
+      createdPairs.push({
+        matchId: match.id,
+        matchNumber: match.matchNumber,
+        tournamentId: tournament.id,
+        tournamentName: tournament.name,
+        tournamentStartDate: null,
+        player1,
+        player2,
+      });
+    }
+
+    return createdPairs;
+  });
 }
 
 async function tryAutoPairClashTournament(tournamentId: string): Promise<CreatedClashPair[]> {
@@ -3134,6 +3349,63 @@ async function handleConversationMessage(message: TelegramMessage) {
   const session = await getSession(telegramId);
   const data = { ...session.data };
 
+  if (session.state === "clash_1v1_qr_submission") {
+    const linked = await getLinkedUserByTelegram(telegramId);
+    if (!linked?.userId || !data.clash1v1EntryId) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "اطلاعات 1V1 ناقص است. دوباره /qr را بزن.", removeKeyboard());
+      return;
+    }
+
+    const [entry] = await db
+      .select({ id: clash1v1Entries.id, status: clash1v1Entries.status, userId: clash1v1Entries.userId })
+      .from(clash1v1Entries)
+      .where(and(eq(clash1v1Entries.id, data.clash1v1EntryId), eq(clash1v1Entries.userId, linked.userId)))
+      .limit(1);
+
+    if (!entry || !["waiting_qr", "queued"].includes(entry.status)) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "این entry برای 1V1 فعال نیست. دوباره /qr را بزن.", removeKeyboard());
+      return;
+    }
+
+    const photos = message.photo || [];
+    const bestPhoto = photos[photos.length - 1];
+    const rawInput = normalizeDigits(message.caption || message.text || "").trim();
+    const typedInvite = extractInviteReference(rawInput);
+    if (!bestPhoto && !typedInvite) {
+      await sendMessage(chatId, "لطفاً عکس QR یا Share Link دعوت کلش رویال را ارسال کن. برای لغو، «لغو» را بزن.");
+      return;
+    }
+
+    const decodedInvite = bestPhoto ? await decodeQrInviteFromTelegramPhoto(bestPhoto.file_id) : null;
+    const inviteLink = typedInvite || decodedInvite;
+    await db.update(clash1v1Entries).set({
+      status: "queued",
+      inviteLink: inviteLink || null,
+      qrFileId: bestPhoto?.file_id || null,
+      submittedAt: new Date(),
+      updatedAt: new Date(),
+    }).where(eq(clash1v1Entries.id, entry.id));
+
+    await clearSession(telegramId);
+    await sendMessage(
+      chatId,
+      [
+        "✅ QR / لینک 1V1 کلش رویال ثبت شد.",
+        decodedInvite && !typedInvite ? "🔎 لینک داخل QR با موفقیت خوانده شد." : "",
+        !inviteLink && bestPhoto ? "ℹ️ لینک داخل QR خوانده نشد، اما خود عکس QR ذخیره شد و برای حریف ارسال می‌شود." : "",
+        "",
+        "اکنون در صف 1V1 هستی. هر وقت یک پلیر دیگر آماده شود، بات شما دو نفر را به هم وصل می‌کند.",
+      ].filter(Boolean).join("\n"),
+      removeKeyboard()
+    );
+
+    const pairs = await tryAutoPairClash1v1Entries();
+    await notifyClashPairs(pairs);
+    return;
+  }
+
   if (session.state === "clash_qr_submission") {
     const linked = await getLinkedUserByTelegram(telegramId);
     if (!linked?.userId || !data.qrRegistrationId || !data.qrTournamentId) {
@@ -3508,6 +3780,8 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:my_tournaments") return myTournamentsCommand(chatId, telegramId);
   if (data === "menu:matches") return matchesCommand(chatId, telegramId);
   if (data === "menu:clash_qr") return startClash1v1(chatId, telegramId);
+  if (data === "clash1v1:register") return registerClash1v1Entry(chatId, telegramId);
+  if (data.startsWith("clash1v1:qr:")) return promptClash1v1Qr(chatId, telegramId, data.replace("clash1v1:qr:", ""));
   if (data.startsWith("qr:")) return startClashQrSubmission(chatId, telegramId, data.replace("qr:", ""));
   if (data === "menu:checkin") return checkInCommand(chatId, telegramId);
   if (data === "menu:missions") { if (!(await ensureFeatureEnabled(chatId, "telegram_missions_enabled", "مأموریت‌ها"))) return; return missionsCommand(chatId, telegramId); }

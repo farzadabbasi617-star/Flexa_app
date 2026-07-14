@@ -1,4 +1,4 @@
-import { matches, players, tournaments, transactions, wallets } from "@/db/schema";
+import { clash1v1Entries, matches, players, tournaments, transactions, wallets } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 export const CLASH_1V1_CONFIG = {
@@ -100,6 +100,11 @@ export async function payoutClash1v1Prize(tx: any, matchId: string, winnerPlayer
       },
     })
     .returning({ id: transactions.id });
+
+  await tx
+    .update(clash1v1Entries)
+    .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
+    .where(eq(clash1v1Entries.matchedMatchId, matchId));
 
   return {
     paid: true as const,
