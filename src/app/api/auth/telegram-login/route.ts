@@ -1,61 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
 import { db } from "@/db";
 import { telegramAccounts, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { createSession } from "@/lib/auth";
+import { rateLimit } from "@/lib/rate-limit";
+import { validateTelegramMiniAppInitData } from "@/lib/telegram-mini-app-auth";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
-
-// Verify the Telegram initData signature using HMAC-SHA256 and the Bot Token
-function verifyTelegramWebAppData(initData: string, botToken: string): { isValid: boolean; user: any } {
-  try {
-    const params = new URLSearchParams(initData);
-    const hash = params.get("hash");
-    if (!hash) return { isValid: false, user: null };
-
-    // Extract user details
-    const userStr = params.get("user");
-    const user = userStr ? JSON.parse(userStr) : null;
-
-    // Collect all parameters except 'hash' and sort them
-    const keys = Array.from(params.keys()).filter((k) => k !== "hash").sort();
-    const dataCheckString = keys.map((k) => `${k}=${params.get(k)}`).join("\n");
-
-    // HMAC verification
-    const secretKey = crypto.createHmac("sha256", "WebAppData").update(botToken).digest();
-    const calculatedHash = crypto.createHmac("sha256", secretKey).update(dataCheckString).digest("hex");
-
-    return { isValid: calculatedHash === hash, user };
-  } catch (err) {
-    logger.error({ err }, "Telegram initData verification error");
-    return { isValid: false, user: null };
-  }
-}
 
 export async function POST(request: NextRequest) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
     const userAgent = request.headers.get("user-agent") || "unknown";
 
-    const body = await request.json();
-    const { initData } = body;
-
-    if (!initData) {
-      return NextResponse.json({ error: "Missing initData" }, { status: 400 });
+    const limit = await rateLimit(`telegram-mini-app-login:${ip}`, 20, 10 * 60 * 1000);
+    if (!limit.success) {
+      const retryAfter = Math.max(1, Math.ceil(((limit.resetAt || Date.now()) - Date.now()) / 1000));
+      return NextResponse.json(
+        { error: "Too many Telegram login attempts" },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } }
+      );
     }
 
-    // BOT_TOKEN is loaded from env variables
-    const botToken = process.env.BOT_TOKEN;
+    const body = await request.json().catch(() => null) as { initData?: unknown } | null;
+    const initData = body?.initData;
+
+    if (typeof initData !== "string" || !initData.trim() || initData.length > 16_384) {
+      return NextResponse.json({ error: "Missing or invalid initData" }, { status: 400 });
+    }
+
+    const botToken = process.env.BOT_TOKEN?.trim();
     if (!botToken) {
       logger.error("BOT_TOKEN environment variable is not defined in Gament settings");
       return NextResponse.json({ error: "Server misconfiguration" }, { status: 500 });
     }
 
-    const { isValid, user: tgUser } = verifyTelegramWebAppData(initData, botToken);
-    if (!isValid || !tgUser || !tgUser.id) {
-      return NextResponse.json({ error: "Invalid Telegram authentication" }, { status: 401 });
+    let tgUser;
+    try {
+      tgUser = validateTelegramMiniAppInitData(initData, botToken);
+    } catch (error) {
+      logger.warn(
+        { ip, reason: error instanceof Error ? error.name : "unknown" },
+        "Rejected invalid or expired Telegram Mini App initData"
+      );
+      return NextResponse.json({ error: "Invalid or expired Telegram authentication" }, { status: 401 });
     }
 
     const tgId = String(tgUser.id);

@@ -19,11 +19,15 @@
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@grammyjs/auto-retry": "^2.0.2",
+    "@grammyjs/transformer-throttler": "^1.2.1",
     "@tailwindcss/postcss": "4.1.17",
     "@tanstack/react-query": "^5.101.0",
+    "@tma.js/init-data-node": "^2.0.8",
     "argon2": "^0.44.0",
     "drizzle-orm": "0.45.2",
     "framer-motion": "^12.42.2",
+    "grammy": "^1.44.0",
     "jimp": "^1.6.1",
     "jsqr": "^1.4.0",
     "mailchecker": "^6.0.20",

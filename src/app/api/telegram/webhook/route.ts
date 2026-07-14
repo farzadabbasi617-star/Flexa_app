@@ -6,7 +6,7 @@ import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { classifiedAds, classifiedScrapeLogs, clash1v1Entries, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews, siteSettings } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
-import { publishHonorToTelegramChannel, publishTournamentToTelegramChannel } from "@/lib/telegram";
+import { publishHonorToTelegramChannel, publishTournamentToTelegramChannel, telegramApi as sharedTelegramApi } from "@/lib/telegram";
 import { generateRealAssistantResponse } from "@/lib/ai-service";
 import { getGameIdGuide, gameGuideKeyboard } from "./guide";
 import { bigIntFromText, formatTomanFromRial, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
@@ -15,6 +15,7 @@ import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } 
 import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achievement-service";
 import { LevelingService } from "@/lib/leveling-service";
 import { CLASH_1V1_CONFIG, ensureClash1v1Schema, payoutClash1v1Prize } from "@/lib/clash-1v1";
+import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -343,21 +344,7 @@ function roomsKeyboard(rows: Array<{ id: string; name: string | null; entryFee?:
 }
 
 async function telegramApi(method: string, payload: Record<string, unknown>) {
-  const token = process.env.BOT_TOKEN?.trim();
-  if (!token) throw new Error("BOT_TOKEN is missing");
-
-  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    cache: "no-store",
-  });
-
-  const result = await response.json().catch(() => null) as { ok?: boolean; description?: string; result?: unknown } | null;
-  if (!response.ok || !result?.ok) {
-    logger.warn({ method, status: response.status, result }, "Telegram API call failed");
-  }
-  return result;
+  return sharedTelegramApi(method, payload);
 }
 
 async function sendMessage(chatId: number, text: string, replyMarkup?: Record<string, unknown>) {
@@ -420,7 +407,7 @@ async function isChannelMember(telegramId: string) {
     chat_id: process.env.TELEGRAM_CHANNEL_ID || "@Gament_games",
     user_id: Number(telegramId),
   });
-  const member = result?.result as { status?: string } | undefined;
+  const member = result.ok ? result.result as { status?: string } : undefined;
   return Boolean(member?.status && !["left", "kicked"].includes(member.status));
 }
 
@@ -3909,7 +3896,26 @@ export async function POST(request: NextRequest) {
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   try {
+    const contentLength = Number(request.headers.get("content-length") || 0);
+    if (contentLength > 1_000_000) {
+      logger.warn({ contentLength }, "Rejected oversized Telegram webhook payload");
+      return NextResponse.json({ ok: false, error: "Payload too large" }, { status: 413 });
+    }
+
     const update = await request.json() as TelegramUpdate;
+    const actorId = update.callback_query?.from.id || update.message?.from?.id;
+
+    if (actorId) {
+      const actorKey = String(actorId);
+      const actorLimit = hasAdminAccess(actorKey) ? 180 : 60;
+      const allowed = await rateLimit(`telegram-webhook:${actorKey}`, actorLimit, 60_000);
+      if (!allowed.success) {
+        logger.warn({ actorId }, "Telegram user update rate limit exceeded");
+        // Return 200 so Telegram does not retry the same spam update.
+        return NextResponse.json({ ok: true, rateLimited: true });
+      }
+    }
+
     await handleUpdate(update);
     return NextResponse.json({ ok: true });
   } catch (err) {

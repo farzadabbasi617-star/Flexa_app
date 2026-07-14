@@ -2,6 +2,9 @@ import logger from "@/lib/logger";
 import { db } from "@/db";
 import { registrations, telegramAccounts } from "@/db/schema";
 import { eq } from "drizzle-orm";
+import { telegramApi } from "@/lib/telegram-api";
+
+export { telegramApi } from "@/lib/telegram-api";
 
 export interface TelegramTournamentPost {
   id: string;
@@ -86,27 +89,6 @@ export function formatTournamentChannelPost(tournament: TelegramTournamentPost) 
     "",
     "برای ثبت‌نام و مشاهده قوانین وارد Gament شو 👇",
   ].filter(Boolean).join("\n");
-}
-
-export async function telegramApi(method: string, payload: Record<string, unknown>) {
-  const token = process.env.BOT_TOKEN?.trim();
-  if (!token) {
-    logger.warn("BOT_TOKEN is missing; cannot call Telegram API");
-    return { ok: false, description: "BOT_TOKEN is missing" };
-  }
-
-  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    cache: "no-store",
-  });
-
-  const result = await response.json().catch(() => null) as { ok?: boolean; description?: string } | null;
-  if (!response.ok || !result?.ok) {
-    logger.warn({ method, status: response.status, result }, "Telegram API call failed");
-  }
-  return result || { ok: false, description: "Invalid Telegram response" };
 }
 
 export async function sendTelegramMessage(chatId: string | number, text: string, replyMarkup?: Record<string, unknown>) {
