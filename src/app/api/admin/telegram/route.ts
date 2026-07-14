@@ -9,6 +9,8 @@ import {
   telegramCampaignEvents,
   telegramPreRegistrations,
   telegramReferrals,
+  telegramOutbox,
+  telegramWebhookUpdates,
   tournamentWaitlist,
   transactions,
   siteSettings,
@@ -16,6 +18,11 @@ import {
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import logger from "@/lib/logger";
 import { telegramApi } from "@/lib/telegram";
+import {
+  ensureTelegramReliabilitySchema,
+  processTelegramOutbox,
+  retryFailedTelegramOutbox,
+} from "@/lib/telegram-reliability";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +99,14 @@ export async function GET(request: NextRequest) {
     const [waitlist] = await db.select({ value: count() }).from(tournamentWaitlist).where(eq(tournamentWaitlist.status, "waiting"));
     const [couponUses] = await db.select({ value: count() }).from(couponRedemptions).where(eq(couponRedemptions.status, "used"));
 
+    await ensureTelegramReliabilitySchema();
+    const [[outboxPending], [outboxFailed], [outboxProcessing], [processedUpdates]] = await Promise.all([
+      db.select({ value: count() }).from(telegramOutbox).where(eq(telegramOutbox.status, "pending")),
+      db.select({ value: count() }).from(telegramOutbox).where(eq(telegramOutbox.status, "failed")),
+      db.select({ value: count() }).from(telegramOutbox).where(eq(telegramOutbox.status, "processing")),
+      db.select({ value: count() }).from(telegramWebhookUpdates).where(eq(telegramWebhookUpdates.status, "completed")),
+    ]);
+
     const telegramRevenueRows = await db
       .select({ amount: transactions.amount })
       .from(transactions)
@@ -142,6 +157,10 @@ export async function GET(request: NextRequest) {
         couponUses: couponUses.value,
         telegramRegistrations: recentTelegramRegistrations[0]?.value || 0,
         revenueToman,
+        outboxPending: outboxPending.value,
+        outboxProcessing: outboxProcessing.value,
+        outboxFailed: outboxFailed.value,
+        processedWebhookUpdates: processedUpdates.value,
       },
       campaigns: campaignRows,
       coupons: couponRows,
@@ -159,6 +178,15 @@ export async function POST(request: NextRequest) {
     const auth = await requireAdminPermission(request, "settings");
     if (isAdminError(auth)) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const body = await request.json().catch(() => ({}));
+    if (body.action === "process_outbox") {
+      const result = await processTelegramOutbox(50);
+      return NextResponse.json({ success: true, result });
+    }
+    if (body.action === "retry_failed_outbox") {
+      const retried = await retryFailedTelegramOutbox(50);
+      const processed = await processTelegramOutbox(50);
+      return NextResponse.json({ success: true, result: { ...processed, requeued: retried.retried } });
+    }
     if (body.action === "setup") {
       const results = await setupTelegramCommands();
       return NextResponse.json({ success: true, results });

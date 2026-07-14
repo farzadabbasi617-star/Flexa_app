@@ -85,6 +85,51 @@ export default function AdminTelegramPage() {
     }
   }
 
+  async function retryFailedOutbox() {
+    setSavingSettings(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/telegram", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ action: "retry_failed_outbox" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "تلاش مجدد صف انجام نشد");
+      setMessage(`${json.result?.requeued || 0} پیام ناموفق دوباره وارد صف شد.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "تلاش مجدد صف انجام نشد");
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
+  async function processOutbox() {
+    setSavingSettings(true);
+    setError("");
+    setMessage("");
+    try {
+      const res = await fetch("/api/admin/telegram", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ action: "process_outbox" }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "پردازش صف انجام نشد");
+      const result = json.result || {};
+      setMessage(`صف پردازش شد: ${result.sent || 0} ارسال، ${result.retried || 0} تلاش مجدد، ${result.failed || 0} ناموفق.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "پردازش صف انجام نشد");
+    } finally {
+      setSavingSettings(false);
+    }
+  }
+
   async function setupBot() {
     setSavingSettings(true);
     setError("");
@@ -115,6 +160,10 @@ export default function AdminTelegramPage() {
       ["🎁", "دعوت‌ها", s.referrals || 0],
       ["🕒", "لیست انتظار", s.waiting || 0],
       ["🎟", "کوپن مصرف‌شده", s.couponUses || 0],
+      ["📨", "صف ارسال", s.outboxPending || 0],
+      ["⚙️", "در حال پردازش", s.outboxProcessing || 0],
+      ["❌", "پیام ناموفق", s.outboxFailed || 0],
+      ["🛡️", "آپدیت امن", s.processedWebhookUpdates || 0],
       ["💰", "درآمد تلگرام", `${fmt(s.revenueToman || 0)} تومان`],
     ];
   }, [data]);
@@ -149,6 +198,8 @@ export default function AdminTelegramPage() {
               <p className="text-xs text-gray-500 mt-1">کنترل سریع قابلیت‌های ربات بدون تغییر کد یا env</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <button onClick={processOutbox} disabled={savingSettings} className="px-4 py-2 rounded-xl bg-emerald-600 text-xs font-black disabled:opacity-50">پردازش صف پیام</button>
+              <button onClick={retryFailedOutbox} disabled={savingSettings || !(data?.stats?.outboxFailed)} className="px-4 py-2 rounded-xl bg-red-600 text-xs font-black disabled:opacity-40">تلاش مجدد ناموفق‌ها</button>
               <button onClick={setupBot} disabled={savingSettings} className="px-4 py-2 rounded-xl bg-cyan-600 text-xs font-black disabled:opacity-50">تنظیم Commands/Menu</button>
               <button onClick={saveSettings} disabled={savingSettings} className="px-4 py-2 rounded-xl bg-purple-600 text-xs font-black disabled:opacity-50">ذخیره تنظیمات</button>
             </div>

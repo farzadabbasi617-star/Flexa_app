@@ -28,6 +28,14 @@ import { aiCommand } from "./commands/ai";
 import { getAdminIds, hasAdminAccess } from "./admin-access";
 import { decodeQrInviteFromTelegramPhoto, downloadTelegramPhotoAsDataUrl } from "./files";
 import { parseTelegramCommand } from "./command-router";
+import {
+  claimTelegramUpdate,
+  completeTelegramUpdate,
+  ensureTelegramReliabilitySchema,
+  failTelegramUpdate,
+  type TelegramUpdateClaim,
+} from "@/lib/telegram-reliability";
+import { shouldRetryTelegramUpdate } from "@/lib/telegram-reliability-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -3349,6 +3357,9 @@ export async function POST(request: NextRequest) {
   const auth = validateWebhookSecret(request);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
+  let update: TelegramUpdate | undefined;
+  let claim: TelegramUpdateClaim | undefined;
+
   try {
     const contentLength = Number(request.headers.get("content-length") || 0);
     if (contentLength > 1_000_000) {
@@ -3356,37 +3367,62 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, error: "Payload too large" }, { status: 413 });
     }
 
-    const update = await request.json() as TelegramUpdate;
-    const actorId = update.callback_query?.from.id || update.message?.from?.id;
+    update = await request.json() as TelegramUpdate;
+    if (!Number.isSafeInteger(update.update_id) || update.update_id < 0) {
+      return NextResponse.json({ ok: false, error: "Invalid update_id" }, { status: 400 });
+    }
 
+    claim = await claimTelegramUpdate(update.update_id);
+    if (!claim.claimed) {
+      return NextResponse.json({
+        ok: true,
+        duplicate: true,
+        updateStatus: claim.status,
+        attempts: claim.attempts,
+      });
+    }
+
+    const actorId = update.callback_query?.from.id || update.message?.from?.id;
     if (actorId) {
       const actorKey = String(actorId);
       const actorLimit = hasAdminAccess(actorKey) ? 180 : 60;
       const allowed = await rateLimit(`telegram-webhook:${actorKey}`, actorLimit, 60_000);
       if (!allowed.success) {
         logger.warn({ actorId }, "Telegram user update rate limit exceeded");
-        // Return 200 so Telegram does not retry the same spam update.
+        if (!claim.degraded) await completeTelegramUpdate(update.update_id);
         return NextResponse.json({ ok: true, rateLimited: true });
       }
     }
 
     await handleUpdate(update);
-    return NextResponse.json({ ok: true });
+    if (!claim.degraded) await completeTelegramUpdate(update.update_id);
+    return NextResponse.json({ ok: true, idempotent: !claim.degraded });
   } catch (err) {
-    logger.error({ err }, "Telegram webhook failed");
-    // Always return 200 to Telegram for handled server-side errors to avoid a
-    // retry storm. Check Render logs for details.
-    return NextResponse.json({ ok: false });
+    logger.error({ err, updateId: update?.update_id }, "Telegram webhook failed");
+    if (update && claim?.claimed && !claim.degraded) {
+      await failTelegramUpdate(update.update_id, err);
+    }
+
+    // Idempotency makes Telegram retries safe. Retry transient failures up to
+    // the bounded attempt limit, then acknowledge to stop a permanent storm.
+    const shouldRetry = Boolean(
+      update && claim?.claimed && shouldRetryTelegramUpdate(claim.attempts, claim.degraded)
+    );
+    return NextResponse.json(
+      { ok: false, retrying: shouldRetry },
+      { status: shouldRetry ? 500 : 200 }
+    );
   }
 }
 
 export async function GET() {
   try {
-    await ensureClash1v1Schema();
+    await Promise.all([ensureClash1v1Schema(), ensureTelegramReliabilitySchema()]);
     const tournament = await getOrCreateClash1v1Tournament();
     return NextResponse.json({
       ok: true,
       webhook: "Gament Telegram webhook",
+      reliabilityReady: true,
       clash1v1Ready: true,
       clash1v1TournamentId: tournament.id,
       setWebhookUrl: `https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=${APP_URL}/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>`,
@@ -3396,6 +3432,7 @@ export async function GET() {
     return NextResponse.json({
       ok: false,
       webhook: "Gament Telegram webhook",
+      reliabilityReady: false,
       clash1v1Ready: false,
       error: err instanceof Error ? err.message : "unknown",
     }, { status: 500 });

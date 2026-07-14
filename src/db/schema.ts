@@ -541,6 +541,50 @@ export const telegramSentNotifications = pgTable("telegram_sent_notifications", 
   typeIdx: index("telegram_sent_notifications_type_idx").on(table.type),
 }));
 
+// Idempotency ledger for incoming Telegram webhook updates. Telegram retries
+// webhooks when delivery is uncertain; this table prevents duplicate wallet,
+// registration, reward, and notification side effects while allowing a failed
+// or abandoned processing lease to be retried safely.
+export const telegramWebhookUpdates = pgTable("telegram_webhook_updates", {
+  updateId: varchar("update_id", { length: 32 }).primaryKey(),
+  status: varchar("status", { length: 20 }).notNull().default("processing"),
+  attempts: integer("attempts").notNull().default(1),
+  lockedUntil: timestamp("locked_until").notNull(),
+  lastError: text("last_error"),
+  receivedAt: timestamp("received_at").defaultNow().notNull(),
+  completedAt: timestamp("completed_at"),
+  expiresAt: timestamp("expires_at").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  statusLockIdx: index("telegram_webhook_updates_status_lock_idx").on(table.status, table.lockedUntil),
+  expiresIdx: index("telegram_webhook_updates_expires_idx").on(table.expiresAt),
+}));
+
+// PostgreSQL-backed outgoing Telegram queue. Cron/background callers enqueue
+// messages transactionally; a worker claims them with a short lease and retries
+// transient Telegram failures with exponential backoff.
+export const telegramOutbox = pgTable("telegram_outbox", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  dedupeKey: varchar("dedupe_key", { length: 191 }).unique(),
+  chatId: varchar("chat_id", { length: 100 }).notNull(),
+  method: varchar("method", { length: 50 }).notNull().default("sendMessage"),
+  payload: jsonb("payload").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  priority: integer("priority").notNull().default(0),
+  attempts: integer("attempts").notNull().default(0),
+  maxAttempts: integer("max_attempts").notNull().default(5),
+  nextAttemptAt: timestamp("next_attempt_at").defaultNow().notNull(),
+  lockedUntil: timestamp("locked_until"),
+  lastError: text("last_error"),
+  telegramMessageId: varchar("telegram_message_id", { length: 64 }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  sentAt: timestamp("sent_at"),
+}, (table) => ({
+  dueIdx: index("telegram_outbox_due_idx").on(table.status, table.nextAttemptAt, table.priority),
+  lockIdx: index("telegram_outbox_lock_idx").on(table.status, table.lockedUntil),
+}));
+
 // Telegram campaign analytics for /start campaign_* and other deep links
 export const telegramCampaignEvents = pgTable("telegram_campaign_events", {
   id: uuid("id").defaultRandom().primaryKey(),

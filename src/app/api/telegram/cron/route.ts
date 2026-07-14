@@ -2,7 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions, honors, honorLikes, honorViews } from "@/db/schema";
-import { getTelegramChannelChatId, sendTelegramMessage } from "@/lib/telegram";
+import { getTelegramChannelChatId } from "@/lib/telegram";
+import {
+  cleanupTelegramReliability,
+  enqueueTelegramMessage as sendTelegramMessage,
+  processTelegramOutbox,
+} from "@/lib/telegram-reliability";
 import { generateDailyGamingNews } from "@/lib/gaming-news-generator";
 import logger from "@/lib/logger";
 
@@ -479,6 +484,10 @@ async function safeCronStep<T>(name: string, fn: () => Promise<T>): Promise<T | 
 export async function GET(request: NextRequest) {
   if (!validateCron(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+  // Drain old work first, enqueue this cron cycle's notifications, then drain
+  // again. If Render stops between these phases, the next invocation resumes
+  // pending rows from PostgreSQL without losing messages.
+  const outboxBefore = await safeCronStep("outboxBefore", () => processTelegramOutbox(25));
   const reminders = await safeCronStep("reminders", sendReminders);
   const capacity = await safeCronStep("capacity", sendCapacityAlerts);
   const lobby = await safeCronStep("lobby", sendLobbyNotices);
@@ -492,9 +501,14 @@ export async function GET(request: NextRequest) {
   const honorEngagementReport = await safeCronStep("honorEngagementReport", sendHonorEngagementReport);
   const honorMilestones = await safeCronStep("honorMilestones", sendHonorMilestoneAlerts);
   const dailyGamingNews = await safeCronStep("dailyGamingNews", () => generateDailyGamingNews());
+  const outboxAfter = await safeCronStep("outboxAfter", () => processTelegramOutbox(50));
+  const reliabilityCleanup = await safeCronStep("reliabilityCleanup", cleanupTelegramReliability);
 
   return NextResponse.json({
     ok: true,
+    outboxBefore,
+    outboxAfter,
+    reliabilityCleanup,
     reminders,
     capacity,
     lobby,
