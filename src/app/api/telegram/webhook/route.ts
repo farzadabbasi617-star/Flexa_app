@@ -404,11 +404,11 @@ async function editMessage(chatId: number, messageId: number, text: string, repl
   });
 }
 
-async function answerCallback(callbackQueryId: string, text?: string) {
+async function answerCallback(callbackQueryId: string, text?: string, showAlert = false) {
   return telegramApi("answerCallbackQuery", {
     callback_query_id: callbackQueryId,
     text,
-    show_alert: false,
+    show_alert: showAlert,
   });
 }
 
@@ -3874,7 +3874,16 @@ async function handleCallback(callback: TelegramCallbackQuery) {
 
 async function handleUpdate(update: TelegramUpdate) {
   if (update.callback_query) {
-    await handleCallback(update.callback_query);
+    try {
+      await handleCallback(update.callback_query);
+    } catch (err) {
+      logger.error({ err, callbackData: update.callback_query.data, telegramId: update.callback_query.from.id }, "Telegram callback failed");
+      await answerCallback(update.callback_query.id, "خطای موقت در اجرای دکمه. لطفاً /qr را بزن یا دوباره تلاش کن.", true).catch(() => undefined);
+      const chatId = update.callback_query.message?.chat.id;
+      if (chatId) {
+        await sendMessage(chatId, "⚠️ اجرای دکمه با خطا مواجه شد. سیستم را آماده‌سازی کردم؛ لطفاً دوباره /qr را بزن یا روی 1V1 کلش رویال بزن.", mainMenuKeyboard()).catch(() => undefined);
+      }
+    }
     return;
   }
 
@@ -3912,9 +3921,23 @@ export async function POST(request: NextRequest) {
 }
 
 export async function GET() {
-  return NextResponse.json({
-    ok: true,
-    webhook: "Gament Telegram webhook",
-    setWebhookUrl: `https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=${APP_URL}/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>`,
-  });
+  try {
+    await ensureClash1v1Schema();
+    const tournament = await getOrCreateClash1v1Tournament();
+    return NextResponse.json({
+      ok: true,
+      webhook: "Gament Telegram webhook",
+      clash1v1Ready: true,
+      clash1v1TournamentId: tournament.id,
+      setWebhookUrl: `https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=${APP_URL}/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>`,
+    });
+  } catch (err) {
+    logger.error({ err }, "Telegram webhook health/repair failed");
+    return NextResponse.json({
+      ok: false,
+      webhook: "Gament Telegram webhook",
+      clash1v1Ready: false,
+      error: err instanceof Error ? err.message : "unknown",
+    }, { status: 500 });
+  }
 }
