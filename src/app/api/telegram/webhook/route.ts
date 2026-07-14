@@ -14,7 +14,7 @@ import { getEntryFeeRial } from "@/lib/tournament-finance";
 import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
 import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achievement-service";
 import { LevelingService } from "@/lib/leveling-service";
-import { CLASH_1V1_CONFIG, payoutClash1v1Prize } from "@/lib/clash-1v1";
+import { CLASH_1V1_CONFIG, ensureClash1v1Schema, payoutClash1v1Prize } from "@/lib/clash-1v1";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -2123,6 +2123,7 @@ async function getOrCreateClash1v1Tournament() {
 }
 
 async function findActiveClash1v1Entry(userId: string) {
+  await ensureClash1v1Schema();
   const [entry] = await db
     .select({
       id: clash1v1Entries.id,
@@ -2168,6 +2169,7 @@ async function showClash1v1EntryStatus(chatId: number, telegramId: string, entry
 }
 
 async function registerClash1v1Entry(chatId: number, telegramId: string): Promise<void> {
+  await ensureClash1v1Schema();
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) {
     await sendMessage(chatId, "برای ثبت‌نام 1V1 کلش رویال، اول حساب تلگرام را با /link به Gament وصل کن.", {
@@ -2389,6 +2391,7 @@ async function startClashQrSubmission(chatId: number, telegramId: string, tourna
 }
 
 async function tryAutoPairClash1v1Entries(): Promise<CreatedClashPair[]> {
+  await ensureClash1v1Schema();
   const tournament = await getOrCreateClash1v1Tournament();
   return db.transaction(async (tx) => {
     await tx.execute(sql`SELECT pg_advisory_xact_lock(7100171)`);
@@ -3350,6 +3353,7 @@ async function handleConversationMessage(message: TelegramMessage) {
   const data = { ...session.data };
 
   if (session.state === "clash_1v1_qr_submission") {
+    await ensureClash1v1Schema();
     const linked = await getLinkedUserByTelegram(telegramId);
     if (!linked?.userId || !data.clash1v1EntryId) {
       await clearSession(telegramId);

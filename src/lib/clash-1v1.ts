@@ -1,5 +1,59 @@
+import { db } from "@/db";
 import { clash1v1Entries, matches, players, tournaments, transactions, wallets } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
+
+
+let clash1v1SchemaReady: Promise<void> | null = null;
+
+async function createClash1v1Schema(client: any) {
+  await client.execute(sql.raw(`DO $$ BEGIN
+    CREATE TYPE clash_1v1_entry_status AS ENUM ('waiting_qr', 'queued', 'matched', 'completed', 'cancelled');
+  EXCEPTION WHEN duplicate_object THEN NULL; END $$;`));
+
+  await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS clash_1v1_entries (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    tournament_id uuid NOT NULL REFERENCES tournaments(id),
+    user_id uuid NOT NULL REFERENCES users(id),
+    player_id uuid NOT NULL REFERENCES players(id),
+    telegram_id varchar(32) NOT NULL,
+    status clash_1v1_entry_status NOT NULL DEFAULT 'waiting_qr',
+    entry_fee_rial numeric(20,0) NOT NULL DEFAULT 500000,
+    prize_rial numeric(20,0) NOT NULL DEFAULT 800000,
+    invite_link text,
+    qr_file_id varchar(255),
+    submitted_at timestamp,
+    matched_match_id uuid REFERENCES matches(id),
+    matched_at timestamp,
+    completed_at timestamp,
+    cancelled_at timestamp,
+    created_at timestamp NOT NULL DEFAULT now(),
+    updated_at timestamp NOT NULL DEFAULT now(),
+    metadata jsonb
+  );`));
+
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_user_status_idx ON clash_1v1_entries(user_id, status);`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_status_submitted_idx ON clash_1v1_entries(status, submitted_at);`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_match_idx ON clash_1v1_entries(matched_match_id);`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_telegram_idx ON clash_1v1_entries(telegram_id);`));
+}
+
+/**
+ * Production safety net: Render/Neon deployments may miss manual migrations.
+ * The 1V1 bot calls this before touching the queue table, so a missing
+ * `clash_1v1_entries` table does not break Telegram callbacks.
+ */
+export async function ensureClash1v1Schema(client: any = db) {
+  if (client === db) {
+    if (!clash1v1SchemaReady) {
+      clash1v1SchemaReady = createClash1v1Schema(client).catch((err) => {
+        clash1v1SchemaReady = null;
+        throw err;
+      });
+    }
+    return clash1v1SchemaReady;
+  }
+  return createClash1v1Schema(client);
+}
 
 export const CLASH_1V1_CONFIG = {
   name: "1V1 کلش رویال",
@@ -38,6 +92,7 @@ export function clash1v1PrizeRial() {
 }
 
 export async function payoutClash1v1Prize(tx: any, matchId: string, winnerPlayerId: string) {
+  await ensureClash1v1Schema(tx);
   const [match] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1);
   if (!match) return { paid: false as const, reason: "match_not_found" };
 
