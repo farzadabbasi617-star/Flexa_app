@@ -1,0 +1,87 @@
+export type BotState =
+  | "idle"
+  | "full_name"
+  | "gamer_tag"
+  | "phone"
+  | "gament_id"
+  | "city"
+  | "team"
+  | "confirm"
+  | "support_subject"
+  | "support_message"
+  | "wallet_deposit_amount"
+  | "wallet_deposit_tracking"
+  | "wallet_deposit_receipt"
+  | "clash_qr_submission"
+  | "clash_1v1_qr_submission"
+  | "dispute_reason"
+  | "evidence_upload";
+
+export interface TelegramUser {
+  id: number;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+}
+
+export interface TelegramChat {
+  id: number;
+  type?: string;
+}
+
+export interface TelegramMessage {
+  message_id: number;
+  chat: TelegramChat;
+  from?: TelegramUser;
+  text?: string;
+  contact?: {
+    phone_number: string;
+    user_id?: number;
+  };
+  photo?: Array<{
+    file_id: string;
+    file_unique_id: string;
+    width: number;
+    height: number;
+    file_size?: number;
+  }>;
+  caption?: string;
+}
+
+export interface TelegramCallbackQuery {
+  id: string;
+  from: TelegramUser;
+  message?: TelegramMessage;
+  data?: string;
+}
+
+export interface TelegramUpdate {
+  update_id: number;
+  message?: TelegramMessage;
+  callback_query?: TelegramCallbackQuery;
+}
+
+export interface SessionData {
+  game?: string;
+  platform?: string;
+  fullName?: string;
+  gamerTag?: string;
+  phoneNumber?: string;
+  gamentId?: string;
+  city?: string;
+  teamName?: string;
+  supportSubject?: string;
+  walletDepositAmountToman?: string;
+  walletDepositTracking?: string;
+  disputeMatchId?: string;
+  evidenceMatchId?: string;
+  qrTournamentId?: string;
+  qrRegistrationId?: string;
+  clash1v1EntryId?: string;
+  selectedAdIds?: string[];
+}
+
+export interface BotSession {
+  state: BotState;
+  data: SessionData;
+}

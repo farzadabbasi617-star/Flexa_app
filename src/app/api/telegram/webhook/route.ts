@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
-import jsQR from "jsqr";
-import { Jimp } from "jimp";
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { classifiedAds, classifiedScrapeLogs, clash1v1Entries, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews, siteSettings } from "@/db/schema";
+import { classifiedAds, classifiedScrapeLogs, clash1v1Entries, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
-import { publishHonorToTelegramChannel, publishTournamentToTelegramChannel, telegramApi as sharedTelegramApi } from "@/lib/telegram";
-import { generateRealAssistantResponse, streamRealAssistantResponse } from "@/lib/ai-service";
+import { publishHonorToTelegramChannel, publishTournamentToTelegramChannel, telegramApi } from "@/lib/telegram";
 import { getGameIdGuide, gameGuideKeyboard } from "./guide";
 import { bigIntFromText, formatTomanFromRial, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
@@ -17,426 +14,22 @@ import { LevelingService } from "@/lib/leveling-service";
 import { CLASH_1V1_CONFIG, ensureClash1v1Schema, payoutClash1v1Prize } from "@/lib/clash-1v1";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
+import type { SessionData, TelegramCallbackQuery, TelegramMessage, TelegramUpdate, TelegramUser } from "./types";
+import { APP_URL, CANCEL_TEXT, CHANNEL_URL, DEFAULT_RULES, GAMENT_ID_REQUIRED, PLATFORM_OPTIONS, SKIP_TEXT } from "./config";
+import { validateWebhookSecret } from "./security";
+import { extractInviteReference, gameLabel, gamePrompt, generateLinkCode, html, isHttpUrl, isValidGamentId, linkCodeHash, normalizeGame, normalizeGamentId } from "./utils";
+import { confirmKeyboard, gameKeyboard, mainMenuKeyboard, platformKeyboard, removeKeyboard, replyKeyboard, roomsKeyboard } from "./keyboards";
+import { answerCallback, editMessage, sendDocument, sendMessage, sendPhoto } from "./transport";
+import { clearSession, getSession, registrationSummary, setSession } from "./sessions";
+import { ensureFeatureEnabled, telegramFeatureEnabled } from "./settings";
+import { isChannelMember, promptChannelMembership } from "./membership";
+import { getLinkedUserByTelegram } from "./user-service";
+import { aiCommand } from "./commands/ai";
+import { getAdminIds, hasAdminAccess } from "./admin-access";
+import { decodeQrInviteFromTelegramPhoto, downloadTelegramPhotoAsDataUrl } from "./files";
+import { parseTelegramCommand } from "./command-router";
 
 export const dynamic = "force-dynamic";
-
-type BotState =
-  | "idle"
-  | "full_name"
-  | "gamer_tag"
-  | "phone"
-  | "gament_id"
-  | "city"
-  | "team"
-  | "confirm"
-  | "support_subject"
-  | "support_message"
-  | "wallet_deposit_amount"
-  | "wallet_deposit_tracking"
-  | "wallet_deposit_receipt"
-  | "clash_qr_submission"
-  | "clash_1v1_qr_submission"
-  | "dispute_reason"
-  | "evidence_upload";
-
-interface TelegramUser {
-  id: number;
-  first_name?: string;
-  last_name?: string;
-  username?: string;
-}
-
-interface TelegramChat {
-  id: number;
-  type?: string;
-}
-
-interface TelegramMessage {
-  message_id: number;
-  chat: TelegramChat;
-  from?: TelegramUser;
-  text?: string;
-  contact?: {
-    phone_number: string;
-    user_id?: number;
-  };
-  photo?: Array<{
-    file_id: string;
-    file_unique_id: string;
-    width: number;
-    height: number;
-    file_size?: number;
-  }>;
-  caption?: string;
-}
-
-interface TelegramCallbackQuery {
-  id: string;
-  from: TelegramUser;
-  message?: TelegramMessage;
-  data?: string;
-}
-
-interface TelegramUpdate {
-  update_id: number;
-  message?: TelegramMessage;
-  callback_query?: TelegramCallbackQuery;
-}
-
-interface SessionData {
-  game?: string;
-  platform?: string;
-  fullName?: string;
-  gamerTag?: string;
-  phoneNumber?: string;
-  gamentId?: string;
-  city?: string;
-  teamName?: string;
-  supportSubject?: string;
-  walletDepositAmountToman?: string;
-  walletDepositTracking?: string;
-  disputeMatchId?: string;
-  evidenceMatchId?: string;
-  qrTournamentId?: string;
-  qrRegistrationId?: string;
-  clash1v1EntryId?: string;
-  selectedAdIds?: string[];
-}
-
-interface BotSession {
-  state: BotState;
-  data: SessionData;
-}
-
-const APP_URL = (process.env.APP_URL || "https://www.gament1.ir").replace(/\/$/, "");
-const CHANNEL_URL = (process.env.TELEGRAM_CHANNEL_URL || process.env.CHANNEL_URL || "https://t.me/Gament_games").trim();
-const SKIP_TEXT = "رد کردن";
-const CANCEL_TEXT = "لغو";
-const GAMENT_ID_REQUIRED = process.env.GAMENT_ID_REQUIRED === "true" || process.env.TELEGRAM_GAMENT_ID_REQUIRED === "true";
-
-const GAME_OPTIONS = [
-  { id: "cod_mobile", label: "🎯 COD MOBILE", fa: "کالاف موبایل", accountPrompt: "UID یا Username کالاف موبایل را وارد کن." },
-  { id: "fortnite", label: "🏗️ FORTNITE", fa: "فورتنایت", accountPrompt: "Epic Games ID یا Username فورتنایت را وارد کن." },
-  { id: "clash_royale", label: "👑 CLASH ROYALE", fa: "کلش رویال", accountPrompt: "Player Tag کلش رویال را وارد کن؛ مثل #ABC123." },
-];
-
-const PLATFORM_OPTIONS = ["Mobile", "PC", "Console", "PS5", "PS4", "Xbox", "Nintendo Switch", "Other"];
-
-const GAME_ALIASES: Record<string, string> = {
-  cod: "cod_mobile",
-  "cod mobile": "cod_mobile",
-  cod_mobile: "cod_mobile",
-  "call of duty": "cod_mobile",
-  "call of duty mobile": "cod_mobile",
-  کالاف: "cod_mobile",
-  "کالاف موبایل": "cod_mobile",
-  fortnite: "fortnite",
-  فورتنایت: "fortnite",
-  clash: "clash_royale",
-  "clash royale": "clash_royale",
-  clash_royale: "clash_royale",
-  کلش: "clash_royale",
-  "کلش رویال": "clash_royale",
-};
-
-const DEFAULT_RULES = `📜 قوانین خلاصه Gament
-
-1) Gament پلتفرم مدیریت، ثبت‌نام، اطلاع‌رسانی، داوری و پشتیبانی تورنومنت‌های گیمینگ است.
-2) مسابقات بر پایه مهارت برگزار می‌شوند؛ شرط‌بندی، تبانی مالی، خرید/فروش نتیجه یا قمار ممنوع است.
-3) اطلاعات ثبت‌شده شامل شماره تماس، Gament ID و آیدی بازی باید صحیح و متعلق به خود بازیکن باشد.
-4) آیدی بازی در روز مسابقه باید با آیدی ثبت‌شده مطابقت داشته باشد.
-5) استفاده از چیت، هک، اسکریپت، سوءاستفاده از باگ، جعل اسکرین‌شات یا هر ابزار غیرمجاز باعث حذف می‌شود.
-6) نتیجه مسابقه طبق قوانین همان روم و با مدارک قابل بررسی ثبت می‌شود؛ داوری Gament ملاک تصمیم نهایی است.
-7) بی‌احترامی، تهدید، نشر اطلاعات شخصی، اسپم و تبلیغات بدون مجوز ممنوع است.
-8) ثبت‌نام قطعی، پرداخت ورودی احتمالی، مشاهده لابی و دریافت جایزه از داخل وب‌اپ Gament انجام می‌شود.`;
-
-function html(value: unknown) {
-  return String(value ?? "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-function timingSafeEqualText(a: string, b: string) {
-  const aBuffer = Buffer.from(a);
-  const bBuffer = Buffer.from(b);
-  if (aBuffer.length !== bBuffer.length) return false;
-  return crypto.timingSafeEqual(aBuffer, bBuffer);
-}
-
-function validateWebhookSecret(request: NextRequest) {
-  const configuredSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
-  if (!configuredSecret) {
-    return process.env.NODE_ENV === "production"
-      ? { ok: false, status: 503, error: "Telegram webhook secret is not configured" }
-      : { ok: true, status: 200, error: null };
-  }
-
-  const providedSecret = request.headers.get("x-telegram-bot-api-secret-token")?.trim() || "";
-  if (!providedSecret || !timingSafeEqualText(providedSecret, configuredSecret)) {
-    return { ok: false, status: 401, error: "Unauthorized" };
-  }
-  return { ok: true, status: 200, error: null };
-}
-
-
-async function getTelegramSetting(key: string, fallback = "") {
-  try {
-    const [row] = await db.select({ value: siteSettings.value }).from(siteSettings).where(eq(siteSettings.key, key)).limit(1);
-    return row?.value ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-async function telegramFeatureEnabled(key: string, fallback = true) {
-  const value = await getTelegramSetting(key, fallback ? "true" : "false");
-  if (value === "false") return false;
-  if (value === "true") return true;
-  return fallback;
-}
-
-async function ensureFeatureEnabled(chatId: number, key: string, label: string) {
-  if (await telegramFeatureEnabled(key, true)) return true;
-  await sendMessage(chatId, `این قابلیت فعلاً از سمت مدیریت غیرفعال است: <b>${html(label)}</b>`);
-  return false;
-}
-
-function normalizeGame(value?: string | null) {
-  if (!value) return "";
-  const normalized = normalizeDigits(value).trim().toLowerCase().replace(/-/g, "_");
-  return GAME_ALIASES[normalized] || GAME_ALIASES[normalized.replace(/_/g, " ")] || normalized;
-}
-
-function gameLabel(gameId?: string) {
-  const normalized = normalizeGame(gameId);
-  const game = GAME_OPTIONS.find((item) => item.id === normalized);
-  return game ? `${game.label} / ${game.fa}` : gameId || "نامشخص";
-}
-
-function gamePrompt(gameId?: string) {
-  const normalized = normalizeGame(gameId);
-  return GAME_OPTIONS.find((item) => item.id === normalized)?.accountPrompt || "آیدی بازی / گیمرتگ / یوزرنیم داخل بازی را وارد کن:";
-}
-
-function normalizeGamentId(value: string) {
-  return normalizeDigits(value).trim().toUpperCase().replace(/\s+/g, "");
-}
-
-function linkCodeHash(code: string) {
-  return crypto.createHash("sha256").update(code).digest("hex");
-}
-
-function generateLinkCode() {
-  return crypto.randomInt(100000, 1000000).toString();
-}
-
-function isValidGamentId(value: string) {
-  const normalized = normalizeGamentId(value);
-  if (!normalized.startsWith("FLX-")) return false;
-  const suffix = normalized.slice(4);
-  return suffix.length >= 4 && suffix.length <= 12 && /^[A-Z0-9-]+$/.test(suffix);
-}
-
-function replyKeyboard(rows: string[][]) {
-  return {
-    keyboard: rows,
-    resize_keyboard: true,
-    one_time_keyboard: true,
-  };
-}
-
-function removeKeyboard() {
-  return { remove_keyboard: true };
-}
-
-function mainMenuKeyboard() {
-  const rows: Array<Array<Record<string, unknown>>> = [
-      [
-        { text: "⚡ Open Gament Mini App", web_app: { url: APP_URL } },
-        { text: "🌐 وب‌اپ", url: APP_URL },
-      ],
-      ...(CHANNEL_URL ? [[{ text: "📣 کانال Gament Games", url: CHANNEL_URL }]] : []),
-      [
-        { text: "🏟 روم‌های فعال", callback_data: "menu:rooms" },
-        { text: "🎮 پیش‌ثبت‌نام", callback_data: "menu:register" },
-      ],
-      [
-        { text: "💳 کیف پول", callback_data: "menu:wallet" },
-        { text: "🏆 تورنومنت‌های من", callback_data: "menu:my_tournaments" },
-      ],
-      [
-        { text: "✅ چک‌این", callback_data: "menu:checkin" },
-        { text: "⚔️ مسابقات من", callback_data: "menu:matches" },
-      ],
-      [
-        { text: "⚔️ 1V1 کلش رویال", callback_data: "menu:clash_qr" },
-        { text: "🎯 مأموریت‌ها", callback_data: "menu:missions" },
-      ],
-      [
-        { text: "🧠 کوییز روزانه", callback_data: "menu:quiz" },
-        { text: "📜 قوانین", callback_data: "menu:rules" },
-      ],
-      [
-        { text: "🎧 پشتیبانی", callback_data: "menu:support" },
-        { text: "🔗 اتصال حساب", callback_data: "menu:link" },
-      ],
-      [
-        { text: "👤 پروفایل", callback_data: "menu:profile" },
-        { text: "👤 وضعیت من", callback_data: "menu:status" },
-      ],
-      [
-        { text: "🆕 ساخت حساب", url: `${APP_URL}/register` },
-        { text: "🌐 پروفایل وب", url: `${APP_URL}/profile` },
-      ],
-    ];
-  return { inline_keyboard: rows };
-}
-
-function gameKeyboard() {
-  return {
-    inline_keyboard: [
-      ...GAME_OPTIONS.map((game) => [{ text: game.label, callback_data: `reg:game:${game.id}` }]),
-      [{ text: "لغو", callback_data: "reg:abort" }],
-    ],
-  };
-}
-
-function platformKeyboard() {
-  const rows = [];
-  for (let i = 0; i < PLATFORM_OPTIONS.length; i += 2) {
-    rows.push(
-      PLATFORM_OPTIONS.slice(i, i + 2).map((platform, offset) => ({
-        text: platform,
-        callback_data: `reg:platform:${i + offset}`,
-      }))
-    );
-  }
-  rows.push([{ text: "لغو", callback_data: "reg:abort" }]);
-  return { inline_keyboard: rows };
-}
-
-function confirmKeyboard() {
-  return {
-    inline_keyboard: [
-      [{ text: "✅ تأیید و ثبت نهایی", callback_data: "reg:confirm" }],
-      [
-        { text: "🔁 شروع دوباره", callback_data: "reg:restart" },
-        { text: "لغو", callback_data: "reg:abort" },
-      ],
-    ],
-  };
-}
-
-function roomsKeyboard(rows: Array<{ id: string; name: string | null; entryFee?: string | null; registeredCount?: number; maxPlayers?: number }>) {
-  const keyboard: Array<Array<Record<string, string>>> = [[{ text: "🌐 مشاهده همه روم‌ها در وب‌اپ", url: `${APP_URL}/tournaments` }]];
-  for (const row of rows.slice(0, 5)) {
-    const title = (row.name || "روم Gament").slice(0, 28);
-    const isFull = typeof row.registeredCount === "number" && typeof row.maxPlayers === "number" && row.registeredCount >= row.maxPlayers;
-    keyboard.push([
-      { text: isFull ? `ظرفیت تکمیل: ${title}` : `✅ ثبت‌نام: ${title}`, callback_data: `join:${row.id}` },
-    ]);
-    keyboard.push([{ text: `جزئیات: ${title}`, url: `${APP_URL}/tournaments/${row.id}` }]);
-  }
-  keyboard.push([{ text: "🎮 پیش‌ثبت‌نام", callback_data: "menu:register" }]);
-  return { inline_keyboard: keyboard };
-}
-
-async function telegramApi(method: string, payload: Record<string, unknown>) {
-  return sharedTelegramApi(method, payload);
-}
-
-async function sendMessage(chatId: number, text: string, replyMarkup?: Record<string, unknown>) {
-  return telegramApi("sendMessage", {
-    chat_id: chatId,
-    text,
-    parse_mode: "HTML",
-    disable_web_page_preview: true,
-    reply_markup: replyMarkup,
-  });
-}
-
-async function sendPhoto(chatId: number, photo: string, caption?: string, replyMarkup?: Record<string, unknown>) {
-  return telegramApi("sendPhoto", {
-    chat_id: chatId,
-    photo,
-    caption,
-    parse_mode: "HTML",
-    reply_markup: replyMarkup,
-  });
-}
-
-async function sendDocument(chatId: number, content: string, filename: string, caption?: string) {
-  const token = process.env.BOT_TOKEN?.trim();
-  if (!token) throw new Error("BOT_TOKEN is missing");
-  const form = new FormData();
-  form.append("chat_id", String(chatId));
-  if (caption) form.append("caption", caption);
-  form.append("document", new Blob([content], { type: "text/csv;charset=utf-8" }), filename);
-  const response = await fetch(`https://api.telegram.org/bot${token}/sendDocument`, { method: "POST", body: form });
-  const result = await response.json().catch(() => null) as { ok?: boolean; description?: string } | null;
-  if (!response.ok || !result?.ok) logger.warn({ status: response.status, result }, "Telegram sendDocument failed");
-  return result;
-}
-
-async function editMessage(chatId: number, messageId: number, text: string, replyMarkup?: Record<string, unknown>) {
-  return telegramApi("editMessageText", {
-    chat_id: chatId,
-    message_id: messageId,
-    text,
-    parse_mode: "HTML",
-    disable_web_page_preview: true,
-    reply_markup: replyMarkup,
-  });
-}
-
-async function answerCallback(callbackQueryId: string, text?: string, showAlert = false) {
-  return telegramApi("answerCallbackQuery", {
-    callback_query_id: callbackQueryId,
-    text,
-    show_alert: showAlert,
-  });
-}
-
-async function isChannelMember(telegramId: string) {
-  const setting = await getTelegramSetting("telegram_require_channel_membership", "");
-  const requireMembership = setting ? setting === "true" : process.env.TELEGRAM_REQUIRE_CHANNEL_MEMBERSHIP === "true";
-  if (!requireMembership) return true;
-  const result = await telegramApi("getChatMember", {
-    chat_id: process.env.TELEGRAM_CHANNEL_ID || "@Gament_games",
-    user_id: Number(telegramId),
-  });
-  const member = result.ok ? result.result as { status?: string } : undefined;
-  return Boolean(member?.status && !["left", "kicked"].includes(member.status));
-}
-
-async function promptChannelMembership(chatId: number) {
-  await sendMessage(chatId, "برای ادامه، اول عضو کانال رسمی Gament Games شو و بعد دوباره تلاش کن:", {
-    inline_keyboard: [
-      [{ text: "📣 عضویت در کانال", url: CHANNEL_URL || "https://t.me/Gament_games" }],
-      [{ text: "✅ عضو شدم", callback_data: "menu:register" }],
-    ],
-  });
-}
-
-async function getLinkedUserByTelegram(telegramId: string) {
-  const [row] = await db
-    .select({
-      userId: telegramAccounts.userId,
-      gamentId: users.gamentId,
-      displayName: users.displayName,
-      username: users.username,
-      role: users.role,
-      level: users.level,
-      rankPoints: users.rankPoints,
-    })
-    .from(telegramAccounts)
-    .leftJoin(users, eq(telegramAccounts.userId, users.id))
-    .where(eq(telegramAccounts.telegramId, telegramId))
-    .limit(1);
-  return row || null;
-}
 
 function isFreeEntryFee(entryFee?: string | null) {
   const value = normalizeDigits(entryFee || "").trim().toLowerCase();
@@ -465,80 +58,6 @@ async function getOrCreateWallet(userId: string, tx: any = db) {
   return created;
 }
 
-
-async function downloadTelegramPhotoAsDataUrl(fileId: string) {
-  const token = process.env.BOT_TOKEN?.trim();
-  if (!token) throw new Error("BOT_TOKEN is missing");
-  const fileInfo = await telegramApi("getFile", { file_id: fileId }) as { ok?: boolean; result?: { file_path?: string; file_size?: number } } | null;
-  const filePath = fileInfo?.result?.file_path;
-  if (!fileInfo?.ok || !filePath) throw new Error("TELEGRAM_FILE_NOT_FOUND");
-  const size = Number(fileInfo.result?.file_size || 0);
-  if (size > 1.2 * 1024 * 1024) throw new Error("RECEIPT_TOO_LARGE");
-
-  const res = await fetch(`https://api.telegram.org/file/bot${token}/${filePath}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("TELEGRAM_FILE_DOWNLOAD_FAILED");
-  const contentType = res.headers.get("content-type") || "image/jpeg";
-  if (!contentType.startsWith("image/")) throw new Error("INVALID_RECEIPT_TYPE");
-  const buffer = Buffer.from(await res.arrayBuffer());
-  if (buffer.byteLength > 1.2 * 1024 * 1024) throw new Error("RECEIPT_TOO_LARGE");
-  return {
-    dataUrl: `data:${contentType};base64,${buffer.toString("base64")}`,
-    contentType,
-    size: buffer.byteLength,
-    fileName: filePath.split("/").pop() || "telegram-receipt.jpg",
-  };
-}
-
-
-async function downloadTelegramPhotoAsBuffer(fileId: string, maxBytes = 2 * 1024 * 1024) {
-  const token = process.env.BOT_TOKEN?.trim();
-  if (!token) throw new Error("BOT_TOKEN is missing");
-  const fileInfo = await telegramApi("getFile", { file_id: fileId }) as { ok?: boolean; result?: { file_path?: string; file_size?: number } } | null;
-  const filePath = fileInfo?.result?.file_path;
-  if (!fileInfo?.ok || !filePath) throw new Error("TELEGRAM_FILE_NOT_FOUND");
-  const size = Number(fileInfo.result?.file_size || 0);
-  if (size > maxBytes) throw new Error("QR_TOO_LARGE");
-
-  const res = await fetch(`https://api.telegram.org/file/bot${token}/${filePath}`, { cache: "no-store" });
-  if (!res.ok) throw new Error("TELEGRAM_FILE_DOWNLOAD_FAILED");
-  const contentType = res.headers.get("content-type") || "image/jpeg";
-  if (!contentType.startsWith("image/")) throw new Error("INVALID_QR_TYPE");
-  const buffer = Buffer.from(await res.arrayBuffer());
-  if (buffer.byteLength > maxBytes) throw new Error("QR_TOO_LARGE");
-  return {
-    buffer,
-    contentType,
-    size: buffer.byteLength,
-    fileName: filePath.split("/").pop() || "telegram-qr.jpg",
-  };
-}
-
-function extractInviteReference(value?: string | null) {
-  const input = normalizeDigits(value || "").trim();
-  if (!input) return null;
-  const match = input.match(/(?:https?:\/\/|clashroyale:\/\/|supercell:\/\/|scid:\/\/)[^\s<>"']+/i);
-  const candidate = (match?.[0] || input).trim().replace(/[،,؛;.)\]]+$/g, "");
-  if (candidate.length < 4 || candidate.length > 500) return null;
-  return candidate;
-}
-
-function isHttpUrl(value?: string | null) {
-  return /^https?:\/\//i.test(String(value || "").trim());
-}
-
-async function decodeQrInviteFromTelegramPhoto(fileId: string) {
-  try {
-    const file = await downloadTelegramPhotoAsBuffer(fileId);
-    const image = await Jimp.read(file.buffer);
-    const bitmap = image.bitmap;
-    const data = new Uint8ClampedArray(bitmap.data.buffer, bitmap.data.byteOffset, bitmap.data.byteLength);
-    const decoded = jsQR(data, bitmap.width, bitmap.height);
-    return extractInviteReference(decoded?.data || "");
-  } catch (err) {
-    logger.warn({ err }, "Failed to decode Clash Royale QR from Telegram photo");
-    return null;
-  }
-}
 
 async function notifyAdminsOnWalletDeposit(user: TelegramUser, userId: string, amountRial: bigint, txId: string) {
   const adminIds = getAdminIds();
@@ -581,49 +100,6 @@ async function rewardUserXP(userId: string, amount: number, reason: string) {
     logger.warn({ err, userId, amount, reason }, "Failed to reward XP");
     return "";
   }
-}
-
-async function getSession(telegramId: string): Promise<BotSession> {
-  const [row] = await db
-    .select({ state: telegramBotSessions.state, data: telegramBotSessions.data })
-    .from(telegramBotSessions)
-    .where(eq(telegramBotSessions.telegramId, telegramId))
-    .limit(1);
-
-  if (!row) return { state: "idle", data: {} };
-  return {
-    state: (row.state || "idle") as BotState,
-    data: (row.data || {}) as SessionData,
-  };
-}
-
-async function setSession(telegramId: string, state: BotState, data: SessionData) {
-  await db
-    .insert(telegramBotSessions)
-    .values({ telegramId, state, data, updatedAt: new Date() })
-    .onConflictDoUpdate({
-      target: telegramBotSessions.telegramId,
-      set: { state, data, updatedAt: new Date() },
-    });
-}
-
-async function clearSession(telegramId: string) {
-  await db.delete(telegramBotSessions).where(eq(telegramBotSessions.telegramId, telegramId));
-}
-
-function registrationSummary(data: SessionData) {
-  return [
-    "⚡ <b>خلاصه پیش‌ثبت‌نام Gament</b>",
-    "",
-    `🎮 بازی: <b>${html(gameLabel(data.game))}</b>`,
-    `🕹 پلتفرم: <b>${html(data.platform || "-")}</b>`,
-    `👤 نام: <b>${html(data.fullName || "-")}</b>`,
-    `🏷 آیدی بازی: <b>${html(data.gamerTag || "-")}</b>`,
-    data.gamentId ? `🆔 Gament ID: <code>${html(data.gamentId)}</code>` : "🆔 Gament ID: <b>ثبت نشده</b>",
-    `📞 شماره تماس: <b>${html(data.phoneNumber || "-")}</b>`,
-    data.city ? `📍 شهر: <b>${html(data.city)}</b>` : "",
-    data.teamName ? `👥 تیم/کلن: <b>${html(data.teamName)}</b>` : "",
-  ].filter(Boolean).join("\n");
 }
 
 async function findLinkedUserId(gamentId: string | undefined, phoneNumber: string) {
@@ -1336,17 +812,6 @@ async function unregisterCommand(chatId: number, telegramId: string) {
   await sendMessage(chatId, "پیش‌ثبت‌نام تلگرامی شما لغو/آرشیو شد.", mainMenuKeyboard());
 }
 
-function getAdminIds() {
-  return (process.env.TELEGRAM_ADMIN_IDS || process.env.ADMIN_IDS || "")
-    .split(",")
-    .map((item) => item.trim())
-    .filter(Boolean);
-}
-
-function hasAdminAccess(telegramId: string) {
-  return getAdminIds().includes(telegramId);
-}
-
 async function notifyAdminsOnPreRegistration(user: TelegramUser, data: SessionData, linkedUserId: string | null) {
   const adminIds = getAdminIds();
   if (!adminIds.length) return;
@@ -1982,93 +1447,6 @@ async function startDispute(chatId: number, telegramId: string, matchId: string)
 async function startEvidenceUpload(chatId: number, telegramId: string, matchId: string) {
   await setSession(telegramId, "evidence_upload", { evidenceMatchId: matchId });
   await sendMessage(chatId, "📎 لطفاً اسکرین‌شات نتیجه را به‌صورت عکس ارسال کن. کپشن اختیاری است.", replyKeyboard([[CANCEL_TEXT]]));
-}
-
-function splitTelegramText(value: string, maxLength = 2800) {
-  const chunks: string[] = [];
-  let rest = value.trim();
-
-  while (rest.length > maxLength) {
-    const candidate = rest.slice(0, maxLength);
-    const breakAt = Math.max(candidate.lastIndexOf("\n"), candidate.lastIndexOf(" "));
-    const end = breakAt > maxLength * 0.6 ? breakAt : maxLength;
-    chunks.push(rest.slice(0, end).trim());
-    rest = rest.slice(end).trim();
-  }
-
-  if (rest) chunks.push(rest);
-  return chunks;
-}
-
-async function aiCommand(chatId: number, prompt: string, telegramId: string) {
-  const query = prompt.trim();
-  if (!query) {
-    await sendMessage(chatId, "سؤال را بعد از دستور بنویس. مثال:\n<code>/ai بهترین دک کلش رویال برای شروع تورنومنت چیه؟</code>");
-    return;
-  }
-
-  const quota = await rateLimit(`telegram-ai:${telegramId}`, 8, 5 * 60 * 1000);
-  if (!quota.success) {
-    await sendMessage(chatId, "⏳ تعداد درخواست‌های دستیار زیاد شده. چند دقیقه دیگر دوباره امتحان کن.");
-    return;
-  }
-
-  const linked = await getLinkedUserByTelegram(telegramId);
-  const context = { lang: "fa" as const, userName: linked?.displayName || undefined };
-  await telegramApi("sendChatAction", { chat_id: chatId, action: "typing" });
-
-  const streamed = await streamRealAssistantResponse(query, context);
-  if (!streamed) {
-    const fallback = await generateRealAssistantResponse(query, context);
-    await sendMessage(chatId, `🤖 <b>دستیار Gament</b>\n\n${html(fallback.response)}\n\n<code>${fallback.provider}</code>`);
-    return;
-  }
-
-  const draftId = crypto.randomInt(1, 2_147_483_647);
-  let answer = "";
-  let lastDraftAt = 0;
-  let streamFailed = false;
-
-  try {
-    for await (const delta of streamed.textStream) {
-      answer += delta;
-      const now = Date.now();
-
-      // Telegram message drafts are supported in private chats. Updating at
-      // most once per second keeps animation smooth without hitting flood
-      // limits or building a large outgoing queue.
-      if (chatId > 0 && (lastDraftAt === 0 || now - lastDraftAt >= 1_000)) {
-        const preview = `🤖 دستیار Gament\n\n${answer.slice(0, 3800)}`;
-        await telegramApi("sendMessageDraft", {
-          chat_id: chatId,
-          draft_id: draftId,
-          text: preview,
-        });
-        lastDraftAt = Date.now();
-      }
-    }
-  } catch (err) {
-    streamFailed = true;
-    logger.warn({ err, telegramId }, "Telegram AI stream interrupted");
-  }
-
-  if (!answer.trim()) {
-    const fallback = await generateRealAssistantResponse(query, context);
-    answer = fallback.response;
-  }
-
-  const provider = streamed.provider === "cache"
-    ? streamed.cachedProvider || "cache"
-    : streamed.provider;
-  const chunks = splitTelegramText(answer);
-
-  for (let index = 0; index < chunks.length; index++) {
-    const heading = index === 0 ? "🤖 <b>دستیار Gament</b>\n\n" : "";
-    const footer = index === chunks.length - 1
-      ? `\n\n<code>${html(provider)}${streamFailed ? " • partial" : ""}</code>`
-      : "";
-    await sendMessage(chatId, `${heading}${html(chunks[index])}${footer}`);
-  }
 }
 
 async function inviteCommand(chatId: number, telegramId: string) {
@@ -3321,8 +2699,9 @@ async function handleCommand(message: TelegramMessage, text: string) {
   const user = message.from;
   if (!user) return;
   const telegramId = String(user.id);
-  const [command, ...args] = text.trim().split(/\s+/);
-  const normalizedCommand = command.split("@")[0].toLowerCase();
+  const parsed = parseTelegramCommand(text);
+  if (!parsed) return;
+  const { command: normalizedCommand, args } = parsed;
 
   if (normalizedCommand === "/start") {
     const payload = args[0];
