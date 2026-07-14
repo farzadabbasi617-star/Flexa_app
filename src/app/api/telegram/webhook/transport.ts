@@ -1,3 +1,4 @@
+import { InputFile } from "grammy";
 import logger from "@/lib/logger";
 import { telegramApi } from "@/lib/telegram";
 
@@ -15,6 +16,22 @@ export async function sendPhoto(chatId: number, photo: string, caption?: string,
   return telegramApi("sendPhoto", {
     chat_id: chatId,
     photo,
+    caption,
+    parse_mode: "HTML",
+    reply_markup: replyMarkup,
+  });
+}
+
+export async function sendPhotoBuffer(
+  chatId: number,
+  buffer: Buffer,
+  filename: string,
+  caption?: string,
+  replyMarkup?: Record<string, unknown>
+) {
+  return telegramApi("sendPhoto", {
+    chat_id: chatId,
+    photo: new InputFile(buffer, filename),
     caption,
     parse_mode: "HTML",
     reply_markup: replyMarkup,

@@ -10,6 +10,7 @@ import {
 } from "@/lib/telegram-reliability";
 import { generateDailyGamingNews } from "@/lib/gaming-news-generator";
 import logger from "@/lib/logger";
+import { runClash1v1MatchmakingAndNotify } from "../webhook/commands/clash-1v1";
 
 export const dynamic = "force-dynamic";
 
@@ -491,6 +492,7 @@ export async function GET(request: NextRequest) {
   const reminders = await safeCronStep("reminders", sendReminders);
   const capacity = await safeCronStep("capacity", sendCapacityAlerts);
   const lobby = await safeCronStep("lobby", sendLobbyNotices);
+  const clash1v1Matchmaking = await safeCronStep("clash1v1Matchmaking", runClash1v1MatchmakingAndNotify);
   const matchAssigned = await safeCronStep("matchAssigned", sendMatchAssignmentNotifications);
   const matchScheduled = await safeCronStep("matchScheduled", sendMatchScheduleNotifications);
   const matchResults = await safeCronStep("matchResults", sendMatchResultNotifications);
@@ -512,6 +514,7 @@ export async function GET(request: NextRequest) {
     reminders,
     capacity,
     lobby,
+    clash1v1Matchmaking,
     matchAssigned,
     matchScheduled,
     matchResults,
