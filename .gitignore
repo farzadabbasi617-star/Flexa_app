@@ -17,6 +17,9 @@ tsconfig.tsbuildinfo
 # Test artifacts
 coverage/
 .vitest/
+playwright-report/
+test-results/
+blob-report/
 
 # Local/user uploads and accidental screenshots
 uploads/

@@ -3,6 +3,8 @@
  * Handles AI-powered judging, moderation, and assistance
  */
 
+import { detectPersianProfanity } from "./persian-moderation";
+
 // Types
 export interface AIJudgmentResult {
   verdict: "player1_wins" | "player2_wins" | "draw" | "rematch" | "needs_review";
@@ -68,9 +70,12 @@ const AI_CONFIG = {
 const TOXIC_PATTERNS = [
   /fuck|shit|damn|ass|bitch/i,
   /idiot|stupid|dumb|loser/i,
-  /hack|cheat|exploit/i,
   /kill\s*yourself|kys/i,
 ];
+
+// Talking about cheats can be legitimate in a gaming-support context, so this
+// is a low-severity signal rather than profanity by itself.
+const CHEATING_REFERENCE_PATTERNS = [/hack|cheat|exploit/i];
 
 const SPAM_PATTERNS = [
   /(.)\1{5,}/i, // Repeated characters
@@ -262,11 +267,29 @@ export function moderateMessage(message: string): AIModerationResult {
   const categories: string[] = [];
   let toxicityScore = 0;
 
-  // Check for toxic content
+  // Check Persian first. The detector normalizes Arabic/Persian variants and
+  // zero-width characters, and uses exact tokens to keep false positives low.
+  const persianProfanity = detectPersianProfanity(message);
+  if (persianProfanity.detected) {
+    toxicityScore += 0.75;
+    categories.push("toxic_language");
+    categories.push("persian_profanity");
+  }
+
+  // Check for toxic English content. Do not add the same category twice when
+  // a bilingual message contains both Persian and English profanity.
   for (const pattern of TOXIC_PATTERNS) {
     if (pattern.test(message)) {
-      toxicityScore += 0.3;
-      categories.push("toxic_language");
+      toxicityScore += 0.75;
+      if (!categories.includes("toxic_language")) categories.push("toxic_language");
+      break;
+    }
+  }
+
+  for (const pattern of CHEATING_REFERENCE_PATTERNS) {
+    if (pattern.test(message)) {
+      toxicityScore += 0.1;
+      categories.push("cheating_reference");
       break;
     }
   }

@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
@@ -27,6 +28,7 @@
     "jsqr": "^1.4.0",
     "mailchecker": "^6.0.20",
     "next": "^16.2.10",
+    "persian-swear-words": "^3.0.0",
     "pg": "8.20.0",
     "pino": "^10.3.1",
     "postcss": "^8.5.15",
@@ -45,6 +47,7 @@
     }
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@types/argon2": "^0.14.1",
     "@types/node": "22.19.15",
     "@types/pg": "8.18.0",

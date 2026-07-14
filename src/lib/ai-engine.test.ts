@@ -88,9 +88,23 @@ describe("moderateMessage", () => {
     expect(r.toxicityScore).toBeLessThan(70);
   });
 
-  it("blocks toxic language", () => {
+  it("blocks toxic English language", () => {
     const r = moderateMessage("you are an idiot and a loser");
     expect(r.categories).toContain("toxic_language");
+    expect(r.isAllowed).toBe(false);
+  });
+
+  it("blocks normalized Persian profanity", () => {
+    const r = moderateMessage("واقعاً بی‌شعور هستی");
+    expect(r.categories).toContain("persian_profanity");
+    expect(r.isAllowed).toBe(false);
+  });
+
+  it("does not treat a normal cheating report as profanity", () => {
+    const r = moderateMessage("یک نفر از cheat استفاده کرده، لطفاً بررسی کنید");
+    expect(r.categories).toContain("cheating_reference");
+    expect(r.categories).not.toContain("toxic_language");
+    expect(r.isAllowed).toBe(true);
   });
 
   it("flags spam (repeated characters)", () => {
