@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { classifiedAds, classifiedScrapeLogs, clash1v1Entries, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramBotSessions, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews, siteSettings } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { publishHonorToTelegramChannel, publishTournamentToTelegramChannel, telegramApi as sharedTelegramApi } from "@/lib/telegram";
-import { generateRealAssistantResponse } from "@/lib/ai-service";
+import { generateRealAssistantResponse, streamRealAssistantResponse } from "@/lib/ai-service";
 import { getGameIdGuide, gameGuideKeyboard } from "./guide";
 import { bigIntFromText, formatTomanFromRial, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
@@ -1984,16 +1984,91 @@ async function startEvidenceUpload(chatId: number, telegramId: string, matchId: 
   await sendMessage(chatId, "📎 لطفاً اسکرین‌شات نتیجه را به‌صورت عکس ارسال کن. کپشن اختیاری است.", replyKeyboard([[CANCEL_TEXT]]));
 }
 
+function splitTelegramText(value: string, maxLength = 2800) {
+  const chunks: string[] = [];
+  let rest = value.trim();
+
+  while (rest.length > maxLength) {
+    const candidate = rest.slice(0, maxLength);
+    const breakAt = Math.max(candidate.lastIndexOf("\n"), candidate.lastIndexOf(" "));
+    const end = breakAt > maxLength * 0.6 ? breakAt : maxLength;
+    chunks.push(rest.slice(0, end).trim());
+    rest = rest.slice(end).trim();
+  }
+
+  if (rest) chunks.push(rest);
+  return chunks;
+}
+
 async function aiCommand(chatId: number, prompt: string, telegramId: string) {
   const query = prompt.trim();
   if (!query) {
     await sendMessage(chatId, "سؤال را بعد از دستور بنویس. مثال:\n<code>/ai بهترین دک کلش رویال برای شروع تورنومنت چیه؟</code>");
     return;
   }
+
+  const quota = await rateLimit(`telegram-ai:${telegramId}`, 8, 5 * 60 * 1000);
+  if (!quota.success) {
+    await sendMessage(chatId, "⏳ تعداد درخواست‌های دستیار زیاد شده. چند دقیقه دیگر دوباره امتحان کن.");
+    return;
+  }
+
   const linked = await getLinkedUserByTelegram(telegramId);
-  await sendMessage(chatId, "🤖 در حال فکر کردن...");
-  const response = await generateRealAssistantResponse(query, { lang: "fa", userName: linked?.displayName || undefined });
-  await sendMessage(chatId, `🤖 <b>دستیار Gament</b>\n\n${html(response.response)}\n\n<code>${response.provider}</code>`);
+  const context = { lang: "fa" as const, userName: linked?.displayName || undefined };
+  await telegramApi("sendChatAction", { chat_id: chatId, action: "typing" });
+
+  const streamed = await streamRealAssistantResponse(query, context);
+  if (!streamed) {
+    const fallback = await generateRealAssistantResponse(query, context);
+    await sendMessage(chatId, `🤖 <b>دستیار Gament</b>\n\n${html(fallback.response)}\n\n<code>${fallback.provider}</code>`);
+    return;
+  }
+
+  const draftId = crypto.randomInt(1, 2_147_483_647);
+  let answer = "";
+  let lastDraftAt = 0;
+  let streamFailed = false;
+
+  try {
+    for await (const delta of streamed.textStream) {
+      answer += delta;
+      const now = Date.now();
+
+      // Telegram message drafts are supported in private chats. Updating at
+      // most once per second keeps animation smooth without hitting flood
+      // limits or building a large outgoing queue.
+      if (chatId > 0 && (lastDraftAt === 0 || now - lastDraftAt >= 1_000)) {
+        const preview = `🤖 دستیار Gament\n\n${answer.slice(0, 3800)}`;
+        await telegramApi("sendMessageDraft", {
+          chat_id: chatId,
+          draft_id: draftId,
+          text: preview,
+        });
+        lastDraftAt = Date.now();
+      }
+    }
+  } catch (err) {
+    streamFailed = true;
+    logger.warn({ err, telegramId }, "Telegram AI stream interrupted");
+  }
+
+  if (!answer.trim()) {
+    const fallback = await generateRealAssistantResponse(query, context);
+    answer = fallback.response;
+  }
+
+  const provider = streamed.provider === "cache"
+    ? streamed.cachedProvider || "cache"
+    : streamed.provider;
+  const chunks = splitTelegramText(answer);
+
+  for (let index = 0; index < chunks.length; index++) {
+    const heading = index === 0 ? "🤖 <b>دستیار Gament</b>\n\n" : "";
+    const footer = index === chunks.length - 1
+      ? `\n\n<code>${html(provider)}${streamFailed ? " • partial" : ""}</code>`
+      : "";
+    await sendMessage(chatId, `${heading}${html(chunks[index])}${footer}`);
+  }
 }
 
 async function inviteCommand(chatId: number, telegramId: string) {

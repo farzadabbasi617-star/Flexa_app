@@ -1,4 +1,4 @@
-import { fetchAIResponse } from "./ai-provider-manager";
+import { fetchAIResponse, fetchAIResponseStream } from "./ai-provider-manager";
 import { analyzeMatch, generateAssistantResponse, AIJudgmentResult } from "./ai-engine";
 import { safeParseAIJson } from "./ai-utils";
 import { gamentSystemPrompt } from "./ai-prompts";
@@ -47,6 +47,36 @@ export async function generateRealAssistantResponse(
     suggestions,
     provider: aiResult.provider,
     cachedProvider: aiResult.cachedProvider,
+  };
+}
+
+export interface AssistantAIStreamResponse {
+  textStream: AsyncIterable<string>;
+  provider: AssistantAIResponse["provider"];
+  cachedProvider?: AssistantAIResponse["cachedProvider"];
+}
+
+/** Open a token stream for Telegram's animated AI message drafts. */
+export async function streamRealAssistantResponse(
+  query: string,
+  context: { lang: "en" | "fa"; userName?: string }
+): Promise<AssistantAIStreamResponse | null> {
+  const isFA = context.lang === "fa";
+  const name = context.userName || (isFA ? "کاربر" : "User");
+  const systemPrompt = gamentSystemPrompt(
+    "assistant",
+    isFA
+      ? `نام کاربر: ${name}. فقط فارسی پاسخ بده. پاسخ کوتاه، کاربردی و صمیمی باشد. از HTML و Markdown استفاده نکن.`
+      : `User name: ${name}. Answer briefly in English. Do not use HTML or Markdown.`
+  );
+
+  const result = await fetchAIResponseStream(query, systemPrompt);
+  if (!result) return null;
+
+  return {
+    textStream: result.textStream,
+    provider: result.provider,
+    cachedProvider: result.cachedProvider,
   };
 }
 

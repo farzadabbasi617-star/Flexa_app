@@ -200,3 +200,165 @@ export async function fetchAIResponse(
 
   return null;
 }
+
+export interface AIProviderStreamResult {
+  textStream: AsyncIterable<string>;
+  provider: AIProvider | "cache";
+  cachedProvider?: AIProvider;
+  model?: string;
+}
+
+/** Parse OpenAI-compatible server-sent events into text deltas. */
+export async function* parseOpenAITextStream(
+  body: ReadableStream<Uint8Array>
+): AsyncGenerator<string> {
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+      let newline = buffer.indexOf("\n");
+      while (newline >= 0) {
+        const line = buffer.slice(0, newline).trim();
+        buffer = buffer.slice(newline + 1);
+        newline = buffer.indexOf("\n");
+
+        if (!line.startsWith("data:")) continue;
+        const data = line.slice(5).trim();
+        if (!data) continue;
+        if (data === "[DONE]") return;
+
+        try {
+          const event = JSON.parse(data);
+          const content = event?.choices?.[0]?.delta?.content;
+          if (typeof content === "string" && content) yield content;
+        } catch {
+          // Ignore provider keep-alives or malformed non-content events. A
+          // later valid event can still complete the answer.
+        }
+      }
+
+      if (done) break;
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
+async function openProviderModelStream(
+  provider: (typeof PROVIDERS)[number],
+  model: string,
+  prompt: string,
+  systemPrompt: string
+): Promise<{ source: AsyncIterable<string>; cancel: () => void } | null> {
+  const apiKey = normalizeAIEnvValue(process.env[provider.apiKeyEnv]);
+  if (!isUsableAISecret(apiKey)) return null;
+
+  const { signal, cancel } = timeoutSignal(45_000);
+  try {
+    const response = await fetch(provider.url, {
+      method: "POST",
+      signal,
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        ...(provider.id === "openrouter"
+          ? {
+              "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "https://www.gament1.ir",
+              "X-Title": "Gament Telegram AI",
+            }
+          : {}),
+      },
+      body: JSON.stringify({
+        model,
+        stream: true,
+        temperature: 0.55,
+        max_tokens: 1200,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+
+    if (!response.ok || !response.body) {
+      const errorText = await response.text().catch(() => "");
+      logger.warn(
+        { provider: provider.id, model, status: response.status, body: errorText.slice(0, 300) },
+        "AI streaming provider returned an error"
+      );
+      cancel();
+      return null;
+    }
+
+    return { source: parseOpenAITextStream(response.body), cancel };
+  } catch (err) {
+    cancel();
+    logger.warn({ provider: provider.id, model, err }, "AI streaming provider connection failed");
+    return null;
+  }
+}
+
+/**
+ * Open a real token stream with provider/model failover before the first token.
+ * Completed responses are cached and reused by both streaming and regular AI
+ * calls. A mid-stream provider failure is surfaced to the caller rather than
+ * restarting and duplicating already displayed text.
+ */
+export async function fetchAIResponseStream(
+  prompt: string,
+  systemPrompt: string
+): Promise<AIProviderStreamResult | null> {
+  const cacheKey = `ai_${Buffer.from(`${systemPrompt}\n${prompt}\n`).toString("base64url")}`;
+  const cached = aiCache.get(cacheKey) as { content: string; provider: AIProvider; model?: string } | null;
+
+  if (cached?.content) {
+    async function* cachedStream() {
+      yield cached!.content;
+    }
+    return {
+      textStream: cachedStream(),
+      provider: "cache",
+      cachedProvider: cached.provider,
+      model: cached.model,
+    };
+  }
+
+  for (const provider of PROVIDERS) {
+    if (!isUsableAISecret(normalizeAIEnvValue(process.env[provider.apiKeyEnv]))) continue;
+
+    for (const model of modelsFor(provider)) {
+      const opened = await openProviderModelStream(provider, model, prompt, systemPrompt);
+      if (!opened) continue;
+
+      async function* cacheCompletedStream() {
+        let content = "";
+        let completed = false;
+        try {
+          for await (const delta of opened!.source) {
+            content += delta;
+            yield delta;
+          }
+          completed = true;
+        } finally {
+          opened!.cancel();
+          if (completed && content.trim()) {
+            aiCache.set(cacheKey, { content: content.trim(), provider: provider.id, model }, 3600);
+          }
+        }
+      }
+
+      return {
+        textStream: cacheCompletedStream(),
+        provider: provider.id,
+        model,
+      };
+    }
+  }
+
+  return null;
+}
