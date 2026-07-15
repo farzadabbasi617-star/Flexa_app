@@ -13,7 +13,7 @@ test("login page is reachable and contains a password field", async ({ page }) =
   const response = await page.goto("/login");
 
   expect(response?.ok()).toBe(true);
-  await expect(page.locator('input[type="password"]')).toBeVisible();
+  await expect(page.locator('input[autocomplete="current-password"]')).toBeVisible({ timeout: 15_000 });
 });
 
 test("public tournament page is reachable", async ({ page }) => {

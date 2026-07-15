@@ -12,6 +12,10 @@ export default defineConfig({
   reporter: process.env.CI ? [["github"], ["line"]] : "html",
   use: {
     baseURL: externalBaseUrl || localBaseUrl,
+    // The production PWA service worker intentionally caches navigation. E2E
+    // smoke tests must always inspect the freshly requested route instead of a
+    // cached fallback page from a previous test.
+    serviceWorkers: "block",
     trace: "on-first-retry",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
