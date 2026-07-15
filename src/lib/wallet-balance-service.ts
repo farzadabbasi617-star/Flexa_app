@@ -17,6 +17,7 @@ async function repairMoneySchema(client: any) {
         WHERE table_schema = 'public' AND table_name = 'wallets'
           AND column_name = 'balance' AND data_type IN ('text', 'character varying')
       ) THEN
+        ALTER TABLE wallets ALTER COLUMN balance DROP DEFAULT;
         ALTER TABLE wallets
           ALTER COLUMN balance TYPE numeric(20,0)
           USING CASE
@@ -31,6 +32,7 @@ async function repairMoneySchema(client: any) {
         WHERE table_schema = 'public' AND table_name = 'transactions'
           AND column_name = 'amount' AND data_type IN ('text', 'character varying')
       ) THEN
+        ALTER TABLE transactions ALTER COLUMN amount DROP DEFAULT;
         ALTER TABLE transactions
           ALTER COLUMN amount TYPE numeric(20,0)
           USING CASE

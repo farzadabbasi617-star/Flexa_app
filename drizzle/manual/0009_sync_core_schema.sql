@@ -22,10 +22,12 @@ DO $$ BEGIN
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- Bring early text money columns in line with the Drizzle schema.
+ALTER TABLE wallets ALTER COLUMN balance DROP DEFAULT;
 ALTER TABLE wallets
   ALTER COLUMN balance TYPE numeric(20,0) USING COALESCE(NULLIF(balance::text, ''), '0')::numeric(20,0),
   ALTER COLUMN balance SET DEFAULT 0;
 
+ALTER TABLE transactions ALTER COLUMN amount DROP DEFAULT;
 ALTER TABLE transactions
   ALTER COLUMN amount TYPE numeric(20,0) USING COALESCE(NULLIF(amount::text, ''), '0')::numeric(20,0);
 

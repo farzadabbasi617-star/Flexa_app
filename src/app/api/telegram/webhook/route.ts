@@ -443,6 +443,18 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
     await sendMessage(chatId, "تورنومنت پیدا نشد یا حذف شده است.");
     return;
   }
+
+  // Legacy room/channel buttons for the system Clash queue used `join:<id>`.
+  // Route them into the dedicated atomic queue instead of the generic
+  // tournament/coupon registration path.
+  if (
+    tournament.game === CLASH_1V1_CONFIG.game &&
+    (tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel || tournament.name === CLASH_1V1_CONFIG.name)
+  ) {
+    await registerClash1v1Queue(chatId, telegramId);
+    return;
+  }
+
   if (tournament.status !== "registration") {
     await sendMessage(chatId, "ثبت‌نام این تورنومنت در حال حاضر باز نیست.");
     return;
