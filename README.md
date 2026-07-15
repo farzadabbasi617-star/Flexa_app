@@ -93,6 +93,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0006_add_telegram_marketing_and_waitlist.
 psql "$DATABASE_URL" -f drizzle/manual/0009_sync_core_schema.sql
 psql "$DATABASE_URL" -f drizzle/manual/0010_harden_registration_integrity.sql
 psql "$DATABASE_URL" -f drizzle/manual/0024_add_telegram_reliability.sql
+psql "$DATABASE_URL" -f drizzle/manual/0025_repair_wallet_money_types.sql
 ```
 
 یا محتوای فایل‌ها را داخل SQL Editor دیتابیس/Neon اجرا کنید.

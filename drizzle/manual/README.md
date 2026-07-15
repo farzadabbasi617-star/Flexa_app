@@ -33,6 +33,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | `0022_add_registration_game_invites.sql` | Adds per-registration game invite fields for Clash Royale QR/Share Link matchmaking in the Telegram bot. |
 | `0023_add_clash_1v1_entries.sql` | Adds a standalone paid Clash Royale 1V1 queue table for repeatable Telegram matchmaking entries. |
 | `0024_add_telegram_reliability.sql` | Adds incoming webhook idempotency leases and the PostgreSQL-backed outgoing Telegram message queue. |
+| `0025_repair_wallet_money_types.sql` | Converts legacy text wallet/transaction money columns to `numeric(20,0)` without losing valid balances. |
 
 > **Email verification (required before deploying the email-OTP auth flow):**
 > Run `0019_add_email_verification.sql` and set `RESEND_API_KEY` (and

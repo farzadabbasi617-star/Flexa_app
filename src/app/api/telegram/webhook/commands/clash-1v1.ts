@@ -14,6 +14,7 @@ import {
 import { CLASH_1V1_CONFIG, ensureClash1v1Schema } from "@/lib/clash-1v1";
 import { bigIntFromText, formatTomanFromRial } from "@/lib/money";
 import logger from "@/lib/logger";
+import { updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
 import { APP_URL, CANCEL_TEXT } from "../config";
 import { decodeQrInviteFromTelegramPhoto } from "../files";
 import { mainMenuKeyboard, removeKeyboard, replyKeyboard } from "../keyboards";
@@ -449,11 +450,7 @@ export async function registerClash1v1Queue(chatId: number, telegramId: string) 
           .returning();
       }
 
-      const [debited] = await tx
-        .update(wallets)
-        .set({ balance: sql`${wallets.balance} - ${feeRial.toString()}`, updatedAt: new Date() })
-        .where(and(eq(wallets.id, wallet.id), sql`${wallets.balance} >= ${feeRial.toString()}`))
-        .returning({ id: wallets.id });
+      const debited = await updateWalletBalanceSafely(tx, wallet.id, feeRial, "decrease");
       if (!debited) {
         const [current] = await tx.select({ balance: wallets.balance }).from(wallets).where(eq(wallets.id, wallet.id)).limit(1);
         return { kind: "insufficient" as const, balance: bigIntFromText(current?.balance || "0") };
@@ -624,10 +621,13 @@ export async function cancelClash1v1Queue(chatId: number, telegramId: string, en
         if (!wallet) {
           [wallet] = await tx.insert(wallets).values({ userId: linked.userId, balance: "0", currency: "RIAL" }).returning();
         }
-        await tx
-          .update(wallets)
-          .set({ balance: sql`${wallets.balance} + ${entry.entryFeeRial}`, updatedAt: new Date() })
-          .where(eq(wallets.id, wallet.id));
+        const refunded = await updateWalletBalanceSafely(
+          tx,
+          wallet.id,
+          bigIntFromText(entry.entryFeeRial),
+          "increase"
+        );
+        if (!refunded) throw new Error("CLASH_QUEUE_REFUND_WALLET_UPDATE_FAILED");
         await tx.insert(transactions).values({
           walletId: wallet.id,
           amount: entry.entryFeeRial,

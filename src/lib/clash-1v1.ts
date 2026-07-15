@@ -1,11 +1,13 @@
 import { db } from "@/db";
 import { clash1v1Entries, matches, players, tournaments, transactions, wallets } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
+import { ensureWalletMoneySchema, updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
 
 
 let clash1v1SchemaReady: Promise<void> | null = null;
 
 async function createClash1v1Schema(client: any) {
+  await ensureWalletMoneySchema(client);
   await client.execute(sql.raw(`DO $$ BEGIN
     CREATE TYPE clash_1v1_entry_status AS ENUM ('waiting_qr', 'queued', 'matched', 'completed', 'cancelled');
   EXCEPTION WHEN duplicate_object THEN NULL; END $$;`));
@@ -129,13 +131,8 @@ export async function payoutClash1v1Prize(tx: any, matchId: string, winnerPlayer
   }
 
   const amountRial = clash1v1PrizeRial();
-  await tx
-    .update(wallets)
-    .set({
-      balance: sql`${wallets.balance} + ${amountRial.toString()}`,
-      updatedAt: new Date(),
-    })
-    .where(eq(wallets.id, wallet.id));
+  const credited = await updateWalletBalanceSafely(tx, wallet.id, amountRial, "increase");
+  if (!credited) throw new Error("CLASH_1V1_PRIZE_WALLET_UPDATE_FAILED");
 
   const [transaction] = await tx
     .insert(transactions)
