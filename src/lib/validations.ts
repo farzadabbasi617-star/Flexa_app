@@ -108,6 +108,16 @@ export const EmailOtpVerifySchema = z.object({
   code: z.string().trim().regex(/^\d{6}$/, "کد تایید باید ۶ رقم باشد"),
 });
 
+export const PasswordResetRequestSchema = z.object({
+  email: requiredEmail,
+});
+
+export const PasswordResetConfirmSchema = z.object({
+  email: requiredEmail,
+  code: z.string().trim().regex(/^\d{6}$/, "کد بازیابی باید ۶ رقم باشد"),
+  password: passwordSchema,
+});
+
 export const LoginSchema = z.object({
   identifier: z
     .string()

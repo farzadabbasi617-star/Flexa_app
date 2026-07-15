@@ -17,6 +17,13 @@ test("login page is reachable", async ({ page }) => {
   await expect(page.locator("body")).toBeVisible();
 });
 
+test("password recovery page is reachable", async ({ page }) => {
+  const response = await page.goto("/forgot-password");
+  expect(response?.ok()).toBe(true);
+  await expect(page).toHaveURL(/\/forgot-password$/);
+  await expect(page.locator("body")).toBeVisible();
+});
+
 test("public tournament page is reachable", async ({ page }) => {
   const response = await page.goto("/tournaments");
 

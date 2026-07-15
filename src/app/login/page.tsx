@@ -223,9 +223,14 @@ export default function LoginPage() {
             </div>
 
             <div>
-              <label className="block text-sm text-gray-400 mb-2">
-                {t.auth.password}
-              </label>
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <label className="block text-sm text-gray-400">
+                  {t.auth.password}
+                </label>
+                <Link href="/forgot-password" className="text-xs text-neon-blue hover:underline">
+                  {lang === "fa" ? "رمز را فراموش کرده‌اید؟" : "Forgot password?"}
+                </Link>
+              </div>
               <input
                 type="password"
                 required

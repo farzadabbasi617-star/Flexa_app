@@ -4,24 +4,21 @@ import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 import logger from "@/lib/logger";
 
-const OTP_TTL_MS = 15 * 60 * 1000; // 15 minutes
-const RESEND_COOLDOWN_MS = 60 * 1000; // 1 minute between resend requests
+const OTP_TTL_MS = 15 * 60 * 1000;
+const RESEND_COOLDOWN_MS = 60 * 1000;
 
-/**
- * Thrown for expected, user-facing verification failures (bad/expired
- * code). API routes should catch specifically this type and show its
- * message directly; any other thrown error (DB connectivity, etc.) should
- * be logged and replaced with a generic message so raw SQL/error internals
- * are never leaked to the client.
- */
 export class InvalidOtpError extends Error {}
 
+function normalizedEmail(email: string) {
+  return email.trim().toLowerCase();
+}
 
-// Verification tokens are keyed by "email:<address>" so the same table can
-// later host other kinds of OTPs (e.g. phone) without colliding on the
-// plain identifier.
 function emailIdentifier(email: string) {
-  return `email:${email.trim().toLowerCase()}`;
+  return `email:${normalizedEmail(email)}`;
+}
+
+function passwordResetIdentifier(email: string) {
+  return `password-reset:${normalizedEmail(email)}`;
 }
 
 function hashOtpToken(identifier: string, token: string) {
@@ -29,22 +26,24 @@ function hashOtpToken(identifier: string, token: string) {
   return crypto.createHmac("sha256", pepper).update(`${identifier}:${token}`).digest("hex");
 }
 
-function otpEmailHtml(code: string) {
+function otpEmailHtml(input: {
+  code: string;
+  heading: string;
+  description: string;
+  warning: string;
+}) {
   return `
-  <div style="font-family: 'Segoe UI', Tahoma, sans-serif; background:#050508; padding:32px; color:#fff;">
+  <div dir="rtl" style="font-family:Tahoma,'Segoe UI',sans-serif;background:#050508;padding:32px;color:#fff;">
     <div style="max-width:420px;margin:0 auto;background:#111114;border-radius:20px;padding:32px;border:1px solid rgba(168,85,247,.25);">
       <div style="text-align:center;margin-bottom:24px;">
-        <div style="font-size:22px;font-weight:900;background:linear-gradient(90deg,#c084fc,#67e8f9);-webkit-background-clip:text;background-clip:text;color:transparent;">GAMENT</div>
+        <div style="font-size:22px;font-weight:900;color:#c084fc;">GAMENT</div>
       </div>
-      <p style="font-size:14px;line-height:1.9;color:#d1d5db;margin:0 0 20px;">
-        کد تایید حساب گیمنت شما:
-      </p>
-      <div style="text-align:center;margin-bottom:20px;">
-        <span style="display:inline-block;font-size:32px;font-weight:900;letter-spacing:8px;color:#c084fc;background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);border-radius:14px;padding:14px 24px;">${code}</span>
+      <h1 style="font-size:18px;color:#fff;margin:0 0 12px;">${input.heading}</h1>
+      <p style="font-size:14px;line-height:1.9;color:#d1d5db;margin:0 0 20px;">${input.description}</p>
+      <div style="text-align:center;margin-bottom:20px;direction:ltr;">
+        <span style="display:inline-block;font-size:32px;font-weight:900;letter-spacing:8px;color:#c084fc;background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.3);border-radius:14px;padding:14px 24px;">${input.code}</span>
       </div>
-      <p style="font-size:12px;color:#9ca3af;line-height:1.8;margin:0;">
-        این کد تا ۱۵ دقیقه معتبر است. اگر این درخواست را شما نداده‌اید، این ایمیل را نادیده بگیرید.
-      </p>
+      <p style="font-size:12px;color:#9ca3af;line-height:1.8;margin:0;">${input.warning}</p>
     </div>
   </div>`;
 }
@@ -52,25 +51,20 @@ function otpEmailHtml(code: string) {
 async function sendViaResend(to: string, subject: string, html: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.RESEND_FROM_EMAIL || "Gament <onboarding@resend.dev>";
-
   if (!apiKey) {
     logger.warn("RESEND_API_KEY missing. Email not sent.");
     return false;
   }
 
   try {
-    const res = await fetch("https://api.resend.com/emails", {
+    const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ from, to, subject, html }),
     });
-
-    if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
-      logger.error({ status: res.status, data }, "Resend email send failed");
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      logger.error({ status: response.status, data }, "Resend email send failed");
       return false;
     }
     return true;
@@ -80,82 +74,122 @@ async function sendViaResend(to: string, subject: string, html: string): Promise
   }
 }
 
-export const EmailService = {
-  /**
-   * Generate a 6-digit OTP for the given email and send it via Resend.
-   * The plaintext code is never stored — only an HMAC hash, bound to the
-   * email so the same numeric code for two addresses never produces the
-   * same DB value.
-   *
-   * Returns { sent, code } — `code` is only populated outside production
-   * (or when RESEND_API_KEY is missing) so local/dev testing doesn't
-   * require a working email provider.
-   */
-  async sendVerificationCode(email: string): Promise<{ sent: boolean; code?: string; cooldownMs?: number }> {
-    const identifier = emailIdentifier(email);
+async function createAndSendOtp(input: {
+  identifier: string;
+  email: string;
+  subject: string;
+  heading: string;
+  description: string;
+  warning: string;
+}): Promise<{ sent: boolean; code?: string; cooldownMs?: number }> {
+  const [existing] = await db
+    .select()
+    .from(verificationTokens)
+    .where(eq(verificationTokens.identifier, input.identifier))
+    .limit(1);
 
-    const [existing] = await db
-      .select()
-      .from(verificationTokens)
-      .where(eq(verificationTokens.identifier, identifier));
+  if (existing) {
+    const age = Date.now() - existing.createdAt.getTime();
+    if (age < RESEND_COOLDOWN_MS) return { sent: false, cooldownMs: RESEND_COOLDOWN_MS - age };
+  }
 
-    if (existing) {
-      const age = Date.now() - existing.createdAt.getTime();
-      if (age < RESEND_COOLDOWN_MS) {
-        return { sent: false, cooldownMs: RESEND_COOLDOWN_MS - age };
-      }
-    }
-
-    const code = crypto.randomInt(100000, 999999).toString();
-    const tokenHash = hashOtpToken(identifier, code);
-    const expiresAt = new Date(Date.now() + OTP_TTL_MS);
-
-    // Keep only the latest live OTP per email.
-    await db.delete(verificationTokens).where(eq(verificationTokens.identifier, identifier));
-    await db.insert(verificationTokens).values({
-      identifier,
+  const code = crypto.randomInt(100000, 1_000_000).toString();
+  const tokenHash = hashOtpToken(input.identifier, code);
+  await db.transaction(async (tx) => {
+    await tx.delete(verificationTokens).where(eq(verificationTokens.identifier, input.identifier));
+    await tx.insert(verificationTokens).values({
+      identifier: input.identifier,
       token: tokenHash,
-      expiresAt,
+      expiresAt: new Date(Date.now() + OTP_TTL_MS),
     });
+  });
 
-    const delivered = await sendViaResend(
-      email,
-      "کد تایید حساب گیمنت | Gament",
-      otpEmailHtml(code)
-    );
+  const delivered = await sendViaResend(input.email, input.subject, otpEmailHtml({
+    code,
+    heading: input.heading,
+    description: input.description,
+    warning: input.warning,
+  }));
+  if (!delivered) logger.warn({ purpose: input.identifier.split(":")[0] }, "OTP email not delivered");
 
-    if (!delivered) {
-      logger.warn({ email }, "Verification email not delivered (missing/failed provider)");
-    }
+  const exposeCode = process.env.NODE_ENV !== "production" || !process.env.RESEND_API_KEY;
+  return { sent: true, code: exposeCode ? code : undefined };
+}
 
-    const exposeCode = process.env.NODE_ENV !== "production" || !process.env.RESEND_API_KEY;
-    return { sent: true, code: exposeCode ? code : undefined };
+async function consumeOtp(client: any, identifier: string, code: string) {
+  const tokenHash = hashOtpToken(identifier, code);
+  const [record] = await client
+    .select()
+    .from(verificationTokens)
+    .where(and(
+      eq(verificationTokens.identifier, identifier),
+      eq(verificationTokens.token, tokenHash)
+    ))
+    .limit(1);
+
+  if (!record || record.expiresAt < new Date()) {
+    throw new InvalidOtpError("کد تایید نامعتبر یا منقضی شده است");
+  }
+
+  // Delete while the caller's transaction is still open. Concurrent reset
+  // attempts cannot both commit because only one can consume the same row.
+  const deleted = await client
+    .delete(verificationTokens)
+    .where(and(eq(verificationTokens.id, record.id), eq(verificationTokens.token, tokenHash)))
+    .returning({ id: verificationTokens.id });
+  if (!deleted.length) throw new InvalidOtpError("این کد قبلاً استفاده شده است");
+}
+
+export const EmailService = {
+  sendVerificationCode(email: string) {
+    const normalized = normalizedEmail(email);
+    return createAndSendOtp({
+      identifier: emailIdentifier(normalized),
+      email: normalized,
+      subject: "کد تایید حساب گیمنت | Gament",
+      heading: "تایید حساب گیمنت",
+      description: "کد تایید حساب شما:",
+      warning: "این کد تا ۱۵ دقیقه معتبر است. اگر این درخواست را شما نداده‌اید، ایمیل را نادیده بگیرید.",
+    });
   },
 
-  /**
-   * Verify the code for an email, and if valid, mark the matching user's
-   * email as verified.
-   */
+  sendPasswordResetCode(email: string) {
+    const normalized = normalizedEmail(email);
+    return createAndSendOtp({
+      identifier: passwordResetIdentifier(normalized),
+      email: normalized,
+      subject: "بازیابی رمز عبور گیمنت | Gament",
+      heading: "بازیابی رمز عبور",
+      description: "برای انتخاب رمز عبور جدید، این کد ۶ رقمی را در گیمنت وارد کنید:",
+      warning: "این کد ۱۵ دقیقه و فقط برای یک‌بار معتبر است. اگر این درخواست را شما نداده‌اید، رمز فعلی شما تغییری نمی‌کند.",
+    });
+  },
+
   async verifyCode(email: string, code: string): Promise<boolean> {
-    const identifier = emailIdentifier(email);
-    const tokenHash = hashOtpToken(identifier, code);
-
-    const [record] = await db
-      .select()
-      .from(verificationTokens)
-      .where(and(eq(verificationTokens.identifier, identifier), eq(verificationTokens.token, tokenHash)));
-
-    if (!record || record.expiresAt < new Date()) {
-      throw new InvalidOtpError("کد تایید نامعتبر یا منقضی شده است");
-    }
-
-    await db
-      .update(users)
-      .set({ emailVerifiedAt: new Date() })
-      .where(eq(users.email, email.trim().toLowerCase()));
-
-    await db.delete(verificationTokens).where(eq(verificationTokens.id, record.id));
-
+    const normalized = normalizedEmail(email);
+    await db.transaction(async (tx) => {
+      await consumeOtp(tx, emailIdentifier(normalized), code);
+      await tx
+        .update(users)
+        .set({ emailVerifiedAt: new Date() })
+        .where(eq(users.email, normalized));
+    });
     return true;
+  },
+
+  consumePasswordResetCode(email: string, code: string, client: any = db) {
+    return consumeOtp(client, passwordResetIdentifier(email), code);
+  },
+
+  async sendPasswordChangedNotice(email: string) {
+    const html = `
+      <div dir="rtl" style="font-family:Tahoma,sans-serif;background:#050508;padding:32px;color:#fff;">
+        <div style="max-width:420px;margin:auto;background:#111114;border-radius:20px;padding:32px;border:1px solid #35204d;">
+          <h1 style="color:#c084fc;font-size:20px;">رمز عبور تغییر کرد</h1>
+          <p style="color:#d1d5db;line-height:1.9;">رمز عبور حساب گیمنت شما با موفقیت تغییر کرد و همه نشست‌های قبلی بسته شدند.</p>
+          <p style="color:#fca5a5;font-size:12px;line-height:1.8;">اگر این کار را شما انجام نداده‌اید، فوراً با پشتیبانی گیمنت تماس بگیرید.</p>
+        </div>
+      </div>`;
+    return sendViaResend(normalizedEmail(email), "رمز عبور گیمنت تغییر کرد", html);
   },
 };

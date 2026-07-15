@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { RegisterSchema, EmailOtpRequestSchema, EmailOtpVerifySchema } from "./validations";
+import {
+  RegisterSchema,
+  EmailOtpRequestSchema,
+  EmailOtpVerifySchema,
+  PasswordResetRequestSchema,
+  PasswordResetConfirmSchema,
+} from "./validations";
 
 const validBase = {
   username: "ShadowGamer",
@@ -132,5 +138,30 @@ describe("EmailOtpVerifySchema", () => {
     expect(EmailOtpVerifySchema.safeParse({ email: "a@b.com", code: "12345" }).success).toBe(false);
     expect(EmailOtpVerifySchema.safeParse({ email: "a@b.com", code: "1234567" }).success).toBe(false);
     expect(EmailOtpVerifySchema.safeParse({ email: "a@b.com", code: "abcdef" }).success).toBe(false);
+  });
+});
+
+describe("Password reset schemas", () => {
+  it("normalizes a valid reset email", () => {
+    const result = PasswordResetRequestSchema.safeParse({ email: "  Player@Example.COM " });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.email).toBe("player@example.com");
+  });
+
+  it("accepts a valid code and strong new password", () => {
+    const result = PasswordResetConfirmSchema.safeParse({
+      email: "player@example.com",
+      code: "123456",
+      password: "NewSecret!123",
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects weak passwords and malformed codes", () => {
+    expect(PasswordResetConfirmSchema.safeParse({
+      email: "player@example.com",
+      code: "12345",
+      password: "weak",
+    }).success).toBe(false);
   });
 });
