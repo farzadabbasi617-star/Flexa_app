@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { verificationTokens, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
+import nodemailer from "nodemailer";
 import logger from "@/lib/logger";
 import { EMAIL_OTP_RESEND_COOLDOWN_SECONDS, EMAIL_OTP_TTL_MINUTES } from "@/lib/email-policy";
 
@@ -49,6 +50,8 @@ function otpEmailHtml(input: {
   </div>`;
 }
 
+type EmailProvider = "smtp" | "resend" | "none";
+
 function resendFromAddress() {
   return process.env.RESEND_FROM_EMAIL || (
     process.env.NODE_ENV === "production"
@@ -57,22 +60,91 @@ function resendFromAddress() {
   );
 }
 
-export function getEmailDeliveryConfiguration() {
-  const from = resendFromAddress();
+function smtpSettings() {
+  const user = (process.env.SMTP_USER || "").trim();
+  const pass = (process.env.SMTP_PASS || "").replace(/\s+/g, "");
+  const host = (process.env.SMTP_HOST || "smtp.gmail.com").trim();
+  const port = Number(process.env.SMTP_PORT || "465");
   return {
-    configured: Boolean(process.env.RESEND_API_KEY),
-    from,
-    sandboxSender: from.toLowerCase().includes("@resend.dev"),
+    user,
+    pass,
+    host,
+    port: Number.isFinite(port) ? port : 465,
+    secure: process.env.SMTP_SECURE ? process.env.SMTP_SECURE === "true" : port === 465,
+    from: process.env.SMTP_FROM_EMAIL || `Gament <${user || "gament1.ir@gmail.com"}>`,
   };
+}
+
+export function getEmailDeliveryConfiguration() {
+  const requested = (process.env.EMAIL_PROVIDER || "auto").trim().toLowerCase();
+  const smtp = smtpSettings();
+  const smtpConfigured = Boolean(smtp.user && smtp.pass);
+  const resendConfigured = Boolean(process.env.RESEND_API_KEY);
+  const provider: EmailProvider = requested === "smtp"
+    ? (smtpConfigured ? "smtp" : "none")
+    : requested === "resend"
+      ? (resendConfigured ? "resend" : "none")
+      : smtpConfigured
+        ? "smtp"
+        : resendConfigured
+          ? "resend"
+          : "none";
+  const smtpSelected = provider === "smtp" || requested === "smtp";
+  const from = smtpSelected ? smtp.from : resendFromAddress();
+  return {
+    provider,
+    requestedProvider: requested,
+    configured: provider !== "none",
+    from,
+    sandboxSender: provider === "resend" && from.toLowerCase().includes("@resend.dev"),
+    smtpHost: smtpSelected ? smtp.host : undefined,
+  };
+}
+
+let smtpTransport: ReturnType<typeof nodemailer.createTransport> | null = null;
+let smtpTransportKey = "";
+
+function getSmtpTransport() {
+  const smtp = smtpSettings();
+  const key = `${smtp.host}:${smtp.port}:${smtp.secure}:${smtp.user}`;
+  if (!smtpTransport || smtpTransportKey !== key) {
+    smtpTransport = nodemailer.createTransport({
+      host: smtp.host,
+      port: smtp.port,
+      secure: smtp.secure,
+      auth: { user: smtp.user, pass: smtp.pass },
+      connectionTimeout: 12_000,
+      greetingTimeout: 12_000,
+      socketTimeout: 20_000,
+    });
+    smtpTransportKey = key;
+  }
+  return smtpTransport;
+}
+
+async function sendViaSmtp(to: string, subject: string, html: string): Promise<boolean> {
+  const smtp = smtpSettings();
+  if (!smtp.user || !smtp.pass) {
+    logger.warn("SMTP_USER or SMTP_PASS missing. Email not sent.");
+    return false;
+  }
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      await getSmtpTransport().sendMail({ from: smtp.from, to, subject, html });
+      return true;
+    } catch (error) {
+      logger.error({ error, attempt, host: smtp.host, user: smtp.user }, "SMTP email send failed");
+      if (attempt === 2) return false;
+      await new Promise((resolve) => setTimeout(resolve, 750));
+    }
+  }
+  return false;
 }
 
 async function sendViaResend(to: string, subject: string, html: string, idempotencyKey?: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = resendFromAddress();
-  if (!apiKey) {
-    logger.warn("RESEND_API_KEY missing. Email not sent.");
-    return false;
-  }
+  if (!apiKey) return false;
 
   for (let attempt = 1; attempt <= 3; attempt += 1) {
     try {
@@ -87,7 +159,6 @@ async function sendViaResend(to: string, subject: string, html: string, idempote
         signal: AbortSignal.timeout(12_000),
       });
       if (response.ok) return true;
-
       const data = await response.json().catch(() => ({}));
       const retryable = response.status === 429 || response.status >= 500;
       logger.error({ status: response.status, data, attempt, from }, "Resend email send failed");
@@ -98,6 +169,14 @@ async function sendViaResend(to: string, subject: string, html: string, idempote
     }
     await new Promise((resolve) => setTimeout(resolve, attempt * 500));
   }
+  return false;
+}
+
+async function sendConfiguredEmail(to: string, subject: string, html: string, idempotencyKey?: string) {
+  const config = getEmailDeliveryConfiguration();
+  if (config.provider === "smtp") return sendViaSmtp(to, subject, html);
+  if (config.provider === "resend") return sendViaResend(to, subject, html, idempotencyKey);
+  logger.warn("No email provider is configured");
   return false;
 }
 
@@ -134,7 +213,7 @@ async function createAndSendOtp(input: {
   });
 
   const idempotencyKey = `otp/${crypto.createHash("sha256").update(`${input.identifier}:${tokenHash}`).digest("hex")}`;
-  const delivered = await sendViaResend(input.email, input.subject, otpEmailHtml({
+  const delivered = await sendConfiguredEmail(input.email, input.subject, otpEmailHtml({
     code,
     heading: input.heading,
     description: input.description,
@@ -142,7 +221,7 @@ async function createAndSendOtp(input: {
   }), idempotencyKey);
   if (!delivered) logger.warn({ purpose: input.identifier.split(":")[0] }, "OTP email not delivered");
 
-  const exposeCode = process.env.NODE_ENV !== "production" || !process.env.RESEND_API_KEY;
+  const exposeCode = process.env.NODE_ENV !== "production";
   return {
     sent: delivered || exposeCode,
     delivered,
@@ -225,6 +304,6 @@ export const EmailService = {
           <p style="color:#fca5a5;font-size:12px;line-height:1.8;">اگر این کار را شما انجام نداده‌اید، فوراً با پشتیبانی گیمنت تماس بگیرید.</p>
         </div>
       </div>`;
-    return sendViaResend(normalizedEmail(email), "رمز عبور گیمنت تغییر کرد", html);
+    return sendConfiguredEmail(normalizedEmail(email), "رمز عبور گیمنت تغییر کرد", html);
   },
 };

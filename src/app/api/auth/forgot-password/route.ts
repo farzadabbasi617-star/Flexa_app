@@ -27,7 +27,11 @@ export async function POST(request: NextRequest) {
     const emailConfig = getEmailDeliveryConfiguration();
     if (!emailConfig.configured || emailConfig.sandboxSender) {
       return NextResponse.json(
-        { error: "سرویس ارسال ایمیل آماده نیست. دامنه gament1.ir باید در Resend تایید و RESEND_FROM_EMAIL تنظیم شود." },
+        {
+          error: emailConfig.sandboxSender
+            ? "فرستنده آزمایشی Resend برای کاربران عمومی قابل استفاده نیست. دامنه فرستنده را تایید کنید."
+            : "سرویس ایمیل آماده نیست. برای Gmail متغیرهای EMAIL_PROVIDER، SMTP_USER و SMTP_PASS را در Render تنظیم کنید.",
+        },
         { status: 503 }
       );
     }

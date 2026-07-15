@@ -30,8 +30,11 @@ export async function GET() {
       database: true,
       email: {
         configured: email.configured,
+        provider: email.provider,
+        requestedProvider: email.requestedProvider,
         sandboxSender: email.sandboxSender,
         from: email.from,
+        smtpHost: email.smtpHost,
       },
     });
   } catch {
