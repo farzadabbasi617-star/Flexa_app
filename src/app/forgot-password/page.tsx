@@ -1,10 +1,11 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { EMAIL_OTP_RESEND_COOLDOWN_SECONDS } from "@/lib/email-policy";
 
 export default function ForgotPasswordPage() {
   const { lang } = useLanguage();
@@ -16,6 +17,17 @@ export default function ForgotPasswordPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+
+  function startResendCooldown() {
+    setResendCooldown(EMAIL_OTP_RESEND_COOLDOWN_SECONDS);
+  }
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = window.setTimeout(() => setResendCooldown((value) => Math.max(0, value - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [resendCooldown]);
 
   async function requestCode(event: FormEvent) {
     event.preventDefault();
@@ -33,8 +45,31 @@ export default function ForgotPasswordPage() {
       if (!response.ok) throw new Error(data.error || "ارسال کد انجام نشد");
       setMessage(data.message || "اگر حسابی وجود داشته باشد، کد ارسال می‌شود.");
       setStep("reset");
+      startResendCooldown();
     } catch (err) {
       setError(err instanceof Error ? err.message : "ارسال کد انجام نشد");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resendCode() {
+    if (resendCooldown > 0 || busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ email }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "ارسال مجدد انجام نشد");
+      setMessage(lang === "fa" ? "درخواست ارسال مجدد ثبت شد. پوشه Spam را هم بررسی کن." : "A new request was sent. Check your spam folder too.");
+      startResendCooldown();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "ارسال مجدد انجام نشد");
     } finally {
       setBusy(false);
     }
@@ -152,9 +187,25 @@ export default function ForgotPasswordPage() {
               <button disabled={busy || code.length !== 6} className="gaming-btn w-full py-3 disabled:opacity-50">
                 {busy ? "..." : (lang === "fa" ? "تغییر رمز عبور" : "Change password")}
               </button>
-              <button type="button" onClick={() => { setStep("email"); setCode(""); setError(""); }} className="w-full text-xs text-neon-blue hover:underline">
-                {lang === "fa" ? "ارسال دوباره کد یا تغییر ایمیل" : "Resend code or change email"}
-              </button>
+              <div className="flex items-center justify-center gap-4 text-xs">
+                <button
+                  type="button"
+                  onClick={resendCode}
+                  disabled={resendCooldown > 0 || busy}
+                  className="text-neon-blue hover:underline disabled:text-gray-600 disabled:no-underline"
+                >
+                  {resendCooldown > 0
+                    ? (lang === "fa" ? `ارسال مجدد (${resendCooldown})` : `Resend (${resendCooldown})`)
+                    : (lang === "fa" ? "ارسال مجدد کد" : "Resend code")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setStep("email"); setCode(""); setError(""); setMessage(""); }}
+                  className="text-gray-400 hover:text-white hover:underline"
+                >
+                  {lang === "fa" ? "تغییر ایمیل" : "Change email"}
+                </button>
+              </div>
             </form>
           )}
 

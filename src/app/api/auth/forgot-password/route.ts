@@ -5,7 +5,7 @@ import { users } from "@/db/schema";
 import { ilike } from "drizzle-orm";
 import { PasswordResetRequestSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
-import { EmailService } from "@/lib/email-service";
+import { EmailService, getEmailDeliveryConfiguration } from "@/lib/email-service";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -22,6 +22,14 @@ export async function POST(request: NextRequest) {
     const ipLimit = await rateLimit(`forgot-password:ip:${ip}`, 5, 15 * 60 * 1000);
     if (!ipLimit.success) {
       return NextResponse.json({ error: "درخواست‌های زیادی ارسال شده است. کمی بعد دوباره امتحان کنید." }, { status: 429 });
+    }
+
+    const emailConfig = getEmailDeliveryConfiguration();
+    if (!emailConfig.configured || emailConfig.sandboxSender) {
+      return NextResponse.json(
+        { error: "سرویس ارسال ایمیل آماده نیست. دامنه gament1.ir باید در Resend تایید و RESEND_FROM_EMAIL تنظیم شود." },
+        { status: 503 }
+      );
     }
 
     const body = await request.json().catch(() => null);

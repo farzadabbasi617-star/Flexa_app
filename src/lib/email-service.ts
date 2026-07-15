@@ -3,9 +3,10 @@ import { verificationTokens, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
 import logger from "@/lib/logger";
+import { EMAIL_OTP_RESEND_COOLDOWN_SECONDS, EMAIL_OTP_TTL_MINUTES } from "@/lib/email-policy";
 
-const OTP_TTL_MS = 15 * 60 * 1000;
-const RESEND_COOLDOWN_MS = 60 * 1000;
+const OTP_TTL_MS = EMAIL_OTP_TTL_MINUTES * 60 * 1000;
+const RESEND_COOLDOWN_MS = EMAIL_OTP_RESEND_COOLDOWN_SECONDS * 1000;
 
 export class InvalidOtpError extends Error {}
 
@@ -48,30 +49,56 @@ function otpEmailHtml(input: {
   </div>`;
 }
 
-async function sendViaResend(to: string, subject: string, html: string): Promise<boolean> {
+function resendFromAddress() {
+  return process.env.RESEND_FROM_EMAIL || (
+    process.env.NODE_ENV === "production"
+      ? "Gament <noreply@gament1.ir>"
+      : "Gament <onboarding@resend.dev>"
+  );
+}
+
+export function getEmailDeliveryConfiguration() {
+  const from = resendFromAddress();
+  return {
+    configured: Boolean(process.env.RESEND_API_KEY),
+    from,
+    sandboxSender: from.toLowerCase().includes("@resend.dev"),
+  };
+}
+
+async function sendViaResend(to: string, subject: string, html: string, idempotencyKey?: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
-  const from = process.env.RESEND_FROM_EMAIL || "Gament <onboarding@resend.dev>";
+  const from = resendFromAddress();
   if (!apiKey) {
     logger.warn("RESEND_API_KEY missing. Email not sent.");
     return false;
   }
 
-  try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to, subject, html }),
-    });
-    if (!response.ok) {
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      const response = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+          ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
+        },
+        body: JSON.stringify({ from, to, subject, html }),
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (response.ok) return true;
+
       const data = await response.json().catch(() => ({}));
-      logger.error({ status: response.status, data }, "Resend email send failed");
-      return false;
+      const retryable = response.status === 429 || response.status >= 500;
+      logger.error({ status: response.status, data, attempt, from }, "Resend email send failed");
+      if (!retryable || attempt === 3) return false;
+    } catch (error) {
+      logger.error({ error, attempt }, "Resend connection error");
+      if (attempt === 3) return false;
     }
-    return true;
-  } catch (error) {
-    logger.error({ error }, "Resend connection error");
-    return false;
+    await new Promise((resolve) => setTimeout(resolve, attempt * 500));
   }
+  return false;
 }
 
 async function createAndSendOtp(input: {
@@ -81,7 +108,7 @@ async function createAndSendOtp(input: {
   heading: string;
   description: string;
   warning: string;
-}): Promise<{ sent: boolean; code?: string; cooldownMs?: number }> {
+}): Promise<{ sent: boolean; delivered: boolean; code?: string; cooldownMs?: number; reason?: "cooldown" | "delivery_failed" }> {
   const [existing] = await db
     .select()
     .from(verificationTokens)
@@ -90,7 +117,9 @@ async function createAndSendOtp(input: {
 
   if (existing) {
     const age = Date.now() - existing.createdAt.getTime();
-    if (age < RESEND_COOLDOWN_MS) return { sent: false, cooldownMs: RESEND_COOLDOWN_MS - age };
+    if (age < RESEND_COOLDOWN_MS) {
+      return { sent: false, delivered: false, cooldownMs: RESEND_COOLDOWN_MS - age, reason: "cooldown" };
+    }
   }
 
   const code = crypto.randomInt(100000, 1_000_000).toString();
@@ -104,16 +133,22 @@ async function createAndSendOtp(input: {
     });
   });
 
+  const idempotencyKey = `otp/${crypto.createHash("sha256").update(`${input.identifier}:${tokenHash}`).digest("hex")}`;
   const delivered = await sendViaResend(input.email, input.subject, otpEmailHtml({
     code,
     heading: input.heading,
     description: input.description,
     warning: input.warning,
-  }));
+  }), idempotencyKey);
   if (!delivered) logger.warn({ purpose: input.identifier.split(":")[0] }, "OTP email not delivered");
 
   const exposeCode = process.env.NODE_ENV !== "production" || !process.env.RESEND_API_KEY;
-  return { sent: true, code: exposeCode ? code : undefined };
+  return {
+    sent: delivered || exposeCode,
+    delivered,
+    code: exposeCode ? code : undefined,
+    reason: delivered || exposeCode ? undefined : "delivery_failed",
+  };
 }
 
 async function consumeOtp(client: any, identifier: string, code: string) {

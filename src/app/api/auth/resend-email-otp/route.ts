@@ -49,10 +49,16 @@ export async function POST(request: NextRequest) {
 
     const result = await EmailService.sendVerificationCode(email);
     if (!result.sent) {
-      const seconds = Math.ceil((result.cooldownMs || 0) / 1000);
+      if (result.reason === "cooldown") {
+        const seconds = Math.ceil((result.cooldownMs || 0) / 1000);
+        return NextResponse.json(
+          { error: `لطفاً ${seconds} ثانیه صبر کنید و دوباره امتحان کنید.` },
+          { status: 429 }
+        );
+      }
       return NextResponse.json(
-        { error: `لطفاً ${seconds} ثانیه صبر کنید و دوباره امتحان کنید.` },
-        { status: 429 }
+        { error: "سرویس ایمیل در دسترس نیست. تنظیمات Resend و دامنه فرستنده را بررسی کنید." },
+        { status: 503 }
       );
     }
 

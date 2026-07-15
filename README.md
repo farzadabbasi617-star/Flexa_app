@@ -170,7 +170,7 @@ ADMIN_SETUP_SECRET="your_long_random_bootstrap_secret"
 OTP_TOKEN_PEPPER="your_different_long_random_otp_hash_pepper"
 # الزامی برای ارسال کد تایید ایمیل ثبت‌نام/ورود
 RESEND_API_KEY="your_resend_api_key"
-RESEND_FROM_EMAIL="Gament <onboarding@resend.dev>"
+RESEND_FROM_EMAIL="Gament <noreply@gament1.ir>"
 ```
 
 **مهم:** بعد از `npm run db:push` (یا برای دیتابیس‌های موجود، اجرای دستی

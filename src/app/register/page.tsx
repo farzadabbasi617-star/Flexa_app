@@ -9,6 +9,7 @@ import TiltCard from "@/components/fx/TiltCard";
 import ParticleField from "@/components/fx/ParticleField";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { EMAIL_OTP_RESEND_COOLDOWN_SECONDS } from "@/lib/email-policy";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { isPasswordStrong } from "@/lib/password-strength";
 import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
@@ -157,7 +158,7 @@ export default function RegisterPage() {
     const result = await resendEmailOtp(pendingEmail);
     if (result.success) {
       setResendMessage(lang === "fa" ? "کد جدید ارسال شد." : "A new code was sent.");
-      setResendCooldown(60);
+      setResendCooldown(EMAIL_OTP_RESEND_COOLDOWN_SECONDS);
       const timer = setInterval(() => {
         setResendCooldown((value) => {
           if (value <= 1) {
