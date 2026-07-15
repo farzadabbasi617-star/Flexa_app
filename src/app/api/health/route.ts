@@ -35,6 +35,7 @@ export async function GET() {
         sandboxSender: email.sandboxSender,
         from: email.from,
         smtpHost: email.smtpHost,
+        appsScriptConfigured: email.appsScriptConfigured,
       },
     });
   } catch {

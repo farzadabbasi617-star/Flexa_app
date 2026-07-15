@@ -50,7 +50,7 @@ function otpEmailHtml(input: {
   </div>`;
 }
 
-type EmailProvider = "smtp" | "resend" | "none";
+type EmailProvider = "google_apps_script" | "smtp" | "resend" | "none";
 
 function resendFromAddress() {
   return process.env.RESEND_FROM_EMAIL || (
@@ -78,19 +78,32 @@ function smtpSettings() {
 export function getEmailDeliveryConfiguration() {
   const requested = (process.env.EMAIL_PROVIDER || "auto").trim().toLowerCase();
   const smtp = smtpSettings();
+  const appsScriptConfigured = Boolean(
+    process.env.GOOGLE_APPS_SCRIPT_EMAIL_URL && process.env.GOOGLE_APPS_SCRIPT_EMAIL_SECRET
+  );
   const smtpConfigured = Boolean(smtp.user && smtp.pass);
   const resendConfigured = Boolean(process.env.RESEND_API_KEY);
-  const provider: EmailProvider = requested === "smtp"
-    ? (smtpConfigured ? "smtp" : "none")
-    : requested === "resend"
-      ? (resendConfigured ? "resend" : "none")
-      : smtpConfigured
-        ? "smtp"
-        : resendConfigured
-          ? "resend"
-          : "none";
+  const wantsAppsScript = requested === "google_apps_script" || requested === "apps_script";
+  const provider: EmailProvider = wantsAppsScript
+    ? (appsScriptConfigured ? "google_apps_script" : "none")
+    : requested === "smtp"
+      ? (smtpConfigured ? "smtp" : "none")
+      : requested === "resend"
+        ? (resendConfigured ? "resend" : "none")
+        : appsScriptConfigured
+          ? "google_apps_script"
+          : smtpConfigured
+            ? "smtp"
+            : resendConfigured
+              ? "resend"
+              : "none";
   const smtpSelected = provider === "smtp" || requested === "smtp";
-  const from = smtpSelected ? smtp.from : resendFromAddress();
+  const appsScriptSelected = provider === "google_apps_script" || wantsAppsScript;
+  const from = appsScriptSelected
+    ? "Gament <gament1.ir@gmail.com>"
+    : smtpSelected
+      ? smtp.from
+      : resendFromAddress();
   return {
     provider,
     requestedProvider: requested,
@@ -98,7 +111,47 @@ export function getEmailDeliveryConfiguration() {
     from,
     sandboxSender: provider === "resend" && from.toLowerCase().includes("@resend.dev"),
     smtpHost: smtpSelected ? smtp.host : undefined,
+    appsScriptConfigured,
   };
+}
+
+async function sendViaGoogleAppsScript(
+  to: string,
+  subject: string,
+  html: string,
+  idempotencyKey?: string
+): Promise<boolean> {
+  const url = (process.env.GOOGLE_APPS_SCRIPT_EMAIL_URL || "").trim();
+  const secret = process.env.GOOGLE_APPS_SCRIPT_EMAIL_SECRET || "";
+  if (!url || !secret) {
+    logger.warn("Google Apps Script email URL or secret is missing");
+    return false;
+  }
+  if (!/^https:\/\/script\.google\.com\/macros\/s\//i.test(url)) {
+    logger.error("Google Apps Script email URL is not an approved script.google.com web app URL");
+    return false;
+  }
+
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
+      const response = await fetch(url, {
+        method: "POST",
+        redirect: "follow",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ secret, to, subject, html, idempotencyKey }),
+        signal: AbortSignal.timeout(25_000),
+      });
+      const text = await response.text();
+      let result: { ok?: boolean; error?: string } = {};
+      try { result = JSON.parse(text); } catch {}
+      if (response.ok && result.ok) return true;
+      logger.error({ status: response.status, result, attempt }, "Google Apps Script email send failed");
+    } catch (error) {
+      logger.error({ error, attempt }, "Google Apps Script email request failed");
+    }
+    if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, 750));
+  }
+  return false;
 }
 
 let smtpTransport: ReturnType<typeof nodemailer.createTransport> | null = null;
@@ -174,6 +227,9 @@ async function sendViaResend(to: string, subject: string, html: string, idempote
 
 async function sendConfiguredEmail(to: string, subject: string, html: string, idempotencyKey?: string) {
   const config = getEmailDeliveryConfiguration();
+  if (config.provider === "google_apps_script") {
+    return sendViaGoogleAppsScript(to, subject, html, idempotencyKey);
+  }
   if (config.provider === "smtp") return sendViaSmtp(to, subject, html);
   if (config.provider === "resend") return sendViaResend(to, subject, html, idempotencyKey);
   logger.warn("No email provider is configured");

@@ -168,14 +168,11 @@ GROQ_API_KEY="your_key"
 # در production برای راه‌اندازی امن اولین مدیر اصلی لازم است
 ADMIN_SETUP_SECRET="your_long_random_bootstrap_secret"
 OTP_TOKEN_PEPPER="your_different_long_random_otp_hash_pepper"
-# ارسال کد تایید از Gmail با App Password گوگل
-EMAIL_PROVIDER="smtp"
-SMTP_HOST="smtp.gmail.com"
-SMTP_PORT="465"
-SMTP_SECURE="true"
-SMTP_USER="gament1.ir@gmail.com"
-SMTP_PASS="your_16_character_gmail_app_password"
-SMTP_FROM_EMAIL="Gament <gament1.ir@gmail.com>"
+# ارسال از gament1.ir@gmail.com روی Render Free از طریق HTTPS
+# راهنما: docs/GOOGLE_APPS_SCRIPT_EMAIL.md
+EMAIL_PROVIDER="google_apps_script"
+GOOGLE_APPS_SCRIPT_EMAIL_URL="https://script.google.com/macros/s/DEPLOYMENT_ID/exec"
+GOOGLE_APPS_SCRIPT_EMAIL_SECRET="your_long_random_shared_secret"
 ```
 
 **مهم:** بعد از `npm run db:push` (یا برای دیتابیس‌های موجود، اجرای دستی

@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
         {
           error: emailConfig.sandboxSender
             ? "فرستنده آزمایشی Resend برای کاربران عمومی قابل استفاده نیست. دامنه فرستنده را تایید کنید."
-            : "سرویس ایمیل آماده نیست. برای Gmail متغیرهای EMAIL_PROVIDER، SMTP_USER و SMTP_PASS را در Render تنظیم کنید.",
+            : "سرویس ایمیل آماده نیست. Google Apps Script URL و Secret را طبق راهنمای پروژه در Render تنظیم کنید.",
         },
         { status: 503 }
       );
