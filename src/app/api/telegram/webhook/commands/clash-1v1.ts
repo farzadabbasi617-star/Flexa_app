@@ -288,12 +288,12 @@ async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: Q
     { text: "🚨 مشکل با حریف", callback_data: `dispute:${pair.matchId}` },
   ]);
 
-  const messageResult = await sendMessage(chatId, [
+  const details = [
     "✅ <b>حریف پیدا شد؛ بازی را شروع کنید</b>",
     "",
     `👤 حریف: <b>${html(participantName(opponent))}</b>`,
     `🏷 Player Tag: <code>${html(participantTag(opponent))}</code>`,
-    `🔗 پیوند دوستی: <code>${html(opponent.inviteLink!)}</code>`,
+    `🔗 پیوند دوستی: ${html(opponent.inviteLink!)}`,
     "",
     "1) دکمه «باز کردن پیوند دوستی حریف» را بزن.",
     "2) در Clash Royale حریف را Add Friend کن.",
@@ -301,8 +301,36 @@ async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: Q
     "4) بعد از بازی، نتیجه و اسکرین‌شات را ثبت کن.",
     "",
     `Match ID: <code>${html(pair.matchId.slice(0, 8))}</code>`,
-  ].filter(Boolean).join("\n"), { inline_keyboard: keyboard });
-  if (!messageResult?.ok) throw new Error("CLASH_QUEUE_DETAILS_SEND_FAILED");
+  ].join("\n");
+
+  let messageResult = await sendMessage(chatId, details, { inline_keyboard: keyboard });
+  if (!messageResult?.ok) {
+    logger.warn({
+      chatId,
+      matchId: pair.matchId,
+      errorCode: messageResult?.error_code,
+      description: messageResult?.description,
+    }, "Clash opponent notification with URL button failed; retrying without URL button");
+
+    // Some Telegram clients/API revisions reject specific external URLs in an
+    // inline button. Retry with a copyable plain-text link so matching never
+    // gets stuck after both players have already paid and submitted links.
+    messageResult = await sendMessage(chatId, details, {
+      inline_keyboard: [[
+        { text: "⚔️ ثبت نتیجه", callback_data: `match:${pair.matchId}` },
+        { text: "🚨 مشکل با حریف", callback_data: `dispute:${pair.matchId}` },
+      ]],
+    });
+  }
+  if (!messageResult?.ok) {
+    logger.warn({
+      chatId,
+      matchId: pair.matchId,
+      errorCode: messageResult?.error_code,
+      description: messageResult?.description,
+    }, "Clash opponent notification fallback failed");
+    return false;
+  }
 
   await db
     .insert(telegramSentNotifications)
@@ -313,6 +341,7 @@ async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: Q
       type: "clash_1v1_matched",
     })
     .onConflictDoNothing({ target: telegramSentNotifications.dedupeKey });
+  return true;
 }
 
 async function notifyPairs(pairs: QueuePair[]) {
