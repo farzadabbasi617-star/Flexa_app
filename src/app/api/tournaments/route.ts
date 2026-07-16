@@ -6,19 +6,33 @@ import { requireRole, validateSession } from "@/lib/auth";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { publicCacheHeaders, ttlCache } from "@/lib/server-cache";
 import logger from "@/lib/logger";
+import { safePagination } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
+function publicTournamentPayload<T extends Record<string, unknown>>(tournament: T) {
+  const {
+    roomId: _roomId,
+    roomPassword: _roomPassword,
+    lobbyNotes: _lobbyNotes,
+    createdById: _createdById,
+    ...safe
+  } = tournament;
+  void _roomId; void _roomPassword; void _lobbyNotes; void _createdById;
+  return safe;
+}
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
   const game = searchParams.get("game");
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "10");
-  const offset = (page - 1) * limit;
+  const { page, limit: safeLimit, offset } = safePagination({
+    page: searchParams.get("page"),
+    limit: searchParams.get("limit"),
+    defaultLimit: 10,
+    maxLimit: 100,
+  });
   const token = request.cookies.get("session")?.value;
   const isPublicRequest = !token;
-  const safeLimit = Math.max(1, Math.min(limit, 100));
   const cacheKey = `tournaments:${game || "all"}:${page}:${safeLimit}`;
 
   try {
@@ -38,7 +52,12 @@ export async function GET(request: NextRequest) {
           .limit(safeLimit)
           .offset((page - 1) * safeLimit);
         return {
-          data: results.map(({ tournament, registeredCount }) => ({ ...tournament, registeredCount, isRegistered: false, myPlayerId: null })),
+          data: results.map(({ tournament, registeredCount }) => ({
+            ...publicTournamentPayload(tournament),
+            registeredCount,
+            isRegistered: false,
+            myPlayerId: null,
+          })),
           pagination: { total: totalResult.value, page, limit: safeLimit, totalPages: Math.ceil(totalResult.value / safeLimit) },
         };
       });
@@ -69,7 +88,7 @@ export async function GET(request: NextRequest) {
       )
       .groupBy(tournaments.id)
       .orderBy(desc(tournaments.createdAt))
-      .limit(limit)
+      .limit(safeLimit)
       .offset(offset);
 
     let registeredTournamentIds = new Set<string>();
@@ -90,7 +109,7 @@ export async function GET(request: NextRequest) {
     }
 
     const formattedResults = results.map(({ tournament, registeredCount }) => ({
-      ...tournament,
+      ...publicTournamentPayload(tournament),
       registeredCount,
       isRegistered: registeredTournamentIds.has(tournament.id),
       myPlayerId: registeredPlayerByTournament.get(tournament.id) || null,
@@ -101,8 +120,8 @@ export async function GET(request: NextRequest) {
       pagination: {
         total: totalResult.value,
         page,
-        limit,
-        totalPages: Math.ceil(totalResult.value / limit),
+        limit: safeLimit,
+        totalPages: Math.ceil(totalResult.value / safeLimit),
       },
     });
   } catch (err) {

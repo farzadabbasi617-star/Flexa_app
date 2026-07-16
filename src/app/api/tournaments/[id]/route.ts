@@ -2,47 +2,117 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { tournaments, registrations, matches, players } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireRole } from "@/lib/auth";
+import { requireRole, validateSession } from "@/lib/auth";
+import { z } from "zod";
 import { distributeTournamentPrizes, refundTournamentEntryFees } from "@/lib/tournament-finance";
 
 export const dynamic = "force-dynamic";
 
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
+  if (!z.string().uuid().safeParse(id).success) {
+    return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
+  }
+
   try {
-    const [tournament] = await db
-      .select()
-      .from(tournaments)
-      .where(eq(tournaments.id, id));
+    const token = request.cookies.get("session")?.value || "";
+    const viewer = token
+      ? await validateSession(
+          token,
+          request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown",
+          request.headers.get("user-agent") || "unknown",
+          request
+        )
+      : null;
 
-    if (!tournament) {
-      return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
-    }
+    const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, id)).limit(1);
+    if (!tournament) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
 
-    // Get registered players
-    const regs = await db
+    const registrationRows = await db
       .select({
-        registration: registrations,
-        player: players,
+        registrationId: registrations.id,
+        playerId: registrations.playerId,
+        ownerId: registrations.visibleUserId,
+        checkedInAt: registrations.checkedInAt,
+        registeredAt: registrations.registeredAt,
+        playerUsername: players.username,
+        playerDisplayName: players.displayName,
+        playerAvatarUrl: players.avatarUrl,
+        playerRating: players.rating,
+        playerWins: players.wins,
+        playerLosses: players.losses,
       })
       .from(registrations)
       .leftJoin(players, eq(registrations.playerId, players.id))
       .where(eq(registrations.tournamentId, id));
 
-    // Get matches
+    const isAdmin = viewer?.role === "admin" || viewer?.role === "super_admin";
+    const isRegistered = Boolean(viewer && registrationRows.some((row) => row.ownerId === viewer.id));
+    const now = Date.now();
+    const credentialsReady = Boolean(
+      isAdmin ||
+      (isRegistered && (
+        tournament.status === "in_progress" ||
+        (tournament.roomVisibleAt && now >= new Date(tournament.roomVisibleAt).getTime()) ||
+        (tournament.startDate && now >= new Date(tournament.startDate).getTime() - 30 * 60 * 1000)
+      ))
+    );
+
+    const publicRegistrations = registrationRows.map((row) => {
+      const isOwner = Boolean(viewer && row.ownerId === viewer.id);
+      return {
+        registration: {
+          id: row.registrationId,
+          playerId: row.playerId,
+          checkedInAt: row.checkedInAt,
+          registeredAt: row.registeredAt,
+          isOwner,
+        },
+        player: row.playerId ? {
+          id: row.playerId,
+          username: row.playerUsername,
+          displayName: row.playerDisplayName,
+          avatarUrl: row.playerAvatarUrl,
+          rating: row.playerRating,
+          wins: row.playerWins,
+          losses: row.playerLosses,
+          isOwner,
+        } : null,
+      };
+    });
+
     const tournamentMatches = await db
-      .select()
+      .select({
+        id: matches.id,
+        tournamentId: matches.tournamentId,
+        round: matches.round,
+        matchNumber: matches.matchNumber,
+        player1Id: matches.player1Id,
+        player2Id: matches.player2Id,
+        winnerId: matches.winnerId,
+        player1Score: matches.player1Score,
+        player2Score: matches.player2Score,
+        status: matches.status,
+        scheduledAt: matches.scheduledAt,
+        completedAt: matches.completedAt,
+        createdAt: matches.createdAt,
+      })
       .from(matches)
       .where(eq(matches.tournamentId, id))
       .orderBy(matches.round, matches.matchNumber);
 
+    const { roomId, roomPassword, lobbyNotes, createdById: _createdById, ...publicTournament } = tournament;
+    void _createdById;
     return NextResponse.json({
-      ...tournament,
-      registrations: regs,
+      ...publicTournament,
+      roomId: credentialsReady ? roomId : null,
+      roomPassword: credentialsReady ? roomPassword : null,
+      lobbyNotes: credentialsReady ? lobbyNotes : null,
+      registrations: publicRegistrations,
       matches: tournamentMatches,
     });
   } catch {

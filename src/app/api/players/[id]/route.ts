@@ -12,11 +12,9 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
     const [player] = await db
       .select({
         id: players.id,
-        visibleUserId: players.visibleUserId,
         username: players.username,
         displayName: players.displayName,
-        avatarUrl: players.avatarUrl,
-        gameId: players.gameId,
+        avatarUrl: users.avatarUrl,
         rating: players.rating,
         wins: players.wins,
         losses: players.losses,

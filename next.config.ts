@@ -6,6 +6,22 @@ const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=()" },
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  {
+    key: "Content-Security-Policy-Report-Only",
+    value: [
+      "default-src 'self'",
+      "base-uri 'self'",
+      "object-src 'none'",
+      "form-action 'self'",
+      "frame-ancestors 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://telegram.org",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https:",
+      "font-src 'self' data:",
+      "connect-src 'self' https://api.telegram.org https://openrouter.ai https://api.groq.com https://router.huggingface.co https://api.resend.com https://script.google.com https://script.googleusercontent.com",
+    ].join("; "),
+  },
 ];
 
 const nextConfig: NextConfig = {

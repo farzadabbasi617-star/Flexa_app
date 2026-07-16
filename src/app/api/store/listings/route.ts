@@ -8,6 +8,7 @@ import { canUserSell } from "@/lib/store-service";
 import { parseTomanToRial } from "@/lib/money";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
+import { safePagination } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
@@ -23,8 +24,12 @@ export async function GET(request: NextRequest) {
     const sort = searchParams.get("sort") || "newest"; // newest | cheapest | expensive | bestselling
     const minToman = Number(searchParams.get("minToman") || "");
     const maxToman = Number(searchParams.get("maxToman") || "");
-    const page = Math.max(1, Number(searchParams.get("page") || "1"));
-    const pageSize = Math.min(48, Math.max(1, Number(searchParams.get("pageSize") || "24")));
+    const { page, limit: pageSize, offset } = safePagination({
+      page: searchParams.get("page"),
+      limit: searchParams.get("pageSize"),
+      defaultLimit: 24,
+      maxLimit: 48,
+    });
 
     const conditions = [eq(storeListings.status, "active")];
     if (kind) conditions.push(eq(storeListings.kind, kind as never));
@@ -81,7 +86,7 @@ export async function GET(request: NextRequest) {
       .where(and(...conditions))
       .orderBy(orderBy)
       .limit(pageSize)
-      .offset((page - 1) * pageSize);
+      .offset(offset);
 
     // Never leak protected delivery notes on the public list.
     const items = rows.map((r) => ({

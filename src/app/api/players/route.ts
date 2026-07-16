@@ -1,33 +1,44 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { players, users } from "@/db/schema";
-import { desc, count, eq } from "drizzle-orm";
-import { requireRole } from "@/lib/auth";
+import { desc, count, eq, sql } from "drizzle-orm";
+import { requireRole, validateSession } from "@/lib/auth";
+import { safePagination } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
-  const page = parseInt(searchParams.get("page") || "1");
-  const limit = parseInt(searchParams.get("limit") || "20");
-  const offset = (page - 1) * limit;
+  const { page, limit, offset } = safePagination({
+    page: searchParams.get("page"),
+    limit: searchParams.get("limit"),
+    defaultLimit: 20,
+    maxLimit: 100,
+  });
 
   try {
+    const token = request.cookies.get("session")?.value || "";
+    const currentUser = token
+      ? await validateSession(
+          token,
+          request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown",
+          request.headers.get("user-agent") || "unknown",
+          request
+        )
+      : null;
     const [totalResult] = await db
       .select({ value: count() })
       .from(players);
 
-    const paginatedPlayers = await db
+    const rows = await db
       .select({
         id: players.id,
-        visibleUserId: players.visibleUserId,
+        ownerId: players.visibleUserId,
         username: players.username,
         displayName: players.displayName,
-        email: players.email,
-        // Fetch users.avatarUrl instead of players.avatarUrl to keep active profile avatars synced instantly!
+        // Fetch users.avatarUrl instead of players.avatarUrl to keep active profile avatars synced instantly.
         avatarUrl: users.avatarUrl,
-        gameId: players.gameId,
         rating: players.rating,
         wins: players.wins,
         losses: players.losses,
@@ -38,11 +49,11 @@ export async function GET(request: NextRequest) {
         rankPoints: users.rankPoints,
         role: users.role,
         isVerified: users.isVerified,
-        clashRoyaleId: users.clashRoyaleId,
+        hasClashRoyale: sql<boolean>`${users.clashRoyaleId} IS NOT NULL`,
+        hasCodMobile: sql<boolean>`${users.codMobileId} IS NOT NULL`,
+        hasFortnite: sql<boolean>`${users.fortniteId} IS NOT NULL`,
         clashRoyaleUsername: users.clashRoyaleUsername,
-        codMobileId: users.codMobileId,
         codMobileUsername: users.codMobileUsername,
-        fortniteId: users.fortniteId,
         fortniteUsername: users.fortniteUsername,
       })
       .from(players)
@@ -51,8 +62,13 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
+    const publicPlayers = rows.map(({ ownerId, ...player }) => ({
+      ...player,
+      isOwner: Boolean(currentUser && ownerId === currentUser.id),
+    }));
+
     return NextResponse.json({
-      data: paginatedPlayers,
+      data: publicPlayers,
       pagination: {
         total: totalResult.value,
         page,

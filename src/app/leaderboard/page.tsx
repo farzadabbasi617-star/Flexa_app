@@ -18,11 +18,11 @@ interface Player {
   isVerified?: boolean | null;
   role?: string | null;
   avatarUrl?: string | null;
-  clashRoyaleId?: string | null;
+  hasClashRoyale?: boolean;
+  hasCodMobile?: boolean;
+  hasFortnite?: boolean;
   clashRoyaleUsername?: string | null;
-  codMobileId?: string | null;
   codMobileUsername?: string | null;
-  fortniteId?: string | null;
   fortniteUsername?: string | null;
 }
 
@@ -115,9 +115,9 @@ export default function LeaderboardPage() {
   const gameFilteredPlayers = useMemo(() => {
     if (selectedGame === "all") return sortedPlayers;
     return sortedPlayers.filter((p) => {
-      if (selectedGame === "clash_royale") return !!p.clashRoyaleId;
-      if (selectedGame === "cod_mobile") return !!p.codMobileId;
-      if (selectedGame === "fortnite") return !!p.fortniteId;
+      if (selectedGame === "clash_royale") return Boolean(p.hasClashRoyale);
+      if (selectedGame === "cod_mobile") return Boolean(p.hasCodMobile);
+      if (selectedGame === "fortnite") return Boolean(p.hasFortnite);
       return true;
     });
   }, [sortedPlayers, selectedGame]);

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface Player {
   id: string;
@@ -19,6 +20,8 @@ interface Player {
 
 export default function PlayersPage() {
   const { t } = useLanguage();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const [players, setPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -90,13 +93,15 @@ export default function PlayersPage() {
             </h1>
             <p className="text-gray-400 mt-1">{t.playersPage.subtitle}</p>
           </div>
-          <button onClick={() => setShowForm(!showForm)} className="gaming-btn">
-            {showForm ? `✕ ${t.playersPage.close}` : t.playersPage.addPlayer}
-          </button>
+          {isAdmin && (
+            <button onClick={() => setShowForm(!showForm)} className="gaming-btn">
+              {showForm ? `✕ ${t.playersPage.close}` : t.playersPage.addPlayer}
+            </button>
+          )}
         </div>
 
         {/* Create Form */}
-        {showForm && (
+        {isAdmin && showForm && (
           <div className="gaming-card p-6 mb-8 animate-slide-up">
             <h3 className="text-lg font-bold mb-4 neon-text-purple">{t.playersPage.addNewPlayer}</h3>
             <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-2 gap-4">

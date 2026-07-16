@@ -6,8 +6,8 @@ import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface Registration {
-  registration: { id: string; visibleUserId: string; checkedInAt: string | null; registeredAt: string };
-  player: { id: string; displayName: string; username: string; visibleUserId?: string | null } | null;
+  registration: { id: string; isOwner?: boolean; checkedInAt: string | null; registeredAt: string };
+  player: { id: string; displayName: string; username: string; isOwner?: boolean } | null;
 }
 
 interface TournamentDetail {
@@ -82,7 +82,7 @@ export default function TournamentLobby() {
 
   const myRegistration = useMemo(() => {
     if (!user || !tournament) return null;
-    return tournament.registrations.find((r) => r.registration.visibleUserId === user.id || r.player?.visibleUserId === user.id) || null;
+    return tournament.registrations.find((r) => r.registration.isOwner || r.player?.isOwner) || null;
   }, [tournament, user]);
 
   // Ticks every second so `credentialsVisible` below re-evaluates as time
@@ -106,6 +106,24 @@ export default function TournamentLobby() {
     if (tournament.status === "in_progress") return true;
     return false;
   }, [isAdmin, myRegistration, tournament, now]);
+
+  // Room credentials are now withheld by the API until the reveal window.
+  // Poll while an authorised participant is waiting so credentials appear
+  // without a manual page refresh once the server starts returning them.
+  useEffect(() => {
+    if (!canViewLobby || !tournament || tournament.roomId || tournament.roomPassword || !params.id) return;
+    const timer = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/tournaments/${params.id}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const fresh = await response.json();
+        setTournament(fresh);
+      } catch {
+        // Keep the current lobby state and retry on the next interval.
+      }
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [canViewLobby, tournament, params.id]);
 
   const copyToClipboard = async (text: string, type: string) => {
     await navigator.clipboard.writeText(text);

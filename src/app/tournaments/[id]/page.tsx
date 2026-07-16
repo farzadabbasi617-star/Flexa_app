@@ -12,7 +12,7 @@ import { useCountdown } from "@/hooks/useCountdown";
 
 interface Player {
   id: string;
-  visibleUserId?: string | null;
+  isOwner?: boolean;
   username: string;
   displayName: string;
   rating: number;
@@ -36,7 +36,7 @@ interface Registration {
   registration: {
     id: string;
     playerId: string;
-    visibleUserId: string;
+    isOwner?: boolean;
     checkedInAt: string | null;
     registeredAt: string;
   };
@@ -250,7 +250,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     const candidates = [match.player1Id, match.player2Id].filter(Boolean) as string[];
     for (const playerId of candidates) {
       const reg = tournament?.registrations.find((r) => r.player?.id === playerId);
-      if (reg?.player?.visibleUserId === user.id) return playerId;
+      if (reg?.player?.isOwner) return playerId;
     }
     return null;
   }
@@ -290,10 +290,10 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const statusLabel = t.statuses[tournament.status];
   const registeredIds = new Set(tournament.registrations.map((r) => r.registration.playerId));
   const myRegistration = user
-    ? tournament.registrations.find((r) => r.registration.visibleUserId === user.id || r.player?.visibleUserId === user.id) || null
+    ? tournament.registrations.find((r) => r.registration.isOwner || r.player?.isOwner) || null
     : null;
   const isRegistered = Boolean(myRegistration);
-  const availablePlayers = allPlayers.filter((p) => !registeredIds.has(p.id) && (isAdmin || p.visibleUserId === user?.id));
+  const availablePlayers = allPlayers.filter((p) => !registeredIds.has(p.id) && (isAdmin || p.isOwner));
   const spotsLeft = Math.max(0, tournament.maxPlayers - tournament.registrations.length);
   const entryFee = tournament.entryFee || "رایگان";
   const entryFeeRial = parseTomanToRial(entryFee);
