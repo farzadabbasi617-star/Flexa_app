@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matches, players, registrations, telegramAccounts, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews } from "@/db/schema";
+import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matchResultClaims, matches, players, registrations, telegramAccounts, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
-import { publishHonorToTelegramChannel, publishTournamentToTelegramChannel, telegramApi } from "@/lib/telegram";
+import { notifyLinkedUserOnTelegram, publishHonorToTelegramChannel, publishTournamentToTelegramChannel, telegramApi } from "@/lib/telegram";
 import { getGameIdGuide, gameGuideKeyboard } from "./guide";
 import { bigIntFromText, formatTomanFromRial, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
 import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
 import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achievement-service";
 import { LevelingService } from "@/lib/leveling-service";
-import { CLASH_1V1_CONFIG, ensureClash1v1Schema, payoutClash1v1Prize } from "@/lib/clash-1v1";
+import { CLASH_1V1_CONFIG, ensureClash1v1Schema, finalizeMatchResult } from "@/lib/clash-1v1";
+import { resolveMatchResultClaims, type MatchResultClaimValue } from "@/lib/match-result-policy";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 import type { SessionData, TelegramCallbackQuery, TelegramMessage, TelegramUpdate, TelegramUser } from "./types";
@@ -19,7 +20,7 @@ import { APP_URL, CANCEL_TEXT, CHANNEL_URL, DEFAULT_RULES, GAMENT_ID_REQUIRED, P
 import { validateWebhookSecret } from "./security";
 import { extractInviteReference, gameLabel, gamePrompt, generateLinkCode, html, isValidGamentId, linkCodeHash, normalizeGame, normalizeGamentId } from "./utils";
 import { confirmKeyboard, gameKeyboard, mainMenuKeyboard, platformKeyboard, removeKeyboard, replyKeyboard, roomsKeyboard } from "./keyboards";
-import { answerCallback, editMessage, sendDocument, sendMessage } from "./transport";
+import { answerCallback, editMessage, sendDocument, sendMessage, sendPhoto } from "./transport";
 import { clearSession, getSession, registrationSummary, setSession } from "./sessions";
 import { ensureFeatureEnabled, telegramFeatureEnabled } from "./settings";
 import { isChannelMember, promptChannelMembership } from "./membership";
@@ -1412,6 +1413,98 @@ async function userMatchRows(telegramId: string) {
   return { linked, rows: rows.map((row) => ({ ...row, playerId: playerIds.includes(row.player1Id || "") ? row.player1Id : row.player2Id })) };
 }
 
+interface MatchResultParticipantContext {
+  id: string;
+  userId: string | null;
+  name: string | null;
+  username: string | null;
+}
+
+async function loadMatchResultContext(matchId: string, client: any = db) {
+  const [match] = await client
+    .select({
+      id: matches.id,
+      tournamentId: matches.tournamentId,
+      tournamentName: tournaments.name,
+      player1Id: matches.player1Id,
+      player2Id: matches.player2Id,
+      winnerId: matches.winnerId,
+      status: matches.status,
+    })
+    .from(matches)
+    .leftJoin(tournaments, eq(matches.tournamentId, tournaments.id))
+    .where(eq(matches.id, matchId))
+    .limit(1);
+  if (!match?.player1Id || !match.player2Id) return null;
+
+  const participantRows = await client
+    .select({ id: players.id, userId: players.visibleUserId, name: players.displayName, username: players.username })
+    .from(players)
+    .where(inArray(players.id, [match.player1Id, match.player2Id]));
+  const byId = new Map<string, MatchResultParticipantContext>(
+    (participantRows as MatchResultParticipantContext[]).map((player) => [player.id, player]),
+  );
+  const player1 = byId.get(match.player1Id);
+  const player2 = byId.get(match.player2Id);
+  if (!player1?.userId || !player2?.userId) return null;
+  return { ...match, player1, player2 };
+}
+
+function resultClaimLabel(claim?: string | null) {
+  return claim === "win" ? "برد" : claim === "lose" ? "باخت" : "ثبت نشده";
+}
+
+async function notifyResultAdmins(matchId: string, message: string) {
+  const keyboard = {
+    inline_keyboard: [[
+      { text: "⚖️ مشاهده ادعا و مدارک", callback_data: `judge:info:${matchId}` },
+      { text: "🏆 بازیکن ۱ برنده", callback_data: `judge:p1:${matchId}` },
+      { text: "🏆 بازیکن ۲ برنده", callback_data: `judge:p2:${matchId}` },
+    ]],
+  };
+  const roleRecipients = await db
+    .select({ telegramId: telegramAccounts.telegramId })
+    .from(telegramAccounts)
+    .innerJoin(users, eq(telegramAccounts.userId, users.id))
+    .where(inArray(users.role, ["judge", "moderator", "admin", "super_admin"]));
+  const recipients = new Set([
+    ...getAdminIds(),
+    ...roleRecipients.map((row) => row.telegramId).filter(Boolean),
+  ]);
+  await Promise.allSettled([...recipients].map((adminId) => {
+    const chatId = Number(adminId);
+    return Number.isFinite(chatId) ? sendMessage(chatId, message, keyboard) : Promise.resolve();
+  }));
+}
+
+async function notifyFinalMatchResult(matchId: string, winnerId: string, prizePaid: boolean) {
+  const context = await loadMatchResultContext(matchId);
+  if (!context) return;
+  const winner = context.player1.id === winnerId ? context.player1 : context.player2;
+  const loser = winner === context.player1 ? context.player2 : context.player1;
+  const prizeLine = prizePaid
+    ? `\n💰 جایزه <b>${html(CLASH_1V1_CONFIG.prize1st)}</b> به کیف پول شما واریز شد.`
+    : "\n💰 وضعیت جایزه در سوابق کیف پول قابل پیگیری است.";
+
+  await Promise.allSettled([
+    evaluateUserAchievements(winner.userId),
+    evaluateUserAchievements(loser.userId),
+    notifyLinkedUserOnTelegram(winner.userId, [
+      "🏆 <b>نتیجه نهایی مسابقه</b>",
+      `شما برنده مسابقه مقابل <b>${html(loser.name || loser.username || "حریف")}</b> شدی.${prizeLine}`,
+    ].join("\n\n"), {
+      inline_keyboard: [[{ text: "💳 مشاهده کیف پول", url: `${APP_URL}/wallet` }]],
+    }),
+    notifyLinkedUserOnTelegram(loser.userId, [
+      "🎮 <b>نتیجه نهایی مسابقه</b>",
+      `برنده مسابقه: <b>${html(winner.name || winner.username || "حریف")}</b>`,
+      "برای مسابقه بعدی آماده باش 💪",
+    ].join("\n\n"), {
+      inline_keyboard: [[{ text: "⚔️ مسابقات من", callback_data: "menu:matches" }]],
+    }),
+  ]);
+}
+
 async function matchesCommand(chatId: number, telegramId: string) {
   const { linked, rows } = await userMatchRows(telegramId);
   if (!linked) {
@@ -1446,27 +1539,126 @@ async function handleMatchAction(chatId: number, telegramId: string, matchId: st
   });
 }
 
-async function submitTelegramResult(chatId: number, telegramId: string, matchId: string, action: "win" | "lose") {
-  const { linked, rows } = await userMatchRows(telegramId);
-  const match = rows.find((row) => row.id === matchId);
-  if (!linked || !match) {
+async function submitTelegramResult(chatId: number, telegramId: string, matchId: string, action: MatchResultClaimValue) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(chatId, "برای ثبت نتیجه، ابتدا حساب تلگرام را به Gament وصل کن.");
+    return;
+  }
+
+  await ensureClash1v1Schema();
+  const outcome = await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`match-result:${matchId}`}))`);
+    const [match] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1);
+    if (!match?.player1Id || !match.player2Id) return { kind: "missing" as const };
+    if (match.status === "completed") return { kind: "completed" as const, winnerId: match.winnerId };
+
+    const participants = await tx
+      .select({ id: players.id, userId: players.visibleUserId })
+      .from(players)
+      .where(inArray(players.id, [match.player1Id, match.player2Id]));
+    const reporter = participants.find((player: { userId: string | null }) => player.userId === linked.userId);
+    if (!reporter) return { kind: "forbidden" as const };
+
+    await tx
+      .insert(matchResultClaims)
+      .values({
+        matchId,
+        playerId: reporter.id,
+        userId: linked.userId,
+        telegramId,
+        claim: action,
+        submittedAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [matchResultClaims.matchId, matchResultClaims.playerId],
+        set: { claim: action, telegramId, updatedAt: new Date() },
+      });
+
+    const claimRows = await tx
+      .select({ playerId: matchResultClaims.playerId, claim: matchResultClaims.claim })
+      .from(matchResultClaims)
+      .where(eq(matchResultClaims.matchId, matchId));
+    const claims = claimRows
+      .filter((claim: { claim: string }) => claim.claim === "win" || claim.claim === "lose")
+      .map((claim: { playerId: string; claim: string }) => ({
+        playerId: claim.playerId,
+        claim: claim.claim as MatchResultClaimValue,
+      }));
+    const resolution = resolveMatchResultClaims(match.player1Id, match.player2Id, claims);
+    const evidenceSummary = {
+      source: "telegram_claims_v2",
+      claims,
+      resolution,
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (resolution.state === "pending") {
+      await tx.update(matches).set({ status: "awaiting_judgment", evidence: evidenceSummary }).where(eq(matches.id, matchId));
+      return { kind: "pending" as const, reporterPlayerId: reporter.id, claims, match };
+    }
+    if (resolution.state === "conflict") {
+      await tx.update(matches).set({ status: "disputed", evidence: evidenceSummary }).where(eq(matches.id, matchId));
+      return { kind: "conflict" as const, reason: resolution.reason, claims, match };
+    }
+
+    const finalized = await finalizeMatchResult(tx, matchId, resolution.winnerId);
+    return { kind: "agreed" as const, resolution, claims, match, finalized };
+  });
+
+  if (outcome.kind === "missing" || outcome.kind === "forbidden") {
     await sendMessage(chatId, "این مسابقه برای حساب شما پیدا نشد.");
     return;
   }
-  await db
-    .update(matches)
-    .set({
-      status: "awaiting_judgment",
-      evidence: {
-        source: "telegram",
-        reporterTelegramId: telegramId,
-        reporterUserId: linked.userId,
-        reporterClaim: action,
-        reportedAt: new Date().toISOString(),
-      },
-    })
-    .where(eq(matches.id, matchId));
-  await sendMessage(chatId, action === "win" ? "✅ نتیجه شما ثبت شد و برای داوری ارسال شد." : "✅ گزارش باخت ثبت شد. ممنون از اعلام نتیجه.");
+  if (outcome.kind === "completed") {
+    await sendMessage(chatId, "✅ نتیجه این مسابقه قبلاً نهایی شده است.");
+    return;
+  }
+
+  const context = await loadMatchResultContext(matchId);
+  const claimsText = context
+    ? [
+        `بازیکن ۱: <b>${html(resultClaimLabel(outcome.claims.find((c) => c.playerId === context.player1.id)?.claim))}</b>`,
+        `بازیکن ۲: <b>${html(resultClaimLabel(outcome.claims.find((c) => c.playerId === context.player2.id)?.claim))}</b>`,
+      ].join("\n")
+    : "";
+
+  if (outcome.kind === "pending") {
+    await sendMessage(chatId, [
+      "✅ نتیجه شما مستقل ثبت شد.",
+      "منتظر گزارش حریف هستیم. برای بررسی بهتر می‌توانی اسکرین‌شات نتیجه را هم ارسال کنی.",
+    ].join("\n"), {
+      inline_keyboard: [[{ text: "📎 ارسال اسکرین‌شات", callback_data: `evidence:${matchId}` }]],
+    });
+    if (context) {
+      const opponent = context.player1.id === outcome.reporterPlayerId ? context.player2 : context.player1;
+      await notifyLinkedUserOnTelegram(opponent.userId, "⚔️ حریف نتیجه مسابقه را ثبت کرده است. لطفاً نتیجه خودت را مستقل اعلام کن.", {
+        inline_keyboard: [[
+          { text: "✅ بردم", callback_data: `result:win:${matchId}` },
+          { text: "❌ باختم", callback_data: `result:lose:${matchId}` },
+        ], [{ text: "🚨 اعتراض", callback_data: `dispute:${matchId}` }]],
+      }).catch(() => undefined);
+    }
+    await notifyResultAdmins(matchId, `📥 <b>گزارش نتیجه جدید</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>\n${claimsText}`);
+    return;
+  }
+
+  if (outcome.kind === "conflict") {
+    await sendMessage(chatId, "🚨 گزارش دو بازیکن با هم سازگار نیست. مسابقه برای داوری انسانی ارسال شد.");
+    if (context) {
+      await Promise.allSettled([
+        notifyLinkedUserOnTelegram(context.player1.userId, "🚨 گزارش‌های مسابقه با هم اختلاف دارند و برای داوری انسانی ارسال شدند."),
+        notifyLinkedUserOnTelegram(context.player2.userId, "🚨 گزارش‌های مسابقه با هم اختلاف دارند و برای داوری انسانی ارسال شدند."),
+      ]);
+    }
+    await notifyResultAdmins(matchId, `🚨 <b>اختلاف نتیجه 1V1</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>\n${claimsText}`);
+    return;
+  }
+
+  const prizePaid = Boolean(outcome.finalized.completed && outcome.finalized.prize?.paid);
+  await notifyFinalMatchResult(matchId, outcome.resolution.winnerId, prizePaid);
+  await notifyResultAdmins(matchId, `✅ <b>نتیجه دوطرفه تأیید شد</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>\n${claimsText}\n🏆 تسویه خودکار انجام شد.`);
 }
 
 async function startDispute(chatId: number, telegramId: string, matchId: string) {
@@ -2126,7 +2318,8 @@ async function judgeCommand(chatId: number, telegramId: string) {
   await sendMessage(chatId, "⚖️ صف داوری:", {
     inline_keyboard: rows.flatMap((m, i) => [
       [{ text: `${i + 1}) ${m.tournamentName || "Match"} | ${m.status}`, callback_data: `judge:info:${m.id}` }],
-      [{ text: "✅ تأیید", callback_data: `judge:approve:${m.id}` }, { text: "🚨 بررسی/اعتراض", callback_data: `judge:review:${m.id}` }],
+      [{ text: "🏆 بازیکن ۱", callback_data: `judge:p1:${m.id}` }, { text: "🏆 بازیکن ۲", callback_data: `judge:p2:${m.id}` }],
+      [{ text: "✅ تأیید نتیجه موافق", callback_data: `judge:approve:${m.id}` }, { text: "🚨 بررسی بیشتر", callback_data: `judge:review:${m.id}` }],
     ]),
   });
 }
@@ -2136,33 +2329,79 @@ async function handleJudgeAction(chatId: number, telegramId: string, action: str
   if (!hasAdminAccess(telegramId) && !["judge", "moderator", "admin", "super_admin"].includes(String(linked?.role || ""))) {
     return sendMessage(chatId, "شما دسترسی داوری ندارید.");
   }
-  const [match] = await db.select().from(matches).where(eq(matches.id, matchId)).limit(1);
-  if (!match) return sendMessage(chatId, "مسابقه پیدا نشد.");
+  await ensureClash1v1Schema();
+  const context = await loadMatchResultContext(matchId);
+  if (!context) return sendMessage(chatId, "مسابقه پیدا نشد.");
+
+  const claimRows = await db
+    .select({ playerId: matchResultClaims.playerId, claim: matchResultClaims.claim, updatedAt: matchResultClaims.updatedAt })
+    .from(matchResultClaims)
+    .where(eq(matchResultClaims.matchId, matchId));
+  const claims = claimRows
+    .filter((claim) => claim.claim === "win" || claim.claim === "lose")
+    .map((claim) => ({ playerId: claim.playerId, claim: claim.claim as MatchResultClaimValue }));
+  const resolution = resolveMatchResultClaims(context.player1.id, context.player2.id, claims);
+
+  if (action === "info") {
+    const evidenceRows = await db
+      .select()
+      .from(matchEvidence)
+      .where(eq(matchEvidence.matchId, matchId))
+      .orderBy(desc(matchEvidence.createdAt));
+    await sendMessage(chatId, [
+      "⚖️ <b>جزئیات داوری مسابقه</b>",
+      `Match: <code>${html(matchId)}</code>`,
+      `وضعیت: <b>${html(context.status)}</b>`,
+      "",
+      `1) ${html(context.player1.name || context.player1.username || "بازیکن ۱")}: <b>${html(resultClaimLabel(claims.find((c) => c.playerId === context.player1.id)?.claim))}</b>`,
+      `2) ${html(context.player2.name || context.player2.username || "بازیکن ۲")}: <b>${html(resultClaimLabel(claims.find((c) => c.playerId === context.player2.id)?.claim))}</b>`,
+      `مدارک: <b>${evidenceRows.length.toLocaleString("fa-IR")}</b>`,
+    ].join("\n"), {
+      inline_keyboard: [[
+        { text: "🏆 بازیکن ۱ برنده", callback_data: `judge:p1:${matchId}` },
+        { text: "🏆 بازیکن ۲ برنده", callback_data: `judge:p2:${matchId}` },
+      ], [{ text: "🚨 بررسی بیشتر", callback_data: `judge:review:${matchId}` }]],
+    });
+
+    for (const evidence of evidenceRows.slice(0, 10)) {
+      const caption = `📎 مدرک مسابقه ${html(matchId.slice(0, 8))}\n${html(evidence.description || "بدون توضیح")}`;
+      if (evidence.fileUrl.startsWith("telegram_file:")) {
+        await sendPhoto(chatId, evidence.fileUrl.replace("telegram_file:", ""), caption).catch(() => undefined);
+      } else {
+        await sendMessage(chatId, `${caption}\n${html(evidence.fileUrl)}`).catch(() => undefined);
+      }
+    }
+    return;
+  }
+
   if (action === "review") {
     await db.update(matches).set({ status: "disputed" }).where(eq(matches.id, matchId));
-    return sendMessage(chatId, "🚨 مسابقه برای بررسی/اعتراض علامت‌گذاری شد.");
+    return sendMessage(chatId, "🚨 مسابقه برای بررسی بیشتر علامت‌گذاری شد.");
   }
-  if (action === "approve") {
-    const evidence = (match.evidence || {}) as { reporterUserId?: string; reporterClaim?: string };
-    let winnerId = match.winnerId;
-    if (!winnerId && evidence.reporterUserId) {
-      const [reporterPlayer] = await db.select({ id: players.id }).from(players).where(eq(players.visibleUserId, evidence.reporterUserId)).limit(1);
-      if (evidence.reporterClaim === "win") winnerId = reporterPlayer?.id || null;
-      if (evidence.reporterClaim === "lose") winnerId = match.player1Id === reporterPlayer?.id ? match.player2Id : match.player1Id;
-    }
-    await db.update(matches).set({ status: "completed", winnerId: winnerId || null, completedAt: new Date() }).where(eq(matches.id, matchId));
-    let prizeText = "";
-    if (winnerId) {
-      const prize = await db.transaction(async (tx) => payoutClash1v1Prize(tx, matchId, winnerId!)).catch((err) => {
-        logger.warn({ err, matchId, winnerId }, "Failed to payout Clash 1V1 prize");
-        return { paid: false as const, reason: "error" };
-      });
-      if (prize.paid) prizeText = `\n💰 جایزه ${CLASH_1V1_CONFIG.prize1st} به کیف پول برنده واریز شد.`;
-      else if (prize.reason === "already_paid") prizeText = "\n💰 جایزه این مسابقه قبلاً پرداخت شده بود.";
-    }
-    return sendMessage(chatId, `✅ نتیجه مسابقه تأیید و مسابقه تکمیل شد.${prizeText}`);
+
+  let winnerId: string | null = null;
+  if (action === "p1") winnerId = context.player1.id;
+  if (action === "p2") winnerId = context.player2.id;
+  if (action === "approve" && resolution.state === "agreed") winnerId = resolution.winnerId;
+  if (action === "approve" && !winnerId) {
+    return sendMessage(chatId, "نتیجه دو طرف موافق نیست؛ لطفاً صریحاً «بازیکن ۱» یا «بازیکن ۲» را به‌عنوان برنده انتخاب کن.");
   }
-  await sendMessage(chatId, `Match ID: <code>${html(match.id)}</code>\nStatus: <b>${html(match.status)}</b>`);
+  if (!winnerId) return sendMessage(chatId, "عملیات داوری نامعتبر است.");
+
+  const finalized = await db.transaction(async (tx) => finalizeMatchResult(tx, matchId, winnerId!));
+  if (!finalized.completed) return sendMessage(chatId, `تکمیل مسابقه انجام نشد: <code>${html(finalized.reason)}</code>`);
+
+  const prizePaid = Boolean(finalized.prize?.paid);
+  await notifyFinalMatchResult(matchId, finalized.winnerId, prizePaid);
+  await db
+    .update(disputes)
+    .set({ status: "resolved", resolution: `winner:${finalized.winnerId}`, resolvedAt: new Date() })
+    .where(eq(disputes.matchId, matchId));
+  return sendMessage(chatId, [
+    "✅ نتیجه مسابقه نهایی شد.",
+    prizePaid ? `💰 جایزه ${CLASH_1V1_CONFIG.prize1st} به کیف پول برنده واریز شد.` : "💰 پرداخت جایزه قبلاً انجام شده یا برای این مسابقه لازم نبود.",
+    "📣 نتیجه برای هر دو بازیکن ارسال شد.",
+  ].join("\n"));
 }
 
 const OUTREACH_MESSAGE_TEMPLATE = `سلام 👋\n\nمن از تیم Gament هستم، پلتفرم برگزاری تورنومنت‌های گیمینگ (Call of Duty Mobile, Clash Royale, Fortnite).\n\nاگر به مسابقات گیمینگ، تورنومنت‌های پولی یا جامعهٔ بازیکنان علاقه‌مند هستی، به ما سر بزن:\n\n🔗 https://www.gament1.ir\n\nثبت‌نام اولیه از طریق ربات تلگرام هم امکان‌پذیره: @FlexaTournamentBot`;
@@ -2698,6 +2937,11 @@ async function handleConversationMessage(message: TelegramMessage) {
       await sendMessage(chatId, "این مسابقه برای حساب شما پیدا نشد.");
       return;
     }
+    if (match.status === "completed") {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "نتیجه این مسابقه قبلاً نهایی شده است.", removeKeyboard());
+      return;
+    }
     await db.insert(matchEvidence).values({
       matchId: match.id,
       uploadedById: linked.userId,
@@ -2705,9 +2949,10 @@ async function handleConversationMessage(message: TelegramMessage) {
       fileType: "photo",
       description: message.caption || "Telegram screenshot evidence",
     });
-    await db.update(matches).set({ status: "awaiting_judgment" }).where(eq(matches.id, match.id));
+    await db.update(matches).set({ status: match.status === "disputed" ? "disputed" : "awaiting_judgment" }).where(eq(matches.id, match.id));
     await clearSession(telegramId);
     await sendMessage(chatId, "✅ اسکرین‌شات ثبت شد و برای داوری ارسال شد.", removeKeyboard());
+    await notifyResultAdmins(match.id, `📎 <b>مدرک جدید مسابقه</b>\nMatch: <code>${html(match.id.slice(0, 8))}</code>\nارسال‌کننده: <code>${html(telegramId)}</code>`);
     return;
   }
 
@@ -2763,6 +3008,7 @@ async function handleConversationMessage(message: TelegramMessage) {
     await db.update(matches).set({ status: "disputed" }).where(eq(matches.id, match.id));
     await clearSession(telegramId);
     await sendMessage(chatId, "✅ اعتراض شما ثبت شد و در پنل داوری بررسی می‌شود.");
+    await notifyResultAdmins(match.id, `🚨 <b>اعتراض جدید مسابقه</b>\nMatch: <code>${html(match.id.slice(0, 8))}</code>\nدلیل: ${html(text.slice(0, 500))}`);
     return;
   }
 

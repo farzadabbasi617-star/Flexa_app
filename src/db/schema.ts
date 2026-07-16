@@ -688,6 +688,23 @@ export const matches = pgTable("matches", {
   player2Idx: index("matches_player2_id_idx").on(table.player2Id),
 }));
 
+// Independent result claims from both match participants. Keeping one row per
+// player prevents the second report from overwriting the first one.
+export const matchResultClaims = pgTable("match_result_claims", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  matchId: uuid("match_id").notNull().references(() => matches.id),
+  playerId: uuid("player_id").notNull().references(() => players.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  telegramId: varchar("telegram_id", { length: 32 }),
+  claim: varchar("claim", { length: 10 }).notNull(),
+  submittedAt: timestamp("submitted_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  matchPlayerUnique: uniqueIndex("match_result_claims_match_player_unique").on(table.matchId, table.playerId),
+  matchIdx: index("match_result_claims_match_idx").on(table.matchId),
+  userIdx: index("match_result_claims_user_idx").on(table.userId),
+}));
+
 // Match evidence
 export const matchEvidence = pgTable("match_evidence", {
   id: uuid("id").defaultRandom().primaryKey(),

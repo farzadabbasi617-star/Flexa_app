@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { clash1v1Entries, matches, players, tournaments, transactions, wallets } from "@/db/schema";
-import { eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { ensureWalletMoneySchema, updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
 
 
@@ -37,6 +37,20 @@ async function createClash1v1Schema(client: any) {
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_status_submitted_idx ON clash_1v1_entries(status, submitted_at);`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_match_idx ON clash_1v1_entries(matched_match_id);`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_telegram_idx ON clash_1v1_entries(telegram_id);`));
+
+  await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS match_result_claims (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    match_id uuid NOT NULL REFERENCES matches(id),
+    player_id uuid NOT NULL REFERENCES players(id),
+    user_id uuid NOT NULL REFERENCES users(id),
+    telegram_id varchar(32),
+    claim varchar(10) NOT NULL CHECK (claim IN ('win', 'lose')),
+    submitted_at timestamp NOT NULL DEFAULT now(),
+    updated_at timestamp NOT NULL DEFAULT now(),
+    CONSTRAINT match_result_claims_match_player_unique UNIQUE (match_id, player_id)
+  );`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS match_result_claims_match_idx ON match_result_claims(match_id);`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS match_result_claims_user_idx ON match_result_claims(user_id);`));
 }
 
 /**
@@ -74,7 +88,7 @@ export const CLASH_1V1_CONFIG = {
   description:
     "صف خودکار 1V1 کلش رویال: هر بازیکن ۵۰ هزار تومان ورودی می‌دهد، پیوند دوستی رسمی کلش رویال را برای بات می‌فرستد، دو نفر به هم وصل می‌شوند و برنده ۸۰ هزار تومان جایزه می‌گیرد.",
   rules:
-    "• فقط آیدی/اکانت کلش رویال خودتان مجاز است.\n• بعد از پرداخت، از بخش افزودن دوست روی «اشتراک‌گذاری پیوند» بزنید و پیوند رسمی را برای بات بفرستید.\n• عکس QR پذیرفته نمی‌شود.\n• دو بازیکن به‌صورت خودکار به هم معرفی می‌شوند.\n• نتیجه با اسکرین‌شات/مدرک در بات ثبت و توسط داور تایید می‌شود.\n• جایزه نفر اول هر 1V1: ۸۰,۰۰۰ تومان.",
+    "• فقط آیدی/اکانت کلش رویال خودتان مجاز است.\n• بعد از پرداخت، از بخش افزودن دوست روی «اشتراک‌گذاری پیوند» بزنید و پیوند رسمی را برای بات بفرستید.\n• عکس QR پذیرفته نمی‌شود.\n• دو بازیکن به‌صورت خودکار به هم معرفی می‌شوند.\n• هر دو بازیکن نتیجه را مستقل ثبت می‌کنند؛ نتایج موافق خودکار نهایی و اختلاف‌ها توسط داور بررسی می‌شوند.\n• ارسال اسکرین‌شات نتیجه برای بررسی اختلاف توصیه می‌شود.\n• جایزه نفر اول هر 1V1: ۸۰,۰۰۰ تومان.",
   lobbyNotes:
     "این حالت نیاز به Room ID یا Password ندارد. بات پیوند دوستی رسمی دو حریف را برای یکدیگر ارسال می‌کند.",
 } as const;
@@ -165,5 +179,53 @@ export async function payoutClash1v1Prize(tx: any, matchId: string, winnerPlayer
     amountToman: CLASH_1V1_CONFIG.prizeToman,
     winnerUserId: winner.userId,
     winnerName: winner.displayName,
+  };
+}
+
+/** Complete a match exactly once, apply stats, and settle the 1V1 prize. */
+export async function finalizeMatchResult(tx: any, matchId: string, winnerId: string) {
+  await ensureClash1v1Schema(tx);
+  const [before] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1);
+  if (!before) return { completed: false as const, reason: "match_not_found" as const };
+  if (!before.player1Id || !before.player2Id) return { completed: false as const, reason: "match_not_ready" as const };
+  if (winnerId !== before.player1Id && winnerId !== before.player2Id) {
+    return { completed: false as const, reason: "invalid_winner" as const };
+  }
+
+  const loserId = winnerId === before.player1Id ? before.player2Id : before.player1Id;
+  const [completed] = await tx
+    .update(matches)
+    .set({ status: "completed", winnerId, completedAt: before.completedAt || new Date() })
+    .where(and(eq(matches.id, matchId), sql`${matches.status} <> 'completed'`))
+    .returning();
+
+  if (!completed) {
+    return {
+      completed: true as const,
+      transitioned: false as const,
+      winnerId: before.winnerId || winnerId,
+      loserId,
+      tournamentId: before.tournamentId,
+      prize: { paid: false as const, reason: "already_completed" as const },
+    };
+  }
+
+  await tx
+    .update(players)
+    .set({ wins: sql`${players.wins} + 1`, rating: sql`${players.rating} + 25` })
+    .where(eq(players.id, winnerId));
+  await tx
+    .update(players)
+    .set({ losses: sql`${players.losses} + 1`, rating: sql`GREATEST(0, ${players.rating} - 15)` })
+    .where(eq(players.id, loserId));
+
+  const prize = await payoutClash1v1Prize(tx, matchId, winnerId);
+  return {
+    completed: true as const,
+    transitioned: true as const,
+    winnerId,
+    loserId,
+    tournamentId: before.tournamentId,
+    prize,
   };
 }
