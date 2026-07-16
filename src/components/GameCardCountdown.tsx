@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface Props {
   /**
@@ -57,16 +57,12 @@ function computeParts(targetMs: number): Parts {
  * The synthesised target is memoised per-mount so it doesn't jump around.
  */
 export default function GameCardCountdown({ targetDate, fallbackDays = 20 }: Props) {
-  // Resolve the effective target once per prop change. When no real date is
-  // provided we anchor a synthetic (now + fallbackDays) target for the
-  // lifetime of this component instance so the timer counts down smoothly.
-  const targetMs = useMemo(() => {
-    if (targetDate) {
-      const ms = new Date(targetDate).getTime();
-      if (!Number.isNaN(ms)) return ms;
-    }
-    return Date.now() + fallbackDays * 86_400_000;
-  }, [targetDate, fallbackDays]);
+  // React permits impure time reads in a lazy state initializer, unlike during
+  // render. This anchors the synthetic target once per mount without calling
+  // Date.now() from useMemo/render (which caused unstable render output).
+  const [fallbackTargetMs] = useState(() => Date.now() + fallbackDays * 86_400_000);
+  const parsedTargetMs = targetDate ? new Date(targetDate).getTime() : Number.NaN;
+  const targetMs = Number.isNaN(parsedTargetMs) ? fallbackTargetMs : parsedTargetMs;
 
   const [parts, setParts] = useState<Parts>(() => computeParts(targetMs));
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
