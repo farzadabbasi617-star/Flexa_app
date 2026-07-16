@@ -5,6 +5,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  CLASH_PRIVATE_DRAFT_CAPACITIES,
+  CLASH_PRIVATE_DRAFT_CATEGORY,
+  CLASH_PRIVATE_DRAFT_DEFAULT_CAPACITY,
+  CLASH_PRIVATE_DRAFT_DESCRIPTION,
+  CLASH_PRIVATE_DRAFT_MODE,
+  CLASH_PRIVATE_DRAFT_RULES,
+  CLASH_PRIVATE_DRAFT_VENUE,
+} from "@/lib/clash-private-tournament";
 
 type GameId = "clash_royale" | "cod_mobile" | "fortnite";
 type FormatId = "single_elimination" | "double_elimination" | "round_robin";
@@ -61,22 +70,22 @@ const emptyForm = {
   id: "",
   name: "",
   game: "clash_royale" as GameId,
-  format: "single_elimination" as FormatId,
+  format: "round_robin" as FormatId,
   status: "registration",
-  description: "",
-  maxPlayers: 16,
+  description: CLASH_PRIVATE_DRAFT_DESCRIPTION,
+  maxPlayers: CLASH_PRIVATE_DRAFT_DEFAULT_CAPACITY,
   prizePool: "",
-  winnersCount: 1,
-  categoryLabel: "",
+  winnersCount: 3,
+  categoryLabel: CLASH_PRIVATE_DRAFT_CATEGORY,
   entryFee: "رایگان",
-  gameMode: "1v1 Best of 3",
-  mapName: "Arena",
-  serverSlots: 16,
+  gameMode: CLASH_PRIVATE_DRAFT_MODE,
+  mapName: CLASH_PRIVATE_DRAFT_VENUE,
+  serverSlots: CLASH_PRIVATE_DRAFT_DEFAULT_CAPACITY,
   prize1st: "",
   prize2nd: "",
   prize3rd: "",
   prize4to10: "",
-  rules: "",
+  rules: CLASH_PRIVATE_DRAFT_RULES,
   bannerUrl: "",
   roomId: "",
   roomPassword: "",
@@ -133,6 +142,26 @@ export default function AdminTournamentsPage() {
     if (!q) return rows;
     return rows.filter((row) => JSON.stringify(row).toLowerCase().includes(q));
   }, [query, rows]);
+
+  function changeGame(game: GameId) {
+    if (game === "clash_royale") {
+      setForm((current) => ({
+        ...current,
+        game,
+        format: "round_robin",
+        categoryLabel: CLASH_PRIVATE_DRAFT_CATEGORY,
+        gameMode: CLASH_PRIVATE_DRAFT_MODE,
+        mapName: CLASH_PRIVATE_DRAFT_VENUE,
+        maxPlayers: CLASH_PRIVATE_DRAFT_DEFAULT_CAPACITY,
+        serverSlots: CLASH_PRIVATE_DRAFT_DEFAULT_CAPACITY,
+        winnersCount: 3,
+        description: CLASH_PRIVATE_DRAFT_DESCRIPTION,
+        rules: CLASH_PRIVATE_DRAFT_RULES,
+      }));
+      return;
+    }
+    setForm((current) => ({ ...current, game, categoryLabel: "" }));
+  }
 
   function edit(row: TournamentRow) {
     setForm({
@@ -229,14 +258,31 @@ export default function AdminTournamentsPage() {
           <form onSubmit={save} className="gaming-card p-4 sm:p-5 mb-8 grid grid-cols-1 md:grid-cols-2 gap-4 animate-slide-up">
             <input className="gaming-input" placeholder="نام تورنومنت" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <input className="gaming-input" placeholder="لینک تصویر بنر" value={form.bannerUrl} onChange={(e) => setForm({ ...form, bannerUrl: e.target.value })} />
-            <select className="gaming-select" value={form.game} onChange={(e) => setForm({ ...form, game: e.target.value as GameId })}>{games.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}</select>
-            <select className="gaming-select" value={form.format} onChange={(e) => setForm({ ...form, format: e.target.value as FormatId })}>{formats.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
+            <select className="gaming-select" value={form.game} onChange={(e) => changeGame(e.target.value as GameId)}>{games.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}</select>
+            <select className="gaming-select" value={form.format} disabled={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY} onChange={(e) => setForm({ ...form, format: e.target.value as FormatId })}>{formats.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
             <select className="gaming-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
             <input className="gaming-input" placeholder="زمان شروع" type="datetime-local" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
-            <input className="gaming-input" placeholder="مود بازی" value={form.gameMode} onChange={(e) => setForm({ ...form, gameMode: e.target.value })} />
-            <input className="gaming-input" placeholder="مپ" value={form.mapName} onChange={(e) => setForm({ ...form, mapName: e.target.value })} />
-            <input className="gaming-input" type="number" placeholder="حداکثر بازیکن" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: Number(e.target.value) })} />
-            <input className="gaming-input" type="number" placeholder="ظرفیت سرور" value={form.serverSlots} onChange={(e) => setForm({ ...form, serverSlots: Number(e.target.value) })} />
+            <input className="gaming-input" placeholder="مود بازی" value={form.gameMode} readOnly={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY} onChange={(e) => setForm({ ...form, gameMode: e.target.value })} />
+            <input className="gaming-input" placeholder="محل برگزاری" value={form.mapName} readOnly={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY} onChange={(e) => setForm({ ...form, mapName: e.target.value })} />
+            {form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY ? (
+              <select
+                className="gaming-select md:col-span-2"
+                value={form.maxPlayers}
+                onChange={(e) => {
+                  const capacity = Number(e.target.value);
+                  setForm({ ...form, maxPlayers: capacity, serverSlots: capacity });
+                }}
+              >
+                {CLASH_PRIVATE_DRAFT_CAPACITIES.map((capacity) => (
+                  <option key={capacity} value={capacity}>ظرفیت رسمی کلش: {capacity} نفر</option>
+                ))}
+              </select>
+            ) : (
+              <>
+                <input className="gaming-input" type="number" placeholder="حداکثر بازیکن" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: Number(e.target.value) })} />
+                <input className="gaming-input" type="number" placeholder="ظرفیت سرور" value={form.serverSlots} onChange={(e) => setForm({ ...form, serverSlots: Number(e.target.value) })} />
+              </>
+            )}
             <input className="gaming-input" placeholder="ورودی" value={form.entryFee} onChange={(e) => setForm({ ...form, entryFee: e.target.value })} />
             <input className="gaming-input" placeholder="کل جایزه" value={form.prizePool} onChange={(e) => setForm({ ...form, prizePool: e.target.value })} />
             <input className="gaming-input" placeholder="نفر اول" value={form.prize1st} onChange={(e) => setForm({ ...form, prize1st: e.target.value })} />

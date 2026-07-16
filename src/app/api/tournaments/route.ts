@@ -7,6 +7,7 @@ import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import { publicCacheHeaders, ttlCache } from "@/lib/server-cache";
 import logger from "@/lib/logger";
 import { safePagination } from "@/lib/pagination";
+import { normalizeClashPrivateDraftSettings } from "@/lib/clash-private-tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -137,11 +138,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
   try {
-    const body = await request.json();
+    const body = normalizeClashPrivateDraftSettings(await request.json());
     const {
       name, game, format, description, maxPlayers, prizePool, rules, startDate,
       entryFee, gameMode, mapName, serverSlots, winnersCount, categoryLabel,
-      prize1st, prize2nd, prize3rd, prize4to10, bannerUrl
+      prize1st, prize2nd, prize3rd, prize4to10, bannerUrl, lobbyNotes
     } = body;
 
     if (!name || !game) {
@@ -170,6 +171,7 @@ export async function POST(request: NextRequest) {
         prize4to10: prize4to10 || null,
         bannerUrl: bannerUrl || null,
         rules: rules || null,
+        lobbyNotes: lobbyNotes || null,
         startDate: startDate ? new Date(startDate) : null,
       })
       .returning();
@@ -180,7 +182,9 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json(tournament, { status: 201 });
   } catch (err) {
-    console.error("Create tournament error:", err);
-    return NextResponse.json({ error: "Failed to create tournament" }, { status: 500 });
+    logger.error({ err }, "Create tournament error");
+    const message = err instanceof Error ? err.message : "Failed to create tournament";
+    const validationError = message.includes("ظرفیت مسابقه خصوصی کلش رویال");
+    return NextResponse.json({ error: validationError ? message : "Failed to create tournament" }, { status: validationError ? 400 : 500 });
   }
 }

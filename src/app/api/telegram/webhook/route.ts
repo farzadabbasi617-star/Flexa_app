@@ -602,7 +602,9 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
   await evaluateUserAchievements(linked.userId).catch(() => undefined);
   const xpText = await rewardUserXP(linked.userId, isPaid ? 25 : 15, isPaid ? "ثبت‌نام پولی" : "ثبت‌نام تورنومنت");
 
-  const needsClashQr = tournament.game === "clash_royale" && isPaid;
+  const needsClashQr = tournament.game === "clash_royale"
+    && tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel
+    && isPaid;
   const qrLine = needsClashQr ? "\n\n⚔️ مرحله بعد: از Clash Royale روی «اشتراک‌گذاری پیوند» بزن و پیوند دوستی را برای بات بفرست." : "";
   await sendMessage(chatId, `✅ ثبت‌نام شما در تورنومنت انجام شد.
 
@@ -1237,6 +1239,7 @@ async function myTournamentsCommand(chatId: number, telegramId: string) {
       game: tournaments.game,
       status: tournaments.status,
       entryFee: tournaments.entryFee,
+      categoryLabel: tournaments.categoryLabel,
       startDate: tournaments.startDate,
       roomId: tournaments.roomId,
       roomVisibleAt: tournaments.roomVisibleAt,
@@ -1268,7 +1271,7 @@ async function myTournamentsCommand(chatId: number, telegramId: string) {
         { text: "لغو", callback_data: `cancelreg:${row.registrationId}` },
       ],
     ];
-    if (row.game === "clash_royale" && !isFreeEntryFee(row.entryFee)) {
+    if (row.game === "clash_royale" && row.categoryLabel === CLASH_1V1_CONFIG.categoryLabel && !isFreeEntryFee(row.entryFee)) {
       result.push([{ text: "⚔️ 1V1 کلش رویال", callback_data: `qr:${row.tournamentId}` }]);
     }
     return result;
@@ -1743,6 +1746,7 @@ async function startClashQrSubmission(chatId: number, telegramId: string, tourna
   const conditions = [
     eq(registrations.visibleUserId, linked.userId),
     eq(tournaments.game, "clash_royale"),
+    eq(tournaments.categoryLabel, CLASH_1V1_CONFIG.categoryLabel),
     inArray(tournaments.status, ["registration", "in_progress"]),
   ];
   if (tournamentId) conditions.push(eq(tournaments.id, tournamentId));
@@ -1775,7 +1779,11 @@ async function startClashQrSubmission(chatId: number, telegramId: string, tourna
       })
       .from(tournaments)
       .leftJoin(registrations, eq(registrations.tournamentId, tournaments.id))
-      .where(and(eq(tournaments.game, "clash_royale"), eq(tournaments.status, "registration")))
+      .where(and(
+        eq(tournaments.game, "clash_royale"),
+        eq(tournaments.categoryLabel, CLASH_1V1_CONFIG.categoryLabel),
+        eq(tournaments.status, "registration")
+      ))
       .groupBy(tournaments.id)
       .orderBy(desc(tournaments.createdAt))
       .limit(6);
@@ -2779,13 +2787,19 @@ async function handleConversationMessage(message: TelegramMessage) {
         tournamentName: tournaments.name,
         game: tournaments.game,
         entryFee: tournaments.entryFee,
+        categoryLabel: tournaments.categoryLabel,
       })
       .from(registrations)
       .innerJoin(tournaments, eq(registrations.tournamentId, tournaments.id))
       .where(and(eq(registrations.id, data.qrRegistrationId), eq(registrations.visibleUserId, linked.userId)))
       .limit(1);
 
-    if (!registration || registration.game !== "clash_royale" || isFreeEntryFee(registration.entryFee)) {
+    if (
+      !registration ||
+      registration.game !== "clash_royale" ||
+      registration.categoryLabel !== CLASH_1V1_CONFIG.categoryLabel ||
+      isFreeEntryFee(registration.entryFee)
+    ) {
       await clearSession(telegramId);
       await sendMessage(chatId, "این ثبت‌نام برای 1V1 کلش رویال معتبر نیست یا تورنومنت پولی کلش نیست.", removeKeyboard());
       return;

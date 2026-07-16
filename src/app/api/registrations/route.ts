@@ -10,6 +10,7 @@ import { notifyLinkedUserOnTelegram } from "@/lib/telegram";
 import { formatTomanFromRial, bigIntFromText } from "@/lib/money";
 import logger from "@/lib/logger";
 import { z } from "zod";
+import { CLASH_1V1_CONFIG } from "@/lib/clash-1v1";
 
 export const dynamic = "force-dynamic";
 
@@ -70,6 +71,7 @@ export async function POST(request: NextRequest) {
           status: tournaments.status,
           maxPlayers: tournaments.maxPlayers,
           entryFee: tournaments.entryFee,
+          categoryLabel: tournaments.categoryLabel,
         })
         .from(tournaments)
         .where(eq(tournaments.id, tournamentId));
@@ -160,11 +162,13 @@ export async function POST(request: NextRequest) {
         .values({ tournamentId, playerId, visibleUserId: ownerId })
         .returning();
 
-      return { registration: reg, entryFeeRial: entryFeeRial.toString(), paymentTransactionId, tournamentName: tournament.name, tournamentGame: tournament.game, playerName: player.displayName };
+      return { registration: reg, entryFeeRial: entryFeeRial.toString(), paymentTransactionId, tournamentName: tournament.name, tournamentGame: tournament.game, tournamentCategory: tournament.categoryLabel, playerName: player.displayName };
     });
 
     await evaluateUserAchievements(result.registration.visibleUserId).catch(() => undefined);
-    const needsClashQr = result.tournamentGame === "clash_royale" && bigIntFromText(result.entryFeeRial) > BigInt(0);
+    const needsClashQr = result.tournamentGame === "clash_royale"
+      && result.tournamentCategory === CLASH_1V1_CONFIG.categoryLabel
+      && bigIntFromText(result.entryFeeRial) > BigInt(0);
     const appUrl = process.env.APP_URL || "https://www.gament1.ir";
     const replyKeyboard = {
       inline_keyboard: [

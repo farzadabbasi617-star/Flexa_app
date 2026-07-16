@@ -5,6 +5,15 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
+import {
+  CLASH_PRIVATE_DRAFT_CAPACITIES,
+  CLASH_PRIVATE_DRAFT_CATEGORY,
+  CLASH_PRIVATE_DRAFT_DEFAULT_CAPACITY,
+  CLASH_PRIVATE_DRAFT_DESCRIPTION,
+  CLASH_PRIVATE_DRAFT_MODE,
+  CLASH_PRIVATE_DRAFT_RULES,
+  CLASH_PRIVATE_DRAFT_VENUE,
+} from "@/lib/clash-private-tournament";
 
 type GameId = "clash_royale" | "cod_mobile" | "fortnite";
 type TournamentFormat = "single_elimination" | "double_elimination" | "round_robin";
@@ -46,19 +55,24 @@ const GAME_CONFIG: Record<GameId, GameConfig> = {
     id: "clash_royale",
     icon: "⚔️",
     name: "کلش رویال",
-    defaultFormat: "single_elimination",
-    defaultMode: "1v1 Best of 3",
-    defaultMap: "Arena",
-    defaultServerSlots: 8,
-    defaultMaxPlayers: 16,
-    serverSlots: [4, 8, 16, 32, 64],
-    maxPlayers: [4, 8, 16, 32, 64],
+    // Large Clash events are managed by the game's Private Tournament
+    // leaderboard, not Gament's head-to-head elimination bracket.
+    defaultFormat: "round_robin",
+    defaultMode: CLASH_PRIVATE_DRAFT_MODE,
+    defaultMap: CLASH_PRIVATE_DRAFT_VENUE,
+    defaultServerSlots: CLASH_PRIVATE_DRAFT_DEFAULT_CAPACITY,
+    defaultMaxPlayers: CLASH_PRIVATE_DRAFT_DEFAULT_CAPACITY,
+    serverSlots: [...CLASH_PRIVATE_DRAFT_CAPACITIES],
+    maxPlayers: [...CLASH_PRIVATE_DRAFT_CAPACITIES],
     entryFeePlaceholder: "مثال: رایگان / ۵۰ هزار تومان",
-    rulesPlaceholder: "مثال: هر مسابقه Best of 3، ارسال اسکرین‌شات نتیجه الزامی است...",
+    rulesPlaceholder: CLASH_PRIVATE_DRAFT_RULES,
     formats: [
-      { id: "single_elimination", icon: "🏆", name: "دوئل حذفی ۱v۱", hint: "بازنده حذف می‌شود؛ مناسب جام سریع" },
-      { id: "round_robin", icon: "🔁", name: "لیگ گروهی کلش", hint: "همه با هم بازی می‌کنند؛ مناسب رتبه‌بندی" },
-      { id: "double_elimination", icon: "🔄", name: "دو شانسه کلش", hint: "هر بازیکن با دو باخت حذف می‌شود" },
+      {
+        id: "round_robin",
+        icon: "🏅",
+        name: "مسابقه خصوصی Draft با جدول رتبه‌بندی",
+        hint: "انتخاب کارت و سطح تورنمنتی برابر؛ رتبه نهایی از Leaderboard خود بازی",
+      },
     ],
   },
   cod_mobile: {
@@ -127,7 +141,7 @@ const initialForm: FormState = {
   name: "",
   game: initialGame.id,
   format: initialGame.defaultFormat,
-  description: "",
+  description: CLASH_PRIVATE_DRAFT_DESCRIPTION,
   maxPlayers: initialGame.defaultMaxPlayers,
   entryFee: "رایگان",
   prizePool: "",
@@ -138,7 +152,7 @@ const initialForm: FormState = {
   gameMode: initialGame.defaultMode,
   mapName: initialGame.defaultMap,
   serverSlots: initialGame.defaultServerSlots,
-  rules: "",
+  rules: initialGame.rulesPlaceholder,
   bannerUrl: "",
   startDate: "",
 };
@@ -189,7 +203,8 @@ export default function CreateTournamentPage() {
       mapName: config.defaultMap,
       serverSlots: config.defaultServerSlots,
       maxPlayers: config.defaultMaxPlayers,
-      rules: prev.rules || config.rulesPlaceholder,
+      description: gameId === "clash_royale" ? CLASH_PRIVATE_DRAFT_DESCRIPTION : prev.description,
+      rules: gameId === "clash_royale" ? CLASH_PRIVATE_DRAFT_RULES : (prev.rules || config.rulesPlaceholder),
     }));
   }
 
@@ -246,6 +261,14 @@ export default function CreateTournamentPage() {
     if (!form.mapName.trim()) errors.mapName = "مپ یا محل برگزاری را وارد کن.";
     if (!form.maxPlayers || form.maxPlayers < 2) errors.maxPlayers = "حداکثر بازیکنان را انتخاب کن.";
     if (!form.serverSlots || form.serverSlots < 2) errors.serverSlots = "ظرفیت سرور را انتخاب کن.";
+    if (form.game === "clash_royale") {
+      if (!CLASH_PRIVATE_DRAFT_CAPACITIES.includes(form.maxPlayers as (typeof CLASH_PRIVATE_DRAFT_CAPACITIES)[number])) {
+        errors.maxPlayers = "ظرفیت کلش فقط ۱۰، ۵۰، ۱۰۰ یا ۲۰۰ نفر است.";
+      }
+      if (form.serverSlots !== form.maxPlayers) {
+        errors.serverSlots = "ظرفیت داخل بازی و ظرفیت ثبت‌نام باید یکسان باشد.";
+      }
+    }
 
     setFieldErrors(errors);
 
@@ -272,6 +295,8 @@ export default function CreateTournamentPage() {
     try {
       const payload = {
         ...form,
+        categoryLabel: form.game === "clash_royale" ? CLASH_PRIVATE_DRAFT_CATEGORY : null,
+        winnersCount: form.game === "clash_royale" ? 3 : 1,
         name: form.name.trim(),
         gameMode: form.gameMode.trim(),
         mapName: form.mapName.trim(),
@@ -406,6 +431,19 @@ export default function CreateTournamentPage() {
             </div>
           </div>
 
+          {form.game === "clash_royale" && (
+            <div className="gaming-card p-5 border-cyan-400/30 bg-cyan-950/20">
+              <h3 className="font-black text-cyan-300 mb-3">⚖️ تنظیمات عادلانه مسابقه خصوصی کلش</h3>
+              <div className="text-xs text-gray-300 leading-7 space-y-1">
+                <p>🃏 مود ثابت: <b>انتخاب کارت (Draft)</b></p>
+                <p>🏰 سطح کارت‌ها و برج‌ها: <b>Tournament Standard و برابر برای همه</b></p>
+                <p>👥 ظرفیت رسمی داخل بازی: <b>۱۰، ۵۰، ۱۰۰ یا ۲۰۰ نفر</b></p>
+                <p>🏅 نتیجه نهایی: <b>Leaderboard مسابقه خصوصی داخل Clash Royale</b></p>
+                <p className="text-cyan-200">این مدل براکت حذفی ندارد؛ حریف‌ها و رتبه‌بندی را خود بازی مدیریت می‌کند.</p>
+              </div>
+            </div>
+          )}
+
           <div className="gaming-card p-5 border-purple-500/25 bg-purple-900/10">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
               <div>
@@ -507,6 +545,7 @@ export default function CreateTournamentPage() {
                 type="text"
                 className={`gaming-input ${fieldErrors.gameMode ? "border-red-500/70" : ""}`}
                 value={form.gameMode}
+                readOnly={form.game === "clash_royale"}
                 onChange={(e) => {
                   setFieldErrors((prev) => ({ ...prev, gameMode: "" }));
                   setForm({ ...form, gameMode: e.target.value });
@@ -520,6 +559,7 @@ export default function CreateTournamentPage() {
                 type="text"
                 className={`gaming-input ${fieldErrors.mapName ? "border-red-500/70" : ""}`}
                 value={form.mapName}
+                readOnly={form.game === "clash_royale"}
                 onChange={(e) => {
                   setFieldErrors((prev) => ({ ...prev, mapName: "" }));
                   setForm({ ...form, mapName: e.target.value });
@@ -529,24 +569,47 @@ export default function CreateTournamentPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {form.game === "clash_royale" ? (
             <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">ظرفیت سرور *</label>
-              <select className="gaming-select" value={form.serverSlots} onChange={(e) => setForm({ ...form, serverSlots: Number(e.target.value) })}>
-                {selectedGame.serverSlots.map((n) => (
-                  <option key={n} value={n}>{n} نفر</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">حداکثر بازیکنان *</label>
-              <select className="gaming-select" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: Number(e.target.value) })}>
-                {selectedGame.maxPlayers.map((n) => (
+              <label className="block text-sm font-medium text-gray-300 mb-2">ظرفیت مسابقه خصوصی کلش *</label>
+              <select
+                className={`gaming-select ${fieldErrors.maxPlayers || fieldErrors.serverSlots ? "border-red-500/70" : ""}`}
+                value={form.maxPlayers}
+                onChange={(e) => {
+                  const capacity = Number(e.target.value);
+                  setFieldErrors((prev) => ({ ...prev, maxPlayers: "", serverSlots: "" }));
+                  setForm({ ...form, maxPlayers: capacity, serverSlots: capacity });
+                }}
+              >
+                {CLASH_PRIVATE_DRAFT_CAPACITIES.map((n) => (
                   <option key={n} value={n}>{n} بازیکن</option>
                 ))}
               </select>
+              <p className="text-[11px] text-cyan-300/80 mt-2">ظرفیت ثبت‌نام Gament و ظرفیت داخل Clash Royale خودکار یکسان می‌شوند.</p>
+              {(fieldErrors.maxPlayers || fieldErrors.serverSlots) && (
+                <p className="text-red-400 text-xs mt-2">{fieldErrors.maxPlayers || fieldErrors.serverSlots}</p>
+              )}
             </div>
-          </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">ظرفیت سرور *</label>
+                <select className="gaming-select" value={form.serverSlots} onChange={(e) => setForm({ ...form, serverSlots: Number(e.target.value) })}>
+                  {selectedGame.serverSlots.map((n) => (
+                    <option key={n} value={n}>{n} نفر</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">حداکثر بازیکنان *</label>
+                <select className="gaming-select" value={form.maxPlayers} onChange={(e) => setForm({ ...form, maxPlayers: Number(e.target.value) })}>
+                  {selectedGame.maxPlayers.map((n) => (
+                    <option key={n} value={n}>{n} بازیکن</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-300 mb-2">⏰ زمان شروع</label>

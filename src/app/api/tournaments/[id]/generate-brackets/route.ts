@@ -7,6 +7,7 @@ import { generateSingleEliminationMatches, shuffle } from "@/lib/brackets";
 import logger from "@/lib/logger";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { notifyTournamentParticipantsOnTelegram } from "@/lib/telegram";
+import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -29,11 +30,12 @@ export async function POST(
       await tx.execute(sql`SELECT id FROM tournaments WHERE id = ${id} FOR UPDATE`);
 
       const [tournament] = await tx
-        .select({ id: tournaments.id, name: tournaments.name, status: tournaments.status })
+        .select({ id: tournaments.id, name: tournaments.name, status: tournaments.status, categoryLabel: tournaments.categoryLabel })
         .from(tournaments)
         .where(eq(tournaments.id, id));
 
       if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
+      if (tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY) throw new Error("CLASH_PRIVATE_USES_GAME_LEADERBOARD");
       if (tournament.status === "completed") throw new Error("TOURNAMENT_COMPLETED");
 
       const regs = await tx
@@ -101,6 +103,9 @@ export async function POST(
     }
     if (message === "TOURNAMENT_COMPLETED") {
       return NextResponse.json({ error: "Completed tournaments cannot be regenerated" }, { status: 409 });
+    }
+    if (message === "CLASH_PRIVATE_USES_GAME_LEADERBOARD") {
+      return NextResponse.json({ error: "این مود از Leaderboard مسابقه خصوصی Clash Royale استفاده می‌کند و براکت حذفی ندارد." }, { status: 409 });
     }
 
     logger.error({ err: e }, "Failed to generate brackets");

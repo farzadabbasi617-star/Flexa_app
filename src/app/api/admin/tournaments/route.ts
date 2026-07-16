@@ -7,6 +7,7 @@ import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { distributeTournamentPrizes, refundTournamentEntryFees } from "@/lib/tournament-finance";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import logger from "@/lib/logger";
+import { normalizeClashPrivateDraftSettings } from "@/lib/clash-private-tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +15,8 @@ const GAME_VALUES = ["clash_royale", "cod_mobile", "fortnite"] as const;
 const FORMAT_VALUES = ["single_elimination", "double_elimination", "round_robin"] as const;
 const STATUS_VALUES = ["registration", "in_progress", "completed", "cancelled"] as const;
 
-function normalizeTournamentBody(body: Record<string, unknown>) {
+function normalizeTournamentBody(rawBody: Record<string, unknown>) {
+  const body = normalizeClashPrivateDraftSettings(rawBody);
   const game = String(body.game || "");
   const format = String(body.format || "single_elimination");
   const status = String(body.status || "registration");
