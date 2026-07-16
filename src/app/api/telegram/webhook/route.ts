@@ -1595,7 +1595,9 @@ async function submitTelegramResult(chatId: number, telegramId: string, matchId:
     };
 
     if (resolution.state === "pending") {
-      await tx.update(matches).set({ status: "awaiting_judgment", evidence: evidenceSummary }).where(eq(matches.id, matchId));
+      // One report alone is not a judging case. Keep the match active and wait
+      // for the opponent's independent claim.
+      await tx.update(matches).set({ status: "in_progress", evidence: evidenceSummary }).where(eq(matches.id, matchId));
       return { kind: "pending" as const, reporterPlayerId: reporter.id, claims, match };
     }
     if (resolution.state === "conflict") {
@@ -1640,7 +1642,6 @@ async function submitTelegramResult(chatId: number, telegramId: string, matchId:
         ], [{ text: "🚨 اعتراض", callback_data: `dispute:${matchId}` }]],
       }).catch(() => undefined);
     }
-    await notifyResultAdmins(matchId, `📥 <b>گزارش نتیجه جدید</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>\n${claimsText}`);
     return;
   }
 
@@ -1657,8 +1658,9 @@ async function submitTelegramResult(chatId: number, telegramId: string, matchId:
   }
 
   const prizePaid = Boolean(outcome.finalized.completed && outcome.finalized.prize?.paid);
+  // Complementary claims (one win + one loss) settle privately and
+  // automatically. No judge/admin notification is created.
   await notifyFinalMatchResult(matchId, outcome.resolution.winnerId, prizePaid);
-  await notifyResultAdmins(matchId, `✅ <b>نتیجه دوطرفه تأیید شد</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>\n${claimsText}\n🏆 تسویه خودکار انجام شد.`);
 }
 
 async function startDispute(chatId: number, telegramId: string, matchId: string) {
@@ -2949,10 +2951,17 @@ async function handleConversationMessage(message: TelegramMessage) {
       fileType: "photo",
       description: message.caption || "Telegram screenshot evidence",
     });
-    await db.update(matches).set({ status: match.status === "disputed" ? "disputed" : "awaiting_judgment" }).where(eq(matches.id, match.id));
     await clearSession(telegramId);
-    await sendMessage(chatId, "✅ اسکرین‌شات ثبت شد و برای داوری ارسال شد.", removeKeyboard());
-    await notifyResultAdmins(match.id, `📎 <b>مدرک جدید مسابقه</b>\nMatch: <code>${html(match.id.slice(0, 8))}</code>\nارسال‌کننده: <code>${html(telegramId)}</code>`);
+    await sendMessage(
+      chatId,
+      match.status === "disputed"
+        ? "✅ اسکرین‌شات ثبت و به پرونده داوری اضافه شد."
+        : "✅ اسکرین‌شات ثبت شد؛ فقط در صورت اختلاف برای داور نمایش داده می‌شود.",
+      removeKeyboard(),
+    );
+    if (match.status === "disputed") {
+      await notifyResultAdmins(match.id, `📎 <b>مدرک جدید اختلاف</b>\nMatch: <code>${html(match.id.slice(0, 8))}</code>\nارسال‌کننده: <code>${html(telegramId)}</code>`);
+    }
     return;
   }
 
