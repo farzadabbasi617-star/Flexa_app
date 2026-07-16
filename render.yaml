@@ -3,7 +3,8 @@ services:
     name: gament
     env: node
     plan: free
-    buildCommand: npm ci --include=dev && npm run build && npm run db:push
+    # Schema changes are applied as reviewed migrations, never implicitly during every build.
+    buildCommand: npm ci --include=dev && npm run build
     startCommand: npm run start
     healthCheckPath: /api/health
     autoDeploy: true
@@ -15,6 +16,10 @@ services:
       - key: OPENROUTER_API_KEY
         sync: false
       - key: GROQ_API_KEY
+        sync: false
+      - key: ADMIN_SETUP_SECRET
+        sync: false
+      - key: OTP_TOKEN_PEPPER
         sync: false
       - key: EMAIL_PROVIDER
         value: google_apps_script
@@ -35,6 +40,8 @@ services:
       - key: TELEGRAM_BOT_USERNAME
         value: FlexaTournamentBot
       - key: TELEGRAM_CRON_SECRET
+        sync: false
+      - key: TELEGRAM_SETUP_SECRET
         sync: false
       - key: TELEGRAM_REQUIRE_CHANNEL_MEMBERSHIP
         value: 'false'

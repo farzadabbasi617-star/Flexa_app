@@ -23,7 +23,7 @@
 *   **رتبه‌بندی Elo**: سیستم امتیازدهی رتبه‌بندی (RP) برای ایجاد لیدربورد عادلانه و رقابتی.
 
 ### ۴. احراز هویت و امنیت (Security)
-*   **ثبت‌نام با موبایل (اجباری) + ایمیل (اجباری) + رمز عبور**: شماره موبایل برای شناسایی/تماس همچنان الزامی است، اما تایید حساب با یک کد ۶ رقمی است که به ایمیل کاربر ارسال می‌شود (از طریق **Resend**) — بدون نیاز به خرید پنل پیامک.
+*   **ثبت‌نام با موبایل (اجباری) + ایمیل (اجباری) + رمز عبور**: شماره موبایل برای شناسایی/تماس همچنان الزامی است، اما تایید حساب با یک کد ۶ رقمی است که به ایمیل کاربر ارسال می‌شود (روی Render Free از طریق **Google Apps Script HTTPS relay**، با پشتیبانی اختیاری Resend/SMTP) — بدون نیاز به خرید پنل پیامک.
 *   **جریان دو مرحله‌ای ثبت‌نام**: پس از پر کردن فرم، حساب ساخته می‌شود ولی ورود (session) فقط بعد از وارد کردن کد تایید ایمیل انجام می‌شود؛ تلاش برای ورود با حساب تاییدنشده مسدود شده و کد تایید دوباره نمایش داده می‌شود.
 *   **شناسه گیمنت (Gament ID)**: تولید شناسه منحصر‌به‌فرد برای هر کاربر (مثلاً `FLX-1234`) جهت ردیابی در مسابقات.
 *   **هشینگ پیشرفته**: استفاده از الگوریتم **Argon2** برای محافظت از رمزهای عبور و ذخیره‌سازی هش‌شده توکن نشست‌ها.
@@ -42,7 +42,7 @@
 *   **Database**: PostgreSQL (Neon.tech) via Drizzle ORM
 *   **Styling**: Tailwind CSS 4 (Luxury Glassmorphism / Dark Theme)
 *   **AI**: OpenRouter (Gemini 2.0) + Groq (Llama 3.3)
-*   **Email OTP**: Resend API
+*   **Email OTP**: Google Apps Script HTTPS relay (primary on Render Free), Resend/SMTP (optional)
 
 ---
 
@@ -150,8 +150,8 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://www.gament1.ir/ap
 
 ۱. **کلون کردن پروژه**:
 ```bash
-git clone https://github.com/farzadabbasi617-star/gament.git
-cd gament
+git clone https://github.com/farzadabbasi617-star/Flexa_app.git
+cd Flexa_app
 ```
 
 ۲. **نصب وابستگی‌ها**:

@@ -26,6 +26,8 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // Playwright's local server is reached through 127.0.0.1 during development.
+  allowedDevOrigins: ["127.0.0.1"],
 
   // فشرده‌سازی
   compress: true,
@@ -44,14 +46,9 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: securityHeaders,
       },
-      // فایل‌های استاتیک Next.js — کش بلندمدت (immutable)
-      {
-        source: "/_next/static/:path*",
-        headers: [
-          ...securityHeaders,
-          { key: "Cache-Control", value: "public, max-age=31536000, immutable" },
-        ],
-      },
+      // Next.js automatically serves hashed /_next/static assets as immutable;
+      // overriding that Cache-Control header causes framework warnings and can
+      // break development caching, so only the global security headers apply.
       // آیکون‌ها — کش یه روزه (نه بلندمدت تا لوگو گیر نکنه)
       {
         source: "/icons/:path*",

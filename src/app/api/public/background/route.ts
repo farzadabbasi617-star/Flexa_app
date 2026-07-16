@@ -1,55 +1,54 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { siteImages } from "@/db/schema";
 import { eq, and, sql } from "drizzle-orm";
+import { publicCacheHeaders, ttlCache } from "@/lib/server-cache";
+import logger from "@/lib/logger";
 
-// Was `force-dynamic`, meaning this handler skipped Next's data cache
-// entirely and hit Postgres on every single request. Since <ThemeRuntime>
-// (which calls this endpoint) is mounted in the root layout, that meant
-// EVERY page view on the whole site — including every client-side
-// navigation — triggered a fresh DB round trip just to fetch a background
-// image URL that rarely changes. Revalidating every 5 minutes instead
-// keeps the background reasonably fresh (picks up admin changes quickly)
-// while cutting DB load dramatically under normal traffic.
-export const revalidate = 300;
+// Keep this route dynamic so `next build` never requires a live production
+// database. The in-process TTL plus CDN response headers still prevent a DB
+// round trip on every navigation.
+export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
-  try {
-    // First try to find app-background or app-bg
+async function loadBackground() {
+  return ttlCache("public:app-background", 300_000, async () => {
     let images = await db
       .select()
       .from(siteImages)
       .where(and(
         sql`slug IN ('app-background', 'app-bg')`,
-        eq(siteImages.isActive, true)
+        eq(siteImages.isActive, true),
       ));
 
-    // If not found, try "background" slug
     if (images.length === 0) {
       images = await db
         .select()
         .from(siteImages)
         .where(and(
           eq(siteImages.slug, "background"),
-          eq(siteImages.isActive, true)
+          eq(siteImages.isActive, true),
         ));
     }
 
-    if (images.length > 0 && images[0].url) {
-      const bgImage = images[0];
-      return NextResponse.json(
-        { url: bgImage.url, slug: bgImage.slug, title: bgImage.title },
-        { headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=300" } }
-      );
-    }
+    const background = images[0];
+    return background?.url
+      ? { url: background.url, slug: background.slug, title: background.title }
+      : { url: null };
+  });
+}
 
-    // No custom background found - return null to use default
+export async function GET() {
+  try {
+    const payload = await loadBackground();
+    return NextResponse.json(payload, { headers: publicCacheHeaders(300, 600) });
+  } catch (error) {
+    // A custom background is decorative and must not break the whole app when
+    // Postgres has a transient problem. `/api/health` remains the authoritative
+    // database readiness signal.
+    logger.error({ error }, "Public background lookup failed");
     return NextResponse.json(
       { url: null },
-      { headers: { "Cache-Control": "public, max-age=60, stale-while-revalidate=300" } }
+      { headers: publicCacheHeaders(30, 60) },
     );
-  } catch (error) {
-    console.error("❌ Background API error:", error);
-    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

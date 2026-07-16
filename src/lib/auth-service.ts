@@ -2,14 +2,13 @@ import { db } from "@/db";
 import { verificationTokens, users } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import crypto from "crypto";
+import { getOtpTokenPepper } from "@/lib/otp-security";
 
 function hashOtpToken(phoneNumber: string, token: string) {
   // Bind the OTP hash to its identifier so the same numeric code for two phone
-  // numbers does not produce the same DB value. A server-side pepper can be
-  // provided, but we also work safely without one.
-  const pepper = process.env.OTP_TOKEN_PEPPER || process.env.ADMIN_SETUP_SECRET || "gament-otp-v1";
+  // numbers does not produce the same DB value.
   return crypto
-    .createHmac("sha256", pepper)
+    .createHmac("sha256", getOtpTokenPepper())
     .update(`${phoneNumber}:${token}`)
     .digest("hex");
 }

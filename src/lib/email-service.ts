@@ -5,6 +5,7 @@ import crypto from "crypto";
 import nodemailer from "nodemailer";
 import logger from "@/lib/logger";
 import { EMAIL_OTP_RESEND_COOLDOWN_SECONDS, EMAIL_OTP_TTL_MINUTES } from "@/lib/email-policy";
+import { getOtpTokenPepper } from "@/lib/otp-security";
 
 const OTP_TTL_MS = EMAIL_OTP_TTL_MINUTES * 60 * 1000;
 const RESEND_COOLDOWN_MS = EMAIL_OTP_RESEND_COOLDOWN_SECONDS * 1000;
@@ -24,8 +25,7 @@ function passwordResetIdentifier(email: string) {
 }
 
 function hashOtpToken(identifier: string, token: string) {
-  const pepper = process.env.OTP_TOKEN_PEPPER || process.env.ADMIN_SETUP_SECRET || "gament-otp-v1";
-  return crypto.createHmac("sha256", pepper).update(`${identifier}:${token}`).digest("hex");
+  return crypto.createHmac("sha256", getOtpTokenPepper()).update(`${identifier}:${token}`).digest("hex");
 }
 
 function otpEmailHtml(input: {
