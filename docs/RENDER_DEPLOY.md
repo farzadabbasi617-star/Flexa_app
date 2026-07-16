@@ -109,6 +109,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0009_sync_core_schema.sql
 psql "$DATABASE_URL" -f drizzle/manual/0010_harden_registration_integrity.sql
 psql "$DATABASE_URL" -f drizzle/manual/0024_add_telegram_reliability.sql
 psql "$DATABASE_URL" -f drizzle/manual/0025_repair_wallet_money_types.sql
+psql "$DATABASE_URL" -f drizzle/manual/0026_repair_telegram_sent_notifications.sql
 ```
 
 یا محتوای همین فایل‌ها را در SQL Editor دیتابیس paste و اجرا کنید.

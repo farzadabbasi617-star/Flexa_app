@@ -18,6 +18,24 @@ let ensurePromise: Promise<void> | undefined;
 export function ensureTelegramReliabilitySchema(): Promise<void> {
   if (ensurePromise) return ensurePromise;
   ensurePromise = (async () => {
+    // This table originally lived in an older optional growth migration, while
+    // core webhook/1V1 code depends on it for notification de-duplication.
+    // Repair it here so a partially migrated Production database is healed by
+    // the same readiness path as the webhook/outbox tables.
+    await db.execute(sql.raw(`
+      CREATE TABLE IF NOT EXISTS telegram_sent_notifications (
+        id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+        dedupe_key varchar(180) NOT NULL UNIQUE,
+        telegram_id varchar(32),
+        tournament_id uuid REFERENCES tournaments(id),
+        type varchar(50) NOT NULL,
+        created_at timestamp NOT NULL DEFAULT now()
+      )
+    `));
+    await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS telegram_sent_notifications_dedupe_idx ON telegram_sent_notifications (dedupe_key)`));
+    await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS telegram_sent_notifications_tournament_idx ON telegram_sent_notifications (tournament_id)`));
+    await db.execute(sql.raw(`CREATE INDEX IF NOT EXISTS telegram_sent_notifications_type_idx ON telegram_sent_notifications (type)`));
+
     await db.execute(sql.raw(`
       CREATE TABLE IF NOT EXISTS telegram_webhook_updates (
         update_id varchar(32) PRIMARY KEY,
