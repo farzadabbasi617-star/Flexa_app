@@ -274,11 +274,19 @@ async function hasDeliveredMatchNotification(matchId: string, telegramId: string
 
 async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: QueueParticipant) {
   const chatId = Number(me.telegramId);
-  if (!Number.isFinite(chatId)) return;
-  if (await hasDeliveredMatchNotification(pair.matchId, me.telegramId)) return;
+  if (!Number.isFinite(chatId)) return false;
+  try {
+    if (await hasDeliveredMatchNotification(pair.matchId, me.telegramId)) return true;
+  } catch (err) {
+    // Notification dedupe is a reliability optimization, not a prerequisite
+    // for delivering a paid match. Fail open and continue sending the link.
+    logger.warn({ err, matchId: pair.matchId, telegramId: me.telegramId }, "Clash notification dedupe lookup failed");
+  }
 
   if (!isSupportedClashInvite(opponent.inviteLink)) {
-    throw new Error("CLASH_QUEUE_OPPONENT_INVITE_LINK_MISSING");
+    logger.warn({ matchId: pair.matchId, opponentEntryId: opponent.entryId }, "Clash opponent invite link is missing");
+    await sendMessage(chatId, "⏳ حریف هنوز پیوند دوستی معتبرش را ثبت نکرده است. کمی بعد دوباره وضعیت 1V1 را بررسی کن.");
+    return false;
   }
   const keyboard: Array<Array<Record<string, string>>> = [
     [{ text: "🔗 باز کردن پیوند دوستی حریف", url: opponent.inviteLink! }],
@@ -328,19 +336,34 @@ async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: Q
       matchId: pair.matchId,
       errorCode: messageResult?.error_code,
       description: messageResult?.description,
-    }, "Clash opponent notification fallback failed");
+    }, "Clash opponent notification fallback with action buttons failed; retrying as text only");
+    messageResult = await sendMessage(chatId, details);
+  }
+  if (!messageResult?.ok) {
+    logger.warn({
+      chatId,
+      matchId: pair.matchId,
+      errorCode: messageResult?.error_code,
+      description: messageResult?.description,
+    }, "Clash opponent text-only notification failed");
     return false;
   }
 
-  await db
-    .insert(telegramSentNotifications)
-    .values({
-      dedupeKey: matchNotificationKey(pair.matchId, me.telegramId),
-      telegramId: me.telegramId,
-      tournamentId: pair.tournamentId,
-      type: "clash_1v1_matched",
-    })
-    .onConflictDoNothing({ target: telegramSentNotifications.dedupeKey });
+  try {
+    await db
+      .insert(telegramSentNotifications)
+      .values({
+        dedupeKey: matchNotificationKey(pair.matchId, me.telegramId),
+        telegramId: me.telegramId,
+        tournamentId: pair.tournamentId,
+        type: "clash_1v1_matched",
+      })
+      .onConflictDoNothing({ target: telegramSentNotifications.dedupeKey });
+  } catch (err) {
+    // The opponent details were already delivered. A bookkeeping failure must
+    // not turn a successful user action into the generic 1V1 error screen.
+    logger.warn({ err, matchId: pair.matchId, telegramId: me.telegramId }, "Clash notification dedupe write failed");
+  }
   return true;
 }
 
