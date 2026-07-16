@@ -1,8 +1,4 @@
-import jsQR from "jsqr";
-import { Jimp } from "jimp";
-import logger from "@/lib/logger";
 import { telegramApi } from "@/lib/telegram";
-import { extractInviteReference } from "./utils";
 
 interface TelegramFileInfo {
   file_path?: string;
@@ -46,22 +42,4 @@ export async function downloadTelegramPhotoAsDataUrl(fileId: string) {
     size: file.size,
     fileName: file.fileName,
   };
-}
-
-export async function downloadTelegramPhotoAsBuffer(fileId: string, maxBytes = 2 * 1024 * 1024) {
-  return downloadTelegramImage(fileId, maxBytes, "QR_TOO_LARGE", "INVALID_QR_TYPE");
-}
-
-export async function decodeQrInviteFromTelegramPhoto(fileId: string) {
-  try {
-    const file = await downloadTelegramPhotoAsBuffer(fileId);
-    const image = await Jimp.read(file.buffer);
-    const bitmap = image.bitmap;
-    const data = new Uint8ClampedArray(bitmap.data.buffer, bitmap.data.byteOffset, bitmap.data.byteLength);
-    const decoded = jsQR(data, bitmap.width, bitmap.height);
-    return extractInviteReference(decoded?.data || "");
-  } catch (err) {
-    logger.warn({ err }, "Failed to decode Clash Royale QR from Telegram photo");
-    return null;
-  }
 }

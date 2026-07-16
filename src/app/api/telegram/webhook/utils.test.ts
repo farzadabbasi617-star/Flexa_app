@@ -23,8 +23,9 @@ describe("Telegram webhook utilities", () => {
     expect(isValidGamentId("1234")).toBe(false);
   });
 
-  it("extracts a supported Clash invite link and trims punctuation", () => {
-    expect(extractInviteReference("لینک: https://link.clashroyale.com/invite/friend،"))
-      .toBe("https://link.clashroyale.com/invite/friend");
+  it("extracts the friend link from Clash Royale's shared message", () => {
+    const link = "https://link.clashroyale.com/invite/friend/fa?tag=%23ABC123&token=XYZ-789&platform=android";
+    expect(extractInviteReference(`برای افزودن من به‌عنوان دوست روی این پیوند بزن! ${link}،`))
+      .toBe(link);
   });
 });

@@ -1,4 +1,3 @@
-import QRCode from "qrcode";
 import { and, count, desc, eq, gte, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -16,16 +15,15 @@ import { bigIntFromText, formatTomanFromRial } from "@/lib/money";
 import logger from "@/lib/logger";
 import { updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
 import { APP_URL, CANCEL_TEXT } from "../config";
-import { decodeQrInviteFromTelegramPhoto } from "../files";
 import { mainMenuKeyboard, removeKeyboard, replyKeyboard } from "../keyboards";
 import { clearSession, setSession } from "../sessions";
-import { sendMessage, sendPhoto, sendPhotoBuffer } from "../transport";
+import { sendMessage } from "../transport";
 import { getLinkedUserByTelegram } from "../user-service";
-import { extractInviteReference, html, isHttpUrl } from "../utils";
+import { extractInviteReference, html } from "../utils";
 import { isSupportedClashInvite } from "./clash-1v1-policy";
 
 const QUEUE_LOCK_ID = 7_100_171;
-const RECENT_QR_REUSE_MS = 24 * 60 * 60 * 1000;
+const RECENT_INVITE_REUSE_MS = 24 * 60 * 60 * 1000;
 
 interface QueueParticipant {
   entryId: string;
@@ -33,7 +31,6 @@ interface QueueParticipant {
   userId: string;
   telegramId: string;
   inviteLink: string | null;
-  qrFileId: string | null;
   displayName: string;
   username: string | null;
   gameId: string | null;
@@ -77,7 +74,28 @@ export async function ensureClash1v1QueueTournament() {
       ))
       .orderBy(desc(tournaments.createdAt))
       .limit(1);
-    if (existing) return existing;
+    if (existing) {
+      if (
+        existing.description === CLASH_1V1_CONFIG.description &&
+        existing.rules === CLASH_1V1_CONFIG.rules &&
+        existing.lobbyNotes === CLASH_1V1_CONFIG.lobbyNotes
+      ) return existing;
+
+      // Keep the public system-tournament copy aligned with the current bot
+      // flow. This also upgrades existing rows from the old QR wording without
+      // requiring a destructive migration.
+      const [updated] = await tx
+        .update(tournaments)
+        .set({
+          description: CLASH_1V1_CONFIG.description,
+          rules: CLASH_1V1_CONFIG.rules,
+          lobbyNotes: CLASH_1V1_CONFIG.lobbyNotes,
+          updatedAt: new Date(),
+        })
+        .where(eq(tournaments.id, existing.id))
+        .returning();
+      return updated || existing;
+    }
 
     const [created] = await tx
       .insert(tournaments)
@@ -144,24 +162,28 @@ async function queuePosition(entry: { id: string; submittedAt: Date | null }) {
   return Math.max(1, Number(value || 1));
 }
 
-function qrPrompt(entryId: string) {
+function inviteLinkPrompt(entryId: string) {
   return [
-    "📲 <b>QR کلش رویال را ارسال کن</b>",
+    "🔗 <b>پیوند دوستی کلش رویال را بفرست</b>",
     "",
     "ورودی با موفقیت رزرو شد. برای ورود نهایی به صف:",
-    "<code>Clash Royale → Social → Add Friends → QR / Share Link</code>",
+    "1) در Clash Royale وارد بخش <b>اجتماعی (Social)</b> شو.",
+    "2) روی <b>افزودن دوست (+)</b> بزن.",
+    "3) زیر QR روی <b>اشتراک‌گذاری پیوند</b> بزن.",
+    "4) پیوند را برای همین بات Share کن یا اینجا Paste کن.",
     "",
-    "یکی از این‌ها را بفرست:",
-    "• عکس QR Code",
-    "• Share Link رسمی کلش رویال",
+    "⚠️ عکس QR نفرست؛ بات فقط پیوند رسمی زیر را می‌پذیرد:",
+    "<code>https://link.clashroyale.com/invite/friend/...</code>",
     "",
     `شناسه صف: <code>${html(entryId.slice(0, 8))}</code>`,
   ].join("\n");
 }
 
 export async function promptClash1v1Qr(chatId: number, telegramId: string, entryId: string) {
+  // Keep the legacy function/state name so users already in this conversation
+  // survive a rolling deploy; the accepted input is now an invite link only.
   await setSession(telegramId, "clash_1v1_qr_submission", { clash1v1EntryId: entryId });
-  await sendMessage(chatId, qrPrompt(entryId), replyKeyboard([[CANCEL_TEXT]]));
+  await sendMessage(chatId, inviteLinkPrompt(entryId), replyKeyboard([[CANCEL_TEXT]]));
 }
 
 async function loadPair(matchId: string): Promise<QueuePair | null> {
@@ -187,7 +209,6 @@ async function loadPair(matchId: string): Promise<QueuePair | null> {
       userId: clash1v1Entries.userId,
       telegramId: clash1v1Entries.telegramId,
       inviteLink: clash1v1Entries.inviteLink,
-      qrFileId: clash1v1Entries.qrFileId,
       displayName: players.displayName,
       username: players.username,
       gameId: players.gameId,
@@ -226,38 +247,17 @@ async function hasDeliveredMatchNotification(matchId: string, telegramId: string
   return Boolean(row);
 }
 
-async function sendOpponentQr(chatId: number, opponent: QueueParticipant) {
-  const caption = `📲 QR حریف: <b>${html(participantName(opponent))}</b>`;
-  if (opponent.qrFileId) {
-    const result = await sendPhoto(chatId, opponent.qrFileId, caption);
-    if (!result?.ok) throw new Error("CLASH_QUEUE_QR_PHOTO_SEND_FAILED");
-    return;
-  }
-  if (opponent.inviteLink) {
-    const png = await QRCode.toBuffer(opponent.inviteLink, {
-      type: "png",
-      errorCorrectionLevel: "M",
-      margin: 2,
-      width: 512,
-    });
-    const result = await sendPhotoBuffer(chatId, png, `clash-opponent-${opponent.entryId.slice(0, 8)}.png`, caption);
-    if (!result?.ok) throw new Error("CLASH_QUEUE_GENERATED_QR_SEND_FAILED");
-    return;
-  }
-  throw new Error("CLASH_QUEUE_OPPONENT_QR_MISSING");
-}
-
 async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: QueueParticipant) {
   const chatId = Number(me.telegramId);
   if (!Number.isFinite(chatId)) return;
   if (await hasDeliveredMatchNotification(pair.matchId, me.telegramId)) return;
 
-  // Send the scannable asset first, then the instructions and action buttons.
-  await sendOpponentQr(chatId, opponent);
-  const keyboard: Array<Array<Record<string, string>>> = [];
-  if (isHttpUrl(opponent.inviteLink)) {
-    keyboard.push([{ text: "🔗 باز کردن لینک دعوت حریف", url: opponent.inviteLink! }]);
+  if (!isSupportedClashInvite(opponent.inviteLink)) {
+    throw new Error("CLASH_QUEUE_OPPONENT_INVITE_LINK_MISSING");
   }
+  const keyboard: Array<Array<Record<string, string>>> = [
+    [{ text: "🔗 باز کردن پیوند دوستی حریف", url: opponent.inviteLink! }],
+  ];
   keyboard.push([
     { text: "⚔️ ثبت نتیجه", callback_data: `match:${pair.matchId}` },
     { text: "🚨 مشکل با حریف", callback_data: `dispute:${pair.matchId}` },
@@ -268,10 +268,10 @@ async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: Q
     "",
     `👤 حریف: <b>${html(participantName(opponent))}</b>`,
     `🏷 Player Tag: <code>${html(participantTag(opponent))}</code>`,
-    opponent.inviteLink ? `🔗 Share Link: <code>${html(opponent.inviteLink)}</code>` : "",
+    `🔗 پیوند دوستی: <code>${html(opponent.inviteLink!)}</code>`,
     "",
-    "1) QR بالا را اسکن یا لینک را باز کن.",
-    "2) حریف را Add Friend کن.",
+    "1) دکمه «باز کردن پیوند دوستی حریف» را بزن.",
+    "2) در Clash Royale حریف را Add Friend کن.",
     "3) Friendly Battle را شروع کنید.",
     "4) بعد از بازی، نتیجه و اسکرین‌شات را ثبت کن.",
     "",
@@ -326,9 +326,9 @@ async function showActiveEntry(chatId: number, telegramId: string, entry: Awaite
   if (!entry) return openClash1v1Queue(chatId, telegramId);
 
   if (entry.status === "waiting_qr") {
-    await sendMessage(chatId, "✅ ورودی پرداخت شده، اما برای ورود به صف باید QR یا Share Link را بفرستی.", {
+    await sendMessage(chatId, "✅ ورودی پرداخت شده؛ برای ورود به صف، پیوند دوستی کلش رویال را بفرست.", {
       inline_keyboard: [
-        [{ text: "📲 ارسال QR / Link", callback_data: `clash1v1:qr:${entry.id}` }],
+        [{ text: "🔗 ارسال پیوند دوستی", callback_data: `clash1v1:qr:${entry.id}` }],
         [{ text: "❌ لغو و بازگشت وجه", callback_data: `clash1v1:cancel:${entry.id}` }],
       ],
     });
@@ -341,11 +341,11 @@ async function showActiveEntry(chatId: number, telegramId: string, entry: Awaite
       "🔎 <b>در حال جست‌وجوی حریف...</b>",
       "",
       position ? `جایگاه تقریبی در صف: <b>${position.toLocaleString("fa-IR")}</b>` : "",
-      "به محض ورود بازیکن آماده بعدی، QR شما به هم ارسال می‌شود.",
+      "به محض ورود بازیکن آماده بعدی، پیوند دوستی شما برای یکدیگر ارسال می‌شود.",
     ].filter(Boolean).join("\n"), {
       inline_keyboard: [
         [{ text: "🔄 بررسی وضعیت", callback_data: "clash1v1:status" }],
-        [{ text: "🔁 تغییر QR", callback_data: `clash1v1:qr:${entry.id}` }],
+        [{ text: "🔁 تغییر پیوند دوستی", callback_data: `clash1v1:qr:${entry.id}` }],
         [{ text: "❌ خروج از صف و بازگشت وجه", callback_data: `clash1v1:cancel:${entry.id}` }],
       ],
     });
@@ -396,7 +396,7 @@ export async function openClash1v1Queue(chatId: number, telegramId: string): Pro
       `🏆 جایزه برنده: <b>${html(CLASH_1V1_CONFIG.prize1st)}</b>`,
       `💰 موجودی شما: <b>${html(formatTomanFromRial(balance))}</b>`,
       "",
-      "بعد از ثبت‌نام، QR/Share Link را می‌فرستی و وارد صف می‌شوی. وقتی حریف پیدا شد، بات QR شما را به یکدیگر می‌فرستد.",
+      "بعد از ثبت‌نام، «پیوند دوستی» را از Clash Royale برای بات Share می‌کنی و وارد صف می‌شوی. وقتی حریف پیدا شد، بات پیوند شما را برای یکدیگر می‌فرستد.",
     ].join("\n"), {
       inline_keyboard: [
         [{ text: "🎮 ثبت‌نام و ورود به صف", callback_data: "clash1v1:register" }],
@@ -456,23 +456,22 @@ export async function registerClash1v1Queue(chatId: number, telegramId: string) 
         return { kind: "insufficient" as const, balance: bigIntFromText(current?.balance || "0") };
       }
 
-      const cutoff = new Date(Date.now() - RECENT_QR_REUSE_MS);
-      const [recentQr] = await tx
+      const cutoff = new Date(Date.now() - RECENT_INVITE_REUSE_MS);
+      const [recentInvite] = await tx
         .select({
           inviteLink: clash1v1Entries.inviteLink,
-          qrFileId: clash1v1Entries.qrFileId,
           submittedAt: clash1v1Entries.submittedAt,
         })
         .from(clash1v1Entries)
         .where(and(
           eq(clash1v1Entries.userId, linked.userId),
           gte(clash1v1Entries.submittedAt, cutoff),
-          or(isNotNull(clash1v1Entries.inviteLink), isNotNull(clash1v1Entries.qrFileId))
+          isNotNull(clash1v1Entries.inviteLink)
         ))
         .orderBy(desc(clash1v1Entries.submittedAt))
         .limit(1);
 
-      const canReuse = Boolean(recentQr && (recentQr.qrFileId || isSupportedClashInvite(recentQr.inviteLink)));
+      const canReuse = Boolean(recentInvite && isSupportedClashInvite(recentInvite.inviteLink));
       const now = new Date();
       const [entry] = await tx
         .insert(clash1v1Entries)
@@ -484,10 +483,10 @@ export async function registerClash1v1Queue(chatId: number, telegramId: string) 
           status: canReuse ? "queued" : "waiting_qr",
           entryFeeRial: feeRial.toString(),
           prizeRial: prizeRial.toString(),
-          inviteLink: canReuse ? recentQr?.inviteLink || null : null,
-          qrFileId: canReuse ? recentQr?.qrFileId || null : null,
+          inviteLink: canReuse ? recentInvite?.inviteLink || null : null,
+          qrFileId: null,
           submittedAt: canReuse ? now : null,
-          metadata: { source: "telegram_queue_v2", reusedQr: canReuse },
+          metadata: { source: "telegram_queue_v3_invite_link", reusedInviteLink: canReuse },
         })
         .returning();
 
@@ -506,7 +505,7 @@ export async function registerClash1v1Queue(chatId: number, telegramId: string) 
           telegramId,
         },
       });
-      return { kind: "created" as const, entry, reusedQr: canReuse };
+      return { kind: "created" as const, entry, reusedInviteLink: canReuse };
     });
 
     if (result.kind === "active") return openClash1v1Queue(chatId, telegramId);
@@ -521,15 +520,15 @@ export async function registerClash1v1Queue(chatId: number, telegramId: string) 
       return;
     }
 
-    if (result.reusedQr) {
+    if (result.reusedInviteLink) {
       await clearSession(telegramId);
-      await sendMessage(chatId, "✅ مبلغ کسر شد و با QR معتبر قبلی مستقیماً وارد صف شدی. در حال جست‌وجوی حریف...", removeKeyboard());
+      await sendMessage(chatId, "✅ مبلغ کسر شد و با پیوند دوستی معتبر قبلی مستقیماً وارد صف شدی. در حال جست‌وجوی حریف...", removeKeyboard());
       const matchmaking = await runClash1v1MatchmakingAndNotify();
       if (!matchmaking.matchedPairs) await showActiveEntry(chatId, telegramId, result.entry);
       return;
     }
 
-    await sendMessage(chatId, `✅ مبلغ <b>${html(CLASH_1V1_CONFIG.entryFee)}</b> کسر شد. حالا QR یا Share Link را بفرست تا وارد صف شوی.`);
+    await sendMessage(chatId, `✅ مبلغ <b>${html(CLASH_1V1_CONFIG.entryFee)}</b> کسر شد. حالا از Clash Royale روی «اشتراک‌گذاری پیوند» بزن و پیوند دوستی را برای بات بفرست.`);
     await promptClash1v1Qr(chatId, telegramId, result.entry.id);
   } catch (err) {
     logger.error({ err, telegramId }, "Clash 1V1 queue registration failed");
@@ -547,21 +546,25 @@ export async function submitClash1v1Qr(input: {
   chatId: number;
   telegramId: string;
   entryId: string;
-  photoFileId?: string;
   text?: string;
 }) {
-  const { chatId, telegramId, entryId, photoFileId } = input;
+  const { chatId, telegramId, entryId } = input;
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) throw new Error("CLASH_QUEUE_ACCOUNT_NOT_LINKED");
 
-  const typed = extractInviteReference(input.text || "");
-  const typedInvite = isSupportedClashInvite(typed) ? typed : null;
-  const decoded = photoFileId ? await decodeQrInviteFromTelegramPhoto(photoFileId) : null;
-  const decodedInvite = isSupportedClashInvite(decoded) ? decoded : null;
-  const inviteLink = typedInvite || decodedInvite;
-
-  if (!photoFileId && !inviteLink) {
-    await sendMessage(chatId, "QR یا Share Link معتبر کلش رویال پیدا نشد. لطفاً عکس QR یا لینک رسمی link.clashroyale.com را بفرست.");
+  const extracted = extractInviteReference(input.text || "");
+  const inviteLink = isSupportedClashInvite(extracted) ? extracted : null;
+  if (!inviteLink) {
+    await sendMessage(chatId, [
+      "❌ پیوند دوستی معتبر پیدا نشد.",
+      "",
+      "در Clash Royale برو به:",
+      "<code>اجتماعی → افزودن دوست (+) → اشتراک‌گذاری پیوند</code>",
+      "سپس پیوندی که با آدرس زیر شروع می‌شود را برای بات بفرست:",
+      "<code>https://link.clashroyale.com/invite/friend/...</code>",
+      "",
+      "⚠️ عکس QR پذیرفته نمی‌شود.",
+    ].join("\n"));
     return;
   }
 
@@ -570,7 +573,7 @@ export async function submitClash1v1Qr(input: {
     .set({
       status: "queued",
       inviteLink,
-      qrFileId: photoFileId || null,
+      qrFileId: null,
       submittedAt: new Date(),
       updatedAt: new Date(),
     })
@@ -588,7 +591,7 @@ export async function submitClash1v1Qr(input: {
   }
 
   await clearSession(telegramId);
-  await sendMessage(chatId, "✅ QR ثبت شد و وارد صف شدی. در حال جست‌وجوی یک حریف آماده...", removeKeyboard());
+  await sendMessage(chatId, "✅ پیوند دوستی ثبت شد و وارد صف شدی. در حال جست‌وجوی یک حریف آماده...", removeKeyboard());
   const matchmaking = await runClash1v1MatchmakingAndNotify();
   if (!matchmaking.matchedPairs) await showActiveEntry(chatId, telegramId, updated);
 }
@@ -681,7 +684,6 @@ export async function runClash1v1Matchmaking(): Promise<QueuePair[]> {
         userId: clash1v1Entries.userId,
         telegramId: clash1v1Entries.telegramId,
         inviteLink: clash1v1Entries.inviteLink,
-        qrFileId: clash1v1Entries.qrFileId,
         displayName: players.displayName,
         username: players.username,
         gameId: players.gameId,
@@ -694,12 +696,13 @@ export async function runClash1v1Matchmaking(): Promise<QueuePair[]> {
       .where(and(
         eq(clash1v1Entries.status, "queued"),
         isNotNull(clash1v1Entries.submittedAt),
-        or(isNotNull(clash1v1Entries.qrFileId), isNotNull(clash1v1Entries.inviteLink))
+        isNotNull(clash1v1Entries.inviteLink)
       ))
       .orderBy(clash1v1Entries.submittedAt, clash1v1Entries.createdAt)
       .limit(20);
 
-    const candidates = queued as QueueParticipant[];
+    const candidates = (queued as QueueParticipant[])
+      .filter((entry) => isSupportedClashInvite(entry.inviteLink));
     const created: QueuePair[] = [];
     while (candidates.length >= 2) {
       const player1 = candidates.shift()!;

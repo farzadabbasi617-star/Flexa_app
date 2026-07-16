@@ -172,7 +172,7 @@ export async function POST(request: NextRequest) {
         [{ text: "مشاهده تورنومنت", url: `${appUrl}/tournaments/${result.registration.tournamentId}` }],
       ],
     };
-    const qrLine = needsClashQr ? "\n\n📲 مرحله بعد: QR یا Share Link را به بات بده تا حریف 1V1 کلش رویال به‌صورت خودکار پیدا شود." : "";
+    const qrLine = needsClashQr ? "\n\n🔗 مرحله بعد: در Clash Royale روی «اشتراک‌گذاری پیوند» بزن و پیوند دوستی را برای بات بفرست تا حریف 1V1 خودکار پیدا شود. عکس QR پذیرفته نمی‌شود." : "";
     await notifyLinkedUserOnTelegram(
       result.registration.visibleUserId,
       `✅ <b>ثبت‌نام تورنومنت انجام شد</b>

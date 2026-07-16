@@ -17,9 +17,9 @@ import logger from "@/lib/logger";
 import type { SessionData, TelegramCallbackQuery, TelegramMessage, TelegramUpdate, TelegramUser } from "./types";
 import { APP_URL, CANCEL_TEXT, CHANNEL_URL, DEFAULT_RULES, GAMENT_ID_REQUIRED, PLATFORM_OPTIONS, SKIP_TEXT } from "./config";
 import { validateWebhookSecret } from "./security";
-import { extractInviteReference, gameLabel, gamePrompt, generateLinkCode, html, isHttpUrl, isValidGamentId, linkCodeHash, normalizeGame, normalizeGamentId } from "./utils";
+import { extractInviteReference, gameLabel, gamePrompt, generateLinkCode, html, isValidGamentId, linkCodeHash, normalizeGame, normalizeGamentId } from "./utils";
 import { confirmKeyboard, gameKeyboard, mainMenuKeyboard, platformKeyboard, removeKeyboard, replyKeyboard, roomsKeyboard } from "./keyboards";
-import { answerCallback, editMessage, sendDocument, sendMessage, sendPhoto } from "./transport";
+import { answerCallback, editMessage, sendDocument, sendMessage } from "./transport";
 import { clearSession, getSession, registrationSummary, setSession } from "./sessions";
 import { ensureFeatureEnabled, telegramFeatureEnabled } from "./settings";
 import { isChannelMember, promptChannelMembership } from "./membership";
@@ -33,8 +33,9 @@ import {
   registerClash1v1Queue,
   submitClash1v1Qr,
 } from "./commands/clash-1v1";
+import { isSupportedClashInvite } from "./commands/clash-1v1-policy";
 import { getAdminIds, hasAdminAccess } from "./admin-access";
-import { decodeQrInviteFromTelegramPhoto, downloadTelegramPhotoAsDataUrl } from "./files";
+import { downloadTelegramPhotoAsDataUrl } from "./files";
 import { parseTelegramCommand } from "./command-router";
 import {
   claimTelegramUpdate,
@@ -577,7 +578,7 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
     });
     if (result.code === "DUPLICATE") {
       if (tournament.game === "clash_royale" && tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel) {
-        await sendMessage(chatId, "✅ شما قبلاً در 1V1 کلش رویال ثبت‌نام کرده‌اید. حالا QR یا Share Link را می‌گیریم تا حریف پیدا شود.");
+        await sendMessage(chatId, "✅ شما قبلاً در 1V1 کلش رویال ثبت‌نام کرده‌اید. حالا پیوند دوستی را می‌گیریم تا حریف پیدا شود.");
         return startClashQrSubmission(chatId, telegramId, tournament.id);
       }
       return sendMessage(chatId, "شما قبلاً در این تورنومنت ثبت‌نام کرده‌اید.", {
@@ -600,7 +601,7 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
   const xpText = await rewardUserXP(linked.userId, isPaid ? 25 : 15, isPaid ? "ثبت‌نام پولی" : "ثبت‌نام تورنومنت");
 
   const needsClashQr = tournament.game === "clash_royale" && isPaid;
-  const qrLine = needsClashQr ? "\n\n⚔️ مرحله بعد: QR یا Share Link را برای 1V1 کلش رویال ارسال کن." : "";
+  const qrLine = needsClashQr ? "\n\n⚔️ مرحله بعد: از Clash Royale روی «اشتراک‌گذاری پیوند» بزن و پیوند دوستی را برای بات بفرست." : "";
   await sendMessage(chatId, `✅ ثبت‌نام شما در تورنومنت انجام شد.
 
 🏆 <b>${html(tournament.name)}</b>
@@ -1496,7 +1497,6 @@ type ClashPairParticipant = {
   playerGameId: string | null;
   telegramId: string;
   inviteLink: string | null;
-  qrFileId: string | null;
   clashRoyaleId: string | null;
   clashRoyaleUsername: string | null;
 };
@@ -1525,14 +1525,14 @@ function clashQrPromptText(tournamentName: string, existing = false) {
     "",
     `تورنومنت: <b>${html(tournamentName)}</b>`,
     "",
-    "از داخل Clash Royale مسیر زیر را برو:",
-    "<code>Social → Add Friends → QR / Share Link</code>",
+    "1) در Clash Royale وارد <b>اجتماعی (Social)</b> شو.",
+    "2) روی <b>افزودن دوست (+)</b> بزن.",
+    "3) زیر QR روی <b>اشتراک‌گذاری پیوند</b> بزن.",
+    "4) پیوند را برای همین بات Share کن یا اینجا Paste کن.",
     "",
-    "حالا یکی از این دو مورد را همین‌جا بفرست:",
-    "1) عکس QR Code",
-    "2) Share Link دعوت / Add Friend",
-    "",
-    "بات تلاش می‌کند QR را بخواند؛ اگر QR خوانده نشد، همان عکس QR برای حریف ارسال می‌شود. برای بهترین نتیجه، اگر لینک داری آن را هم به‌صورت متن یا کپشن بفرست.",
+    "پیوند باید با این آدرس شروع شود:",
+    "<code>https://link.clashroyale.com/invite/friend/...</code>",
+    "⚠️ عکس QR پذیرفته نمی‌شود.",
   ].join("\n");
 }
 
@@ -1598,7 +1598,7 @@ async function startClashQrSubmission(chatId: number, telegramId: string, tourna
 
     await sendMessage(
       chatId,
-      "⚔️ <b>1V1 کلش رویال</b>\n\nبرای واقعی شدن مچ‌میکینگ، اول باید در یک تورنومنت <b>پولی کلش رویال</b> ثبت‌نام کرده باشی و ورودی پرداخت شده باشد.\n\nبعد از ثبت‌نام، همین دکمه را بزن یا دستور /qr را بفرست تا QR/Share Link را بگیرم و حریف را اتوماتیک وصل کنم.",
+      "⚔️ <b>1V1 کلش رویال</b>\n\nبرای واقعی شدن مچ‌میکینگ، اول باید در یک تورنومنت <b>پولی کلش رویال</b> ثبت‌نام کرده باشی و ورودی پرداخت شده باشد.\n\nبعد از ثبت‌نام، «پیوند دوستی» را از گزینه اشتراک‌گذاری پیوند در Clash Royale برای بات بفرست تا حریف را اتوماتیک وصل کنم.",
       { inline_keyboard: keyboard }
     );
     return;
@@ -1650,7 +1650,6 @@ async function tryAutoPairClashTournament(tournamentId: string): Promise<Created
         playerId: registrations.playerId,
         userId: registrations.visibleUserId,
         inviteLink: registrations.gameInviteLink,
-        qrFileId: registrations.gameInviteQrFileId,
         playerName: players.displayName,
         playerUsername: players.username,
         playerGameId: players.gameId,
@@ -1663,11 +1662,15 @@ async function tryAutoPairClashTournament(tournamentId: string): Promise<Created
       .innerJoin(players, eq(registrations.playerId, players.id))
       .innerJoin(telegramAccounts, eq(registrations.visibleUserId, telegramAccounts.userId))
       .leftJoin(users, eq(registrations.visibleUserId, users.id))
-      .where(and(eq(registrations.tournamentId, tournamentId), sql`${registrations.gameInviteSubmittedAt} IS NOT NULL`))
+      .where(and(
+        eq(registrations.tournamentId, tournamentId),
+        sql`${registrations.gameInviteSubmittedAt} IS NOT NULL`,
+        sql`${registrations.gameInviteLink} IS NOT NULL`
+      ))
       .orderBy(registrations.gameInviteSubmittedAt, registrations.registeredAt);
 
     const eligible = queued
-      .filter((row) => row.playerId && !busyPlayerIds.has(row.playerId))
+      .filter((row) => row.playerId && !busyPlayerIds.has(row.playerId) && isSupportedClashInvite(row.inviteLink))
       .map((row) => ({
         registrationId: row.registrationId,
         playerId: row.playerId,
@@ -1677,7 +1680,6 @@ async function tryAutoPairClashTournament(tournamentId: string): Promise<Created
         playerGameId: row.playerGameId,
         telegramId: row.telegramId,
         inviteLink: row.inviteLink,
-        qrFileId: row.qrFileId,
         clashRoyaleId: row.clashRoyaleId,
         clashRoyaleUsername: row.clashRoyaleUsername,
       } satisfies ClashPairParticipant));
@@ -1740,25 +1742,22 @@ async function notifyClashPairSide(pair: CreatedClashPair, me: ClashPairParticip
     `👤 حریف: <b>${html(clashParticipantDisplayName(opponent))}</b>`,
     `🏷 Player Tag / ID: <code>${html(clashParticipantTag(opponent))}</code>`,
     opponent.clashRoyaleUsername ? `👑 Username: <b>${html(opponent.clashRoyaleUsername)}</b>` : "",
-    opponentLink ? `🔗 Invite/QR Link: <code>${html(opponentLink)}</code>` : "🔗 لینک متنی از حریف ثبت نشده؛ QR به‌صورت عکس ارسال می‌شود.",
+    `🔗 پیوند دوستی حریف: <code>${html(opponentLink || "ثبت نشده")}</code>`,
     "",
     "قدم بعدی:",
-    "1) لینک/QR حریف را در Clash Royale باز یا اسکن کن.",
+    "1) دکمه «باز کردن پیوند دوستی حریف» را بزن.",
     "2) او را Add Friend کن و Friendly Battle را شروع کنید.",
     "3) بعد از بازی نتیجه را با /matches ثبت کن.",
   ].filter(Boolean).join("\n");
 
   const keyboard: Array<Array<Record<string, string>>> = [];
-  if (isHttpUrl(opponentLink)) keyboard.push([{ text: "🔗 باز کردن لینک دعوت حریف", url: opponentLink! }]);
+  if (isSupportedClashInvite(opponentLink)) keyboard.push([{ text: "🔗 باز کردن پیوند دوستی حریف", url: opponentLink! }]);
   keyboard.push([
     { text: "⚔️ ثبت نتیجه", callback_data: `match:${pair.matchId}` },
     { text: "🏆 تورنومنت", url: `${APP_URL}/tournaments/${pair.tournamentId}` },
   ]);
 
   await sendMessage(chatId, lines, { inline_keyboard: keyboard });
-  if (opponent.qrFileId) {
-    await sendPhoto(chatId, opponent.qrFileId, `⚔️ QR حریف 1V1 کلش رویال: ${html(clashParticipantDisplayName(opponent))}`);
-  }
 }
 
 async function notifyClashPairs(pairs: CreatedClashPair[]) {
@@ -2441,7 +2440,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/support") { if (!(await ensureFeatureEnabled(chatId, "telegram_support_enabled", "پشتیبانی"))) return; return supportStartCommand(chatId, telegramId); }
   if (normalizedCommand === "/my_tickets") return myTicketsCommand(chatId, telegramId);
   if (normalizedCommand === "/matches") return matchesCommand(chatId, telegramId);
-  if (normalizedCommand === "/qr" || normalizedCommand === "/clash_qr") {
+  if (["/qr", "/clash_qr", "/clash_link"].includes(normalizedCommand)) {
     const tournamentId = args.join(" ").match(/[0-9a-f-]{36}/i)?.[0];
     return tournamentId ? startClashQrSubmission(chatId, telegramId, tournamentId) : openClash1v1Queue(chatId, telegramId);
   }
@@ -2513,13 +2512,10 @@ async function handleConversationMessage(message: TelegramMessage) {
       await sendMessage(chatId, "اطلاعات صف ناقص است. دوباره /qr را بزن.", removeKeyboard());
       return;
     }
-    const photos = message.photo || [];
-    const bestPhoto = photos[photos.length - 1];
     await submitClash1v1Qr({
       chatId,
       telegramId,
       entryId: data.clash1v1EntryId,
-      photoFileId: bestPhoto?.file_id,
       text: message.caption || message.text || "",
     });
     return;
@@ -2529,7 +2525,7 @@ async function handleConversationMessage(message: TelegramMessage) {
     const linked = await getLinkedUserByTelegram(telegramId);
     if (!linked?.userId || !data.qrRegistrationId || !data.qrTournamentId) {
       await clearSession(telegramId);
-      await sendMessage(chatId, "اطلاعات QR ناقص است. دوباره /qr را بزن.", removeKeyboard());
+      await sendMessage(chatId, "اطلاعات پیوند دوستی ناقص است. دوباره /qr یا /clash_link را بزن.", removeKeyboard());
       return;
     }
 
@@ -2552,24 +2548,29 @@ async function handleConversationMessage(message: TelegramMessage) {
       return;
     }
 
-    const photos = message.photo || [];
-    const bestPhoto = photos[photos.length - 1];
     const rawInput = normalizeDigits(message.caption || message.text || "").trim();
-    const typedInvite = extractInviteReference(rawInput);
+    const extractedInvite = extractInviteReference(rawInput);
+    const inviteLink = isSupportedClashInvite(extractedInvite) ? extractedInvite : null;
 
-    if (!bestPhoto && !typedInvite) {
-      await sendMessage(chatId, "لطفاً عکس QR یا Share Link دعوت کلش رویال را ارسال کن. برای لغو، «لغو» را بزن.");
+    if (!inviteLink) {
+      await sendMessage(chatId, [
+        "❌ پیوند دوستی معتبر پیدا نشد.",
+        "",
+        "در Clash Royale برو به:",
+        "<code>اجتماعی → افزودن دوست (+) → اشتراک‌گذاری پیوند</code>",
+        "سپس پیوند رسمی <code>link.clashroyale.com/invite/friend</code> را بفرست.",
+        "⚠️ عکس QR پذیرفته نمی‌شود.",
+        "",
+        "برای لغو، «لغو» را بزن.",
+      ].join("\n"));
       return;
     }
-
-    const decodedInvite = bestPhoto ? await decodeQrInviteFromTelegramPhoto(bestPhoto.file_id) : null;
-    const inviteLink = typedInvite || decodedInvite;
 
     await db
       .update(registrations)
       .set({
-        gameInviteLink: inviteLink || null,
-        gameInviteQrFileId: bestPhoto?.file_id || null,
+        gameInviteLink: inviteLink,
+        gameInviteQrFileId: null,
         gameInviteSubmittedAt: new Date(),
       })
       .where(eq(registrations.id, registration.registrationId));
@@ -2578,12 +2579,10 @@ async function handleConversationMessage(message: TelegramMessage) {
     await sendMessage(
       chatId,
       [
-        "✅ اطلاعات 1V1 کلش رویال شما ثبت شد.",
-        decodedInvite && !typedInvite ? "🔎 لینک داخل QR با موفقیت خوانده شد." : "",
-        !inviteLink && bestPhoto ? "ℹ️ لینک داخل QR خوانده نشد، اما خود عکس QR ذخیره شد و برای حریف ارسال می‌شود." : "",
+        "✅ پیوند دوستی 1V1 کلش رویال شما ثبت شد.",
         "",
-        "اکنون در صف 1V1 کلش رویال هستی. هر وقت یک پلیر دیگر آماده شود، بات شما دو نفر را واقعی به هم وصل می‌کند.",
-      ].filter(Boolean).join("\n"),
+        "اکنون در صف هستی. هر وقت یک بازیکن دیگر آماده شود، بات پیوند دوستی شما را برای یکدیگر می‌فرستد.",
+      ].join("\n"),
       removeKeyboard()
     );
 
