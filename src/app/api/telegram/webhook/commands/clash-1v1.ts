@@ -17,7 +17,7 @@ import { updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
 import { APP_URL, CANCEL_TEXT } from "../config";
 import { mainMenuKeyboard, removeKeyboard, replyKeyboard } from "../keyboards";
 import { clearSession, setSession } from "../sessions";
-import { sendMessage } from "../transport";
+import { sendMessage, sendPhoto } from "../transport";
 import { getLinkedUserByTelegram } from "../user-service";
 import { extractInviteReference, html } from "../utils";
 import { isSupportedClashInvite } from "./clash-1v1-policy";
@@ -179,11 +179,36 @@ function inviteLinkPrompt(entryId: string) {
   ].join("\n");
 }
 
+export async function sendClashFriendLinkGuide(chatId: number) {
+  const steps = [
+    {
+      photo: `${APP_URL}/guides/clash-friend-link-step-1.jpg`,
+      caption: "🖼 <b>مرحله ۱:</b> در بخش «اجتماعی» روی دکمه سبز «افزودن دوست» بزن.",
+    },
+    {
+      photo: `${APP_URL}/guides/clash-friend-link-step-2.jpg`,
+      caption: "🖼 <b>مرحله ۲:</b> روی «اشتراک‌گذاری پیوند» بزن و پیوند را برای همین بات بفرست. QR داخل تصویر آموزشی برای حفظ حریم خصوصی پوشانده شده است.",
+    },
+  ];
+
+  for (const step of steps) {
+    try {
+      const result = await sendPhoto(chatId, step.photo, step.caption);
+      if (!result?.ok) logger.warn({ chatId, photo: step.photo }, "Clash friend-link guide photo was not delivered");
+    } catch (err) {
+      // The text instructions are sufficient fallback; a transient image/CDN
+      // error must never break or roll back the paid queue conversation.
+      logger.warn({ err, chatId, photo: step.photo }, "Clash friend-link guide photo send failed");
+    }
+  }
+}
+
 export async function promptClash1v1Qr(chatId: number, telegramId: string, entryId: string) {
   // Keep the legacy function/state name so users already in this conversation
   // survive a rolling deploy; the accepted input is now an invite link only.
   await setSession(telegramId, "clash_1v1_qr_submission", { clash1v1EntryId: entryId });
   await sendMessage(chatId, inviteLinkPrompt(entryId), replyKeyboard([[CANCEL_TEXT]]));
+  await sendClashFriendLinkGuide(chatId);
 }
 
 async function loadPair(matchId: string): Promise<QueuePair | null> {
@@ -357,6 +382,22 @@ async function showActiveEntry(chatId: number, telegramId: string, entry: Awaite
     if (pair) {
       const me = pair.player1.userId === entry.userId ? pair.player1 : pair.player2;
       const opponent = me === pair.player1 ? pair.player2 : pair.player1;
+
+      // Entries matched by the previous QR-based release may not have a text
+      // link. Upgrade them in place instead of throwing a generic bot error.
+      if (!isSupportedClashInvite(me.inviteLink)) {
+        await sendMessage(chatId, "برای ادامه این مسابقه، پیوند دوستی خودت را با روش جدید ثبت کن.");
+        await promptClash1v1Qr(chatId, telegramId, me.entryId);
+        return;
+      }
+      if (!isSupportedClashInvite(opponent.inviteLink)) {
+        await sendMessage(chatId, [
+          "⏳ پیوند دوستی شما ثبت است.",
+          "حریف هنوز پیوند دوستی جدیدش را نفرستاده؛ به محض ثبت، بات اطلاعات مسابقه را ارسال می‌کند.",
+        ].join("\n"), mainMenuKeyboard());
+        return;
+      }
+
       await notifyPairSide(pair, me, opponent);
       return;
     }
@@ -580,7 +621,7 @@ export async function submitClash1v1Qr(input: {
     .where(and(
       eq(clash1v1Entries.id, entryId),
       eq(clash1v1Entries.userId, linked.userId),
-      inArray(clash1v1Entries.status, ["waiting_qr", "queued"])
+      inArray(clash1v1Entries.status, ["waiting_qr", "queued", "matched"])
     ))
     .returning();
 
@@ -591,6 +632,22 @@ export async function submitClash1v1Qr(input: {
   }
 
   await clearSession(telegramId);
+
+  if (updated.status === "matched" && updated.matchedMatchId) {
+    const pair = await loadPair(updated.matchedMatchId);
+    if (pair) {
+      const bothReady = isSupportedClashInvite(pair.player1.inviteLink)
+        && isSupportedClashInvite(pair.player2.inviteLink);
+      if (bothReady) {
+        await sendMessage(chatId, "✅ پیوند دوستی به‌روزرسانی شد. اطلاعات حریف در حال ارسال است...", removeKeyboard());
+        await notifyPairs([pair]);
+      } else {
+        await sendMessage(chatId, "✅ پیوند دوستی ثبت شد. منتظر ثبت پیوند حریف هستیم.", mainMenuKeyboard());
+      }
+      return;
+    }
+  }
+
   await sendMessage(chatId, "✅ پیوند دوستی ثبت شد و وارد صف شدی. در حال جست‌وجوی یک حریف آماده...", removeKeyboard());
   const matchmaking = await runClash1v1MatchmakingAndNotify();
   if (!matchmaking.matchedPairs) await showActiveEntry(chatId, telegramId, updated);

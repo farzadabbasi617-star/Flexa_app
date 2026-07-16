@@ -205,6 +205,8 @@ async function checkOptimizedAssets() {
     ["/avatars/avatar_2.jpg", 250_000],
     ["/avatars/avatar_3.jpg", 250_000],
     ["/avatars/avatar_4.jpg", 250_000],
+    ["/guides/clash-friend-link-step-1.jpg", 200_000],
+    ["/guides/clash-friend-link-step-2.jpg", 200_000],
   ];
 
   await Promise.all(assets.map(async ([path, maxBytes]) => {

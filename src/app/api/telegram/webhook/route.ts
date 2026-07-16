@@ -31,6 +31,7 @@ import {
   openClash1v1Queue,
   promptClash1v1Qr,
   registerClash1v1Queue,
+  sendClashFriendLinkGuide,
   submitClash1v1Qr,
 } from "./commands/clash-1v1";
 import { isSupportedClashInvite } from "./commands/clash-1v1-policy";
@@ -1617,6 +1618,7 @@ async function startClashQrSubmission(chatId: number, telegramId: string, tourna
     qrRegistrationId: row.registrationId,
   });
   await sendMessage(chatId, clashQrPromptText(row.tournamentName, Boolean(row.submittedAt)), replyKeyboard([[CANCEL_TEXT]]));
+  await sendClashFriendLinkGuide(chatId);
 }
 
 async function tryAutoPairClashTournament(tournamentId: string): Promise<CreatedClashPair[]> {
@@ -2850,7 +2852,11 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   const telegramId = String(callback.from.id);
   const data = callback.data || "";
 
-  await answerCallback(callback.id);
+  // A stale/expired Telegram callback acknowledgement must not prevent the
+  // underlying action (notably the 1V1 button) from running.
+  await answerCallback(callback.id).catch((err) => {
+    logger.warn({ err, callbackData: data, telegramId }, "Telegram callback acknowledgement failed");
+  });
   if (!chatId) return;
 
   if (data === "support:mine") return myTicketsCommand(chatId, telegramId);
