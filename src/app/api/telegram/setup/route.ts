@@ -29,6 +29,7 @@ function commands() {
     { command: "matches", description: "مسابقات، نتیجه، مدرک و اعتراض" },
     { command: "qr", description: "1V1 کلش و ارسال پیوند دوستی" },
     { command: "clash_link", description: "ارسال پیوند دوستی کلش رویال" },
+    { command: "clash_tournament", description: "مسابقات چندنفره کلش رویال" },
     { command: "checkin", description: "چک‌این سریع تورنومنت" },
     { command: "support", description: "ساخت تیکت پشتیبانی" },
     { command: "my_tickets", description: "تیکت‌های من" },

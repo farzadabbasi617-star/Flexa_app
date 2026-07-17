@@ -12,6 +12,9 @@ export async function getLinkedUserByTelegram(telegramId: string) {
       role: users.role,
       level: users.level,
       rankPoints: users.rankPoints,
+      clashRoyaleId: users.clashRoyaleId,
+      clashRoyaleUsername: users.clashRoyaleUsername,
+      clashRoyaleStatus: users.clashRoyaleStatus,
     })
     .from(telegramAccounts)
     .leftJoin(users, eq(telegramAccounts.userId, users.id))

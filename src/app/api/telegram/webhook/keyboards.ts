@@ -22,10 +22,11 @@ export function mainMenuKeyboard() {
     [{ text: "🏟 روم‌های فعال", callback_data: "menu:rooms" }, { text: "🎮 پیش‌ثبت‌نام", callback_data: "menu:register" }],
     [{ text: "💳 کیف پول", callback_data: "menu:wallet" }, { text: "🏆 تورنومنت‌های من", callback_data: "menu:my_tournaments" }],
     [{ text: "✅ چک‌این", callback_data: "menu:checkin" }, { text: "⚔️ مسابقات من", callback_data: "menu:matches" }],
-    [{ text: "⚔️ 1V1 کلش رویال", callback_data: "menu:clash_qr" }, { text: "🎯 مأموریت‌ها", callback_data: "menu:missions" }],
-    [{ text: "🧠 کوییز روزانه", callback_data: "menu:quiz" }, { text: "📜 قوانین", callback_data: "menu:rules" }],
-    [{ text: "🎧 پشتیبانی", callback_data: "menu:support" }, { text: "🔗 اتصال حساب", callback_data: "menu:link" }],
-    [{ text: "👤 پروفایل", callback_data: "menu:profile" }, { text: "👤 وضعیت من", callback_data: "menu:status" }],
+    [{ text: "⚔️ 1V1 کلش رویال", callback_data: "menu:clash_qr" }, { text: "🏅 کلش چندنفره", callback_data: "menu:clash_private" }],
+    [{ text: "🎯 مأموریت‌ها", callback_data: "menu:missions" }, { text: "🧠 کوییز روزانه", callback_data: "menu:quiz" }],
+    [{ text: "📜 قوانین", callback_data: "menu:rules" }, { text: "🎧 پشتیبانی", callback_data: "menu:support" }],
+    [{ text: "🔗 اتصال حساب", callback_data: "menu:link" }, { text: "👤 پروفایل", callback_data: "menu:profile" }],
+    [{ text: "👤 وضعیت من", callback_data: "menu:status" }],
     [{ text: "🆕 ساخت حساب", url: `${APP_URL}/register` }, { text: "🌐 پروفایل وب", url: `${APP_URL}/profile` }],
   ];
   return { inline_keyboard: rows };

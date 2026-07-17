@@ -11,6 +11,7 @@ import {
 import { generateDailyGamingNews } from "@/lib/gaming-news-generator";
 import logger from "@/lib/logger";
 import { runClash1v1MatchmakingAndNotify } from "../webhook/commands/clash-1v1";
+import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -49,7 +50,11 @@ async function markSent(dedupeKey: string, type: string, tournamentId?: string, 
 
 async function tournamentRecipients(tournamentId: string) {
   return db
-    .select({ telegramId: telegramAccounts.telegramId })
+    .select({
+      telegramId: telegramAccounts.telegramId,
+      registrationId: registrations.id,
+      checkedInAt: registrations.checkedInAt,
+    })
     .from(registrations)
     .innerJoin(telegramAccounts, eq(registrations.visibleUserId, telegramAccounts.userId))
     .where(eq(registrations.tournamentId, tournamentId));
@@ -73,17 +78,22 @@ async function sendReminders() {
     const startTime = new Date(tournament.startDate).getTime();
     if (!Number.isFinite(startTime) || startTime < now || startTime > futureLimit.getTime()) continue;
     const minutes = Math.round((startTime - now) / 60000);
-    const bucket = minutes <= 16 ? 15 : minutes <= 65 ? 60 : minutes <= 24 * 60 + 5 ? 1440 : 0;
+    const bucket = minutes <= 16 ? 15 : minutes <= 35 ? 30 : minutes <= 65 ? 60 : minutes <= 24 * 60 + 5 ? 1440 : 0;
     if (!bucket) continue;
 
     const recipients = await tournamentRecipients(tournament.id);
     for (const recipient of recipients) {
       const key = `reminder:${bucket}:${tournament.id}:${recipient.telegramId}`;
       if (await hasSent(key)) continue;
+      const isPrivateClash = tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY;
+      const checkInOpen = isPrivateClash && bucket <= 30 && !recipient.checkedInAt;
+      const keyboard: Array<Array<Record<string, string>>> = [];
+      if (checkInOpen) keyboard.push([{ text: "✅ چک‌این مسابقه", callback_data: `checkin:${recipient.registrationId}` }]);
+      keyboard.push([{ text: "مشاهده تورنومنت", url: `${process.env.APP_URL || "https://www.gament1.ir"}/tournaments/${tournament.id}` }]);
       await sendTelegramMessage(
         recipient.telegramId,
-        `⏰ <b>یادآوری تورنومنت</b>\n\n🏆 ${html(tournament.name)}\n🎮 ${html(gameLabel(tournament.game))}\n\nشروع تا حدود <b>${bucket === 1440 ? "۲۴ ساعت" : `${bucket} دقیقه`}</b> دیگر.\n\nبرای جزئیات و قوانین وارد Gament شو.`,
-        { inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${process.env.APP_URL || "https://www.gament1.ir"}/tournaments/${tournament.id}` }]] }
+        `⏰ <b>یادآوری تورنومنت</b>\n\n🏆 ${html(tournament.name)}\n🎮 ${html(gameLabel(tournament.game))}\n\nشروع تا حدود <b>${bucket === 1440 ? "۲۴ ساعت" : `${bucket} دقیقه`}</b> دیگر.${checkInOpen ? "\n\n✅ چک‌این باز شده؛ همین الان حضور خودت را ثبت کن." : ""}\n\nبرای جزئیات و قوانین وارد Gament شو.`,
+        { inline_keyboard: keyboard }
       );
       await markSent(key, "reminder", tournament.id, recipient.telegramId);
       sent += 1;
@@ -118,14 +128,18 @@ async function sendLobbyNotices() {
   let sent = 0;
 
   for (const tournament of rows) {
-    if (!tournament.roomId || !tournament.roomVisibleAt || new Date(tournament.roomVisibleAt) > now) continue;
+    const revealAt = tournament.roomVisibleAt
+      ? new Date(tournament.roomVisibleAt).getTime()
+      : tournament.startDate ? new Date(tournament.startDate).getTime() - 30 * 60 * 1000 : Number.POSITIVE_INFINITY;
+    if (!tournament.roomId || !Number.isFinite(revealAt) || revealAt > now.getTime()) continue;
     const recipients = await tournamentRecipients(tournament.id);
     for (const recipient of recipients) {
+      if (tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY && !recipient.checkedInAt) continue;
       const key = `lobby:${tournament.id}:${recipient.telegramId}`;
       if (await hasSent(key)) continue;
       await sendTelegramMessage(
         recipient.telegramId,
-        `🏟 <b>اطلاعات لابی آماده شد</b>\n\n🏆 ${html(tournament.name)}\nRoom ID: <code>${html(tournament.roomId)}</code>\nPassword: <code>${html(tournament.roomPassword || "بدون رمز")}</code>\n\n${html(tournament.lobbyNotes || "لطفاً به‌موقع وارد لابی شوید.")}`,
+        `🏟 <b>اطلاعات ورود آماده شد</b>\n\n🏆 ${html(tournament.name)}\n${tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY ? "نام/برچسب مسابقه" : "Room ID"}: <code>${html(tournament.roomId)}</code>\nPassword: <code>${html(tournament.roomPassword || "بدون رمز")}</code>\n\n${html(tournament.lobbyNotes || "لطفاً به‌موقع وارد شوید.")}`,
         { inline_keyboard: [[{ text: "مشاهده لابی", url: `${process.env.APP_URL || "https://www.gament1.ir"}/tournaments/${tournament.id}/lobby` }]] }
       );
       await markSent(key, "lobby", tournament.id, recipient.telegramId);

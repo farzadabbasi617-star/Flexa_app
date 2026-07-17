@@ -11,6 +11,7 @@ import { formatTomanFromRial, bigIntFromText } from "@/lib/money";
 import logger from "@/lib/logger";
 import { z } from "zod";
 import { CLASH_1V1_CONFIG } from "@/lib/clash-1v1";
+import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,10 @@ export async function POST(request: NextRequest) {
 
       if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
       if (tournament.status !== "registration") throw new Error("REGISTRATION_CLOSED");
+      if (
+        tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY &&
+        (!user.clashRoyaleId || user.clashRoyaleStatus !== "verified")
+      ) throw new Error("CLASH_TAG_NOT_VERIFIED");
 
       const ownerId = player.ownerId ?? user.id;
 
@@ -200,6 +205,7 @@ export async function POST(request: NextRequest) {
       REGISTRATION_CLOSED: { text: "ثبت‌نام این تورنومنت بسته شده است.", status: 409 },
       DUPLICATE_REGISTRATION: { text: "این بازیکن قبلاً در تورنومنت ثبت‌نام شده است.", status: 409 },
       TOURNAMENT_FULL: { text: "ظرفیت تورنومنت تکمیل شده است.", status: 409 },
+      CLASH_TAG_NOT_VERIFIED: { text: "برای ثبت‌نام، ابتدا Player Tag کلش رویال را در پروفایل با Supercell API تأیید کن.", status: 409 },
     };
 
     if (message === "INSUFFICIENT_BALANCE") {

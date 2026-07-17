@@ -5,6 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 import logger from "@/lib/logger";
 import { notifyLinkedUserOnTelegram } from "@/lib/telegram";
+import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const user = await validateSession(token || "", ip, ua, request);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-    const [tournament] = await db.select({ id: tournaments.id, name: tournaments.name, status: tournaments.status }).from(tournaments).where(eq(tournaments.id, id)).limit(1);
+    const [tournament] = await db.select({
+      id: tournaments.id,
+      name: tournaments.name,
+      status: tournaments.status,
+      categoryLabel: tournaments.categoryLabel,
+      startDate: tournaments.startDate,
+    }).from(tournaments).where(eq(tournaments.id, id)).limit(1);
     if (!tournament) return NextResponse.json({ error: "Tournament not found" }, { status: 404 });
 
     const [registration] = await db
@@ -44,6 +51,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!registration && !isAdmin) return NextResponse.json({ error: "فقط شرکت‌کنندگان تورنومنت می‌توانند حضور را تأیید کنند." }, { status: 403 });
 
     if (!registration && isAdmin) return NextResponse.json({ success: true, admin: true });
+    if (registration.checkedInAt) return NextResponse.json({ success: true, registration, alreadyCheckedIn: true });
+
+    if (tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY) {
+      if (!tournament.startDate) return NextResponse.json({ error: "زمان شروع مشخص نشده و چک‌این باز نیست." }, { status: 409 });
+      const start = new Date(tournament.startDate).getTime();
+      const now = Date.now();
+      if (now < start - 30 * 60 * 1000) {
+        return NextResponse.json({ error: "چک‌این ۳۰ دقیقه قبل از شروع باز می‌شود." }, { status: 409 });
+      }
+      if (now > start + 15 * 60 * 1000) {
+        return NextResponse.json({ error: "مهلت چک‌این تمام شده است." }, { status: 409 });
+      }
+    }
 
     const [updated] = await db
       .update(registrations)

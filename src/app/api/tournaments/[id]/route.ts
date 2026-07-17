@@ -53,11 +53,15 @@ export async function GET(
       .where(eq(registrations.tournamentId, id));
 
     const isAdmin = viewer?.role === "admin" || viewer?.role === "super_admin";
-    const isRegistered = Boolean(viewer && registrationRows.some((row) => row.ownerId === viewer.id));
+    const myRegistration = viewer ? registrationRows.find((row) => row.ownerId === viewer.id) : null;
+    const isRegistered = Boolean(myRegistration);
+    const accessEligible = tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY
+      ? Boolean(myRegistration?.checkedInAt)
+      : isRegistered;
     const now = Date.now();
     const credentialsReady = Boolean(
       isAdmin ||
-      (isRegistered && (
+      (accessEligible && (
         tournament.status === "in_progress" ||
         (tournament.roomVisibleAt && now >= new Date(tournament.roomVisibleAt).getTime()) ||
         (tournament.startDate && now >= new Date(tournament.startDate).getTime() - 30 * 60 * 1000)
