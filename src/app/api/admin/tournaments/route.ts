@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { disputes, judgments, matchEvidence, matches, registrations, tournaments } from "@/db/schema";
+import { disputes, judgments, matchEvidence, matchResultClaims, matches, privateTournamentStandings, registrations, tournamentLeaderboardSubmissions, tournaments } from "@/db/schema";
 import { count, desc, eq, inArray } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
@@ -208,7 +208,10 @@ export async function DELETE(request: NextRequest) {
         await tx.delete(judgments).where(inArray(judgments.matchId, matchIds));
         await tx.delete(disputes).where(inArray(disputes.matchId, matchIds));
         await tx.delete(matchEvidence).where(inArray(matchEvidence.matchId, matchIds));
+        await tx.delete(matchResultClaims).where(inArray(matchResultClaims.matchId, matchIds));
       }
+      await tx.delete(privateTournamentStandings).where(eq(privateTournamentStandings.tournamentId, id));
+      await tx.delete(tournamentLeaderboardSubmissions).where(eq(tournamentLeaderboardSubmissions.tournamentId, id));
       await tx.delete(registrations).where(eq(registrations.tournamentId, id));
       await tx.delete(matches).where(eq(matches.tournamentId, id));
       await tx.delete(tournaments).where(eq(tournaments.id, id));

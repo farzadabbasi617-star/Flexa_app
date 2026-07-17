@@ -332,6 +332,9 @@ export default function AdminTournamentsPage() {
                   </div>
                   <div className="flex flex-wrap gap-2 mt-5">
                     <Link href={`/tournaments/${row.id}`} className="px-3 py-2 rounded-lg bg-dark-700 text-neon-blue text-xs font-bold">مشاهده</Link>
+                    {row.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY && (
+                      <Link href={`/admin/tournaments/${row.id}/leaderboard`} className="px-3 py-2 rounded-lg bg-yellow-500/10 text-yellow-300 text-xs font-bold">🏅 Leaderboard</Link>
+                    )}
                     <button onClick={() => edit(row)} className="px-3 py-2 rounded-lg bg-dark-700 text-neon-green text-xs font-bold">ویرایش</button>
                     <button onClick={() => remove(row.id)} className="px-3 py-2 rounded-lg bg-red-500/10 text-red-300 text-xs font-bold">حذف</button>
                   </div>

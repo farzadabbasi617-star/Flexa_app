@@ -96,6 +96,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0024_add_telegram_reliability.sql
 psql "$DATABASE_URL" -f drizzle/manual/0025_repair_wallet_money_types.sql
 psql "$DATABASE_URL" -f drizzle/manual/0026_repair_telegram_sent_notifications.sql
 psql "$DATABASE_URL" -f drizzle/manual/0027_add_match_result_claims.sql
+psql "$DATABASE_URL" -f drizzle/manual/0028_add_private_tournament_leaderboards.sql
 ```
 
 یا محتوای فایل‌ها را داخل SQL Editor دیتابیس/Neon اجرا کنید.

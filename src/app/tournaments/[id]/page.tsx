@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { calculateDynamicTournamentPrizePool } from "@/lib/tournament-finance";
 import { useCountdown } from "@/hooks/useCountdown";
+import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 
 interface Player {
   id: string;
@@ -57,9 +58,11 @@ interface Tournament {
   entryFee?: string | null;
   gameMode?: string | null;
   mapName?: string | null;
+  categoryLabel?: string | null;
   rules: string | null;
   registrations: Registration[];
   matches: Match[];
+  leaderboard?: Array<{ rank: number; playerName: string; score: number | null; verified: boolean }>;
 }
 
 const GAMES_DATA = {
@@ -318,10 +321,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     roundsMap.get(m.round)!.push(m);
   });
   const rounds = Array.from(roundsMap.entries()).sort(([a], [b]) => a - b);
+  const isPrivateClashDraft = tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY;
 
   const tabs = [
     { key: "overview", label: t.tournamentDetail.overview, icon: "📋" },
-    { key: "bracket", label: t.tournamentDetail.bracket, icon: "🏆" },
+    { key: "bracket", label: isPrivateClashDraft ? "Leaderboard" : t.tournamentDetail.bracket, icon: "🏆" },
     { key: "players", label: t.tournamentDetail.players, icon: "👥" },
     { key: "rules", label: t.tournamentDetail.rules, icon: "📜" },
   ] as const;
@@ -705,7 +709,29 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
           </div>
         )}
 
-        {tab === "bracket" && (
+        {tab === "bracket" && isPrivateClashDraft && (
+          <div className="gaming-card p-6 overflow-x-auto">
+            <h3 className="text-lg font-bold mb-2 neon-text-blue">🏅 Leaderboard رسمی مسابقه</h3>
+            <p className="text-xs text-gray-500 mb-5">رتبه‌ها بعد از بررسی تصویر جدول داخل Clash Royale توسط مدیریت نمایش داده می‌شوند.</p>
+            {(tournament.leaderboard || []).length === 0 ? (
+              <p className="text-gray-400 text-center py-12">هنوز Leaderboard تأییدشده‌ای ثبت نشده است.</p>
+            ) : (
+              <table className="w-full min-w-[460px] text-sm">
+                <thead><tr className="border-b border-white/10 text-gray-500"><th className="p-3">رتبه</th><th>بازیکن</th><th>امتیاز</th><th>وضعیت</th></tr></thead>
+                <tbody>{(tournament.leaderboard || []).map((row) => (
+                  <tr key={row.rank} className="border-b border-white/5">
+                    <td className="p-3 font-black text-yellow-300">#{row.rank.toLocaleString("fa-IR")}</td>
+                    <td className="font-bold">{row.playerName}</td>
+                    <td>{row.score ?? "—"}</td>
+                    <td>{row.verified ? <span className="text-green-300">✅ متصل به Gament</span> : <span className="text-orange-300">در انتظار تطبیق</span>}</td>
+                  </tr>
+                ))}</tbody>
+              </table>
+            )}
+          </div>
+        )}
+
+        {tab === "bracket" && !isPrivateClashDraft && (
           <div className="gaming-card p-6 overflow-x-auto">
             <h3 className="text-lg font-bold mb-6 neon-text-blue">{t.tournamentDetail.bracket}</h3>
             {rounds.length === 0 ? (

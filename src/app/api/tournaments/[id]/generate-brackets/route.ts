@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { disputes, judgments, matchEvidence, matches, registrations, tournaments } from "@/db/schema";
+import { disputes, judgments, matchEvidence, matchResultClaims, matches, registrations, tournaments } from "@/db/schema";
 import { eq, inArray, sql } from "drizzle-orm";
 import { requireRole } from "@/lib/auth";
 import { generateSingleEliminationMatches, shuffle } from "@/lib/brackets";
@@ -60,6 +60,7 @@ export async function POST(
         await tx.delete(judgments).where(inArray(judgments.matchId, oldMatchIds));
         await tx.delete(disputes).where(inArray(disputes.matchId, oldMatchIds));
         await tx.delete(matchEvidence).where(inArray(matchEvidence.matchId, oldMatchIds));
+        await tx.delete(matchResultClaims).where(inArray(matchResultClaims.matchId, oldMatchIds));
       }
 
       await tx.delete(matches).where(eq(matches.tournamentId, id));

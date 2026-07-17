@@ -278,6 +278,44 @@ export const tournaments = pgTable("tournaments", {
   startDate: timestamp("start_date"),
 });
 
+// Uploaded Clash Royale private-tournament leaderboard screenshots.
+export const tournamentLeaderboardSubmissions = pgTable("tournament_leaderboard_submissions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tournamentId: uuid("tournament_id").notNull().references(() => tournaments.id),
+  submittedById: uuid("submitted_by_id").references(() => users.id),
+  imageUrl: text("image_url").notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  parsedData: jsonb("parsed_data"),
+  aiProvider: varchar("ai_provider", { length: 50 }),
+  error: text("error"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  tournamentIdx: index("tournament_leaderboard_submissions_tournament_idx").on(table.tournamentId),
+  statusIdx: index("tournament_leaderboard_submissions_status_idx").on(table.status),
+}));
+
+// Confirmed standings extracted from the in-game Clash Royale leaderboard.
+export const privateTournamentStandings = pgTable("private_tournament_standings", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tournamentId: uuid("tournament_id").notNull().references(() => tournaments.id),
+  submissionId: uuid("submission_id").references(() => tournamentLeaderboardSubmissions.id),
+  rank: integer("rank").notNull(),
+  playerId: uuid("player_id").references(() => players.id),
+  userId: uuid("user_id").references(() => users.id),
+  playerTag: varchar("player_tag", { length: 32 }),
+  playerName: varchar("player_name", { length: 100 }).notNull(),
+  score: integer("score"),
+  verified: boolean("verified").notNull().default(false),
+  source: varchar("source", { length: 30 }).notNull().default("leaderboard_ocr"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  tournamentRankUnique: uniqueIndex("private_tournament_standings_tournament_rank_unique").on(table.tournamentId, table.rank),
+  tournamentPlayerIdx: index("private_tournament_standings_tournament_player_idx").on(table.tournamentId, table.playerId),
+  userIdx: index("private_tournament_standings_user_idx").on(table.userId),
+}));
+
 // Honors / Hall of Fame
 export const honors = pgTable("honors", {
   id: uuid("id").defaultRandom().primaryKey(),

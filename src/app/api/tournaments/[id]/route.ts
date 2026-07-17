@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { tournaments, registrations, matches, players } from "@/db/schema";
+import { privateTournamentStandings, tournaments, registrations, matches, players } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { requireRole, validateSession } from "@/lib/auth";
 import { z } from "zod";
 import { distributeTournamentPrizes, refundTournamentEntryFees } from "@/lib/tournament-finance";
+import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
+import { ensureClashPrivateResultsSchema } from "@/lib/clash-private-results";
 
 export const dynamic = "force-dynamic";
 
@@ -105,6 +107,21 @@ export async function GET(
       .where(eq(matches.tournamentId, id))
       .orderBy(matches.round, matches.matchNumber);
 
+    let leaderboard: Array<{ rank: number; playerName: string; score: number | null; verified: boolean }> = [];
+    if (tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY) {
+      await ensureClashPrivateResultsSchema();
+      leaderboard = await db
+        .select({
+          rank: privateTournamentStandings.rank,
+          playerName: privateTournamentStandings.playerName,
+          score: privateTournamentStandings.score,
+          verified: privateTournamentStandings.verified,
+        })
+        .from(privateTournamentStandings)
+        .where(eq(privateTournamentStandings.tournamentId, id))
+        .orderBy(privateTournamentStandings.rank);
+    }
+
     const { roomId, roomPassword, lobbyNotes, createdById: _createdById, ...publicTournament } = tournament;
     void _createdById;
     return NextResponse.json({
@@ -114,6 +131,7 @@ export async function GET(
       lobbyNotes: credentialsReady ? lobbyNotes : null,
       registrations: publicRegistrations,
       matches: tournamentMatches,
+      leaderboard,
     });
   } catch {
     return NextResponse.json({ error: "Failed to fetch tournament" }, { status: 500 });
