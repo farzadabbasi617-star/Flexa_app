@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { isLikelyPostgresUrl, normalizeDatabaseUrl } from "@/lib/database-url";
 import { sql } from "drizzle-orm";
 import { getEmailDeliveryConfiguration } from "@/lib/email-service";
+import { getClashRoyaleApiConfiguration } from "@/lib/clash-royale-api";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ function unhealthy(error: string) {
 export async function GET() {
   const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
   const email = getEmailDeliveryConfiguration();
+  const clashRoyaleApi = getClashRoyaleApiConfiguration();
 
   if (!databaseUrl) return unhealthy("DATABASE_URL_MISSING");
   if (!isLikelyPostgresUrl(databaseUrl)) return unhealthy("DATABASE_URL_INVALID_FORMAT");
@@ -37,6 +39,10 @@ export async function GET() {
         ok: true,
         database: true,
         release,
+        clashRoyaleApi: {
+          configured: clashRoyaleApi.configured,
+          provider: clashRoyaleApi.provider,
+        },
         email: {
           configured: email.configured,
           provider: email.provider,

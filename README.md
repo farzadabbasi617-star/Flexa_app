@@ -167,6 +167,8 @@ npm install
 DATABASE_URL="your_postgresql_url"
 OPENROUTER_API_KEY="your_key"
 GROQ_API_KEY="your_key"
+CLASH_ROYALE_API_TOKEN="your_supercell_api_token"
+CLASH_ROYALE_API_BASE_URL="https://proxy.royaleapi.dev/v1"
 # در production برای راه‌اندازی امن اولین مدیر اصلی لازم است
 ADMIN_SETUP_SECRET="your_long_random_bootstrap_secret"
 OTP_TOKEN_PEPPER="your_different_long_random_otp_hash_pepper"

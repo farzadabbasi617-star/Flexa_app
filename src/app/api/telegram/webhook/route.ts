@@ -13,6 +13,12 @@ import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achi
 import { LevelingService } from "@/lib/leveling-service";
 import { CLASH_1V1_CONFIG, ensureClash1v1Schema, finalizeMatchResult } from "@/lib/clash-1v1";
 import { resolveMatchResultClaims, type MatchResultClaimValue } from "@/lib/match-result-policy";
+import {
+  ClashRoyaleApiError,
+  getClashRoyaleApiConfiguration,
+  normalizeClashRoyaleTag,
+  verifyClashRoyaleHeadToHead,
+} from "@/lib/clash-royale-api";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 import type { SessionData, TelegramCallbackQuery, TelegramMessage, TelegramUpdate, TelegramUser } from "./types";
@@ -1421,6 +1427,7 @@ interface MatchResultParticipantContext {
   userId: string | null;
   name: string | null;
   username: string | null;
+  clashRoyaleTag: string | null;
 }
 
 async function loadMatchResultContext(matchId: string, client: any = db) {
@@ -1433,6 +1440,7 @@ async function loadMatchResultContext(matchId: string, client: any = db) {
       player2Id: matches.player2Id,
       winnerId: matches.winnerId,
       status: matches.status,
+      createdAt: matches.createdAt,
     })
     .from(matches)
     .leftJoin(tournaments, eq(matches.tournamentId, tournaments.id))
@@ -1441,8 +1449,15 @@ async function loadMatchResultContext(matchId: string, client: any = db) {
   if (!match?.player1Id || !match.player2Id) return null;
 
   const participantRows = await client
-    .select({ id: players.id, userId: players.visibleUserId, name: players.displayName, username: players.username })
+    .select({
+      id: players.id,
+      userId: players.visibleUserId,
+      name: players.displayName,
+      username: players.username,
+      clashRoyaleTag: users.clashRoyaleId,
+    })
     .from(players)
+    .leftJoin(users, eq(players.visibleUserId, users.id))
     .where(inArray(players.id, [match.player1Id, match.player2Id]));
   const byId = new Map<string, MatchResultParticipantContext>(
     (participantRows as MatchResultParticipantContext[]).map((player) => [player.id, player]),
@@ -1505,6 +1520,80 @@ async function notifyFinalMatchResult(matchId: string, winnerId: string, prizePa
     ].join("\n\n"), {
       inline_keyboard: [[{ text: "⚔️ مسابقات من", callback_data: "menu:matches" }]],
     }),
+  ]);
+}
+
+type ClashApiSettlementResult =
+  | { state: "completed"; winnerId: string; prizePaid: boolean }
+  | { state: "pending_api" }
+  | { state: "missing_tags" }
+  | { state: "api_error"; reason: string }
+  | { state: "disputed"; reason: string }
+  | { state: "no_consensus" };
+
+async function verifyAndFinalizeAgreedMatch(matchId: string): Promise<ClashApiSettlementResult> {
+  const context = await loadMatchResultContext(matchId);
+  if (!context) return { state: "no_consensus" };
+  const claimRows = await db
+    .select({ playerId: matchResultClaims.playerId, claim: matchResultClaims.claim })
+    .from(matchResultClaims)
+    .where(eq(matchResultClaims.matchId, matchId));
+  const claims = claimRows
+    .filter((claim) => claim.claim === "win" || claim.claim === "lose")
+    .map((claim) => ({ playerId: claim.playerId, claim: claim.claim as MatchResultClaimValue }));
+  const resolution = resolveMatchResultClaims(context.player1.id, context.player2.id, claims);
+  if (resolution.state !== "agreed") return { state: "no_consensus" };
+
+  const apiConfig = getClashRoyaleApiConfiguration();
+  if (!apiConfig.configured) return { state: "api_error", reason: "not_configured" };
+  const player1Tag = normalizeClashRoyaleTag(context.player1.clashRoyaleTag);
+  const player2Tag = normalizeClashRoyaleTag(context.player2.clashRoyaleTag);
+  if (!player1Tag || !player2Tag) return { state: "missing_tags" };
+
+  try {
+    const battle = await verifyClashRoyaleHeadToHead({
+      player1Tag,
+      player2Tag,
+      notBefore: new Date(new Date(context.createdAt).getTime() - 30_000),
+    });
+    if (!battle) return { state: "pending_api" };
+    const claimedWinner = resolution.winnerId === context.player1.id ? player1Tag : player2Tag;
+    if (!battle.winnerTag || battle.winnerTag !== claimedWinner) {
+      await db.update(matches).set({
+        status: "disputed",
+        evidence: {
+          source: "clash_api_mismatch",
+          claimedWinnerId: resolution.winnerId,
+          apiWinnerTag: battle.winnerTag,
+          battleTime: battle.battleTime.toISOString(),
+          player1Crowns: battle.player1Crowns,
+          player2Crowns: battle.player2Crowns,
+        },
+      }).where(eq(matches.id, matchId));
+      return { state: "disputed", reason: "api_result_mismatch" };
+    }
+
+    const finalized = await db.transaction(async (tx) => finalizeMatchResult(tx, matchId, resolution.winnerId));
+    if (!finalized.completed) return { state: "api_error", reason: finalized.reason };
+    return {
+      state: "completed",
+      winnerId: finalized.winnerId,
+      prizePaid: Boolean(finalized.prize?.paid),
+    };
+  } catch (error) {
+    const reason = error instanceof ClashRoyaleApiError ? error.reason || error.message : "network_error";
+    logger.warn({ error, matchId, reason }, "Clash API result verification failed");
+    return { state: "api_error", reason };
+  }
+}
+
+async function notifyApiVerificationPending(matchId: string, context: Awaited<ReturnType<typeof loadMatchResultContext>>) {
+  if (!context) return;
+  const text = "⏳ گزارش‌های دو طرف با هم موافق است، اما Battle Log هنوز در Clash Royale API دیده نشد. کمی بعد دوباره بررسی کن؛ تا زمان تأیید API جایزه پرداخت نمی‌شود.";
+  const keyboard = { inline_keyboard: [[{ text: "🔄 بررسی دوباره نتیجه", callback_data: `result:verify:${matchId}` }]] };
+  await Promise.allSettled([
+    notifyLinkedUserOnTelegram(context.player1.userId, text, keyboard),
+    notifyLinkedUserOnTelegram(context.player2.userId, text, keyboard),
   ]);
 }
 
@@ -1608,8 +1697,8 @@ async function submitTelegramResult(chatId: number, telegramId: string, matchId:
       return { kind: "conflict" as const, reason: resolution.reason, claims, match };
     }
 
-    const finalized = await finalizeMatchResult(tx, matchId, resolution.winnerId);
-    return { kind: "agreed" as const, resolution, claims, match, finalized };
+    await tx.update(matches).set({ status: "in_progress", evidence: evidenceSummary }).where(eq(matches.id, matchId));
+    return { kind: "agreed" as const, resolution, claims, match };
   });
 
   if (outcome.kind === "missing" || outcome.kind === "forbidden") {
@@ -1660,10 +1749,36 @@ async function submitTelegramResult(chatId: number, telegramId: string, matchId:
     return;
   }
 
-  const prizePaid = Boolean(outcome.finalized.completed && outcome.finalized.prize?.paid);
-  // Complementary claims (one win + one loss) settle privately and
-  // automatically. No judge/admin notification is created.
-  await notifyFinalMatchResult(matchId, outcome.resolution.winnerId, prizePaid);
+  const settlement = await verifyAndFinalizeAgreedMatch(matchId);
+  if (settlement.state === "completed") {
+    // Complementary claims settle privately after the Battle Log confirms the
+    // same winner. No judge/admin notification is created.
+    await notifyFinalMatchResult(matchId, settlement.winnerId, settlement.prizePaid);
+    return;
+  }
+  if (settlement.state === "disputed") {
+    if (context) {
+      await Promise.allSettled([
+        notifyLinkedUserOnTelegram(context.player1.userId, "🚨 نتیجه ثبت‌شده با Battle Log کلش رویال مطابقت ندارد و برای داوری ارسال شد."),
+        notifyLinkedUserOnTelegram(context.player2.userId, "🚨 نتیجه ثبت‌شده با Battle Log کلش رویال مطابقت ندارد و برای داوری ارسال شد."),
+      ]);
+    }
+    await notifyResultAdmins(matchId, `🚨 <b>اختلاف با Clash Royale API</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>`);
+    return;
+  }
+  if (settlement.state === "missing_tags") {
+    if (context) {
+      const text = `⚠️ برای بررسی خودکار، هر دو بازیکن باید Player Tag تأییدشده داشته باشند. از پروفایل Gament ثبتش کنید: ${html(`${APP_URL}/profile/edit`)}`;
+      await Promise.allSettled([
+        notifyLinkedUserOnTelegram(context.player1.userId, text),
+        notifyLinkedUserOnTelegram(context.player2.userId, text),
+      ]);
+    }
+    return;
+  }
+  // Battle logs can appear with a short delay, and proxy/network failures are
+  // transient. Keep the match active and expose an idempotent retry button.
+  await notifyApiVerificationPending(matchId, context);
 }
 
 async function startDispute(chatId: number, telegramId: string, matchId: string) {
@@ -3186,6 +3301,21 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data.startsWith("result:")) {
     const [, action, matchId] = data.split(":");
     if ((action === "win" || action === "lose") && matchId) return submitTelegramResult(chatId, telegramId, matchId, action);
+    if (action === "verify" && matchId) {
+      const { linked, rows } = await userMatchRows(telegramId);
+      if (!linked || !rows.some((match) => match.id === matchId)) return sendMessage(chatId, "این مسابقه برای حساب شما پیدا نشد.");
+      const settlement = await verifyAndFinalizeAgreedMatch(matchId);
+      if (settlement.state === "completed") {
+        await notifyFinalMatchResult(matchId, settlement.winnerId, settlement.prizePaid);
+        return sendMessage(chatId, "✅ Battle Log تأیید شد و نتیجه/جایزه نهایی شد.");
+      }
+      if (settlement.state === "disputed") {
+        await notifyResultAdmins(matchId, `🚨 <b>اختلاف با Clash Royale API</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>`);
+        return sendMessage(chatId, "🚨 نتیجه با Battle Log مطابقت ندارد و برای داوری ارسال شد.");
+      }
+      if (settlement.state === "missing_tags") return sendMessage(chatId, "هر دو بازیکن باید Player Tag تأییدشده را در پروفایل ثبت کنند.");
+      return sendMessage(chatId, "⏳ Battle Log هنوز در API دیده نمی‌شود. یک دقیقه دیگر دوباره تلاش کن.");
+    }
   }
   if (data.startsWith("dispute:")) return startDispute(chatId, telegramId, data.replace("dispute:", ""));
   if (data.startsWith("evidence:")) return startEvidenceUpload(chatId, telegramId, data.replace("evidence:", ""));

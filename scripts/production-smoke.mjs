@@ -128,6 +128,7 @@ async function checkHealthAndRelease() {
   assert(health?.ok === true, "/api/health: application is not healthy");
   assert(health?.database === true, "/api/health: database is not ready");
   assert(health?.email?.configured === true, "/api/health: transactional email is not configured");
+  assert(health?.clashRoyaleApi?.configured === true, "/api/health: Clash Royale API is not configured");
 
   if (expectedRelease) {
     const liveRelease = String(health?.release || "").toLowerCase();

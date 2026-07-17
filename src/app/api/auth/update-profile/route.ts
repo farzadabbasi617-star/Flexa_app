@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { users } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
+import { ClashRoyaleApiError, createClashRoyaleApiClient, normalizeClashRoyaleTag } from "@/lib/clash-royale-api";
+import logger from "@/lib/logger";
+import { rateLimit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +33,8 @@ export async function PATCH(request: NextRequest) {
     if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+    const limit = await rateLimit(`profile:update:${user.id}:${ip}`, 20, 60_000);
+    if (!limit.success) return NextResponse.json({ error: "تعداد درخواست‌ها زیاد است؛ کمی صبر کن." }, { status: 429 });
 
     const body = await request.json();
     const {
@@ -53,8 +58,35 @@ export async function PATCH(request: NextRequest) {
       updateData.avatarUrl = ALLOWED_AVATARS.includes(url) ? url : "/icons/profile_icon.png";
     }
     
-    if (clashRoyaleId !== undefined) updateData.clashRoyaleId = clashRoyaleId || null;
-    if (clashRoyaleUsername !== undefined) updateData.clashRoyaleUsername = clashRoyaleUsername || null;
+    if (clashRoyaleId !== undefined) {
+      const rawTag = String(clashRoyaleId || "").trim();
+      if (!rawTag) {
+        updateData.clashRoyaleId = null;
+        updateData.clashRoyaleUsername = null;
+        updateData.clashRoyaleStatus = "unlinked";
+      } else {
+        const normalizedTag = normalizeClashRoyaleTag(rawTag);
+        if (!normalizedTag) {
+          return NextResponse.json({ error: "Player Tag کلش رویال معتبر نیست." }, { status: 400 });
+        }
+        const [duplicate] = await db
+          .select({ id: users.id })
+          .from(users)
+          .where(and(eq(users.clashRoyaleId, normalizedTag), ne(users.id, user.id)))
+          .limit(1);
+        if (duplicate) {
+          return NextResponse.json({ error: "این Player Tag قبلاً به حساب دیگری متصل شده است." }, { status: 409 });
+        }
+
+        const clashPlayer = await createClashRoyaleApiClient().getPlayer(normalizedTag);
+        updateData.clashRoyaleId = normalizeClashRoyaleTag(clashPlayer.tag) || normalizedTag;
+        updateData.clashRoyaleUsername = String(clashPlayer.name || "").trim().slice(0, 100);
+        updateData.clashRoyaleStatus = "verified";
+      }
+    }
+    // Clash Royale username is authoritative from Supercell and cannot be
+    // overwritten manually. Keep the old request field only for compatibility.
+    void clashRoyaleUsername;
     if (codMobileId !== undefined) updateData.codMobileId = codMobileId || null;
     if (codMobileUsername !== undefined) updateData.codMobileUsername = codMobileUsername || null;
     if (fortniteId !== undefined) updateData.fortniteId = fortniteId || null;
@@ -84,6 +116,7 @@ export async function PATCH(request: NextRequest) {
         xp: updated.xp,
         clashRoyaleId: updated.clashRoyaleId,
         clashRoyaleUsername: updated.clashRoyaleUsername,
+        clashRoyaleStatus: updated.clashRoyaleStatus,
         codMobileId: updated.codMobileId,
         codMobileUsername: updated.codMobileUsername,
         fortniteId: updated.fortniteId,
@@ -91,7 +124,14 @@ export async function PATCH(request: NextRequest) {
         metadata: updated.metadata,
       },
     });
-  } catch {
+  } catch (error) {
+    if (error instanceof ClashRoyaleApiError) {
+      if (error.status === 404) return NextResponse.json({ error: "Player Tag در Clash Royale پیدا نشد." }, { status: 404 });
+      if (error.status === 403) return NextResponse.json({ error: "کلید API یا IP مجاز Clash Royale مشکل دارد." }, { status: 502 });
+      if (error.status === 503) return NextResponse.json({ error: "Clash Royale API هنوز تنظیم نشده است." }, { status: 503 });
+      return NextResponse.json({ error: "استعلام Player Tag از Clash Royale انجام نشد." }, { status: 502 });
+    }
+    logger.error({ error, userId: request.cookies.has("session") ? "authenticated" : "unknown" }, "Profile update failed");
     return NextResponse.json({ error: "Failed to update profile" }, { status: 500 });
   }
 }

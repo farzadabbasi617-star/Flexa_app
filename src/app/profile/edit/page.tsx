@@ -12,6 +12,7 @@ export default function EditProfilePage() {
   const router = useRouter();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState("");
   const [form, setForm] = useState({
     displayName: "",
     clashRoyaleId: "",
@@ -43,6 +44,7 @@ export default function EditProfilePage() {
     e.preventDefault();
     setSaving(true);
     setSaved(false);
+    setSaveError("");
 
     try {
       const res = await fetch("/api/auth/update-profile", {
@@ -54,13 +56,21 @@ export default function EditProfilePage() {
         body: JSON.stringify(form),
       });
 
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setSaveError(data.error || "ذخیره اطلاعات انجام نشد.");
+      } else {
         await refreshUser();
+        setForm((current) => ({
+          ...current,
+          clashRoyaleId: data.user?.clashRoyaleId || current.clashRoyaleId,
+          clashRoyaleUsername: data.user?.clashRoyaleUsername || "",
+        }));
         setSaved(true);
         setTimeout(() => setSaved(false), 3000);
       }
     } catch {
-      // handle error
+      setSaveError("ارتباط با سرور انجام نشد.");
     }
     setSaving(false);
   }
@@ -148,8 +158,9 @@ export default function EditProfilePage() {
                     className="gaming-input text-sm"
                     placeholder={lang === "fa" ? "نام کاربری شما" : "Your username"}
                     value={form.clashRoyaleUsername}
-                    onChange={(e) => setForm({ ...form, clashRoyaleUsername: e.target.value })}
+                    readOnly
                   />
+                  <p className="text-[11px] text-cyan-300/80 mt-2">نام بازیکن بعد از ذخیره، مستقیماً از Supercell API دریافت می‌شود.</p>
                 </div>
               </div>
             </div>
@@ -222,6 +233,12 @@ export default function EditProfilePage() {
               </div>
             </div>
           </div>
+
+          {saveError && (
+            <div className="rounded-xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {saveError}
+            </div>
+          )}
 
           {/* Submit */}
           <div className="flex items-center gap-4">
