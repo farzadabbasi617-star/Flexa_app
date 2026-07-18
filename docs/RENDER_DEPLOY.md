@@ -59,6 +59,8 @@ TELEGRAM_CHANNEL_URL=https://t.me/Gament_games
 TELEGRAM_CHANNEL_ID=@Gament_games
 TELEGRAM_CRON_SECRET=your_long_random_cron_secret
 TELEGRAM_SETUP_SECRET=your_different_long_random_setup_secret
+# Optional trusted public Telegram news channels:
+GAMING_NEWS_TELEGRAM_CHANNELS=clash_royale:channel_one,cod_mobile:channel_two,fortnite:channel_three
 # Optional legacy Python-worker integration:
 TELEGRAM_INTEGRATION_SECRET=your_long_random_secret
 ```

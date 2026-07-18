@@ -14,9 +14,11 @@ type NewsItem = {
   pubDate: string | null;
   game: "clash_royale" | "cod_mobile" | "fortnite";
   imageUrl?: string;
+  content?: string;
 };
 
 type GeneratedNews = {
+  reject?: boolean;
   title: string;
   summary: string;
   description: string;
@@ -38,13 +40,10 @@ const GAME_BRAND: Record<string, { label: string; icon: string; from: string; to
   fortnite: { label: "فورتنایت", icon: "🏗️", from: "#2e1065", to: "#9d174d", accent: "#d946ef" },
 };
 
-const GAME_TEMPLATE_IMAGES: Record<NewsItem["game"], string[]> = {
-  clash_royale: [
-    "/news/supercell-store-goblin-emote-freebie.jpg",
-    "https://clashroyale.inbox.supercell.com/9jtsgmsiuthj/6RiSIAymrumYiP7YvqvrPN/f15b9acaca486955a753d634ca2fb3d5/March_Balance_changes.jpg",
-  ],
-  cod_mobile: ["/news/codm-season-6-arcade-weapons.jpg", "/news/codm-season-6-arcade-action.jpg"],
-  fortnite: ["/icons/icon-fortnite.png"],
+const TRUSTED_NEWS_HOSTS: Record<NewsItem["game"], string[]> = {
+  clash_royale: ["supercell.com", "clashroyale.com", "royaleapi.com"],
+  cod_mobile: ["callofduty.com", "activision.com", "charlieintel.com"],
+  fortnite: ["fortnite.com", "epicgames.com"],
 };
 
 const GAME_SEO_KEYWORDS: Record<NewsItem["game"], string[]> = {
@@ -57,10 +56,6 @@ function stripHtml(value: string) {
   return value.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
 }
 
-function escapeSvg(value: string) {
-  return stripHtml(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
 function shortText(value: string, max = 72) {
   const clean = stripHtml(value);
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
@@ -69,15 +64,6 @@ function shortText(value: string, max = 72) {
 function readingTimeMinutes(description: string) {
   const words = stripHtml(description).split(/\s+/).filter(Boolean).length;
   return Math.max(1, Math.ceil(words / 180));
-}
-
-function createLightweightNewsImage(title: string, game: string, icon?: string) {
-  const brand = GAME_BRAND[game] || { label: "Gament News", icon: icon || "📰", from: "#1e1b4b", to: "#020617", accent: "#a855f7" };
-  const safeTitle = escapeSvg(shortText(title, 68));
-  const safeLabel = escapeSvg(brand.label);
-  const safeIcon = escapeSvg(icon || brand.icon || "📰");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="540" viewBox="0 0 960 540" direction="rtl"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${brand.from}"/><stop offset="1" stop-color="${brand.to}"/></linearGradient><radialGradient id="r" cx="22%" cy="18%" r="80%"><stop offset="0" stop-color="${brand.accent}" stop-opacity=".38"/><stop offset="1" stop-color="#000" stop-opacity="0"/></radialGradient><filter id="blur"><feGaussianBlur stdDeviation="18"/></filter></defs><rect width="960" height="540" fill="url(#g)"/><rect width="960" height="540" fill="url(#r)"/><circle cx="790" cy="90" r="170" fill="${brand.accent}" opacity=".16" filter="url(#blur)"/><path d="M0 410 C190 330 360 520 560 420 C720 340 815 355 960 300 L960 540 L0 540Z" fill="#020617" opacity=".42"/><rect x="56" y="54" width="848" height="432" rx="42" fill="#000" opacity=".22" stroke="#fff" stroke-opacity=".12"/><text x="840" y="126" text-anchor="end" font-family="Tahoma, Arial, sans-serif" font-size="30" font-weight="800" fill="${brand.accent}">${safeIcon} ${safeLabel}</text><text x="840" y="256" text-anchor="end" font-family="Tahoma, Arial, sans-serif" font-size="48" font-weight="900" fill="#fff"><tspan x="840" dy="0">${safeTitle.slice(0, 38)}</tspan><tspan x="840" dy="64">${safeTitle.slice(38)}</tspan></text><text x="840" y="420" text-anchor="end" font-family="Arial, sans-serif" font-size="26" font-weight="800" fill="#d8b4fe">GAMENT NEWS • SEO GAMING REPORT</text><circle cx="120" cy="420" r="38" fill="${brand.accent}" opacity=".9"/><text x="120" y="432" text-anchor="middle" font-family="Arial" font-size="30" font-weight="900" fill="#fff">G</text></svg>`;
-  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
 
 function decodeXml(value: string) {
@@ -144,7 +130,7 @@ async function fetchGoogleNewsItems(query: string, game: NewsItem["game"]): Prom
         if (imageUrl.startsWith("//")) imageUrl = "https:" + imageUrl;
       }
 
-      return { title, link, source, pubDate, game, imageUrl };
+      return { title, link, source, pubDate, game, imageUrl, content: stripHtml(description) };
     }).filter((item) => item.title && item.link);
   } catch (err) {
     logger.warn({ err, query, game }, "Failed to fetch Google News RSS");
@@ -188,6 +174,7 @@ async function fetchDiscordNewsItems(): Promise<NewsItem[]> {
           pubDate: msg.timestamp,
           game,
           imageUrl: msg.attachments?.[0]?.url || "",
+          content: stripHtml(msg.content || ""),
         });
       }
     } catch (err) {
@@ -213,41 +200,101 @@ function validExternalImage(value?: string | null) {
   }
 }
 
-async function fetchArticlePreviewImage(url: string) {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 8_000);
+function isTrustedNewsUrl(value: string, game: NewsItem["game"]) {
   try {
-    const response = await fetch(url, {
+    const host = new URL(value).hostname.toLowerCase();
+    return TRUSTED_NEWS_HOSTS[game].some((allowed) => host === allowed || host.endsWith(`.${allowed}`));
+  } catch {
+    return false;
+  }
+}
+
+async function fetchTrustedArticleDetails(item: NewsItem) {
+  if (!isTrustedNewsUrl(item.link, item.game)) return { imageUrl: item.imageUrl || "", content: item.content || "" };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
+  try {
+    const response = await fetch(item.link, {
       signal: controller.signal,
       redirect: "follow",
       headers: { "User-Agent": "Mozilla/5.0 (compatible; GamentNews/1.0)", Accept: "text/html" },
       cache: "no-store",
     });
-    if (!response.ok || !(response.headers.get("content-type") || "").includes("text/html")) return "";
-    const html = (await response.text()).slice(0, 500_000);
-    const match = html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']/i)
+    if (!response.ok || !isTrustedNewsUrl(response.url, item.game) || !(response.headers.get("content-type") || "").includes("text/html")) {
+      return { imageUrl: item.imageUrl || "", content: item.content || "" };
+    }
+    const html = (await response.text()).slice(0, 800_000);
+    const imageMatch = html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']/i)
       || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']/i);
-    if (!match?.[1]) return "";
-    const absolute = new URL(match[1], response.url).href;
-    return validExternalImage(absolute) ? absolute : "";
+    const imageUrl = imageMatch?.[1] ? new URL(imageMatch[1], response.url).href : item.imageUrl || "";
+    const articleHtml = html.match(/<article[^>]*>([\s\S]*?)<\/article>/i)?.[1] || html;
+    const content = decodeXml(stripHtml(articleHtml
+      .replace(/<script[\s\S]*?<\/script>/gi, " ")
+      .replace(/<style[\s\S]*?<\/style>/gi, " ")
+      .replace(/<nav[\s\S]*?<\/nav>/gi, " ")
+      .replace(/<footer[\s\S]*?<\/footer>/gi, " "))).slice(0, 12_000);
+    return {
+      imageUrl: validExternalImage(imageUrl) ? imageUrl : item.imageUrl || "",
+      content: content.length >= 250 ? content : item.content || "",
+    };
   } catch {
-    return "";
+    return { imageUrl: item.imageUrl || "", content: item.content || "" };
   } finally {
     clearTimeout(timeout);
   }
 }
 
+async function fetchTelegramNewsItems(): Promise<NewsItem[]> {
+  const configured = (process.env.GAMING_NEWS_TELEGRAM_CHANNELS || "")
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const rows: NewsItem[] = [];
+  for (const entry of configured) {
+    const [gameRaw, channelRaw] = entry.split(":");
+    const game = gameRaw as NewsItem["game"];
+    const channel = String(channelRaw || "").replace(/^@/, "");
+    if (!GAME_BRAND[game] || !/^[A-Za-z0-9_]{5,64}$/.test(channel)) continue;
+    try {
+      const response = await fetch(`https://t.me/s/${channel}`, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; GamentNews/1.0)" },
+        cache: "no-store",
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!response.ok) continue;
+      const html = await response.text();
+      const blocks = html.match(/<div class="tgme_widget_message_wrap[\s\S]*?<\/article>\s*<\/div>/gi) || [];
+      for (const block of blocks.slice(-5)) {
+        const content = stripHtml(block.match(/<div class="tgme_widget_message_text[^>]*>([\s\S]*?)<\/div>/i)?.[1] || "");
+        const link = block.match(/<a class="tgme_widget_message_date" href="([^"]+)"/i)?.[1] || "";
+        const pubDate = block.match(/<time[^>]+datetime="([^"]+)"/i)?.[1] || null;
+        const imageUrl = decodeXml(block.match(/background-image:url\(['"]?([^)'\"]+)/i)?.[1] || "");
+        if (content.length < 120 || !link) continue;
+        rows.push({ title: shortText(content, 100), content, link, source: `Telegram @${channel}`, pubDate, game, imageUrl });
+      }
+    } catch (error) {
+      logger.warn({ error, channel, game }, "Failed to fetch configured Telegram news channel");
+    }
+  }
+  return rows;
+}
+
 async function collectGamingNewsItems() {
-  const discordResults = await fetchDiscordNewsItems();
-  const rawItems = discordResults.length > 0
-    ? discordResults.slice(0, 15)
-    : (await Promise.all(NEWS_QUERIES.map((entry) => fetchGoogleNewsItems(entry.query, entry.game)))).flat().slice(0, 15);
+  const [discordResults, telegramResults, ...googleGroups] = await Promise.all([
+    fetchDiscordNewsItems(),
+    fetchTelegramNewsItems(),
+    ...NEWS_QUERIES.map((entry) => fetchGoogleNewsItems(entry.query, entry.game)),
+  ]);
+  const rawItems = [...discordResults, ...telegramResults, ...googleGroups.flat()].slice(0, 30);
   const recentItems = rawItems.filter((item) => isRecentNewsItem(item));
-  const enriched = await Promise.all(recentItems.map(async (item) => ({
-    ...item,
-    imageUrl: validExternalImage(item.imageUrl) ? item.imageUrl : await fetchArticlePreviewImage(item.link),
-  })));
-  return enriched;
+  const enriched = await Promise.all(recentItems.map(async (item) => ({ ...item, ...await fetchTrustedArticleDetails(item) })));
+  // A title alone is not enough to produce a faithful translation. Publish
+  // only when a trusted article or configured Discord message contains text.
+  return enriched.filter((item) => {
+    const length = stripHtml(item.content || "").length;
+    const configuredFeed = item.source.startsWith("Discord") || item.source.startsWith("Telegram @");
+    return configuredFeed ? length >= 120 : isTrustedNewsUrl(item.link, item.game) && length >= 250;
+  });
 }
 
 async function hasGenerated(dedupeKey: string) {
@@ -273,33 +320,6 @@ async function markGenerated(dedupeKey: string) {
   } catch (err) {
     logger.error({ err, dedupeKey }, "Failed to markGenerated");
   }
-}
-
-function localFallbackNews(items: NewsItem[]): GeneratedNews {
-  const first = items[0] || {
-    title: "به‌روزرسانی‌های جدید دنیای گیمینگ",
-    link: "https://www.gament1.ir/honors",
-    source: "Gament",
-    pubDate: null,
-    game: "cod_mobile" as const,
-  };
-
-  const gameLabel: Record<string, string> = {
-    clash_royale: "کلش رویال",
-    cod_mobile: "کالاف دیوتی موبایل",
-    fortnite: "فورتنایت",
-  };
-
-  const title = `تازه‌ترین خبر ${gameLabel[first.game] || "گیمینگ"} برای گیمرهای گیمنت`;
-  return {
-    title,
-    summary: `مروری کوتاه و کاربردی بر تازه‌ترین خبرهای ${gameLabel[first.game] || "گیمینگ"} برای بازیکنان رقابتی گیمنت.`,
-    description: `در تازه‌ترین گزارش مربوط به ${gameLabel[first.game] || "بازی رقابتی"}، منبع «${first.source}» خبری با عنوان «${first.title}» منتشر کرده است. این خبر برای بازیکنان رقابتی اهمیت دارد، چون تغییرات رسمی، رویدادهای محدود و به‌روزرسانی‌های بازی می‌توانند روی تصمیم‌های روزانه و آمادگی برای مسابقات اثر بگذارند.\n\nگیمنت این گزارش را با تمرکز بر جامعه رقابتی ${gameLabel[first.game] || "گیمینگ"} منتشر می‌کند. برای جزئیات قطعی باید منبع اصلی خبر بررسی شود و بازیکنان پیش از تغییر استراتژی، تجهیزات یا برنامه مسابقه خود، اطلاعیه رسمی ناشر را مبنا قرار دهند.`,
-    game: first.game,
-    icon: "📰",
-    imageAlt: title,
-    seoKeywords: ["گیمنت", "تورنومنت گیمینگ", gameLabel[first.game] || "گیمینگ"],
-  };
 }
 
 /**
@@ -338,13 +358,6 @@ function sourceFingerprint(items: NewsItem[]) {
     .slice(0, 24);
 }
 
-function templateImage(game: NewsItem["game"], fingerprint: string) {
-  const images = GAME_TEMPLATE_IMAGES[game];
-  if (!images?.length) return "";
-  const index = Number.parseInt(fingerprint.slice(0, 8), 16) % images.length;
-  return images[index];
-}
-
 async function generateNewsForGame(game: NewsItem["game"], items: NewsItem[], today: string, force: boolean) {
   if (!items.length) return { generated: false as const, game, reason: "no_recent_sources" };
   const dailyKey = `daily-gaming-news:${today}:${game}`;
@@ -364,24 +377,26 @@ async function generateNewsForGame(game: NewsItem["game"], items: NewsItem[], to
 
   const brand = GAME_BRAND[game];
   const sourcesText = items.map((item, index) =>
-    `${index + 1}. ${item.title}\nمنبع: ${item.source}\nتاریخ: ${item.pubDate || "نامشخص"}\nلینک: ${item.link}`
+    `${index + 1}. عنوان: ${item.title}\nمنبع: ${item.source}\nتاریخ: ${item.pubDate || "نامشخص"}\nمتن منبع:\n${stripHtml(item.content || "").slice(0, 6000)}\nلینک: ${item.link}`
   ).join("\n\n");
   const seo = GAME_SEO_KEYWORDS[game].join("، ");
-  const prompt = `تو سردبیر فارسی Gament هستی. براساس منابع زیر یک خبر روز دقیق درباره ${brand.label} بنویس.
+  const prompt = `متن معتبر زیر را بدون افزودن اطلاعات تازه به فارسی روان ترجمه و برای انتشار در Gament ویرایش کن. موضوع فقط ${brand.label} است.
 
 ${sourcesText}
 
 قواعد اجباری:
-- فقط اطلاعاتی را بنویس که در تیتر/منابع قابل استناد است؛ خبر یا عدد نساز.
+- فقط ترجمه و بازنویسی وفادار به متن منبع؛ هیچ خبر، عدد، توصیه، تحلیل یا ادعای جدید نساز.
+- اگر متن منبع اطلاعات کافی ندارد، JSON با فیلد \"reject\":true برگردان.
 - نام هیچ بازی دیگری را وارد نکن.
-- متن ۵۰۰ تا ۷۰۰ کلمه، روان، غیرتکراری و مناسب مخاطب ایرانی باشد.
-- ساختار متن: مقدمه خبری، جزئیات اصلی، تأثیر روی بازیکنان رقابتی، جمع‌بندی.
-- کلمات سئو را طبیعی و بدون Keyword Stuffing استفاده کن: ${seo}.
+- طول متن متناسب با محتوای واقعی منبع باشد؛ برای بلندترشدن متن چیزی اضافه نکن.
+- نام آیتم‌ها، فصل‌ها، مودها و تاریخ‌ها را دقیق حفظ کن.
+- کلمات سئو را فقط جایی که طبیعی و مرتبط است استفاده کن: ${seo}.
 - لینک منابع را داخل متن تکرار نکن؛ منابع جداگانه نمایش داده می‌شوند.
 
 فقط JSON معتبر بده:
 {
-  "title":"تیتر فارسی دقیق و جذاب بدون کلیک‌بیت دروغین",
+  "reject":false,
+  "title":"ترجمه دقیق تیتر منبع بدون کلیک‌بیت",
   "summary":"خلاصه ۱۴۰ تا ۱۹۰ کاراکتری",
   "description":"متن کامل فارسی با پاراگراف‌بندی",
   "game":"${game}",
@@ -389,19 +404,23 @@ ${sourcesText}
   "imageAlt":"Alt فارسی دقیق برای تصویر خبر",
   "seoKeywords":["حداکثر ۸ عبارت مرتبط"]
 }`;
-  const systemPrompt = gamentSystemPrompt("honors", "You are a fact-grounded Persian gaming news editor. Return valid JSON only. Never fabricate facts.");
+  const systemPrompt = gamentSystemPrompt("honors", "You are a strict Persian translator of trusted gaming source text. Preserve facts exactly, add nothing, and return valid JSON only. If the source lacks enough text, set reject=true.");
   const ai = await fetchAIResponse(prompt, systemPrompt).catch((error) => {
     logger.warn({ error, game }, "AI news generation failed; using source-grounded local template");
     return null;
   });
   const parsed = ai ? safeParseAIJson<GeneratedNews>(ai.content) : null;
-  const news = parsed?.title && parsed?.description ? parsed : localFallbackNews(items);
-  const title = shortText(String(news.title || items[0].title), 100);
-  const description = String(news.description || "").trim();
+  if (!parsed || parsed.reject || !parsed.title || !parsed.description) {
+    return { generated: false as const, game, reason: "source_translation_rejected" };
+  }
+  const news = parsed;
+  const title = shortText(String(news.title), 100);
+  const description = String(news.description).trim();
   const summary = shortText(String(news.summary || description.split("\n")[0] || title), 190);
   const icon = String(news.icon || brand.icon).slice(0, 20);
   const sourceImage = items.find((item) => validExternalImage(item.imageUrl))?.imageUrl || "";
-  const imageUrl = sourceImage || templateImage(game, fingerprint) || createLightweightNewsImage(title, game, icon);
+  if (!sourceImage) return { generated: false as const, game, reason: "missing_trusted_source_image" };
+  const imageUrl = sourceImage;
   const generatedKeywords = Array.isArray(news.seoKeywords)
     ? news.seoKeywords.map((keyword) => shortText(String(keyword), 50)).filter(Boolean)
     : [];
@@ -429,7 +448,7 @@ ${sourcesText}
       dailyKey,
       sourceFingerprint: fingerprint,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      imageOrigin: sourceImage ? "source_og_image" : "existing_gament_template",
+      imageOrigin: "trusted_source_image",
       contentFramework: "gament_news_v3_template_matched",
     },
   }).returning();
