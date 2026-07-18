@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import StoreIcon from "@/components/store/StoreIcon";
 
 interface Order {
   id: string;
@@ -170,148 +171,194 @@ export default function OrdersPage() {
   }
 
   return (
-    <main className="min-h-[100dvh] bg-[#06060f] px-4 py-8 text-white sm:px-6 pb-28">
-      <div className="mx-auto max-w-3xl">
-        <Link href="/store" className="text-sm text-gray-400 hover:text-white">← بازگشت به فروشگاه</Link>
-        <h1 className="mt-3 text-2xl font-black sm:text-3xl">📦 سفارش‌های من</h1>
+    <main className="relative min-h-[100dvh] overflow-x-hidden bg-[#07080d] pb-28 text-white" dir="rtl">
+      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_82%_0%,rgba(124,58,237,.13),transparent_30%),radial-gradient(circle_at_8%_35%,rgba(6,182,212,.06),transparent_25%)]" />
 
-        {/* Tabs */}
-        <div className="mt-4 flex gap-2">
-          <button
-            onClick={() => setTab("orders")}
-            className={`rounded-2xl px-4 py-2 text-sm font-bold transition ${tab === "orders" ? "bg-purple-600 text-white" : "border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"}`}
-          >
-            سفارش‌ها
+      <div className="relative z-30 border-b border-white/[.06] bg-[#0b0c12] px-4 py-2 text-center text-[10px] font-bold text-gray-400 sm:text-xs">
+        <span className="inline-flex items-center gap-1.5"><StoreIcon name="shield" className="h-3.5 w-3.5 text-emerald-400" /> وضعیت پرداخت امانی و تحویل سفارش‌ها در این صفحه قابل پیگیری است</span>
+      </div>
+
+      <header className="sticky top-0 z-30 border-b border-white/[.07] bg-[#090a10]/90 backdrop-blur-2xl">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-3 px-4 sm:px-6">
+          <Link href="/store" className="flex items-center gap-2.5" aria-label="فروشگاه گیمنت">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/gament-icon-192.png" alt="گیمنت" className="h-10 w-10 object-contain drop-shadow-[0_0_15px_rgba(168,85,247,.45)]" />
+            <div className="hidden sm:block">
+              <div className="text-[8px] font-black tracking-[.2em] text-violet-300">GAMENT STORE</div>
+              <div className="text-sm font-black">فروشگاه گیمنت</div>
+            </div>
+          </Link>
+          <nav className="mr-auto flex items-center gap-2">
+            <Link href="/wallet" className="grid h-10 w-10 place-items-center rounded-xl border border-white/10 bg-white/[.04] text-gray-300 hover:text-violet-200" title="کیف پول"><StoreIcon name="wallet" className="h-5 w-5" /></Link>
+            <Link href="/store/sell" className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[.04] px-3 text-xs font-black text-gray-200"><StoreIcon name="plus" className="h-4 w-4" /><span className="hidden min-[420px]:inline">ثبت آگهی</span></Link>
+            <Link href="/store" className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-violet-600 px-3 text-xs font-black"><StoreIcon name="store" className="h-4 w-4" /><span className="hidden sm:inline">فروشگاه</span></Link>
+          </nav>
+        </div>
+      </header>
+
+      <div className="relative mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-9">
+        <nav className="flex items-center gap-2 text-[11px] text-gray-500" aria-label="مسیر صفحه">
+          <Link href="/store" className="hover:text-white">فروشگاه</Link>
+          <StoreIcon name="chevron-left" className="h-3 w-3" />
+          <span className="text-gray-300">سفارش‌های من</span>
+        </nav>
+
+        <div className="mt-5 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <span className="text-[9px] font-black tracking-[.24em] text-violet-400">ORDER CENTER</span>
+            <h1 className="mt-1 text-2xl font-black sm:text-3xl">مدیریت سفارش‌ها</h1>
+            <p className="mt-2 text-xs leading-6 text-gray-500">خریدها، فروش‌ها و پیشنهادهای قیمت خود را یک‌جا پیگیری کنید.</p>
+          </div>
+          <Link href="/store" className="inline-flex w-fit items-center gap-2 rounded-xl border border-white/10 bg-white/[.04] px-4 py-2.5 text-xs font-black text-gray-300 transition hover:border-violet-300/25 hover:text-white">
+            ادامه خرید <StoreIcon name="arrow-left" className="h-4 w-4" />
+          </Link>
+        </div>
+
+        <div className="mt-7 inline-flex rounded-2xl border border-white/[.08] bg-white/[.025] p-1.5">
+          <button onClick={() => setTab("orders")} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition ${tab === "orders" ? "bg-violet-600 text-white shadow-[0_8px_20px_rgba(124,58,237,.24)]" : "text-gray-500 hover:text-gray-200"}`}>
+            <StoreIcon name="package" className="h-4 w-4" /> سفارش‌ها
+            {items.length > 0 && <span className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[9px] ${tab === "orders" ? "bg-white/15" : "bg-white/[.06]"}`}>{items.length.toLocaleString("fa-IR")}</span>}
           </button>
-          <button
-            onClick={() => setTab("offers")}
-            className={`relative rounded-2xl px-4 py-2 text-sm font-bold transition ${tab === "offers" ? "bg-purple-600 text-white" : "border border-white/10 bg-white/5 text-gray-300 hover:bg-white/10"}`}
-          >
-            پیشنهادهای قیمت
-            {offers.some((o) => o.iAmSeller && o.status === "pending") && (
-              <span className="absolute -right-1 -top-1 h-3 w-3 rounded-full bg-red-500" />
-            )}
+          <button onClick={() => setTab("offers")} className={`relative inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-black transition ${tab === "offers" ? "bg-violet-600 text-white shadow-[0_8px_20px_rgba(124,58,237,.24)]" : "text-gray-500 hover:text-gray-200"}`}>
+            <StoreIcon name="tag" className="h-4 w-4" /> پیشنهادها
+            {offers.length > 0 && <span className={`grid h-5 min-w-5 place-items-center rounded-full px-1 text-[9px] ${tab === "offers" ? "bg-white/15" : "bg-white/[.06]"}`}>{offers.length.toLocaleString("fa-IR")}</span>}
+            {offers.some((offer) => offer.iAmSeller && offer.status === "pending") && <span className="absolute left-1 top-1 h-2 w-2 rounded-full bg-red-400 ring-2 ring-[#0f1017]" />}
           </button>
         </div>
 
         {loading ? (
           <div className="mt-6 space-y-3">
-            {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-28 animate-pulse rounded-3xl border border-white/10 bg-white/[0.04]" />)}
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={index} className="animate-pulse rounded-[26px] border border-white/[.07] bg-white/[.025] p-5">
+                <div className="flex justify-between"><span className="h-5 w-2/5 rounded-full bg-white/[.06]" /><span className="h-6 w-24 rounded-full bg-white/[.06]" /></div>
+                <div className="mt-5 h-14 rounded-2xl bg-white/[.05]" />
+              </div>
+            ))}
           </div>
         ) : tab === "offers" ? (
           offers.length === 0 ? (
-            <div className="mt-10 rounded-3xl border border-white/10 bg-white/[0.03] py-16 text-center">
-              <div className="text-5xl">💬</div>
-              <p className="mt-4 font-bold text-gray-300">هنوز پیشنهاد قیمتی ندارید.</p>
+            <div className="mt-6 rounded-[28px] border border-white/[.08] bg-white/[.025] px-5 py-16 text-center">
+              <span className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-cyan-500/[.08] text-cyan-300"><StoreIcon name="tag" className="h-8 w-8" /></span>
+              <h2 className="mt-5 text-lg font-black">هنوز پیشنهاد قیمتی ندارید</h2>
+              <p className="mt-2 text-xs text-gray-500">پیشنهادهایی که ارسال یا دریافت می‌کنید اینجا نمایش داده می‌شوند.</p>
+              <Link href="/store" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black">مشاهده محصولات <StoreIcon name="arrow-left" className="h-4 w-4" /></Link>
             </div>
           ) : (
             <div className="mt-6 space-y-3">
-              {offers.map((o) => {
-                const st = OFFER_STATUS_LABELS[o.status] || { label: o.status, cls: "bg-gray-500/20 text-gray-300" };
+              {offers.map((offer) => {
+                const status = OFFER_STATUS_LABELS[offer.status] || { label: offer.status, cls: "bg-gray-500/20 text-gray-300" };
                 return (
-                  <div key={o.id} className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+                  <article key={offer.id} className="overflow-hidden rounded-[26px] border border-white/[.08] bg-[#0f1017] p-4 shadow-[0_14px_35px_rgba(0,0,0,.16)] sm:p-5">
                     <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <h3 className="font-black">{o.title || "آگهی"}</h3>
-                        <p className="mt-1 text-xs text-gray-500">
-                          {o.iAmSeller ? `🏷️ پیشنهاد از ${o.buyerName || "خریدار"}` : "🛒 پیشنهاد شما"}
-                          {" · "}قیمت آگهی: {toman(o.listingToman)}
-                        </p>
+                      <div className="min-w-0">
+                        <div className="mb-2 flex items-center gap-2 text-[9px] font-black text-gray-600"><StoreIcon name="tag" className="h-3.5 w-3.5" /> {offer.iAmSeller ? "پیشنهاد دریافتی" : "پیشنهاد ارسالی"} · {new Date(offer.createdAt).toLocaleDateString("fa-IR")}</div>
+                        <h2 className="truncate text-sm font-black text-gray-100 sm:text-base">{offer.title || "آگهی فروشگاه"}</h2>
+                        <p className="mt-1 text-[10px] text-gray-500">{offer.iAmSeller ? `ارسال‌کننده: ${offer.buyerName || "خریدار"}` : "پیشنهاد ثبت‌شده توسط شما"} · قیمت آگهی: {toman(offer.listingToman)}</p>
                       </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ${st.cls}`}>{st.label}</span>
+                      <span className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[9px] font-black ${status.cls}`}>{status.label}</span>
                     </div>
-                    <div className="mt-2 text-lg font-black text-cyan-200">پیشنهاد: {toman(o.offerToman)}</div>
-                    {o.message && (
-                      <p className="mt-2 whitespace-pre-wrap rounded-2xl bg-black/30 p-3 text-xs leading-6 text-gray-300 ring-1 ring-white/10">
-                        «{o.message}»
-                      </p>
-                    )}
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {o.iAmSeller && o.status === "pending" && (
+
+                    <div className="mt-4 flex flex-col gap-3 rounded-2xl border border-white/[.06] bg-black/20 p-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div><span className="block text-[9px] text-gray-600">مبلغ پیشنهادی</span><strong className="mt-1 block text-lg font-black text-cyan-200">{toman(offer.offerToman)}</strong></div>
+                      {offer.message && <p className="max-w-md text-[10px] leading-5 text-gray-400">«{offer.message}»</p>}
+                    </div>
+
+                    <div className="mt-4 flex flex-wrap items-center gap-2">
+                      {offer.iAmSeller && offer.status === "pending" && (
                         <>
-                          <button onClick={() => respondOffer(o.id, "accept")} disabled={busyId === o.id} className="rounded-xl bg-green-600 px-3 py-1.5 text-xs font-black disabled:opacity-40">پذیرفتن</button>
-                          <button onClick={() => respondOffer(o.id, "reject")} disabled={busyId === o.id} className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-black disabled:opacity-40">رد کردن</button>
+                          <button onClick={() => respondOffer(offer.id, "accept")} disabled={busyId === offer.id} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-[10px] font-black transition hover:bg-emerald-500 disabled:opacity-40"><StoreIcon name="check" className="h-3.5 w-3.5" /> پذیرش پیشنهاد</button>
+                          <button onClick={() => respondOffer(offer.id, "reject")} disabled={busyId === offer.id} className="rounded-xl border border-red-300/20 bg-red-500/[.07] px-4 py-2 text-[10px] font-black text-red-300 disabled:opacity-40">رد پیشنهاد</button>
                         </>
                       )}
-                      {o.iAmBuyer && o.status === "pending" && (
-                        <button onClick={() => respondOffer(o.id, "withdraw")} disabled={busyId === o.id} className="rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black disabled:opacity-40">لغو پیشنهاد</button>
-                      )}
-                      {o.status === "accepted" && (
-                        <span className="text-xs font-bold text-green-300">سفارش ثبت شد — در تب «سفارش‌ها» پیگیری کنید.</span>
-                      )}
+                      {offer.iAmBuyer && offer.status === "pending" && <button onClick={() => respondOffer(offer.id, "withdraw")} disabled={busyId === offer.id} className="rounded-xl border border-white/10 bg-white/[.04] px-4 py-2 text-[10px] font-black text-gray-300 disabled:opacity-40">لغو پیشنهاد</button>}
+                      {offer.status === "accepted" && <span className="inline-flex items-center gap-1.5 text-[10px] font-black text-emerald-300"><StoreIcon name="check" className="h-4 w-4" /> سفارش ثبت شد؛ از تب سفارش‌ها پیگیری کنید.</span>}
                     </div>
-                  </div>
+                  </article>
                 );
               })}
             </div>
           )
         ) : items.length === 0 ? (
-          <div className="mt-10 rounded-3xl border border-white/10 bg-white/[0.03] py-16 text-center">
-            <div className="text-5xl">🧾</div>
-            <p className="mt-4 font-bold text-gray-300">هنوز سفارشی ندارید.</p>
-            <Link href="/store" className="mt-4 inline-block rounded-2xl bg-purple-600 px-5 py-2.5 text-sm font-black">رفتن به فروشگاه</Link>
+          <div className="mt-6 rounded-[28px] border border-white/[.08] bg-white/[.025] px-5 py-16 text-center">
+            <span className="mx-auto grid h-16 w-16 place-items-center rounded-[22px] bg-violet-500/[.09] text-violet-300"><StoreIcon name="package" className="h-8 w-8" /></span>
+            <h2 className="mt-5 text-lg font-black">هنوز سفارشی ثبت نشده است</h2>
+            <p className="mt-2 text-xs text-gray-500">پس از خرید یا فروش، روند معامله در این بخش نمایش داده می‌شود.</p>
+            <Link href="/store" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-violet-600 px-4 py-2.5 text-xs font-black">رفتن به فروشگاه <StoreIcon name="arrow-left" className="h-4 w-4" /></Link>
           </div>
         ) : (
-          <div className="mt-6 space-y-3">
-            {items.map((o) => {
-              const st = STATUS_LABELS[o.status] || { label: o.status, cls: "bg-gray-500/20 text-gray-300" };
+          <div className="mt-6 space-y-4">
+            {items.map((order) => {
+              const status = STATUS_LABELS[order.status] || { label: order.status, cls: "bg-gray-500/20 text-gray-300" };
+              const paidReached = !["pending_payment", "cancelled"].includes(order.status);
+              const deliveredReached = ["delivered", "completed"].includes(order.status);
+              const completedReached = order.status === "completed";
+              const finalStatus = ["completed", "refunded", "cancelled"].includes(order.status);
               return (
-                <div key={o.id} className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-black">{o.title || "کالا"}</h3>
-                      <p className="mt-1 text-xs text-gray-500">
-                        {o.iAmBuyer ? "🛒 خریدار" : "🏷️ فروشنده"} · تعداد {o.quantity.toLocaleString("fa-IR")}
-                        {o.source === "official" && " · فروشگاه رسمی"}
-                      </p>
+                <article key={order.id} className="overflow-hidden rounded-[28px] border border-white/[.08] bg-[#0f1017] shadow-[0_16px_40px_rgba(0,0,0,.18)]">
+                  <div className="p-4 sm:p-5">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="mb-2 flex flex-wrap items-center gap-2 text-[9px] font-bold text-gray-600">
+                          <span>سفارش #{order.id.slice(0, 8).toUpperCase()}</span>
+                          <span>·</span>
+                          <time>{new Date(order.createdAt).toLocaleDateString("fa-IR")}</time>
+                          <span>·</span>
+                          <span>{order.iAmBuyer ? "خرید شما" : "فروش شما"}</span>
+                        </div>
+                        <h2 className="truncate text-sm font-black text-gray-100 sm:text-base">{order.title || "کالای فروشگاه"}</h2>
+                        <p className="mt-1 text-[10px] text-gray-500">تعداد {order.quantity.toLocaleString("fa-IR")}{order.source === "official" ? " · فروشگاه رسمی گیمنت" : " · معامله کاربران"}</p>
+                      </div>
+                      <span className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[9px] font-black ${status.cls}`}>{status.label}</span>
                     </div>
-                    <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ${st.cls}`}>{st.label}</span>
-                  </div>
-                  <div className="mt-2 text-sm font-black text-purple-200">{toman(o.totalPriceToman)}</div>
-                  {o.status === "paid_escrow" && o.deliveryDeadlineAt && <div className="mt-1 text-[11px] text-orange-300">مهلت تحویل: {new Date(o.deliveryDeadlineAt).toLocaleString("fa-IR")}</div>}
-                  {o.status === "delivered" && o.autoReleaseAt && <div className="mt-1 text-[11px] text-cyan-300">آزادسازی خودکار وجه: {new Date(o.autoReleaseAt).toLocaleString("fa-IR")}</div>}
 
-                  {/* Actions */}
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {/* Seller delivers */}
-                    {o.iAmSeller && o.status === "paid_escrow" && (
-                      <button onClick={() => act(o.id, "deliver")} disabled={busyId === o.id} className="rounded-xl bg-cyan-600 px-3 py-1.5 text-xs font-black disabled:opacity-40">تحویل دادم</button>
-                    )}
-                    {/* Buyer confirms / disputes / reveals */}
-                    {o.iAmBuyer && o.status === "delivered" && (
-                      <button onClick={() => act(o.id, "confirm")} disabled={busyId === o.id} className="rounded-xl bg-green-600 px-3 py-1.5 text-xs font-black disabled:opacity-40">تأیید دریافت</button>
-                    )}
-                    {o.iAmBuyer && ["paid_escrow", "delivered"].includes(o.status) && (
-                      <button onClick={() => act(o.id, "dispute")} disabled={busyId === o.id} className="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-black disabled:opacity-40">اعتراض</button>
-                    )}
-                    {o.iAmBuyer && o.status === "paid_escrow" && (
-                      <button onClick={() => { if (confirm("سفارش پیش از تحویل لغو و مبلغ بازپرداخت شود؟")) act(o.id, "cancel"); }} disabled={busyId === o.id} className="rounded-xl border border-red-500/40 px-3 py-1.5 text-xs font-black text-red-300 disabled:opacity-40">لغو و بازپرداخت</button>
-                    )}
-                    {o.iAmBuyer && ["delivered", "completed"].includes(o.status) && (
-                      <button onClick={() => showDelivery(o.id)} className="rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black">نمایش اطلاعات تحویل</button>
-                    )}
-                    {o.iAmBuyer && o.status === "completed" && o.sellerId && (
-                      <button onClick={() => submitReview(o.id)} className="rounded-xl bg-amber-600 px-3 py-1.5 text-xs font-black">★ ثبت نظر و امتیاز</button>
-                    )}
-                  </div>
-
-                  {reveal[o.id] && (
-                    <div className="mt-3 whitespace-pre-wrap rounded-2xl bg-black/40 p-3 text-xs text-gray-200 ring-1 ring-white/10">
-                      {reveal[o.id]}
+                    <div className="mt-4 flex items-end justify-between gap-3 border-t border-white/[.06] pt-4">
+                      <div><span className="text-[9px] text-gray-600">مبلغ سفارش</span><strong className="mt-1 block text-lg font-black text-white">{toman(order.totalPriceToman)}</strong></div>
+                      {!finalStatus && <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/[.08] px-2.5 py-1.5 text-[9px] font-black text-emerald-300"><StoreIcon name="shield" className="h-3.5 w-3.5" /> وجه در حساب امانی</span>}
                     </div>
-                  )}
-                </div>
+
+                    {!['refunded', 'cancelled'].includes(order.status) && (
+                      <div className="mt-5 rounded-2xl border border-white/[.055] bg-black/20 p-3">
+                        <div className="relative grid grid-cols-3 gap-1 before:absolute before:right-[16.66%] before:left-[16.66%] before:top-3 before:h-px before:bg-white/10">
+                          {[
+                            { label: "پرداخت امن", reached: paidReached },
+                            { label: "تحویل کالا", reached: deliveredReached },
+                            { label: "تکمیل معامله", reached: completedReached },
+                          ].map((step) => (
+                            <div key={step.label} className="relative z-10 text-center">
+                              <span className={`mx-auto grid h-6 w-6 place-items-center rounded-full border ${step.reached ? "border-violet-400 bg-violet-600 text-white" : "border-white/15 bg-[#0b0c12] text-gray-700"}`}>{step.reached ? <StoreIcon name="check" className="h-3 w-3" /> : <span className="h-1.5 w-1.5 rounded-full bg-current" />}</span>
+                              <span className={`mt-2 block text-[9px] font-bold ${step.reached ? "text-gray-300" : "text-gray-700"}`}>{step.label}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {order.status === "paid_escrow" && order.deliveryDeadlineAt && <div className="mt-3 inline-flex items-center gap-1.5 text-[10px] text-amber-300"><StoreIcon name="clock" className="h-3.5 w-3.5" /> مهلت تحویل: {new Date(order.deliveryDeadlineAt).toLocaleString("fa-IR")}</div>}
+                    {order.status === "delivered" && order.autoReleaseAt && <div className="mt-3 inline-flex items-center gap-1.5 text-[10px] text-cyan-300"><StoreIcon name="clock" className="h-3.5 w-3.5" /> آزادسازی خودکار وجه: {new Date(order.autoReleaseAt).toLocaleString("fa-IR")}</div>}
+
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      {order.iAmSeller && order.status === "paid_escrow" && <button onClick={() => act(order.id, "deliver")} disabled={busyId === order.id} className="inline-flex items-center gap-1.5 rounded-xl bg-cyan-600 px-4 py-2 text-[10px] font-black hover:bg-cyan-500 disabled:opacity-40"><StoreIcon name="truck" className="h-4 w-4" /> اعلام تحویل کالا</button>}
+                      {order.iAmBuyer && order.status === "delivered" && <button onClick={() => act(order.id, "confirm")} disabled={busyId === order.id} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2 text-[10px] font-black hover:bg-emerald-500 disabled:opacity-40"><StoreIcon name="check" className="h-4 w-4" /> تأیید دریافت</button>}
+                      {order.iAmBuyer && ["paid_escrow", "delivered"].includes(order.status) && <button onClick={() => act(order.id, "dispute")} disabled={busyId === order.id} className="rounded-xl border border-amber-300/20 bg-amber-500/[.07] px-4 py-2 text-[10px] font-black text-amber-300 disabled:opacity-40">ثبت اعتراض</button>}
+                      {order.iAmBuyer && order.status === "paid_escrow" && <button onClick={() => { if (confirm("سفارش پیش از تحویل لغو و مبلغ بازپرداخت شود؟")) act(order.id, "cancel"); }} disabled={busyId === order.id} className="rounded-xl border border-red-300/15 bg-red-500/[.05] px-4 py-2 text-[10px] font-black text-red-300 disabled:opacity-40">لغو و بازپرداخت</button>}
+                      {order.iAmBuyer && ["delivered", "completed"].includes(order.status) && <button onClick={() => showDelivery(order.id)} className="rounded-xl border border-white/10 bg-white/[.04] px-4 py-2 text-[10px] font-black text-gray-300">اطلاعات تحویل</button>}
+                      {order.iAmBuyer && order.status === "completed" && order.sellerId && <button onClick={() => submitReview(order.id)} className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2 text-[10px] font-black"><StoreIcon name="star" className="h-3.5 w-3.5" /> ثبت امتیاز</button>}
+                    </div>
+
+                    {reveal[order.id] && <div className="mt-4 whitespace-pre-wrap rounded-2xl border border-cyan-300/10 bg-cyan-500/[.045] p-3 text-xs leading-6 text-gray-200">{reveal[order.id]}</div>}
+                  </div>
+                </article>
               );
             })}
           </div>
         )}
-
-        {msg && (
-          <div className={`fixed bottom-24 left-1/2 z-50 -translate-x-1/2 rounded-2xl px-5 py-3 text-sm font-bold shadow-2xl ${msg.type === "ok" ? "bg-green-600" : "bg-red-600"}`}>
-            {msg.text}
-          </div>
-        )}
       </div>
+
+      {msg && (
+        <div className={`fixed bottom-24 left-1/2 z-50 w-[calc(100%-2rem)] max-w-md -translate-x-1/2 rounded-2xl border px-5 py-3 text-center text-sm font-bold shadow-2xl backdrop-blur-xl ${msg.type === "ok" ? "border-emerald-300/25 bg-emerald-600/95" : "border-red-300/25 bg-red-600/95"}`}>
+          {msg.text}
+        </div>
+      )}
 
       <BottomNav />
     </main>

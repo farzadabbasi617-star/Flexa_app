@@ -32,6 +32,22 @@ const nextConfig: NextConfig = {
   // فشرده‌سازی
   compress: true,
 
+  // Keep production builds inside Render Free's memory budget. Running the
+  // webpack compiler in-process avoids duplicating the full module graph in a
+  // worker, while the memory-optimized graph trades a little speed for a much
+  // lower peak RSS.
+  experimental: {
+    cpus: 2,
+    webpackBuildWorker: false,
+    webpackMemoryOptimizations: true,
+  },
+  // Type checking already runs as a mandatory CI job (`npm run typecheck`).
+  // Skipping Next's duplicate checker prevents two large TypeScript processes
+  // from exceeding the memory limit during the Render production build.
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
   // بهینه‌سازی تصاویر
   images: {
     formats: ["image/avif", "image/webp"],
