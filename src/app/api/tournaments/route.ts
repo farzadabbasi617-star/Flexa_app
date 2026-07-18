@@ -8,6 +8,7 @@ import { publicCacheHeaders, ttlCache } from "@/lib/server-cache";
 import logger from "@/lib/logger";
 import { safePagination } from "@/lib/pagination";
 import { normalizeClashPrivateDraftSettings } from "@/lib/clash-private-tournament";
+import { normalizeClash1v1QueueSettings } from "@/lib/clash-1v1";
 
 export const dynamic = "force-dynamic";
 
@@ -138,7 +139,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
   try {
-    const body = normalizeClashPrivateDraftSettings(await request.json());
+    const body = normalizeClash1v1QueueSettings(normalizeClashPrivateDraftSettings(await request.json()));
     const {
       name, game, format, description, maxPlayers, prizePool, rules, startDate, endDate,
       entryFee, gameMode, mapName, serverSlots, winnersCount, categoryLabel,

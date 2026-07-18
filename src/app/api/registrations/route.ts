@@ -81,6 +81,9 @@ export async function POST(request: NextRequest) {
         .where(eq(tournaments.id, tournamentId));
 
       if (!tournament) throw new Error("TOURNAMENT_NOT_FOUND");
+      if (tournament.game === CLASH_1V1_CONFIG.game && tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel) {
+        throw new Error("CLASH_1V1_TELEGRAM_ONLY");
+      }
       if (tournament.status !== "registration") throw new Error("REGISTRATION_CLOSED");
       if (
         tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY &&
@@ -219,6 +222,7 @@ export async function POST(request: NextRequest) {
       TOURNAMENT_FULL: { text: "ظرفیت تورنومنت تکمیل شده است.", status: 409 },
       CLASH_TAG_NOT_VERIFIED: { text: "برای ثبت‌نام، ابتدا Player Tag کلش رویال را در پروفایل با Supercell API تأیید کن.", status: 409 },
       PRIVATE_POLICY_REQUIRED: { text: "برای ثبت‌نام باید قانون No-show و عدم بازگشت وجه را بپذیری.", status: 409 },
+      CLASH_1V1_TELEGRAM_ONLY: { text: "ثبت‌نام 1V1 کلش فقط از بات انجام می‌شود تا پرداخت و QR امن ثبت شود.", status: 409 },
     };
 
     if (message === "INSUFFICIENT_BALANCE") {

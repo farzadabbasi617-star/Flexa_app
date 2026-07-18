@@ -18,6 +18,7 @@ import { APP_URL, CANCEL_TEXT } from "../config";
 import { mainMenuKeyboard, removeKeyboard, replyKeyboard } from "../keyboards";
 import { clearSession, setSession } from "../sessions";
 import { sendMessage, sendPhoto } from "../transport";
+import { decodeClashFriendQr } from "./clash-qr";
 import { getLinkedUserByTelegram } from "../user-service";
 import { extractInviteReference, html } from "../utils";
 import { isSupportedClashInvite } from "./clash-1v1-policy";
@@ -32,6 +33,7 @@ interface QueueParticipant {
   userId: string;
   telegramId: string;
   inviteLink: string | null;
+  qrFileId: string | null;
   matchedAt: Date | null;
   readyAt: Date | null;
   displayName: string;
@@ -70,10 +72,7 @@ export async function ensureClash1v1QueueTournament() {
       .where(and(
         eq(tournaments.game, CLASH_1V1_CONFIG.game),
         eq(tournaments.status, "registration"),
-        or(
-          eq(tournaments.categoryLabel, CLASH_1V1_CONFIG.categoryLabel),
-          eq(tournaments.name, CLASH_1V1_CONFIG.name)
-        )
+        eq(tournaments.categoryLabel, CLASH_1V1_CONFIG.categoryLabel)
       ))
       .orderBy(desc(tournaments.createdAt))
       .limit(1);
@@ -81,7 +80,13 @@ export async function ensureClash1v1QueueTournament() {
       if (
         existing.description === CLASH_1V1_CONFIG.description &&
         existing.rules === CLASH_1V1_CONFIG.rules &&
-        existing.lobbyNotes === CLASH_1V1_CONFIG.lobbyNotes
+        existing.lobbyNotes === CLASH_1V1_CONFIG.lobbyNotes &&
+        existing.entryFee === CLASH_1V1_CONFIG.entryFee &&
+        existing.prize1st === CLASH_1V1_CONFIG.prize1st &&
+        existing.serverSlots === 2 &&
+        !existing.roomId &&
+        !existing.roomPassword &&
+        !existing.roomVisibleAt
       ) return existing;
 
       // Keep the public system-tournament copy aligned with the current bot
@@ -90,9 +95,26 @@ export async function ensureClash1v1QueueTournament() {
       const [updated] = await tx
         .update(tournaments)
         .set({
+          name: CLASH_1V1_CONFIG.name,
+          format: CLASH_1V1_CONFIG.format,
+          status: "registration",
+          maxPlayers: CLASH_1V1_CONFIG.maxPlayers,
+          serverSlots: 2,
+          winnersCount: 1,
+          entryFee: CLASH_1V1_CONFIG.entryFee,
+          prizePool: CLASH_1V1_CONFIG.prizePool,
+          prize1st: CLASH_1V1_CONFIG.prize1st,
+          prize2nd: null,
+          prize3rd: null,
+          prize4to10: null,
+          gameMode: CLASH_1V1_CONFIG.gameMode,
+          mapName: CLASH_1V1_CONFIG.mapName,
           description: CLASH_1V1_CONFIG.description,
           rules: CLASH_1V1_CONFIG.rules,
           lobbyNotes: CLASH_1V1_CONFIG.lobbyNotes,
+          roomId: null,
+          roomPassword: null,
+          roomVisibleAt: null,
           updatedAt: new Date(),
         })
         .where(eq(tournaments.id, existing.id))
@@ -175,7 +197,8 @@ function inviteLinkPrompt(entryId: string) {
     "3) زیر QR روی <b>اشتراک‌گذاری پیوند</b> بزن.",
     "4) پیوند را برای همین بات Share کن یا اینجا Paste کن.",
     "",
-    "⚠️ عکس QR نفرست؛ بات فقط پیوند رسمی زیر را می‌پذیرد:",
+    "می‌توانی خودِ عکس QR را بفرستی یا «اشتراک‌گذاری پیوند» را Paste کنی.",
+    "بات QR را خودکار می‌خواند؛ اگر قابل‌خواندن نباشد هم تصویر QR تو را برای حریف می‌فرستد.",
     "<code>https://link.clashroyale.com/invite/friend/...</code>",
     "",
     `شناسه صف: <code>${html(entryId.slice(0, 8))}</code>`,
@@ -237,6 +260,7 @@ async function loadPair(matchId: string): Promise<QueuePair | null> {
       userId: clash1v1Entries.userId,
       telegramId: clash1v1Entries.telegramId,
       inviteLink: clash1v1Entries.inviteLink,
+      qrFileId: clash1v1Entries.qrFileId,
       matchedAt: clash1v1Entries.matchedAt,
       readyAt: clash1v1Entries.readyAt,
       displayName: players.displayName,
@@ -280,96 +304,30 @@ async function hasDeliveredMatchNotification(matchId: string, telegramId: string
 async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: QueueParticipant) {
   const chatId = Number(me.telegramId);
   if (!Number.isFinite(chatId)) return false;
-  try {
-    if (await hasDeliveredMatchNotification(pair.matchId, me.telegramId)) return true;
-  } catch (err) {
-    // Notification dedupe is a reliability optimization, not a prerequisite
-    // for delivering a paid match. Fail open and continue sending the link.
-    logger.warn({ err, matchId: pair.matchId, telegramId: me.telegramId }, "Clash notification dedupe lookup failed");
+  try { if (await hasDeliveredMatchNotification(pair.matchId, me.telegramId)) return true; }
+  catch (err) { logger.warn({ err, matchId: pair.matchId }, "Clash notification dedupe lookup failed"); }
+  const opponentHasLink = isSupportedClashInvite(opponent.inviteLink);
+  const opponentHasQr = Boolean(opponent.qrFileId);
+  if (!opponentHasLink && !opponentHasQr) {
+    await sendMessage(chatId, "⏳ حریف هنوز QR یا پیوند دوستی‌اش را ثبت نکرده است."); return false;
   }
-
-  if (!isSupportedClashInvite(opponent.inviteLink)) {
-    logger.warn({ matchId: pair.matchId, opponentEntryId: opponent.entryId }, "Clash opponent invite link is missing");
-    await sendMessage(chatId, "⏳ حریف هنوز پیوند دوستی معتبرش را ثبت نکرده است. کمی بعد دوباره وضعیت 1V1 را بررسی کن.");
-    return false;
-  }
-  const keyboard: Array<Array<Record<string, string>>> = [
-    [{ text: "🔗 باز کردن پیوند دوستی حریف", url: opponent.inviteLink! }],
-  ];
-  keyboard.push([
-    { text: me.readyAt ? "✅ آماده‌ام" : "🎮 آماده‌ام", callback_data: `clash1v1:ready:${me.entryId}` },
-    { text: "🚨 مشکل با حریف", callback_data: `dispute:${pair.matchId}` },
-  ]);
-
+  const keyboard: Array<Array<Record<string, string>>> = [];
+  if (opponentHasLink) keyboard.push([{ text: "🔗 باز کردن پیوند دوستی حریف", url: opponent.inviteLink! }]);
+  keyboard.push([{ text: me.readyAt ? "✅ آماده‌ام" : "🎮 آماده‌ام", callback_data: `clash1v1:ready:${me.entryId}` }, { text: "🚨 مشکل با حریف", callback_data: `dispute:${pair.matchId}` }]);
+  if (opponentHasQr) await sendPhoto(chatId, opponent.qrFileId!, "📷 QR دوستی حریف — آن را داخل Clash Royale اسکن کن.");
   const details = [
-    "✅ <b>حریف پیدا شد؛ آماده شوید</b>",
-    "",
-    `👤 حریف: <b>${html(participantName(opponent))}</b>`,
-    `🏷 Player Tag: <code>${html(participantTag(opponent))}</code>`,
-    `🔗 پیوند دوستی: ${html(opponent.inviteLink!)}`,
-    "",
-    "1) دکمه «باز کردن پیوند دوستی حریف» را بزن.",
-    "2) در Clash Royale حریف را Add Friend کن.",
-    "3) وقتی آماده شدی دکمه «آماده‌ام» را بزن.",
-    "4) بازی را فقط بعد از پیام رسمی شروع Match آغاز کنید.",
-    "5) بعد از بازی، نتیجه را ثبت کن؛ Battle Log خودکار بررسی می‌شود.",
-    "",
+    "✅ <b>حریف پیدا شد؛ آماده شوید</b>", "",
+    `👤 حریف: <b>${html(participantName(opponent))}</b>`, `🏷 Player Tag: <code>${html(participantTag(opponent))}</code>`,
+    ...(opponentHasLink ? [`🔗 پیوند دوستی: ${html(opponent.inviteLink!)}`] : ["📷 QR حریف ارسال شد."]), "",
+    opponentHasLink ? "1) دکمه «باز کردن پیوند دوستی حریف» را بزن." : "1) QR ارسال‌شده را داخل Clash Royale اسکن کن.",
+    "2) در Clash Royale حریف را Add Friend کن.", "3) وقتی آماده شدی دکمه «آماده‌ام» را بزن.",
+    "4) بازی را فقط بعد از پیام رسمی شروع Match آغاز کنید.", "5) بعد از بازی، نتیجه را ثبت کن؛ Battle Log خودکار بررسی می‌شود.", "",
     `Match ID: <code>${html(pair.matchId.slice(0, 8))}</code>`,
   ].join("\n");
-
-  let messageResult = await sendMessage(chatId, details, { inline_keyboard: keyboard });
-  if (!messageResult?.ok) {
-    logger.warn({
-      chatId,
-      matchId: pair.matchId,
-      errorCode: messageResult?.error_code,
-      description: messageResult?.description,
-    }, "Clash opponent notification with URL button failed; retrying without URL button");
-
-    // Some Telegram clients/API revisions reject specific external URLs in an
-    // inline button. Retry with a copyable plain-text link so matching never
-    // gets stuck after both players have already paid and submitted links.
-    messageResult = await sendMessage(chatId, details, {
-      inline_keyboard: [[
-        { text: "🎮 آماده‌ام", callback_data: `clash1v1:ready:${me.entryId}` },
-        { text: "🚨 مشکل با حریف", callback_data: `dispute:${pair.matchId}` },
-      ]],
-    });
-  }
-  if (!messageResult?.ok) {
-    logger.warn({
-      chatId,
-      matchId: pair.matchId,
-      errorCode: messageResult?.error_code,
-      description: messageResult?.description,
-    }, "Clash opponent notification fallback with action buttons failed; retrying as text only");
-    messageResult = await sendMessage(chatId, details);
-  }
-  if (!messageResult?.ok) {
-    logger.warn({
-      chatId,
-      matchId: pair.matchId,
-      errorCode: messageResult?.error_code,
-      description: messageResult?.description,
-    }, "Clash opponent text-only notification failed");
-    return false;
-  }
-
-  try {
-    await db
-      .insert(telegramSentNotifications)
-      .values({
-        dedupeKey: matchNotificationKey(pair.matchId, me.telegramId),
-        telegramId: me.telegramId,
-        tournamentId: pair.tournamentId,
-        type: "clash_1v1_matched",
-      })
-      .onConflictDoNothing({ target: telegramSentNotifications.dedupeKey });
-  } catch (err) {
-    // The opponent details were already delivered. A bookkeeping failure must
-    // not turn a successful user action into the generic 1V1 error screen.
-    logger.warn({ err, matchId: pair.matchId, telegramId: me.telegramId }, "Clash notification dedupe write failed");
-  }
+  const sent = await sendMessage(chatId, details, { inline_keyboard: keyboard });
+  if (!sent?.ok) return false;
+  try { await db.insert(telegramSentNotifications).values({ dedupeKey: matchNotificationKey(pair.matchId, me.telegramId), telegramId: me.telegramId, tournamentId: pair.tournamentId, type: "clash_1v1_matched" }).onConflictDoNothing({ target: telegramSentNotifications.dedupeKey }); }
+  catch (err) { logger.warn({ err, matchId: pair.matchId }, "Clash notification dedupe write failed"); }
   return true;
 }
 
@@ -523,9 +481,9 @@ async function showActiveEntry(chatId: number, telegramId: string, entry: Awaite
   if (!entry) return openClash1v1Queue(chatId, telegramId);
 
   if (entry.status === "waiting_qr") {
-    await sendMessage(chatId, "✅ ورودی پرداخت شده؛ برای ورود به صف، پیوند دوستی کلش رویال را بفرست.", {
+    await sendMessage(chatId, "✅ ورودی پرداخت شده؛ برای ورود به صف، QR یا پیوند دوستی کلش رویال را بفرست.", {
       inline_keyboard: [
-        [{ text: "🔗 ارسال پیوند دوستی", callback_data: `clash1v1:qr:${entry.id}` }],
+        [{ text: "📷 ارسال QR / پیوند دوستی", callback_data: `clash1v1:qr:${entry.id}` }],
         [{ text: "❌ لغو و بازگشت وجه", callback_data: `clash1v1:cancel:${entry.id}` }],
       ],
     });
@@ -773,67 +731,45 @@ export async function submitClash1v1Qr(input: {
   telegramId: string;
   entryId: string;
   text?: string;
+  qrPhoto?: { buffer: Buffer; contentType: string; fileId: string };
 }) {
   const { chatId, telegramId, entryId } = input;
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) throw new Error("CLASH_QUEUE_ACCOUNT_NOT_LINKED");
 
   const extracted = extractInviteReference(input.text || "");
-  const inviteLink = isSupportedClashInvite(extracted) ? extracted : null;
-  if (!inviteLink) {
-    await sendMessage(chatId, [
-      "❌ پیوند دوستی معتبر پیدا نشد.",
-      "",
-      "در Clash Royale برو به:",
-      "<code>اجتماعی → افزودن دوست (+) → اشتراک‌گذاری پیوند</code>",
-      "سپس پیوندی که با آدرس زیر شروع می‌شود را برای بات بفرست:",
-      "<code>https://link.clashroyale.com/invite/friend/...</code>",
-      "",
-      "⚠️ عکس QR پذیرفته نمی‌شود.",
-    ].join("\n"));
+  let inviteLink = isSupportedClashInvite(extracted) ? extracted : null;
+  let qrFileId: string | null = null;
+  if (!inviteLink && input.qrPhoto) {
+    const decoded = await decodeClashFriendQr(input.qrPhoto.buffer, input.qrPhoto.contentType);
+    inviteLink = decoded.inviteLink;
+    qrFileId = input.qrPhoto.fileId;
+  }
+  if (!inviteLink && !qrFileId) {
+    await sendMessage(chatId, "❌ QR یا پیوند دوستی معتبر پیدا نشد. عکس QR را بفرست یا Share Link کلش را Paste کن.");
     return;
   }
 
-  const [updated] = await db
-    .update(clash1v1Entries)
-    .set({
-      status: "queued",
-      inviteLink,
-      qrFileId: null,
-      submittedAt: new Date(),
-      updatedAt: new Date(),
-    })
-    .where(and(
-      eq(clash1v1Entries.id, entryId),
-      eq(clash1v1Entries.userId, linked.userId),
-      inArray(clash1v1Entries.status, ["waiting_qr", "queued", "matched"])
-    ))
-    .returning();
+  const [updated] = await db.update(clash1v1Entries).set({
+    status: "queued", inviteLink, qrFileId, submittedAt: new Date(), updatedAt: new Date(),
+  }).where(and(
+    eq(clash1v1Entries.id, entryId), eq(clash1v1Entries.userId, linked.userId),
+    inArray(clash1v1Entries.status, ["waiting_qr", "queued", "matched"])
+  )).returning();
 
   if (!updated) {
     await clearSession(telegramId);
-    await sendMessage(chatId, "این ورودی دیگر فعال نیست. برای مشاهده وضعیت /qr را بزن.", removeKeyboard());
+    await sendMessage(chatId, "این ورودی فعال نیست. برای وضعیت /clash را بزن.", removeKeyboard());
     return;
   }
-
   await clearSession(telegramId);
 
   if (updated.status === "matched" && updated.matchedMatchId) {
     const pair = await loadPair(updated.matchedMatchId);
-    if (pair) {
-      const bothReady = isSupportedClashInvite(pair.player1.inviteLink)
-        && isSupportedClashInvite(pair.player2.inviteLink);
-      if (bothReady) {
-        await sendMessage(chatId, "✅ پیوند دوستی به‌روزرسانی شد. اطلاعات حریف در حال ارسال است...", removeKeyboard());
-        await notifyPairs([pair]);
-      } else {
-        await sendMessage(chatId, "✅ پیوند دوستی ثبت شد. منتظر ثبت پیوند حریف هستیم.", mainMenuKeyboard());
-      }
-      return;
-    }
+    if (pair) { await notifyPairs([pair]); return; }
   }
 
-  await sendMessage(chatId, "✅ پیوند دوستی ثبت شد و وارد صف شدی. در حال جست‌وجوی یک حریف آماده...", removeKeyboard());
+  await sendMessage(chatId, `✅ ${inviteLink ? "پیوند دوستی" : "QR دوستی"} ثبت شد و وارد صف شدی. در حال جست‌وجوی حریف...`, removeKeyboard());
   const matchmaking = await runClash1v1MatchmakingAndNotify();
   if (!matchmaking.matchedPairs) await showActiveEntry(chatId, telegramId, updated);
 }
@@ -913,7 +849,7 @@ export async function runClash1v1Matchmaking(): Promise<QueuePair[]> {
       .where(and(
         eq(tournaments.game, CLASH_1V1_CONFIG.game),
         eq(tournaments.status, "registration"),
-        or(eq(tournaments.categoryLabel, CLASH_1V1_CONFIG.categoryLabel), eq(tournaments.name, CLASH_1V1_CONFIG.name))
+        eq(tournaments.categoryLabel, CLASH_1V1_CONFIG.categoryLabel)
       ))
       .orderBy(desc(tournaments.createdAt))
       .limit(1);
@@ -926,6 +862,7 @@ export async function runClash1v1Matchmaking(): Promise<QueuePair[]> {
         userId: clash1v1Entries.userId,
         telegramId: clash1v1Entries.telegramId,
         inviteLink: clash1v1Entries.inviteLink,
+        qrFileId: clash1v1Entries.qrFileId,
         matchedAt: clash1v1Entries.matchedAt,
         readyAt: clash1v1Entries.readyAt,
         displayName: players.displayName,
@@ -940,13 +877,13 @@ export async function runClash1v1Matchmaking(): Promise<QueuePair[]> {
       .where(and(
         eq(clash1v1Entries.status, "queued"),
         isNotNull(clash1v1Entries.submittedAt),
-        isNotNull(clash1v1Entries.inviteLink)
+        or(isNotNull(clash1v1Entries.inviteLink), isNotNull(clash1v1Entries.qrFileId))
       ))
       .orderBy(clash1v1Entries.submittedAt, clash1v1Entries.createdAt)
       .limit(20);
 
     const candidates = (queued as QueueParticipant[])
-      .filter((entry) => isSupportedClashInvite(entry.inviteLink));
+      .filter((entry) => isSupportedClashInvite(entry.inviteLink) || Boolean(entry.qrFileId));
     const created: QueuePair[] = [];
     while (candidates.length >= 2) {
       const player1 = candidates.shift()!;

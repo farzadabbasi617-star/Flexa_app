@@ -8,6 +8,7 @@ import { distributeTournamentPrizes, refundTournamentEntryFees } from "@/lib/tou
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import logger from "@/lib/logger";
 import { normalizeClashPrivateDraftSettings } from "@/lib/clash-private-tournament";
+import { normalizeClash1v1QueueSettings } from "@/lib/clash-1v1";
 import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
 
 export const dynamic = "force-dynamic";
@@ -17,7 +18,7 @@ const FORMAT_VALUES = ["single_elimination", "double_elimination", "round_robin"
 const STATUS_VALUES = ["registration", "in_progress", "completed", "cancelled"] as const;
 
 function normalizeTournamentBody(rawBody: Record<string, unknown>) {
-  const body = normalizeClashPrivateDraftSettings(rawBody);
+  const body = normalizeClash1v1QueueSettings(normalizeClashPrivateDraftSettings(rawBody));
   const game = String(body.game || "");
   const format = String(body.format || "single_elimination");
   const status = String(body.status || "registration");

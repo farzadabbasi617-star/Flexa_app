@@ -50,7 +50,7 @@ import {
 } from "./commands/clash-1v1";
 import { isSupportedClashInvite } from "./commands/clash-1v1-policy";
 import { getAdminIds, hasAdminAccess } from "./admin-access";
-import { downloadTelegramPhotoAsDataUrl } from "./files";
+import { downloadTelegramPhotoAsDataUrl, downloadTelegramQrPhoto } from "./files";
 import { parseTelegramCommand } from "./command-router";
 import {
   claimTelegramUpdate,
@@ -412,6 +412,7 @@ async function roomsCommand(chatId: number, gameFilter?: string) {
       prizePool: tournaments.prizePool,
       entryFee: tournaments.entryFee,
       status: tournaments.status,
+      categoryLabel: tournaments.categoryLabel,
       registeredCount: count(registrations.id),
     })
     .from(tournaments)
@@ -421,7 +422,8 @@ async function roomsCommand(chatId: number, gameFilter?: string) {
     .orderBy(desc(tournaments.createdAt))
     .limit(10);
 
-  if (!rows.length) {
+  const visibleRows = rows.filter((row) => row.categoryLabel !== CLASH_1V1_CONFIG.categoryLabel);
+  if (!visibleRows.length) {
     await sendMessage(chatId, "فعلاً روم فعالی پیدا نشد. از وب‌اپ هم می‌تونی آخرین وضعیت رو ببینی:", {
       inline_keyboard: [[{ text: "🏟 مشاهده روم‌ها", url: `${APP_URL}/tournaments` }]],
     });
@@ -431,7 +433,7 @@ async function roomsCommand(chatId: number, gameFilter?: string) {
   const text = [
     "🏟 <b>روم‌های فعال Gament</b>",
     "",
-    ...rows.map((row, index) => [
+    ...visibleRows.map((row, index) => [
       `<b>${index + 1}. ${html(row.name || "روم Gament")}</b>`,
       `🎮 ${html(gameLabel(row.game))} | ${html(row.gameMode || "مود اعلام نشده")}`,
       `👥 ظرفیت: <b>${row.registeredCount}/${row.maxPlayers}</b>`,
@@ -442,7 +444,7 @@ async function roomsCommand(chatId: number, gameFilter?: string) {
     "برای ثبت‌نام قطعی وارد وب‌اپ شو.",
   ].join("\n\n");
 
-  await sendMessage(chatId, text, roomsKeyboard(rows));
+  await sendMessage(chatId, text, roomsKeyboard(visibleRows));
 }
 
 async function clashPrivateTournamentsCommand(chatId: number, telegramId: string) {
@@ -3012,7 +3014,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/my_tickets") return myTicketsCommand(chatId, telegramId);
   if (normalizedCommand === "/matches") return matchesCommand(chatId, telegramId);
   if (["/clash_tournament", "/clash_multi"].includes(normalizedCommand)) return clashPrivateTournamentsCommand(chatId, telegramId);
-  if (["/qr", "/clash_qr", "/clash_link"].includes(normalizedCommand)) {
+  if (["/qr", "/clash_qr", "/clash_link", "/clash", "/clash_1v1", "/1v1"].includes(normalizedCommand)) {
     const tournamentId = args.join(" ").match(/[0-9a-f-]{36}/i)?.[0];
     return tournamentId ? startClashQrSubmission(chatId, telegramId, tournamentId) : openClash1v1Queue(chatId, telegramId);
   }
@@ -3084,12 +3086,19 @@ async function handleConversationMessage(message: TelegramMessage) {
       await sendMessage(chatId, "اطلاعات صف ناقص است. دوباره /qr را بزن.", removeKeyboard());
       return;
     }
-    await submitClash1v1Qr({
-      chatId,
-      telegramId,
-      entryId: data.clash1v1EntryId,
-      text: message.caption || message.text || "",
-    });
+    const bestQrPhoto = message.photo?.[message.photo.length - 1];
+    let qrPhoto: { buffer: Buffer; contentType: string; fileId: string } | undefined;
+    if (bestQrPhoto) {
+      try {
+        const file = await downloadTelegramQrPhoto(bestQrPhoto.file_id);
+        qrPhoto = { buffer: file.buffer, contentType: file.contentType, fileId: bestQrPhoto.file_id };
+      } catch (err) {
+        logger.warn({ err, telegramId }, "Failed to download Clash 1V1 QR photo");
+        await sendMessage(chatId, "عکس QR قابل دریافت نیست؛ عکس واضح‌تری بفرست یا Share Link را Paste کن.");
+        return;
+      }
+    }
+    await submitClash1v1Qr({ chatId, telegramId, entryId: data.clash1v1EntryId, text: message.caption || message.text || "", qrPhoto });
     return;
   }
 
@@ -3718,3 +3727,4 @@ export async function GET() {
     }, { status: 500 });
   }
 }
+

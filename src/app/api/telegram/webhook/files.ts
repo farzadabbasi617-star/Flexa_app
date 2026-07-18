@@ -34,6 +34,17 @@ async function downloadTelegramImage(fileId: string, maxBytes: number, sizeError
   };
 }
 
+
+export async function downloadTelegramQrPhoto(fileId: string) {
+  const file = await downloadTelegramImage(fileId, 2.5 * 1024 * 1024, "QR_TOO_LARGE", "INVALID_QR_TYPE");
+  return {
+    buffer: file.buffer,
+    contentType: file.contentType,
+    size: file.size,
+    fileName: file.fileName,
+  };
+}
+
 export async function downloadTelegramPhotoAsDataUrl(fileId: string) {
   const file = await downloadTelegramImage(fileId, 1.2 * 1024 * 1024, "RECEIPT_TOO_LARGE", "INVALID_RECEIPT_TYPE");
   return {
