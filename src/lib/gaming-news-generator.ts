@@ -331,7 +331,10 @@ export async function cleanupOldNews(days = 7) {
     const oldRows = await db.select({ id: honors.id }).from(honors).where(and(
       eq(honors.type, "news"),
       eq(honors.source, "ai_news"),
-      sql`COALESCE(${honors.publishedAt}, ${honors.createdAt}) < ${threshold}`,
+      sql`(
+        COALESCE(${honors.publishedAt}, ${honors.createdAt}) < ${threshold}
+        OR COALESCE(${honors.metadata}->>'contentFramework', '') <> 'gament_news_v4_source_translation'
+      )`,
     ));
     const ids = oldRows.map((row) => row.id);
     if (!ids.length) return { deleted: 0 };
@@ -449,7 +452,7 @@ ${sourcesText}
       sourceFingerprint: fingerprint,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       imageOrigin: "trusted_source_image",
-      contentFramework: "gament_news_v3_template_matched",
+      contentFramework: "gament_news_v4_source_translation",
     },
   }).returning();
   await Promise.all([markGenerated(dailyKey), markGenerated(sourceKey)]);
