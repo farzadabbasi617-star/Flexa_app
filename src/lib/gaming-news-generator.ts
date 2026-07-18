@@ -1,6 +1,7 @@
-import { and, eq, sql, lt } from "drizzle-orm";
+import crypto from "crypto";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { honors, telegramSentNotifications } from "@/db/schema";
+import { honorContentLikes, honorContentViews, honorLikes, honorViews, honors, telegramSentNotifications } from "@/db/schema";
 import { fetchAIResponse } from "@/lib/ai-provider-manager";
 import { gamentSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
@@ -31,12 +32,25 @@ const NEWS_QUERIES: Array<{ game: NewsItem["game"]; query: string }> = [
   { game: "fortnite", query: "site:fortnite.com news OR site:fnbr.co fortnite update" },
 ];
 
-const SEO_KEYWORDS = "گیمنت، Gament، خرید سی پی کالاف دیوتی موبایل، جم کلش رویال، تورنومنت گیمینگ رایگان، مسابقات آنلاین موبایل، اکانت فورتنایت، جایزه نقدی گیمینگ";
-
 const GAME_BRAND: Record<string, { label: string; icon: string; from: string; to: string; accent: string }> = {
   clash_royale: { label: "کلش رویال", icon: "👑", from: "#083344", to: "#1d4ed8", accent: "#22d3ee" },
   cod_mobile: { label: "کالاف دیوتی موبایل", icon: "🎯", from: "#431407", to: "#991b1b", accent: "#fb923c" },
   fortnite: { label: "فورتنایت", icon: "🏗️", from: "#2e1065", to: "#9d174d", accent: "#d946ef" },
+};
+
+const GAME_TEMPLATE_IMAGES: Record<NewsItem["game"], string[]> = {
+  clash_royale: [
+    "/news/supercell-store-goblin-emote-freebie.jpg",
+    "https://clashroyale.inbox.supercell.com/9jtsgmsiuthj/6RiSIAymrumYiP7YvqvrPN/f15b9acaca486955a753d634ca2fb3d5/March_Balance_changes.jpg",
+  ],
+  cod_mobile: ["/news/codm-season-6-arcade-weapons.jpg", "/news/codm-season-6-arcade-action.jpg"],
+  fortnite: ["/icons/icon-fortnite.png"],
+};
+
+const GAME_SEO_KEYWORDS: Record<NewsItem["game"], string[]> = {
+  clash_royale: ["اخبار کلش رویال", "آپدیت کلش رویال", "Clash Royale", "متای کلش رویال", "مسابقات کلش رویال Gament"],
+  cod_mobile: ["اخبار کالاف دیوتی موبایل", "آپدیت COD Mobile", "فصل جدید کالاف موبایل", "متای CODM", "مسابقات کالاف موبایل Gament"],
+  fortnite: ["اخبار فورتنایت", "آپدیت Fortnite", "فصل جدید فورتنایت", "متای فورتنایت", "مسابقات فورتنایت Gament"],
 };
 
 function stripHtml(value: string) {
@@ -109,22 +123,22 @@ async function fetchGoogleNewsItems(query: string, game: NewsItem["game"]): Prom
     if (!res.ok) return [];
     const xml = await res.text();
     const itemBlocks = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
-    
+
     return itemBlocks.slice(0, 5).map((block) => {
       const title = extractTag(block, "title");
       const link = normalizeGoogleNewsUrl(extractTag(block, "link"));
       const pubDate = extractTag(block, "pubDate") || null;
       const source = extractTag(block, "source") || "Google News";
-      
+
       // بهبود استخراج تصویر از منابع مختلف
       let imageUrl = "";
       const description = extractTag(block, "description");
       const imgInDescription = description.match(/src="([^"]+)"/i) || description.match(/url="([^"]+)"/i);
-      
-      const imgMatch = block.match(/<media:content[^>]+url="([^"]+)"/i) || 
+
+      const imgMatch = block.match(/<media:content[^>]+url="([^"]+)"/i) ||
                        block.match(/<enclosure[^>]+url="([^"]+)"/i) ||
                        (imgInDescription ? imgInDescription : null);
-                       
+
       if (imgMatch) {
         imageUrl = imgMatch[1];
         if (imageUrl.startsWith("//")) imageUrl = "https:" + imageUrl;
@@ -143,7 +157,7 @@ async function fetchGoogleNewsItems(query: string, game: NewsItem["game"]): Prom
 async function fetchDiscordNewsItems(): Promise<NewsItem[]> {
   const token = process.env.DISCORD_BOT_TOKEN;
   const channelIds = (process.env.DISCORD_CHANNEL_IDS || "").split(",").filter(Boolean);
-  
+
   if (!token || channelIds.length === 0) return [];
 
   const allMessages: NewsItem[] = [];
@@ -184,17 +198,56 @@ async function fetchDiscordNewsItems(): Promise<NewsItem[]> {
   return allMessages;
 }
 
+export function isRecentNewsItem(item: NewsItem, maxAgeHours = 96) {
+  if (!item.pubDate) return false;
+  const published = new Date(item.pubDate).getTime();
+  return Number.isFinite(published) && published <= Date.now() + 60 * 60 * 1000 && published >= Date.now() - maxAgeHours * 60 * 60 * 1000;
+}
+
+function validExternalImage(value?: string | null) {
+  try {
+    const url = new URL(String(value || ""));
+    return url.protocol === "https:" && !/googleusercontent\.com\/favicon/i.test(url.href);
+  } catch {
+    return false;
+  }
+}
+
+async function fetchArticlePreviewImage(url: string) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8_000);
+  try {
+    const response = await fetch(url, {
+      signal: controller.signal,
+      redirect: "follow",
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; GamentNews/1.0)", Accept: "text/html" },
+      cache: "no-store",
+    });
+    if (!response.ok || !(response.headers.get("content-type") || "").includes("text/html")) return "";
+    const html = (await response.text()).slice(0, 500_000);
+    const match = html.match(/<meta[^>]+(?:property|name)=["'](?:og:image|twitter:image)["'][^>]+content=["']([^"']+)["']/i)
+      || html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["'](?:og:image|twitter:image)["']/i);
+    if (!match?.[1]) return "";
+    const absolute = new URL(match[1], response.url).href;
+    return validExternalImage(absolute) ? absolute : "";
+  } catch {
+    return "";
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 async function collectGamingNewsItems() {
   const discordResults = await fetchDiscordNewsItems();
-
-  // اگر دیسکورد خالی بود، برای اینکه سایت خالی نماند از منابع وب استفاده کن
-  // در غیر این صورت فقط از دیسکورد استفاده کن
-  if (discordResults.length > 0) {
-    return discordResults.slice(0, 15);
-  }
-
-  const googleResults = await Promise.all(NEWS_QUERIES.map((entry) => fetchGoogleNewsItems(entry.query, entry.game)));
-  return googleResults.flat().slice(0, 10);
+  const rawItems = discordResults.length > 0
+    ? discordResults.slice(0, 15)
+    : (await Promise.all(NEWS_QUERIES.map((entry) => fetchGoogleNewsItems(entry.query, entry.game)))).flat().slice(0, 15);
+  const recentItems = rawItems.filter((item) => isRecentNewsItem(item));
+  const enriched = await Promise.all(recentItems.map(async (item) => ({
+    ...item,
+    imageUrl: validExternalImage(item.imageUrl) ? item.imageUrl : await fetchArticlePreviewImage(item.link),
+  })));
+  return enriched;
 }
 
 async function hasGenerated(dedupeKey: string) {
@@ -241,7 +294,7 @@ function localFallbackNews(items: NewsItem[]): GeneratedNews {
   return {
     title,
     summary: `مروری کوتاه و کاربردی بر تازه‌ترین خبرهای ${gameLabel[first.game] || "گیمینگ"} برای بازیکنان رقابتی گیمنت.`,
-    description: `در تازه‌ترین موج اخبار گیمینگ، گزارش‌هایی درباره ${gameLabel[first.game] || "بازی‌های رقابتی"} منتشر شده که می‌تواند برای بازیکنان رقابتی گیمنت مهم باشد. منبع اصلی این خبر با عنوان «${first.title}» توسط ${first.source} منتشر شده و نشان می‌دهد دنبال‌کردن تغییرات بازی‌ها برای شرکت در تورنومنت گیمینگ اهمیت زیادی دارد.\n\nگیمنت تلاش می‌کند اخبار مهم کالاف دیوتی موبایل، کلش رویال و فورتنایت را با نگاه رقابتی و کاربردی پوشش دهد تا بازیکنان قبل از ورود به مسابقات، از تغییرات متا، آپدیت‌ها و فضای رقابت آگاه باشند.`,
+    description: `در تازه‌ترین گزارش مربوط به ${gameLabel[first.game] || "بازی رقابتی"}، منبع «${first.source}» خبری با عنوان «${first.title}» منتشر کرده است. این خبر برای بازیکنان رقابتی اهمیت دارد، چون تغییرات رسمی، رویدادهای محدود و به‌روزرسانی‌های بازی می‌توانند روی تصمیم‌های روزانه و آمادگی برای مسابقات اثر بگذارند.\n\nگیمنت این گزارش را با تمرکز بر جامعه رقابتی ${gameLabel[first.game] || "گیمینگ"} منتشر می‌کند. برای جزئیات قطعی باید منبع اصلی خبر بررسی شود و بازیکنان پیش از تغییر استراتژی، تجهیزات یا برنامه مسابقه خود، اطلاعیه رسمی ناشر را مبنا قرار دهند.`,
     game: first.game,
     icon: "📰",
     imageAlt: title,
@@ -252,153 +305,160 @@ function localFallbackNews(items: NewsItem[]): GeneratedNews {
 /**
  * Removes news older than N days to keep the database lean.
  */
-async function cleanupOldNews(days = 5) {
+export async function cleanupOldNews(days = 7) {
   try {
-    const threshold = new Date();
-    threshold.setDate(threshold.getDate() - days);
-    
-    await db.delete(honors)
-      .where(
-        and(
-          eq(honors.type, "news"),
-          sql`${honors.publishedAt} < ${threshold}`
-        )
-      );
-    logger.info({ days }, "Cleaned up old AI news from honors table");
+    const threshold = new Date(Date.now() - Math.max(1, days) * 24 * 60 * 60 * 1000);
+    const oldRows = await db.select({ id: honors.id }).from(honors).where(and(
+      eq(honors.type, "news"),
+      eq(honors.source, "ai_news"),
+      sql`COALESCE(${honors.publishedAt}, ${honors.createdAt}) < ${threshold}`,
+    ));
+    const ids = oldRows.map((row) => row.id);
+    if (!ids.length) return { deleted: 0 };
+
+    await db.transaction(async (tx) => {
+      await tx.delete(honorLikes).where(inArray(honorLikes.honorId, ids));
+      await tx.delete(honorViews).where(inArray(honorViews.honorId, ids));
+      await tx.delete(honorContentLikes).where(inArray(honorContentLikes.contentId, ids));
+      await tx.delete(honorContentViews).where(inArray(honorContentViews.contentId, ids));
+      await tx.delete(honors).where(inArray(honors.id, ids));
+    });
+    logger.info({ days, deleted: ids.length }, "Cleaned up expired AI news from honors table");
+    return { deleted: ids.length };
   } catch (err) {
     logger.error({ err }, "Failed to cleanup old news");
+    return { deleted: 0, error: true };
   }
 }
 
-async function uploadToCloudinary(url: string): Promise<string> {
-  if (!process.env.CLOUDINARY_API_KEY) return url;
-  
-  try {
-    // We use a simple fetch to a proxy or directly to Cloudinary if configured.
-    // For now, we'll keep the logic ready to be swapped with a real SDK call.
-    // If Cloudinary isn't fully set up, we return the original URL as fallback.
-    return url; 
-  } catch {
-    return url;
+function sourceFingerprint(items: NewsItem[]) {
+  return crypto.createHash("sha256")
+    .update(items.map((item) => `${item.game}:${item.link}`).sort().join("|"))
+    .digest("hex")
+    .slice(0, 24);
+}
+
+function templateImage(game: NewsItem["game"], fingerprint: string) {
+  const images = GAME_TEMPLATE_IMAGES[game];
+  if (!images?.length) return "";
+  const index = Number.parseInt(fingerprint.slice(0, 8), 16) % images.length;
+  return images[index];
+}
+
+async function generateNewsForGame(game: NewsItem["game"], items: NewsItem[], today: string, force: boolean) {
+  if (!items.length) return { generated: false as const, game, reason: "no_recent_sources" };
+  const dailyKey = `daily-gaming-news:${today}:${game}`;
+  const fingerprint = sourceFingerprint(items);
+  const sourceKey = `gaming-news-source:${fingerprint}`;
+  if (!force) {
+    const dayStart = new Date(`${today}T00:00:00+03:30`);
+    const [existingToday] = await db.select({ id: honors.id }).from(honors).where(and(
+      eq(honors.type, "news"),
+      eq(honors.source, "ai_news"),
+      eq(honors.game, game),
+      sql`COALESCE(${honors.publishedAt}, ${honors.createdAt}) >= ${dayStart}`,
+    )).limit(1);
+    if (existingToday || await hasGenerated(dailyKey)) return { generated: false as const, game, reason: "already_today" };
   }
+  if (!force && await hasGenerated(sourceKey)) return { generated: false as const, game, reason: "source_already_used" };
+
+  const brand = GAME_BRAND[game];
+  const sourcesText = items.map((item, index) =>
+    `${index + 1}. ${item.title}\nمنبع: ${item.source}\nتاریخ: ${item.pubDate || "نامشخص"}\nلینک: ${item.link}`
+  ).join("\n\n");
+  const seo = GAME_SEO_KEYWORDS[game].join("، ");
+  const prompt = `تو سردبیر فارسی Gament هستی. براساس منابع زیر یک خبر روز دقیق درباره ${brand.label} بنویس.
+
+${sourcesText}
+
+قواعد اجباری:
+- فقط اطلاعاتی را بنویس که در تیتر/منابع قابل استناد است؛ خبر یا عدد نساز.
+- نام هیچ بازی دیگری را وارد نکن.
+- متن ۵۰۰ تا ۷۰۰ کلمه، روان، غیرتکراری و مناسب مخاطب ایرانی باشد.
+- ساختار متن: مقدمه خبری، جزئیات اصلی، تأثیر روی بازیکنان رقابتی، جمع‌بندی.
+- کلمات سئو را طبیعی و بدون Keyword Stuffing استفاده کن: ${seo}.
+- لینک منابع را داخل متن تکرار نکن؛ منابع جداگانه نمایش داده می‌شوند.
+
+فقط JSON معتبر بده:
+{
+  "title":"تیتر فارسی دقیق و جذاب بدون کلیک‌بیت دروغین",
+  "summary":"خلاصه ۱۴۰ تا ۱۹۰ کاراکتری",
+  "description":"متن کامل فارسی با پاراگراف‌بندی",
+  "game":"${game}",
+  "icon":"${brand.icon}",
+  "imageAlt":"Alt فارسی دقیق برای تصویر خبر",
+  "seoKeywords":["حداکثر ۸ عبارت مرتبط"]
+}`;
+  const systemPrompt = gamentSystemPrompt("honors", "You are a fact-grounded Persian gaming news editor. Return valid JSON only. Never fabricate facts.");
+  const ai = await fetchAIResponse(prompt, systemPrompt).catch((error) => {
+    logger.warn({ error, game }, "AI news generation failed; using source-grounded local template");
+    return null;
+  });
+  const parsed = ai ? safeParseAIJson<GeneratedNews>(ai.content) : null;
+  const news = parsed?.title && parsed?.description ? parsed : localFallbackNews(items);
+  const title = shortText(String(news.title || items[0].title), 100);
+  const description = String(news.description || "").trim();
+  const summary = shortText(String(news.summary || description.split("\n")[0] || title), 190);
+  const icon = String(news.icon || brand.icon).slice(0, 20);
+  const sourceImage = items.find((item) => validExternalImage(item.imageUrl))?.imageUrl || "";
+  const imageUrl = sourceImage || templateImage(game, fingerprint) || createLightweightNewsImage(title, game, icon);
+  const generatedKeywords = Array.isArray(news.seoKeywords)
+    ? news.seoKeywords.map((keyword) => shortText(String(keyword), 50)).filter(Boolean)
+    : [];
+  const seoKeywords = [...new Set([...generatedKeywords, ...GAME_SEO_KEYWORDS[game]])].slice(0, 8);
+
+  const [created] = await db.insert(honors).values({
+    type: "news",
+    title,
+    description,
+    icon,
+    imageUrl,
+    game,
+    status: "approved",
+    highlight: false,
+    publishedAt: new Date(),
+    source: "ai_news",
+    metadata: {
+      summary,
+      imageAlt: news.imageAlt || title,
+      readTimeMinutes: readingTimeMinutes(description),
+      provider: ai?.provider || "local_fallback",
+      model: ai?.model || null,
+      sources: items,
+      seoKeywords,
+      dailyKey,
+      sourceFingerprint: fingerprint,
+      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+      imageOrigin: sourceImage ? "source_og_image" : "existing_gament_template",
+      contentFramework: "gament_news_v3_template_matched",
+    },
+  }).returning();
+  await Promise.all([markGenerated(dailyKey), markGenerated(sourceKey)]);
+  logger.info({ honorId: created.id, title, game, sources: items.length }, "Generated daily game news");
+  return { generated: true as const, honorId: created.id, title, game, sources: items.length, provider: ai?.provider || "local_fallback" };
 }
 
 export async function generateDailyGamingNews({ force = false } = {}) {
-  // 1. Cleanup old news first
-  await cleanupOldNews(5);
-
+  const cleanup = await cleanupOldNews(7);
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
-  const key = `daily-gaming-news:${today}`;
-  if (!force && await hasGenerated(key)) return { generated: false, reason: "already_today" };
+  const items = await collectGamingNewsItems();
+  if (!items.length) return { generated: false, generatedCount: 0, reason: "no_recent_sources", cleanup };
 
-  const allItems = await collectGamingNewsItems();
-  if (allItems.length === 0) return { generated: false, reason: "no_sources" };
-
-  // انتخاب بازی هدف بر اساس بیشترین تعداد اخبار واکشی شده یا به صورت رندوم برای تنوع
-  const games: Array<"cod_mobile" | "clash_royale" | "fortnite"> = ["cod_mobile", "clash_royale", "fortnite"];
-  const targetGame = games[Math.floor(Math.random() * games.length)];
-  
-  const filteredItems = allItems.filter(item => item.game === targetGame);
-  const finalItems = filteredItems.length > 0 ? filteredItems : allItems.slice(0, 5);
-  const actualGame = finalItems[0].game;
-
-  const sourcesText = finalItems.map((item, index) => 
-    `${index + 1}. [TARGET: ${actualGame}] ${item.title} — ${item.source} — ${item.link}`
-  ).join("\n");
-
-  const prompt = `تو سردبیر ارشد و متخصص بازی "${actualGame}" در سایت Gament هستی. 
-فقط و فقط درباره بازی "${actualGame}" بنویس. 
-
-منابع اختصاصی:
-${sourcesText}
-
-دستورالعمل حیاتی:
-۱. تمرکز مطلق: تحت هیچ شرایطی نام بازی‌های دیگر را در متن نیاور. تمام متن باید درباره ${actualGame} باشد.
-۲. طول متن: یک مقاله مفصل و تحلیلی (حداقل ۴۵۰ کلمه) بساز.
-۳. سئو طلایی: کلمات کلیدی ${SEO_KEYWORDS} را با تاکید بر ${actualGame} استفاده کن.
-۴. تحلیل اختصاصی: توضیح بده که این اخبار چه تاثیری بر استراتژی بازیکنان در "تورنومنت‌های گیمنت" دارد.
-
-خروجی فقط JSON:
-{
-  "title": "تیتر حرفه‌ای مخصوص ${actualGame}",
-  "summary": "لید خبری جذاب",
-  "description": "متن کامل و طولانی مقاله فارسی",
-  "game": "${actualGame}",
-  "icon": "ایموجی مناسب",
-  "imageAlt": "توضیح تصویر سئو شده برای ${actualGame}",
-  "seoKeywords": ["کلمات کلیدی مرتبط"]
-}`;
-
-  const systemPrompt = gamentSystemPrompt("honors", "Respond ONLY with valid JSON. No markdown. Never invent fake breaking news.");
-  const ai = await fetchAIResponse(prompt, systemPrompt).catch(err => {
-    logger.error({ err }, "AI Fetch failed in news generator");
-    return null;
-  });
-
-  const parsed = ai ? safeParseAIJson<GeneratedNews>(ai.content) : null;
-  const news = (parsed?.title && parsed?.description) ? parsed : localFallbackNews(finalItems);
-  
-  // Ensure strings to prevent SVG encoding errors
-  const game = String(news.game || (finalItems.length > 0 ? finalItems[0].game : "cod_mobile")).slice(0, 50);
-  const title = shortText(String(news.title || "اخبار جدید گیمینگ"), 90);
-  const description = String(news.description || "در حال حاضر جزییات بیشتری در دسترس نیست.").trim();
-  const summary = shortText(String(news.summary || description.split("\n")[0] || title), 190);
-  const icon = String(news.icon || GAME_BRAND[game]?.icon || "📰").slice(0, 20);
-  
-  let imageUrl = "";
-  // اولویت ۱: استفاده از تصویر واقعی واکشی شده از منبع خبر
-  const sourceWithImage = finalItems.find(item => item.imageUrl);
-  if (sourceWithImage?.imageUrl) {
-    imageUrl = sourceWithImage.imageUrl;
-  } else {
-    // اولویت ۲: اگر تصویر منبع نبود، تولید تصویر گرافیکی حرفه‌ای
-    try {
-      imageUrl = createLightweightNewsImage(title, game, icon);
-    } catch (err) {
-      logger.error({ err }, "SVG Generation failed");
-      imageUrl = "";
-    }
+  const games: NewsItem["game"][] = ["clash_royale", "cod_mobile", "fortnite"];
+  const results = await Promise.all(games.map((game) =>
+    generateNewsForGame(game, items.filter((item) => item.game === game).slice(0, 4), today, force)
+  ));
+  const generated = results.filter((result) => result.generated);
+  if (generated.length > 0) {
+    await db.update(honors).set({ highlight: false, updatedAt: new Date() })
+      .where(and(eq(honors.type, "news"), eq(honors.source, "ai_news")));
+    await db.update(honors).set({ highlight: true, updatedAt: new Date() })
+      .where(eq(honors.id, generated[0].honorId));
   }
-  const seoKeywords = Array.isArray(news.seoKeywords) ? news.seoKeywords.map((k) => shortText(String(k), 40)).slice(0, 8) : [];
-
-  try {
-    const [created] = await db.insert(honors).values({
-      type: "news",
-      title,
-      description,
-      icon,
-      imageUrl,
-      game,
-      status: "approved",
-      highlight: false,
-      publishedAt: new Date(),
-      source: "ai_news",
-      metadata: {
-        summary,
-        imageAlt: news.imageAlt || title,
-        readTimeMinutes: readingTimeMinutes(description),
-        provider: ai?.provider || "local_fallback",
-        model: ai?.model || null,
-        sources: finalItems,
-        seoKeywords,
-        dedupeKey: key,
-        contentFramework: "gament_news_v2",
-      },
-    }).returning();
-
-    await markGenerated(key);
-    logger.info({ honorId: created.id, title: created.title, sources: finalItems.length }, "Generated daily gaming news");
-
-    return {
-      generated: true,
-      honorId: created.id,
-      title: created.title,
-      game: created.game,
-      sources: finalItems.length,
-      provider: ai?.provider || "local_fallback",
-    };
-  } catch (err: any) {
-    logger.error({ err: err?.message || err, key }, "Failed to insert news into honors table");
-    throw err;
-  }
+  return {
+    generated: generated.length > 0,
+    generatedCount: generated.length,
+    items: results,
+    cleanup,
+  };
 }

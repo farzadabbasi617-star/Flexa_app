@@ -112,8 +112,10 @@ export default function AdminHonorsPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "ساخت خبر خودکار انجام نشد");
-      if (data.generated) alert(`خبر خودکار ساخته شد: ${data.title}`);
-      else alert(`خبری ساخته نشد: ${data.reason || "نامشخص"}`);
+      if (data.generated) {
+        const titles = Array.isArray(data.items) ? data.items.filter((item: any) => item.generated).map((item: any) => item.title).filter(Boolean).join("\n• ") : "";
+        alert(`${Number(data.generatedCount || 1).toLocaleString("fa-IR")} خبر خودکار ساخته شد${titles ? `:\n• ${titles}` : ""}`);
+      } else alert(`خبری ساخته نشد: ${data.reason || "منبع تازه‌ای پیدا نشد"}`);
       fetchHonors();
     } catch (err) {
       alert(err instanceof Error ? err.message : "ساخت خبر خودکار انجام نشد");
