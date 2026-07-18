@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { transactions, users, wallets } from "@/db/schema";
-import { desc, eq, sql } from "drizzle-orm";
+import { registrations, tournaments, transactions, users, wallets } from "@/db/schema";
+import { count, desc, eq, sql } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { bigIntFromText } from "@/lib/money";
 import { evaluateUserAchievements } from "@/lib/achievement-service";
+import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
 
 export const dynamic = "force-dynamic";
 
@@ -13,10 +14,15 @@ function bi(value: string | null | undefined) {
   try { return BigInt(value || "0"); } catch { return BigInt(0); }
 }
 
+function meta(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
+}
+
 export async function GET(request: NextRequest) {
   try {
     const auth = await requireAdminPermission(request, "finance");
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
+    await ensurePrivateTournamentAttendanceSchema();
 
     const txRows = await db
       .select({
@@ -38,11 +44,26 @@ export async function GET(request: NextRequest) {
       .leftJoin(wallets, eq(transactions.walletId, wallets.id))
       .leftJoin(users, eq(wallets.userId, users.id))
       .orderBy(desc(transactions.createdAt))
-      .limit(500);
+      .limit(5000);
 
     const walletRows = await db
-      .select({ balance: wallets.balance })
+      .select({ id: wallets.id, balance: wallets.balance })
       .from(wallets);
+
+    const tournamentRows = await db
+      .select({
+        id: tournaments.id,
+        name: tournaments.name,
+        status: tournaments.status,
+        maxPlayers: tournaments.maxPlayers,
+        registeredCount: count(registrations.id),
+        noShowCount: sql<number>`count(${registrations.id}) FILTER (WHERE ${registrations.attendanceStatus} = 'no_show')::int`,
+      })
+      .from(tournaments)
+      .leftJoin(registrations, eq(registrations.tournamentId, tournaments.id))
+      .groupBy(tournaments.id)
+      .orderBy(desc(tournaments.createdAt))
+      .limit(200);
 
     let totalDeposits = BigInt(0);
     let totalWithdrawals = BigInt(0);
@@ -64,6 +85,35 @@ export async function GET(request: NextRequest) {
 
     const totalWalletBalance = walletRows.reduce((sum, w) => sum + bi(w.balance), BigInt(0));
 
+    const tournamentFunds = tournamentRows.map((tournament) => {
+      const related = txRows.filter((tx) => String(meta(tx.metadata).tournamentId || "") === tournament.id && tx.status === "completed");
+      const entryFeesRial = related.filter((tx) => tx.type === "entry_fee").reduce((sum, tx) => sum + bi(tx.amount), BigInt(0));
+      const refundsRial = related.filter((tx) => tx.type === "refund").reduce((sum, tx) => sum + bi(tx.amount), BigInt(0));
+      const prizesRial = related.filter((tx) => tx.type === "tournament_win").reduce((sum, tx) => sum + bi(tx.amount), BigInt(0));
+      const netCollectedRial = entryFeesRial > refundsRial ? entryFeesRial - refundsRial : BigInt(0);
+      const commissionRial = netCollectedRial / BigInt(5);
+      const expectedPrizeRial = netCollectedRial - commissionRial;
+      const varianceRial = expectedPrizeRial - prizesRial;
+      return {
+        ...tournament,
+        entryFeesToman: Number(entryFeesRial / BigInt(10)),
+        refundsToman: Number(refundsRial / BigInt(10)),
+        commissionToman: Number(commissionRial / BigInt(10)),
+        expectedPrizeToman: Number(expectedPrizeRial / BigInt(10)),
+        paidPrizeToman: Number(prizesRial / BigInt(10)),
+        varianceToman: Number(varianceRial / BigInt(10)),
+      };
+    });
+
+    const referenceCounts = new Map<string, number>();
+    for (const tx of txRows) {
+      if (tx.referenceId) referenceCounts.set(tx.referenceId, (referenceCounts.get(tx.referenceId) || 0) + 1);
+    }
+    const duplicateReferences = [...referenceCounts.entries()].filter(([, value]) => value > 1).map(([referenceId, occurrences]) => ({ referenceId, occurrences }));
+    const negativeWallets = walletRows.filter((wallet) => bi(wallet.balance) < BigInt(0)).map((wallet) => wallet.id);
+    const stalePending = txRows.filter((tx) => tx.status === "pending" && Date.now() - new Date(tx.createdAt).getTime() > 24 * 60 * 60 * 1000).length;
+    const overpaidTournaments = tournamentFunds.filter((fund) => fund.varianceToman < 0).map((fund) => ({ id: fund.id, name: fund.name, overpaidToman: Math.abs(fund.varianceToman) }));
+
     return NextResponse.json({
       summary: {
         totalDepositsRial: totalDeposits.toString(),
@@ -79,8 +129,14 @@ export async function GET(request: NextRequest) {
         completedTransactions,
         pendingTransactions,
         transactionCount: txRows.length,
+        totalCommissionToman: tournamentFunds.reduce((sum, fund) => sum + fund.commissionToman, 0),
+        totalExpectedPrizeToman: tournamentFunds.reduce((sum, fund) => sum + fund.expectedPrizeToman, 0),
+        noShowCount: tournamentFunds.reduce((sum, fund) => sum + Number(fund.noShowCount || 0), 0),
+        anomalyCount: duplicateReferences.length + negativeWallets.length + stalePending + overpaidTournaments.length,
       },
-      transactions: txRows.map((tx) => ({
+      tournamentFunds,
+      anomalies: { duplicateReferences, negativeWallets, stalePending, overpaidTournaments },
+      transactions: txRows.slice(0, 500).map((tx) => ({
         ...tx,
         amountRial: bi(tx.amount).toString(),
         amountToman: Number(bi(tx.amount) / BigInt(10)),

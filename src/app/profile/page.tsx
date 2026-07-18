@@ -6,6 +6,19 @@ import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 
+interface ClashApiProfile {
+  tag: string;
+  name: string;
+  expLevel: number | null;
+  trophies: number | null;
+  bestTrophies: number | null;
+  wins: number | null;
+  losses: number | null;
+  battleCount: number | null;
+  clan: { tag: string | null; name: string | null } | null;
+  arena: { id: number | null; name: string | null } | null;
+}
+
 interface TelegramLinkAccount {
   telegramId: string;
   telegramUsername: string | null;
@@ -88,6 +101,7 @@ export default function ProfilePage() {
   const [data, setData] = useState<DashboardData | null>(null);
   const [busy, setBusy] = useState(true);
   const [dashboardError, setDashboardError] = useState("");
+  const [clashProfile, setClashProfile] = useState<ClashApiProfile | null>(null);
 
   // Profile Edit Data
   const [displayName, setDisplayName] = useState("");
@@ -127,6 +141,17 @@ export default function ProfilePage() {
     }
   }, [user]);
 
+  async function loadClashProfile(tag?: string | null) {
+    if (!tag) return setClashProfile(null);
+    try {
+      const response = await fetch(`/api/clash-royale/player?tag=${encodeURIComponent(tag)}`, { cache: "no-store", credentials: "include" });
+      const json = await response.json();
+      setClashProfile(response.ok ? json.player || null : null);
+    } catch {
+      setClashProfile(null);
+    }
+  }
+
   async function loadTelegramLink() {
     if (!user) return;
     setTelegramLoading(true);
@@ -152,6 +177,7 @@ export default function ProfilePage() {
       setClaimedQuests(metadata.claimedQuests || []);
       loadDashboard();
       loadTelegramLink();
+      loadClashProfile(user.clashRoyaleId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
@@ -443,6 +469,22 @@ export default function ProfilePage() {
             </div>
           </div>
         </section>
+
+        {clashProfile && (
+          <section className="gaming-card p-5 mb-6 border border-cyan-500/25 bg-cyan-950/10" dir="rtl">
+            <div className="flex items-center justify-between gap-3 mb-4"><div><h3 className="font-black text-cyan-300">⚔️ پروفایل تأییدشده کلش رویال</h3><p className="text-xs text-gray-500 mt-1">اطلاعات زنده از Supercell API</p></div><span className="text-green-300 text-xs font-black">✅ API Verified</span></div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="bg-black/20 rounded-xl p-3"><div className="text-xs text-gray-500">نام</div><div className="font-black mt-1 truncate">{clashProfile.name}</div></div>
+              <div className="bg-black/20 rounded-xl p-3"><div className="text-xs text-gray-500">Trophy</div><div className="font-black text-yellow-300 mt-1">{Number(clashProfile.trophies || 0).toLocaleString("fa-IR")}</div></div>
+              <div className="bg-black/20 rounded-xl p-3"><div className="text-xs text-gray-500">Best</div><div className="font-black text-orange-300 mt-1">{Number(clashProfile.bestTrophies || 0).toLocaleString("fa-IR")}</div></div>
+              <div className="bg-black/20 rounded-xl p-3"><div className="text-xs text-gray-500">Arena</div><div className="font-black text-purple-300 mt-1 truncate">{clashProfile.arena?.name || "—"}</div></div>
+              <div className="bg-black/20 rounded-xl p-3"><div className="text-xs text-gray-500">برد</div><div className="font-black text-green-300 mt-1">{Number(clashProfile.wins || 0).toLocaleString("fa-IR")}</div></div>
+              <div className="bg-black/20 rounded-xl p-3"><div className="text-xs text-gray-500">باخت</div><div className="font-black text-red-300 mt-1">{Number(clashProfile.losses || 0).toLocaleString("fa-IR")}</div></div>
+              <div className="bg-black/20 rounded-xl p-3"><div className="text-xs text-gray-500">Clan</div><div className="font-black mt-1 truncate">{clashProfile.clan?.name || "بدون کلن"}</div></div>
+              <div className="bg-black/20 rounded-xl p-3"><div className="text-xs text-gray-500">Player Tag</div><div className="font-black font-mono mt-1">{clashProfile.tag}</div></div>
+            </div>
+          </section>
+        )}
 
         {/* Settings tabs */}
         <section className="grid grid-cols-2 gap-3 mb-8" dir="rtl">

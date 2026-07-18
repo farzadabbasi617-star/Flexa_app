@@ -8,6 +8,13 @@ import { useAuth } from "@/contexts/AuthContext";
 interface FinanceData {
   summary: Record<string, number | string>;
   transactions: Array<Record<string, any>>;
+  tournamentFunds: Array<Record<string, any>>;
+  anomalies: {
+    duplicateReferences: Array<{ referenceId: string; occurrences: number }>;
+    negativeWallets: string[];
+    stalePending: number;
+    overpaidTournaments: Array<{ id: string; name: string; overpaidToman: number }>;
+  };
 }
 
 export default function AdminFinancePage() {
@@ -63,7 +70,10 @@ export default function AdminFinancePage() {
   function exportCsv() {
     const rows = filtered;
     const header = ["createdAt", "displayName", "username", "type", "status", "amountToman", "referenceId"];
-    const csv = [header.join(","), ...rows.map((r) => header.map((h) => `"${String(r[h] ?? "").replaceAll('"', '""')}"`).join(","))].join("\n");
+    const transactionCsv = [header.join(","), ...rows.map((r) => header.map((h) => `"${String(r[h] ?? "").replaceAll('"', '""')}"`).join(","))];
+    const fundHeader = ["tournament", "registered", "noShow", "entryFeesToman", "refundsToman", "commissionToman", "expectedPrizeToman", "paidPrizeToman", "varianceToman"];
+    const fundRows = (data?.tournamentFunds || []).map((fund) => [fund.name, fund.registeredCount, fund.noShowCount, fund.entryFeesToman, fund.refundsToman, fund.commissionToman, fund.expectedPrizeToman, fund.paidPrizeToman, fund.varianceToman].map((value) => `"${String(value ?? "").replaceAll('"', '""')}"`).join(","));
+    const csv = [...transactionCsv, "", "TOURNAMENT_FUNDS", fundHeader.join(","), ...fundRows].join("\n");
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -83,7 +93,17 @@ export default function AdminFinancePage() {
       {error && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-5 text-sm">{error}</div>}
       {busy ? <div className="text-center py-20 text-4xl animate-neon-pulse">📈</div> : data && <>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {[['واریز کل', s?.totalDepositsToman], ['برداشت کل', s?.totalWithdrawalsToman], ['ورودی تورنومنت', s?.totalEntryFeesToman], ['جوایز پرداختی', s?.totalTournamentWinsToman], ['موجودی کیف پول‌ها', s?.totalWalletBalanceToman], ['تراکنش تکمیل', s?.completedTransactions], ['در انتظار', s?.pendingTransactions], ['تعداد تراکنش', s?.transactionCount]].map(([label, value]) => <div key={label} className="gaming-card p-4"><div className="text-xs text-gray-500 mb-2">{label}</div><div className="text-xl font-black text-neon-green">{Number(value || 0).toLocaleString("fa-IR")}</div></div>)}
+          {[['واریز کل', s?.totalDepositsToman], ['برداشت کل', s?.totalWithdrawalsToman], ['ورودی تورنومنت', s?.totalEntryFeesToman], ['جوایز پرداختی', s?.totalTournamentWinsToman], ['کارمزد پلتفرم', s?.totalCommissionToman], ['موجودی کیف پول‌ها', s?.totalWalletBalanceToman], ['No-show', s?.noShowCount], ['هشدار مغایرت', s?.anomalyCount]].map(([label, value]) => <div key={label} className="gaming-card p-4"><div className="text-xs text-gray-500 mb-2">{label}</div><div className="text-xl font-black text-neon-green">{Number(value || 0).toLocaleString("fa-IR")}</div></div>)}
+        </div>
+        {Number(s?.anomalyCount || 0) > 0 && (
+          <div className="mb-6 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-200">
+            <div className="font-black mb-2">🚨 مغایرت مالی نیازمند بررسی</div>
+            <div>رفرنس تکراری: {data.anomalies.duplicateReferences.length} • کیف پول منفی: {data.anomalies.negativeWallets.length} • درخواست قدیمی: {data.anomalies.stalePending} • پرداخت بیشتر از استخر: {data.anomalies.overpaidTournaments.length}</div>
+          </div>
+        )}
+        <div className="gaming-card overflow-hidden mb-8">
+          <div className="p-4 font-black text-neon-purple">🏆 صندوق مالی تورنمنت‌ها</div>
+          <div className="overflow-x-auto"><table className="w-full min-w-[1050px] text-sm"><thead className="bg-dark-800 text-gray-400"><tr><th className="p-3 text-right">تورنومنت</th><th>ثبت‌نام/No-show</th><th>ورودی</th><th>Refund</th><th>کارمزد</th><th>استخر مورد انتظار</th><th>پرداخت‌شده</th><th>مانده</th></tr></thead><tbody>{data.tournamentFunds.map((fund) => <tr key={fund.id} className="border-t border-white/5"><td className="p-3 font-bold">{fund.name}</td><td>{fund.registeredCount}/{fund.noShowCount}</td><td>{Number(fund.entryFeesToman).toLocaleString("fa-IR")}</td><td>{Number(fund.refundsToman).toLocaleString("fa-IR")}</td><td>{Number(fund.commissionToman).toLocaleString("fa-IR")}</td><td>{Number(fund.expectedPrizeToman).toLocaleString("fa-IR")}</td><td>{Number(fund.paidPrizeToman).toLocaleString("fa-IR")}</td><td className={Number(fund.varianceToman) < 0 ? "text-red-300 font-black" : "text-green-300 font-black"}>{Number(fund.varianceToman).toLocaleString("fa-IR")}</td></tr>)}</tbody></table></div>
         </div>
         <input className="gaming-input max-w-md mb-5" placeholder="جستجو در تراکنش‌ها..." value={query} onChange={(e) => setQuery(e.target.value)} />
         <div className="gaming-card overflow-hidden"><div className="overflow-x-auto"><table className="w-full min-w-[980px] text-sm"><thead className="bg-dark-800 text-gray-400"><tr><th className="p-3 text-right">زمان</th><th className="p-3 text-right">کاربر</th><th className="p-3 text-right">نوع</th><th className="p-3 text-right">وضعیت</th><th className="p-3 text-right">مبلغ</th><th className="p-3 text-right">رفرنس</th><th className="p-3 text-right">عملیات</th></tr></thead><tbody>{filtered.map((tx) => <tr key={tx.id} className="border-t border-white/5"><td className="p-3">{new Date(tx.createdAt).toLocaleString("fa-IR")}</td><td className="p-3">{tx.displayName || tx.username || "—"}</td><td className="p-3 text-neon-blue">{tx.type}</td><td className="p-3">{tx.status}</td><td className="p-3 text-neon-green font-black">{Number(tx.amountToman || 0).toLocaleString("fa-IR")} تومان</td><td className="p-3" dir="ltr">{tx.referenceId || "—"}</td><td className="p-3">{tx.type === "deposit" && tx.status === "pending" ? <div className="flex gap-2"><button onClick={() => updateTransaction(tx.id, "approve")} className="text-green-300 text-xs font-bold">تأیید</button><button onClick={() => updateTransaction(tx.id, "reject")} className="text-red-300 text-xs font-bold">رد</button></div> : <span className="text-gray-600 text-xs">—</span>}</td></tr>)}</tbody></table></div></div>
