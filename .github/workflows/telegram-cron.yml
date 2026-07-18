@@ -1,0 +1,33 @@
+name: Telegram automation cron
+
+on:
+  schedule:
+    # GitHub scheduled workflows have a five-minute minimum interval.
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: telegram-automation-cron
+  cancel-in-progress: true
+
+jobs:
+  run:
+    name: Run Gament scheduled automation
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Call protected production cron
+        env:
+          CRON_SECRET: ${{ secrets.TELEGRAM_CRON_SECRET }}
+        run: |
+          test -n "$CRON_SECRET" || { echo "TELEGRAM_CRON_SECRET repository secret is missing"; exit 1; }
+          response="$(curl --fail-with-body --silent --show-error \
+            --retry 2 --retry-all-errors --max-time 90 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            -H "User-Agent: Gament-GitHub-Cron/1.0" \
+            https://www.gament1.ir/api/telegram/cron)"
+          printf '%s' "$response" | jq -e '.ok == true' >/dev/null
+          echo "Gament cron completed successfully"

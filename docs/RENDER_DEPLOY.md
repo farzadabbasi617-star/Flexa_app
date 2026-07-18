@@ -81,7 +81,39 @@ FARAZSMS_SENDER=+983000505
 postgresql://neondb_owner:<PASSWORD>@<HOST>/neondb?sslmode=verify-full
 ```
 
-## 3) ساخت جدول‌های دیتابیس
+## 3) زمان‌بندی رایگان Automation با GitHub Actions
+
+Render Free اجرای Cron داخلی تضمین‌شده ندارد و سرویس هنگام بی‌کاری Sleep می‌شود. فایل
+`.github/workflows/telegram-cron.yml` هر پنج دقیقه endpoint محافظت‌شده Automation را اجرا می‌کند.
+
+در GitHub این مسیر را باز کنید:
+
+```txt
+Repository → Settings → Secrets and variables → Actions → New repository secret
+```
+
+Secret زیر را با **همان مقدار تنظیم‌شده در Render** بسازید:
+
+```txt
+Name: TELEGRAM_CRON_SECRET
+Value: همان مقدار TELEGRAM_CRON_SECRET در Render
+```
+
+مقدار Secret را در فایل، Commit، چت یا URL قرار ندهید. Workflow آن را فقط در Header زیر می‌فرستد:
+
+```txt
+Authorization: Bearer <secret>
+```
+
+برای تست دستی بدون منتظرماندن تا نوبت بعدی:
+
+```txt
+GitHub → Actions → Telegram automation cron → Run workflow
+```
+
+این Automation شامل یادآوری‌ها، چک‌این و No-show، ارسال اطلاعات ورود، Ready Timeout، بررسی دوره‌ای Battle Log، اعلان پایان تورنمنت و پردازش Outbox است.
+
+## 4) ساخت جدول‌های دیتابیس
 
 بعد از ست کردن `DATABASE_URL`، باید schema دیتابیس ساخته شود.
 
@@ -126,7 +158,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0030_add_clash_ready_and_tournament_end.s
 https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://www.gament1.ir/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>
 ```
 
-## 4) Redeploy
+## 5) Redeploy
 
 بعد از تنظیم env و ساخت دیتابیس:
 
@@ -154,6 +186,6 @@ npm run test:production
 
 این تست صفحات عمومی، Health دیتابیس/ایمیل/تلگرام، هدرهای امنیتی، عدم نشت اطلاعات خصوصی، Pagination، مرزهای احراز هویت و Assetهای اصلی را بررسی می‌کند و هیچ کاربر یا تراکنشی ایجاد نمی‌کند. GitHub Actions نیز آن را زمان‌بندی‌شده و با اجرای دستی بررسی می‌کند؛ این تست عمداً جزو Checkهای قبل از Deploy نیست تا با تنظیم «Deploy after CI checks pass» در Render حلقه انتظار ایجاد نکند.
 
-## 5) نکته امنیتی
+## 6) نکته امنیتی
 
 اگر کلید API یا URL دیتابیس را جایی خارج از Render وارد کرده‌اید یا در چت/اسکرین‌شات/گیت منتشر شده، بعد از راه‌اندازی آن‌ها را Rotate کنید.
