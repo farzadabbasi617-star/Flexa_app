@@ -6,6 +6,7 @@ import { validateSession } from "@/lib/auth";
 import logger from "@/lib/logger";
 import { notifyLinkedUserOnTelegram } from "@/lib/telegram";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
+import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const ua = request.headers.get("user-agent") || "unknown";
     const user = await validateSession(token || "", ip, ua, request);
     if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    await ensurePrivateTournamentAttendanceSchema();
 
     const [tournament] = await db.select({
       id: tournaments.id,
@@ -67,7 +69,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const [updated] = await db
       .update(registrations)
-      .set({ checkedInAt: new Date() })
+      .set({ checkedInAt: new Date(), attendanceStatus: "checked_in", noShowAt: null })
       .where(eq(registrations.id, registration.id))
       .returning();
 

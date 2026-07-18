@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { disputes, judgments, matchEvidence, matchResultClaims, matches, privateTournamentStandings, registrations, tournamentLeaderboardSubmissions, tournaments } from "@/db/schema";
-import { count, desc, eq, inArray } from "drizzle-orm";
+import { count, desc, eq, inArray, sql } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { distributeTournamentPrizes, refundTournamentEntryFees } from "@/lib/tournament-finance";
 import { publishTournamentToTelegramChannel } from "@/lib/telegram";
 import logger from "@/lib/logger";
 import { normalizeClashPrivateDraftSettings } from "@/lib/clash-private-tournament";
+import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
 
 export const dynamic = "force-dynamic";
 
@@ -63,6 +64,7 @@ export async function GET(request: NextRequest) {
     const auth = await requireAdminPermission(request, "tournaments");
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
+    await ensurePrivateTournamentAttendanceSchema();
     const limit = Math.min(Number(request.nextUrl.searchParams.get("limit") || 200), 500);
     const rows = await db
       .select({
@@ -94,6 +96,8 @@ export async function GET(request: NextRequest) {
         createdAt: tournaments.createdAt,
         updatedAt: tournaments.updatedAt,
         registrations: count(registrations.id),
+        checkedInCount: sql<number>`count(${registrations.id}) FILTER (WHERE ${registrations.checkedInAt} IS NOT NULL)::int`,
+        noShowCount: sql<number>`count(${registrations.id}) FILTER (WHERE ${registrations.attendanceStatus} = 'no_show')::int`,
       })
       .from(tournaments)
       .leftJoin(registrations, eq(registrations.tournamentId, tournaments.id))

@@ -99,6 +99,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [registering, setRegistering] = useState(false);
   const [adminError, setAdminError] = useState("");
   const [registrationError, setRegistrationError] = useState("");
+  const [privatePolicyAccepted, setPrivatePolicyAccepted] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const countdown = useCountdown(tournament?.startDate);
@@ -150,19 +151,24 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
   async function registerPlayer() {
     if (!selectedPlayer) return;
+    if (isPrivateClashDraft && !privatePolicyAccepted) {
+      setRegistrationError("قبل از ثبت‌نام باید قانون No-show و عدم بازگشت وجه را بپذیری.");
+      return;
+    }
     setRegistering(true);
     setRegistrationError("");
     try {
       const res = await fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-        body: JSON.stringify({ tournamentId: id, playerId: selectedPlayer }),
+        body: JSON.stringify({ tournamentId: id, playerId: selectedPlayer, policyAccepted: privatePolicyAccepted }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "ثبت‌نام انجام نشد");
       await fetchTournament();
       await fetchWalletBalance();
       setSelectedPlayer("");
+      setPrivatePolicyAccepted(false);
     } catch (err) {
       setRegistrationError(err instanceof Error ? err.message : "ثبت‌نام انجام نشد");
     }
@@ -518,10 +524,27 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     </div>
                   )}
 
-                  {isPaidTournament && (
+                  {isPaidTournament && !isPrivateClashDraft && (
                     <div className="bg-yellow-500/10 border border-yellow-500/20 text-yellow-200 rounded-2xl p-3 text-xs leading-6">
                       در صورت ثبت‌نام، ورودی از کیف پول کسر می‌شود. اگر تورنومنت لغو شود، وجه به کیف پول برمی‌گردد.
                     </div>
+                  )}
+
+                  {isPrivateClashDraft && (
+                    <label className="block bg-orange-500/10 border border-orange-500/30 text-orange-100 rounded-2xl p-4 text-xs leading-7 cursor-pointer">
+                      <div className="flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          checked={privatePolicyAccepted}
+                          onChange={(event) => setPrivatePolicyAccepted(event.target.checked)}
+                          className="mt-1 h-4 w-4 accent-orange-500"
+                        />
+                        <span>
+                          <b>قانون No-show و عدم بازگشت وجه را می‌پذیرم:</b><br />
+                          اگر از ۳۰ دقیقه قبل شروع انصراف بدهم، چک‌این نکنم یا در مسابقه حاضر نشوم، ورودی به من بازگردانده نمی‌شود و داخل استخر جایزه برندگان باقی می‌ماند. فقط لغو مسابقه یا خطای فنی برگزارکننده شامل Refund کامل است.
+                        </span>
+                      </div>
+                    </label>
                   )}
 
                   {availablePlayers.length === 0 ? (
@@ -548,7 +571,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       ) : (
                         <button
                           onClick={registerPlayer}
-                          disabled={!selectedPlayer || registering}
+                          disabled={!selectedPlayer || registering || (isPrivateClashDraft && !privatePolicyAccepted)}
                           className="gaming-btn disabled:opacity-50 text-sm"
                         >
                           {registering ? "..." : isPaidTournament ? "ثبت‌نام و کسر ورودی" : t.tournamentDetail.register}

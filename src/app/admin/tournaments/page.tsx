@@ -45,6 +45,8 @@ type TournamentRow = {
   roomVisibleAt: string | null;
   startDate: string | null;
   registrations: number;
+  checkedInCount?: number;
+  noShowCount?: number;
 };
 
 const games = [
@@ -329,6 +331,9 @@ export default function AdminTournamentsPage() {
                   <div className="grid grid-cols-2 gap-2 mt-4 text-xs text-gray-400">
                     <div>ظرفیت: {row.maxPlayers}</div><div>سرور: {row.serverSlots || "—"}</div>
                     <div>ورودی: {row.entryFee || "—"}</div><div>جایزه: {row.prizePool || "—"}</div>
+                    {row.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY && (
+                      <><div className="text-green-300">چک‌این: {row.checkedInCount || 0}</div><div className="text-orange-300">No-show: {row.noShowCount || 0}</div></>
+                    )}
                   </div>
                   <div className="flex flex-wrap gap-2 mt-5">
                     <Link href={`/tournaments/${row.id}`} className="px-3 py-2 rounded-lg bg-dark-700 text-neon-blue text-xs font-bold">مشاهده</Link>

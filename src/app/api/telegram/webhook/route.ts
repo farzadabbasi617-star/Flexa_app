@@ -15,6 +15,11 @@ import { CLASH_1V1_CONFIG, ensureClash1v1Schema, finalizeMatchResult } from "@/l
 import { resolveMatchResultClaims, type MatchResultClaimValue } from "@/lib/match-result-policy";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 import {
+  ensurePrivateTournamentAttendanceSchema,
+  privateCancellationKeepsEntryFee,
+  PRIVATE_NO_SHOW_POLICY_TEXT,
+} from "@/lib/private-tournament-attendance";
+import {
   ClashRoyaleApiError,
   getClashRoyaleApiConfiguration,
   normalizeClashRoyaleTag,
@@ -475,12 +480,6 @@ async function clashPrivateTournamentsCommand(chatId: number, telegramId: string
         .from(registrations).where(eq(registrations.visibleUserId, linked.userId))
     : [];
   const registrationByTournament = new Map(myRegistrations.map((registration) => [registration.tournamentId, registration]));
-  const waitingRows = linked?.userId
-    ? await db.select({ tournamentId: tournamentWaitlist.tournamentId })
-        .from(tournamentWaitlist)
-        .where(and(eq(tournamentWaitlist.userId, linked.userId), inArray(tournamentWaitlist.status, ["waiting", "notified"])))
-    : [];
-  const waitingTournamentIds = new Set(waitingRows.map((row) => row.tournamentId));
 
   const text = [
     "🏅 <b>مسابقات چندنفره کلش رویال</b>",
@@ -492,8 +491,7 @@ async function clashPrivateTournamentsCommand(chatId: number, telegramId: string
     ...rows.map((row, index) => {
       const registration = registrationByTournament.get(row.id);
       const state = registration ? (registration.checkedInAt ? "✅ چک‌این‌شده" : "🎟 ثبت‌نام‌شده")
-        : waitingTournamentIds.has(row.id) ? "⏳ لیست انتظار"
-          : Number(row.registeredCount) >= row.maxPlayers ? "🔴 تکمیل ظرفیت" : "🟢 ثبت‌نام باز";
+        : Number(row.registeredCount) >= row.maxPlayers ? "🔴 تکمیل ظرفیت" : "🟢 ثبت‌نام باز";
       return [
         `<b>${index + 1}) ${html(row.name)}</b>`,
         `👥 ${Number(row.registeredCount).toLocaleString("fa-IR")}/${row.maxPlayers.toLocaleString("fa-IR")} | ${state}`,
@@ -515,15 +513,13 @@ async function clashPrivateTournamentsCommand(chatId: number, telegramId: string
       ]);
     } else if (row.status === "registration" && Number(row.registeredCount) < row.maxPlayers) {
       keyboard.push([{ text: `🎟 ثبت‌نام: ${title}`, callback_data: `join:${row.id}` }]);
-    } else if (row.status === "registration" && !waitingTournamentIds.has(row.id)) {
-      keyboard.push([{ text: `⏳ لیست انتظار: ${title}`, callback_data: `waitlist:${row.id}` }]);
     }
     keyboard.push([{ text: `جزئیات: ${title}`, url: `${APP_URL}/tournaments/${row.id}` }]);
   }
   await sendMessage(chatId, text, { inline_keyboard: keyboard });
 }
 
-async function joinTournamentFromTelegram(chatId: number, telegramId: string, tournamentId: string) {
+async function joinTournamentFromTelegram(chatId: number, telegramId: string, tournamentId: string, privatePolicyAccepted = false) {
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) {
     await sendMessage(chatId, "برای ثبت‌نام مستقیم، اول حساب تلگرامت را با /link به Gament وصل کن.", {
@@ -562,7 +558,17 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
     });
     return;
   }
+  if (tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY && !privatePolicyAccepted) {
+    await sendMessage(chatId, `⚠️ <b>تأیید قانون مالی مسابقه</b>\n\n${html(PRIVATE_NO_SHOW_POLICY_TEXT)}`, {
+      inline_keyboard: [
+        [{ text: "✅ می‌پذیرم و ثبت‌نام می‌کنم", callback_data: `joinprivate:confirm:${tournament.id}` }],
+        [{ text: "انصراف", callback_data: "menu:clash_private" }],
+      ],
+    });
+    return;
+  }
 
+  await ensurePrivateTournamentAttendanceSchema();
   const entryFeeRial = getEntryFeeRial(tournament.entryFee);
   const isPaid = entryFeeRial > BigInt(0);
   const player = await getOrCreateUserPlayer(linked.userId, linked.displayName || linked.username || "Gament Player", linked.username);
@@ -670,14 +676,25 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
         paymentText += `\n💳 ورودی از کیف پول کسر شد: <b>${html(formatTomanFromRial(finalEntryFeeRial))}</b>`;
       }
 
-    const [registration] = await tx.insert(registrations).values({ tournamentId, playerId: player.id, visibleUserId: linked.userId }).returning();
+    const [registration] = await tx.insert(registrations).values({
+      tournamentId,
+      playerId: player.id,
+      visibleUserId: linked.userId,
+      attendanceStatus: "registered",
+      cancellationPolicyAcceptedAt: tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY ? new Date() : null,
+    }).returning();
     return { ok: true as const, paymentText, registrationId: registration.id };
   });
 
   if (!result.ok) {
-    if (result.code === "FULL") return sendMessage(chatId, "ظرفیت این تورنومنت تکمیل شده است. می‌خواهی در لیست انتظار قرار بگیری؟", {
-      inline_keyboard: [[{ text: "🕒 ورود به لیست انتظار", callback_data: `waitlist:${tournament.id}` }]],
-    });
+    if (result.code === "FULL") {
+      if (tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY) {
+        return sendMessage(chatId, "ظرفیت این مسابقه چندنفره تکمیل شده است. طبق قانون این مود، جایگزینی پس از غیبت انجام نمی‌شود.");
+      }
+      return sendMessage(chatId, "ظرفیت این تورنومنت تکمیل شده است. می‌خواهی در لیست انتظار قرار بگیری؟", {
+        inline_keyboard: [[{ text: "🕒 ورود به لیست انتظار", callback_data: `waitlist:${tournament.id}` }]],
+      });
+    }
     if (result.code === "DUPLICATE") {
       if (tournament.game === "clash_royale" && tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel) {
         await sendMessage(chatId, "✅ شما قبلاً در 1V1 کلش رویال ثبت‌نام کرده‌اید. حالا پیوند دوستی را می‌گیریم تا حریف پیدا شود.");
@@ -726,6 +743,9 @@ async function joinWaitlist(chatId: number, telegramId: string, tournamentId: st
   if (!linked?.userId) return sendMessage(chatId, "برای لیست انتظار، اول حساب را با /link وصل کن.");
   const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
   if (!tournament) return sendMessage(chatId, "تورنومنت پیدا نشد.");
+  if (tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY) {
+    return sendMessage(chatId, "برای مسابقات چندنفره کلش جایگزینی پس از غیبت انجام نمی‌شود؛ لیست انتظار این مود غیرفعال است.");
+  }
   const [existing] = await db
     .select({ id: tournamentWaitlist.id })
     .from(tournamentWaitlist)
@@ -739,7 +759,7 @@ async function joinWaitlist(chatId: number, telegramId: string, tournamentId: st
 
 async function notifyWaitlistSpot(tournamentId: string) {
   const [tournament] = await db.select().from(tournaments).where(eq(tournaments.id, tournamentId)).limit(1);
-  if (!tournament) return;
+  if (!tournament || tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY) return;
   const [{ value }] = await db.select({ value: count() }).from(registrations).where(eq(registrations.tournamentId, tournamentId));
   if (value >= tournament.maxPlayers) return;
   const [waiting] = await db
@@ -1415,12 +1435,25 @@ async function cancelRegistrationCommand(chatId: number, telegramId: string, reg
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) return sendMessage(chatId, "حساب لینک نیست.");
   const [row] = await db
-    .select({ registrationId: registrations.id, tournamentId: tournaments.id, tournamentName: tournaments.name, status: tournaments.status })
+    .select({
+      registrationId: registrations.id,
+      tournamentId: tournaments.id,
+      tournamentName: tournaments.name,
+      status: tournaments.status,
+      categoryLabel: tournaments.categoryLabel,
+      startDate: tournaments.startDate,
+    })
     .from(registrations)
     .innerJoin(tournaments, eq(registrations.tournamentId, tournaments.id))
     .where(and(eq(registrations.id, registrationId), eq(registrations.visibleUserId, linked.userId)))
     .limit(1);
   if (!row) return sendMessage(chatId, "ثبت‌نام پیدا نشد.");
+  if (row.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY && privateCancellationKeepsEntryFee(row.startDate)) {
+    await ensurePrivateTournamentAttendanceSchema();
+    await db.update(registrations).set({ attendanceStatus: "no_show", noShowAt: new Date() }).where(eq(registrations.id, registrationId));
+    await sendMessage(chatId, "⚠️ انصراف شما بعد از بازشدن چک‌این به‌عنوان No-show ثبت شد. طبق قانونی که هنگام پرداخت پذیرفتی، ورودی بازگردانده نمی‌شود و داخل استخر جایزه باقی می‌ماند.");
+    return;
+  }
   if (row.status === "in_progress" || row.status === "completed") return sendMessage(chatId, "بعد از شروع/پایان تورنومنت امکان لغو از ربات نیست.");
 
   const refundText = await db.transaction(async (tx) => {
@@ -2353,7 +2386,8 @@ async function handleCheckIn(chatId: number, telegramId: string, registrationId:
       return;
     }
   }
-  await db.update(registrations).set({ checkedInAt: new Date() }).where(eq(registrations.id, registrationId));
+  await ensurePrivateTournamentAttendanceSchema();
+  await db.update(registrations).set({ checkedInAt: new Date(), attendanceStatus: "checked_in", noShowAt: null }).where(eq(registrations.id, registrationId));
   await sendMessage(chatId, `✅ حضور شما برای تورنومنت <b>${html(row.tournamentName)}</b> ثبت شد.`, {
     inline_keyboard: [[{ text: "🏟 دریافت نام/رمز مسابقه", callback_data: `mylobby:${row.tournamentId}` }]],
   });
@@ -3443,6 +3477,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data.startsWith("ad:ignore:")) return contactClassifiedAd(chatId, telegramId, data.replace("ad:ignore:", ""), "ignore");
   if (data.startsWith("ad:delete:")) return contactClassifiedAd(chatId, telegramId, data.replace("ad:delete:", ""), "delete");
   if (data.startsWith("ad:copy:")) return copyOutreachMessage(chatId, telegramId, data.replace("ad:copy:", ""));
+  if (data.startsWith("joinprivate:confirm:")) return joinTournamentFromTelegram(chatId, telegramId, data.replace("joinprivate:confirm:", ""), true);
   if (data.startsWith("join:")) return joinTournamentFromTelegram(chatId, telegramId, data.replace("join:", ""));
   if (data.startsWith("waitlist:")) return joinWaitlist(chatId, telegramId, data.replace("waitlist:", ""));
   if (data === "menu:rules") return rulesCommand(chatId);

@@ -12,12 +12,14 @@ import logger from "@/lib/logger";
 import { z } from "zod";
 import { CLASH_1V1_CONFIG } from "@/lib/clash-1v1";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
+import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
 
 export const dynamic = "force-dynamic";
 
 const registrationSchema = z.object({
   tournamentId: z.string().uuid(),
   playerId: z.string().uuid(),
+  policyAccepted: z.boolean().optional().default(false),
 });
 
 function isPgUniqueViolation(error: unknown) {
@@ -46,9 +48,10 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json({ error: "ورودی‌های ارسالی نامعتبر هستند.", details: validation.error.format() }, { status: 400 });
     }
-    const { tournamentId, playerId } = validation.data;
+    const { tournamentId, playerId, policyAccepted } = validation.data;
 
     const isAdmin = user.role === "admin" || user.role === "super_admin";
+    await ensurePrivateTournamentAttendanceSchema();
 
     const result = await db.transaction(async (tx) => {
       const [player] = await tx
@@ -83,6 +86,9 @@ export async function POST(request: NextRequest) {
         tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY &&
         (!user.clashRoyaleId || user.clashRoyaleStatus !== "verified")
       ) throw new Error("CLASH_TAG_NOT_VERIFIED");
+      if (tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY && !isAdmin && !policyAccepted) {
+        throw new Error("PRIVATE_POLICY_REQUIRED");
+      }
 
       const ownerId = player.ownerId ?? user.id;
 
@@ -164,7 +170,13 @@ export async function POST(request: NextRequest) {
 
       const [reg] = await tx
         .insert(registrations)
-        .values({ tournamentId, playerId, visibleUserId: ownerId })
+        .values({
+          tournamentId,
+          playerId,
+          visibleUserId: ownerId,
+          attendanceStatus: "registered",
+          cancellationPolicyAcceptedAt: tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY ? new Date() : null,
+        })
         .returning();
 
       return { registration: reg, entryFeeRial: entryFeeRial.toString(), paymentTransactionId, tournamentName: tournament.name, tournamentGame: tournament.game, tournamentCategory: tournament.categoryLabel, playerName: player.displayName };
@@ -206,6 +218,7 @@ export async function POST(request: NextRequest) {
       DUPLICATE_REGISTRATION: { text: "این بازیکن قبلاً در تورنومنت ثبت‌نام شده است.", status: 409 },
       TOURNAMENT_FULL: { text: "ظرفیت تورنومنت تکمیل شده است.", status: 409 },
       CLASH_TAG_NOT_VERIFIED: { text: "برای ثبت‌نام، ابتدا Player Tag کلش رویال را در پروفایل با Supercell API تأیید کن.", status: 409 },
+      PRIVATE_POLICY_REQUIRED: { text: "برای ثبت‌نام باید قانون No-show و عدم بازگشت وجه را بپذیری.", status: 409 },
     };
 
     if (message === "INSUFFICIENT_BALANCE") {

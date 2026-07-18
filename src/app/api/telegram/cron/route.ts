@@ -12,6 +12,7 @@ import { generateDailyGamingNews } from "@/lib/gaming-news-generator";
 import logger from "@/lib/logger";
 import { runClash1v1MatchmakingAndNotify } from "../webhook/commands/clash-1v1";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
+import { ensurePrivateTournamentAttendanceSchema, privateCheckInWindow } from "@/lib/private-tournament-attendance";
 
 export const dynamic = "force-dynamic";
 
@@ -147,6 +148,58 @@ async function sendLobbyNotices() {
     }
   }
   return sent;
+}
+
+async function markPrivateTournamentNoShows() {
+  await ensurePrivateTournamentAttendanceSchema();
+  const now = new Date();
+  const rows = await db.select().from(tournaments).where(and(
+    eq(tournaments.categoryLabel, CLASH_PRIVATE_DRAFT_CATEGORY),
+    inArray(tournaments.status, ["registration", "in_progress"]),
+    sql`${tournaments.startDate} IS NOT NULL`,
+  ));
+  let marked = 0;
+
+  for (const tournament of rows) {
+    if (!tournament.startDate || now < privateCheckInWindow(tournament.startDate).closesAt) continue;
+    const absent = await db
+      .select({
+        registrationId: registrations.id,
+        telegramId: telegramAccounts.telegramId,
+      })
+      .from(registrations)
+      .leftJoin(telegramAccounts, eq(registrations.visibleUserId, telegramAccounts.userId))
+      .where(and(
+        eq(registrations.tournamentId, tournament.id),
+        eq(registrations.attendanceStatus, "registered"),
+        sql`${registrations.checkedInAt} IS NULL`,
+      ));
+    if (!absent.length) continue;
+
+    await db.update(registrations).set({ attendanceStatus: "no_show", noShowAt: now })
+      .where(and(
+        eq(registrations.tournamentId, tournament.id),
+        eq(registrations.attendanceStatus, "registered"),
+        sql`${registrations.checkedInAt} IS NULL`,
+      ));
+
+    for (const player of absent) {
+      if (!player.telegramId) continue;
+      const key = `private-noshow:${tournament.id}:${player.registrationId}`;
+      if (await hasSent(key)) continue;
+      await sendTelegramMessage(
+        player.telegramId,
+        `⚠️ <b>No-show ثبت شد</b>\n\n🏆 ${html(tournament.name)}\n\nمهلت چک‌این تمام شد. طبق قانون پذیرفته‌شده هنگام ثبت‌نام، ورودی بازگردانده نمی‌شود و داخل استخر جایزه برندگان باقی می‌ماند.`
+      );
+      await markSent(key, "private_tournament_no_show", tournament.id, player.telegramId);
+    }
+    await sendToAdmins(
+      `⚠️ <b>گزارش No-show مسابقه چندنفره</b>\n\n🏆 ${html(tournament.name)}\nغایبان جدید: <b>${absent.length.toLocaleString("fa-IR")}</b>\nورودی این افراد در استخر جایزه باقی ماند.`,
+      { inline_keyboard: [[{ text: "مدیریت تورنومنت", url: `${process.env.APP_URL || "https://www.gament1.ir"}/admin/tournaments` }]] },
+    );
+    marked += absent.length;
+  }
+  return marked;
 }
 
 async function runHourlyClassifiedScrape() {
@@ -506,6 +559,7 @@ export async function GET(request: NextRequest) {
   const reminders = await safeCronStep("reminders", sendReminders);
   const capacity = await safeCronStep("capacity", sendCapacityAlerts);
   const lobby = await safeCronStep("lobby", sendLobbyNotices);
+  const privateNoShows = await safeCronStep("privateNoShows", markPrivateTournamentNoShows);
   const clash1v1Matchmaking = await safeCronStep("clash1v1Matchmaking", runClash1v1MatchmakingAndNotify);
   const matchAssigned = await safeCronStep("matchAssigned", sendMatchAssignmentNotifications);
   const matchScheduled = await safeCronStep("matchScheduled", sendMatchScheduleNotifications);
@@ -528,6 +582,7 @@ export async function GET(request: NextRequest) {
     reminders,
     capacity,
     lobby,
+    privateNoShows,
     clash1v1Matchmaking,
     matchAssigned,
     matchScheduled,

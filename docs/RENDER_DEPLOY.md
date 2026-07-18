@@ -114,6 +114,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0025_repair_wallet_money_types.sql
 psql "$DATABASE_URL" -f drizzle/manual/0026_repair_telegram_sent_notifications.sql
 psql "$DATABASE_URL" -f drizzle/manual/0027_add_match_result_claims.sql
 psql "$DATABASE_URL" -f drizzle/manual/0028_add_private_tournament_leaderboards.sql
+psql "$DATABASE_URL" -f drizzle/manual/0029_add_private_tournament_attendance.sql
 ```
 
 یا محتوای همین فایل‌ها را در SQL Editor دیتابیس paste و اجرا کنید.
