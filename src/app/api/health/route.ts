@@ -4,6 +4,7 @@ import { sql } from "drizzle-orm";
 import { getEmailDeliveryConfiguration } from "@/lib/email-service";
 import { getClashRoyaleApiConfiguration } from "@/lib/clash-royale-api";
 import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
+import { ensureStoreOrderLifecycleSchema } from "@/lib/store-service";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +35,10 @@ export async function GET() {
   if (!isLikelyPostgresUrl(databaseUrl)) return unhealthy("DATABASE_URL_INVALID_FORMAT");
 
   try {
-    await ensurePrivateTournamentAttendanceSchema();
+    await Promise.all([
+      ensurePrivateTournamentAttendanceSchema(),
+      ensureStoreOrderLifecycleSchema(),
+    ]);
     await db.execute(sql`select 1`);
     return Response.json(
       {

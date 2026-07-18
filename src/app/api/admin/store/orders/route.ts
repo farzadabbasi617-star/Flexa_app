@@ -64,10 +64,10 @@ export async function PATCH(request: NextRequest) {
 
     let result;
     if (resolution === "refund_buyer") {
-      result = await refundOrder(id, user.id, reason);
+      result = await refundOrder(id, user.id, reason, true);
     } else {
       // Release escrow to the seller on behalf of the buyer (admin override).
-      result = await confirmAndRelease(id, order.buyerId);
+      result = await confirmAndRelease(id, user.id, true);
     }
 
     await logAdminAction({

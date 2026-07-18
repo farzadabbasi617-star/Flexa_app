@@ -1025,6 +1025,8 @@ export const storeOrders = pgTable("store_orders", {
   releaseTxId: uuid("release_tx_id"),
   refundTxId: uuid("refund_tx_id"),
   deliveredAt: timestamp("delivered_at"),
+  deliveryDeadlineAt: timestamp("delivery_deadline_at"),
+  autoReleaseAt: timestamp("auto_release_at"),
   completedAt: timestamp("completed_at"),
   buyerNote: text("buyer_note"),
   disputeReason: text("dispute_reason"),

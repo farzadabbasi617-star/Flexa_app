@@ -157,6 +157,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0027_add_match_result_claims.sql
 psql "$DATABASE_URL" -f drizzle/manual/0028_add_private_tournament_leaderboards.sql
 psql "$DATABASE_URL" -f drizzle/manual/0029_add_private_tournament_attendance.sql
 psql "$DATABASE_URL" -f drizzle/manual/0030_add_clash_ready_and_tournament_end.sql
+psql "$DATABASE_URL" -f drizzle/manual/0031_add_store_order_deadlines.sql
 ```
 
 یا محتوای همین فایل‌ها را در SQL Editor دیتابیس paste و اجرا کنید.

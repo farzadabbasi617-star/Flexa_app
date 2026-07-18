@@ -16,6 +16,7 @@ import { ensurePrivateTournamentAttendanceSchema, privateCheckInWindow } from "@
 import { CLASH_1V1_CONFIG, finalizeMatchResult } from "@/lib/clash-1v1";
 import { resolveMatchResultClaims, type MatchResultClaimValue } from "@/lib/match-result-policy";
 import { getClashRoyaleApiConfiguration, normalizeClashRoyaleTag, verifyClashRoyaleHeadToHead } from "@/lib/clash-royale-api";
+import { processStoreOrderDeadlines } from "@/lib/store-service";
 
 export const dynamic = "force-dynamic";
 
@@ -695,6 +696,7 @@ export async function GET(request: NextRequest) {
   const matchScheduled = await safeCronStep("matchScheduled", sendMatchScheduleNotifications);
   const matchResults = await safeCronStep("matchResults", sendMatchResultNotifications);
   const results = await safeCronStep("results", publishCompletedResults);
+  const storeOrderDeadlines = await safeCronStep("storeOrderDeadlines", () => processStoreOrderDeadlines(50));
   const classifiedScrape = await safeCronStep("classifiedScrape", runHourlyClassifiedScrape);
   const classifiedCleanup = await safeCronStep("classifiedCleanup", cleanupClassifiedAds);
   const dailyReports = await safeCronStep("dailyReports", sendDailyAdminReport);
@@ -721,6 +723,7 @@ export async function GET(request: NextRequest) {
     matchScheduled,
     matchResults,
     results,
+    storeOrderDeadlines,
     classifiedScrape,
     classifiedCleanup,
     dailyReports,

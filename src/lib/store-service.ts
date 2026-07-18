@@ -1,4 +1,5 @@
-import { and, eq, sql } from "drizzle-orm";
+import crypto from "crypto";
+import { and, eq, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   storeListings,
@@ -12,12 +13,40 @@ import {
 import { bigIntFromText } from "@/lib/money";
 import { getSellerStats } from "@/lib/seller-reputation";
 import logger from "@/lib/logger";
+import {
+  autoReleaseDeadline,
+  canConfirmStoreOrder,
+  canRefundStoreOrder,
+  deliveryDeadline,
+} from "@/lib/store-order-policy";
 
 /**
  * Platform commission taken from user (P2P) sales, in basis points.
  * 500 = 5%. Official listings have no commission (platform is the seller).
  */
 export const PLATFORM_FEE_BPS = Number(process.env.STORE_FEE_BPS || "500");
+
+let storeSchemaPromise: Promise<void> | null = null;
+export function ensureStoreOrderLifecycleSchema(client: any = db) {
+  if (client !== db) {
+    return Promise.all([
+      client.execute(sql.raw(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivery_deadline_at timestamp`)),
+      client.execute(sql.raw(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS auto_release_at timestamp`)),
+    ]).then(() => undefined);
+  }
+  if (!storeSchemaPromise) {
+    storeSchemaPromise = (async () => {
+      await client.execute(sql.raw(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS delivery_deadline_at timestamp`));
+      await client.execute(sql.raw(`ALTER TABLE store_orders ADD COLUMN IF NOT EXISTS auto_release_at timestamp`));
+      await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS store_orders_delivery_deadline_idx ON store_orders(status, delivery_deadline_at)`));
+      await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS store_orders_auto_release_idx ON store_orders(status, auto_release_at)`));
+    })().catch((error) => {
+      storeSchemaPromise = null;
+      throw error;
+    });
+  }
+  return storeSchemaPromise;
+}
 
 export class StoreError extends Error {
   status: number;
@@ -102,6 +131,7 @@ export async function createEscrowOrder(params: {
   tx?: Tx;
 }) {
   const { buyerId, listingId, quantity, buyerNote, overrideUnitPriceRial, tx: outerTx } = params;
+  await ensureStoreOrderLifecycleSchema(outerTx || db);
 
   const run = async (tx: Tx) => {
     // Lock listing to prevent overselling under concurrency.
@@ -127,6 +157,7 @@ export async function createEscrowOrder(params: {
     if (totalPriceRial <= BigInt(0)) throw new StoreError("قیمت نامعتبر است", 400);
 
     const source = listing.source as "official" | "user";
+    const orderId = crypto.randomUUID();
     // Tiered commission: a higher-reputation seller pays a lower platform fee.
     let feeBps = PLATFORM_FEE_BPS;
     if (source === "user" && listing.sellerId) {
@@ -166,7 +197,8 @@ export async function createEscrowOrder(params: {
         amount: totalPriceRial.toString(),
         type: "store_escrow_hold",
         status: "completed",
-        metadata: { listingId, quantity, source, role: "buyer", withdrawable: false },
+        referenceId: `store-hold-${orderId}`,
+        metadata: { orderId, listingId, quantity, source, role: "buyer", withdrawable: false },
       })
       .returning();
 
@@ -185,6 +217,7 @@ export async function createEscrowOrder(params: {
     const [order] = await tx
       .insert(storeOrders)
       .values({
+        id: orderId,
         listingId,
         buyerId,
         sellerId: listing.sellerId ?? null,
@@ -196,6 +229,7 @@ export async function createEscrowOrder(params: {
         sellerPayoutRial: sellerPayoutRial.toString(),
         status: "paid_escrow",
         holdTxId: holdTx.id,
+        deliveryDeadlineAt: deliveryDeadline(),
         buyerNote: buyerNote ?? null,
       })
       .returning();
@@ -217,6 +251,7 @@ export async function createEscrowOrder(params: {
 
 /** Seller (or platform) marks the order as delivered. */
 export async function markDelivered(orderId: string, actorId: string, isAdmin = false) {
+  await ensureStoreOrderLifecycleSchema();
   return db.transaction(async (tx) => {
     const [order] = await tx
       .select()
@@ -237,7 +272,7 @@ export async function markDelivered(orderId: string, actorId: string, isAdmin = 
 
     const [updated] = await tx
       .update(storeOrders)
-      .set({ status: "delivered", deliveredAt: new Date(), updatedAt: new Date() })
+      .set({ status: "delivered", deliveredAt: new Date(), autoReleaseAt: autoReleaseDeadline(), updatedAt: new Date() })
       .where(eq(storeOrders.id, orderId))
       .returning();
 
@@ -251,7 +286,8 @@ export async function markDelivered(orderId: string, actorId: string, isAdmin = 
  *  - user (P2P): credit seller payout (minus platform fee).
  *  - official: funds simply settle to the platform (no seller credit).
  */
-export async function confirmAndRelease(orderId: string, buyerId: string) {
+export async function confirmAndRelease(orderId: string, buyerId: string, isAdmin = false) {
+  await ensureStoreOrderLifecycleSchema();
   return db.transaction(async (tx) => {
     const [order] = await tx
       .select()
@@ -260,9 +296,9 @@ export async function confirmAndRelease(orderId: string, buyerId: string) {
       .for("update")
       .limit(1);
     if (!order) throw new StoreError("سفارش یافت نشد", 404);
-    if (order.buyerId !== buyerId) throw new StoreError("شما اجازه این عمل را ندارید", 403);
-    if (!["paid_escrow", "delivered"].includes(order.status)) {
-      throw new StoreError("این سفارش قابل تأیید نیست", 409);
+    if (!isAdmin && order.buyerId !== buyerId) throw new StoreError("شما اجازه این عمل را ندارید", 403);
+    if (!canConfirmStoreOrder(order.status, isAdmin)) {
+      throw new StoreError("تأیید دریافت فقط پس از اعلام تحویل فروشنده ممکن است", 409);
     }
 
     let releaseTxId: string | null = null;
@@ -292,6 +328,7 @@ export async function confirmAndRelease(orderId: string, buyerId: string) {
           amount: payout.toString(),
           type: "store_payout",
           status: "completed",
+          referenceId: `store-release-${order.id}`,
           metadata: {
             orderId: order.id,
             role: "seller",
@@ -309,6 +346,7 @@ export async function confirmAndRelease(orderId: string, buyerId: string) {
         status: "completed",
         completedAt: new Date(),
         releaseTxId,
+        autoReleaseAt: null,
         updatedAt: new Date(),
       })
       .where(eq(storeOrders.id, orderId))
@@ -328,7 +366,8 @@ export async function confirmAndRelease(orderId: string, buyerId: string) {
  * Refund the buyer (admin resolution of a dispute, or cancel).
  * Returns held funds to the buyer wallet and restocks the listing.
  */
-export async function refundOrder(orderId: string, actorId: string, reason?: string) {
+export async function refundOrder(orderId: string, actorId: string, reason?: string, isAdmin = false) {
+  await ensureStoreOrderLifecycleSchema();
   return db.transaction(async (tx) => {
     const [order] = await tx
       .select()
@@ -337,8 +376,8 @@ export async function refundOrder(orderId: string, actorId: string, reason?: str
       .for("update")
       .limit(1);
     if (!order) throw new StoreError("سفارش یافت نشد", 404);
-    if (!["paid_escrow", "delivered", "disputed"].includes(order.status)) {
-      throw new StoreError("این سفارش قابل بازپرداخت نیست", 409);
+    if (!canRefundStoreOrder({ status: order.status, actorId, buyerId: order.buyerId, isAdmin })) {
+      throw new StoreError("فقط خریدار پیش از تحویل یا ادمین می‌تواند سفارش را بازپرداخت کند", 403);
     }
 
     const total = bigIntFromText(order.totalPriceRial);
@@ -365,6 +404,7 @@ export async function refundOrder(orderId: string, actorId: string, reason?: str
         amount: total.toString(),
         type: "refund",
         status: "completed",
+        referenceId: `store-refund-${order.id}`,
         metadata: { orderId: order.id, role: "buyer", reason: reason ?? null, withdrawable: false },
       })
       .returning();
@@ -375,6 +415,7 @@ export async function refundOrder(orderId: string, actorId: string, reason?: str
       .set({
         stock: sql`${storeListings.stock} + ${order.quantity}`,
         soldCount: sql`GREATEST(${storeListings.soldCount} - ${order.quantity}, 0)`,
+        status: sql`CASE WHEN ${storeListings.status} = 'sold_out' THEN 'active'::store_listing_status ELSE ${storeListings.status} END`,
         updatedAt: new Date(),
       })
       .where(eq(storeListings.id, order.listingId));
@@ -385,6 +426,8 @@ export async function refundOrder(orderId: string, actorId: string, reason?: str
         status: "refunded",
         refundTxId: refundTx.id,
         disputeReason: reason ?? order.disputeReason,
+        deliveryDeadlineAt: null,
+        autoReleaseAt: null,
         updatedAt: new Date(),
       })
       .where(eq(storeOrders.id, orderId))
@@ -402,6 +445,7 @@ export async function refundOrder(orderId: string, actorId: string, reason?: str
 
 /** Buyer or seller opens a dispute (funds stay in escrow until admin resolves). */
 export async function openDispute(orderId: string, actorId: string, reason: string) {
+  await ensureStoreOrderLifecycleSchema();
   const [order] = await db
     .select()
     .from(storeOrders)
@@ -416,7 +460,7 @@ export async function openDispute(orderId: string, actorId: string, reason: stri
   }
   const [updated] = await db
     .update(storeOrders)
-    .set({ status: "disputed", disputeReason: reason, updatedAt: new Date() })
+    .set({ status: "disputed", disputeReason: reason, autoReleaseAt: null, updatedAt: new Date() })
     .where(eq(storeOrders.id, orderId))
     .returning();
 
@@ -424,6 +468,44 @@ export async function openDispute(orderId: string, actorId: string, reason: stri
   const otherParty = order.buyerId === actorId ? order.sellerId : order.buyerId;
   await notify(otherParty, "اعتراض ثبت شد", "برای یکی از سفارش‌ها اعتراض ثبت شد و در حال بررسی توسط تیم گیمنت است.", orderId);
   return updated;
+}
+
+/** Process expired escrow deadlines; safe to run repeatedly from cron. */
+export async function processStoreOrderDeadlines(limit = 50) {
+  await ensureStoreOrderLifecycleSchema();
+  const now = new Date();
+  const [undelivered, awaitingConfirmation] = await Promise.all([
+    db.select({ id: storeOrders.id }).from(storeOrders).where(and(
+      eq(storeOrders.status, "paid_escrow"),
+      lte(storeOrders.deliveryDeadlineAt, now),
+    )).limit(limit),
+    db.select({ id: storeOrders.id }).from(storeOrders).where(and(
+      eq(storeOrders.status, "delivered"),
+      lte(storeOrders.autoReleaseAt, now),
+    )).limit(limit),
+  ]);
+  const expiredOffers = await db.update(storeOffers).set({ status: "expired", respondedAt: now, updatedAt: now })
+    .where(and(eq(storeOffers.status, "pending"), lte(storeOffers.expiresAt, now)))
+    .returning({ id: storeOffers.id });
+  let refunded = 0;
+  let released = 0;
+  for (const order of undelivered) {
+    try {
+      await refundOrder(order.id, "system", "مهلت تحویل ۲۴ ساعته تمام شد", true);
+      refunded += 1;
+    } catch (error) {
+      logger.warn({ error, orderId: order.id }, "Automatic store delivery-timeout refund failed");
+    }
+  }
+  for (const order of awaitingConfirmation) {
+    try {
+      await confirmAndRelease(order.id, "system", true);
+      released += 1;
+    } catch (error) {
+      logger.warn({ error, orderId: order.id }, "Automatic store escrow release failed");
+    }
+  }
+  return { checked: undelivered.length + awaitingConfirmation.length, refunded, released, expiredOffers: expiredOffers.length };
 }
 
 // =========================================================================

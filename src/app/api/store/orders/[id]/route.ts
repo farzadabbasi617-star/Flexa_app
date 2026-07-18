@@ -9,6 +9,7 @@ import {
   confirmAndRelease,
   openDispute,
   refundOrder,
+  ensureStoreOrderLifecycleSchema,
   StoreError,
 } from "@/lib/store-service";
 import logger from "@/lib/logger";
@@ -22,6 +23,7 @@ const ADMIN_ROLES = ["admin", "super_admin", "moderator"];
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { user, error, status } = await requireUser(request);
   if (!user) return NextResponse.json({ error }, { status });
+  await ensureStoreOrderLifecycleSchema();
   const { id } = await params;
 
   const [order] = await db
@@ -84,7 +86,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         result = await markDelivered(id, user.id, isAdmin);
         break;
       case "confirm":
-        result = await confirmAndRelease(id, user.id);
+        result = await confirmAndRelease(id, user.id, isAdmin);
         break;
       case "dispute":
         if (!reason) return NextResponse.json({ error: "دلیل اعتراض الزامی است" }, { status: 400 });
@@ -92,7 +94,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         break;
       case "cancel":
         // A buyer cancel before delivery is treated as a refund; admins can always refund.
-        result = await refundOrder(id, user.id, reason);
+        result = await refundOrder(id, user.id, reason, isAdmin);
         break;
       default:
         return NextResponse.json({ error: "عملیات ناشناخته" }, { status: 400 });

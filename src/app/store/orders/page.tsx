@@ -15,6 +15,8 @@ interface Order {
   sellerId: string | null;
   iAmBuyer: boolean;
   iAmSeller: boolean;
+  deliveryDeadlineAt?: string | null;
+  autoReleaseAt?: string | null;
   createdAt: string;
 }
 
@@ -266,6 +268,8 @@ export default function OrdersPage() {
                     <span className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-black ${st.cls}`}>{st.label}</span>
                   </div>
                   <div className="mt-2 text-sm font-black text-purple-200">{toman(o.totalPriceToman)}</div>
+                  {o.status === "paid_escrow" && o.deliveryDeadlineAt && <div className="mt-1 text-[11px] text-orange-300">مهلت تحویل: {new Date(o.deliveryDeadlineAt).toLocaleString("fa-IR")}</div>}
+                  {o.status === "delivered" && o.autoReleaseAt && <div className="mt-1 text-[11px] text-cyan-300">آزادسازی خودکار وجه: {new Date(o.autoReleaseAt).toLocaleString("fa-IR")}</div>}
 
                   {/* Actions */}
                   <div className="mt-3 flex flex-wrap gap-2">
@@ -274,11 +278,14 @@ export default function OrdersPage() {
                       <button onClick={() => act(o.id, "deliver")} disabled={busyId === o.id} className="rounded-xl bg-cyan-600 px-3 py-1.5 text-xs font-black disabled:opacity-40">تحویل دادم</button>
                     )}
                     {/* Buyer confirms / disputes / reveals */}
+                    {o.iAmBuyer && o.status === "delivered" && (
+                      <button onClick={() => act(o.id, "confirm")} disabled={busyId === o.id} className="rounded-xl bg-green-600 px-3 py-1.5 text-xs font-black disabled:opacity-40">تأیید دریافت</button>
+                    )}
                     {o.iAmBuyer && ["paid_escrow", "delivered"].includes(o.status) && (
-                      <>
-                        <button onClick={() => act(o.id, "confirm")} disabled={busyId === o.id} className="rounded-xl bg-green-600 px-3 py-1.5 text-xs font-black disabled:opacity-40">تأیید دریافت</button>
-                        <button onClick={() => act(o.id, "dispute")} disabled={busyId === o.id} className="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-black disabled:opacity-40">اعتراض</button>
-                      </>
+                      <button onClick={() => act(o.id, "dispute")} disabled={busyId === o.id} className="rounded-xl bg-orange-600 px-3 py-1.5 text-xs font-black disabled:opacity-40">اعتراض</button>
+                    )}
+                    {o.iAmBuyer && o.status === "paid_escrow" && (
+                      <button onClick={() => { if (confirm("سفارش پیش از تحویل لغو و مبلغ بازپرداخت شود؟")) act(o.id, "cancel"); }} disabled={busyId === o.id} className="rounded-xl border border-red-500/40 px-3 py-1.5 text-xs font-black text-red-300 disabled:opacity-40">لغو و بازپرداخت</button>
                     )}
                     {o.iAmBuyer && ["delivered", "completed"].includes(o.status) && (
                       <button onClick={() => showDelivery(o.id)} className="rounded-xl border border-white/20 px-3 py-1.5 text-xs font-black">نمایش اطلاعات تحویل</button>

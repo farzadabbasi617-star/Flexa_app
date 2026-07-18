@@ -4,7 +4,7 @@ import { storeOrders, storeListings } from "@/db/schema";
 import { and, desc, eq, or } from "drizzle-orm";
 import { requireUser } from "@/lib/auth";
 import { StoreOrderCreateSchema } from "@/lib/validations";
-import { createEscrowOrder, StoreError } from "@/lib/store-service";
+import { createEscrowOrder, ensureStoreOrderLifecycleSchema, StoreError } from "@/lib/store-service";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 
@@ -14,6 +14,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const { user, error, status } = await requireUser(request);
   if (!user) return NextResponse.json({ error }, { status });
+  await ensureStoreOrderLifecycleSchema();
 
   const { searchParams } = new URL(request.url);
   const role = searchParams.get("role"); // buyer | seller
@@ -39,6 +40,8 @@ export async function GET(request: NextRequest) {
       sellerPayoutRial: storeOrders.sellerPayoutRial,
       status: storeOrders.status,
       deliveredAt: storeOrders.deliveredAt,
+      deliveryDeadlineAt: storeOrders.deliveryDeadlineAt,
+      autoReleaseAt: storeOrders.autoReleaseAt,
       completedAt: storeOrders.completedAt,
       createdAt: storeOrders.createdAt,
     })
