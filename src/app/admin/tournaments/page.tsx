@@ -44,6 +44,7 @@ type TournamentRow = {
   lobbyNotes: string | null;
   roomVisibleAt: string | null;
   startDate: string | null;
+  endDate: string | null;
   registrations: number;
   checkedInCount?: number;
   noShowCount?: number;
@@ -94,6 +95,7 @@ const emptyForm = {
   lobbyNotes: "",
   roomVisibleAt: "",
   startDate: "",
+  endDate: "",
 };
 
 function toDateTimeLocal(value: string | null) {
@@ -192,6 +194,7 @@ export default function AdminTournamentsPage() {
       lobbyNotes: row.lobbyNotes || "",
       roomVisibleAt: toDateTimeLocal(row.roomVisibleAt),
       startDate: toDateTimeLocal(row.startDate),
+      endDate: toDateTimeLocal(row.endDate),
     });
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -210,7 +213,7 @@ export default function AdminTournamentsPage() {
       const res = await fetch("/api/admin/tournaments", {
         method: form.id ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-        body: JSON.stringify({ ...form, startDate: form.startDate || null, roomVisibleAt: form.roomVisibleAt || null }),
+        body: JSON.stringify({ ...form, startDate: form.startDate || null, endDate: form.endDate || null, roomVisibleAt: form.roomVisibleAt || null }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "ذخیره نشد");
@@ -263,7 +266,8 @@ export default function AdminTournamentsPage() {
             <select className="gaming-select" value={form.game} onChange={(e) => changeGame(e.target.value as GameId)}>{games.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}</select>
             <select className="gaming-select" value={form.format} disabled={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY} onChange={(e) => setForm({ ...form, format: e.target.value as FormatId })}>{formats.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
             <select className="gaming-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
-            <input className="gaming-input" placeholder="زمان شروع" type="datetime-local" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+            <input className="gaming-input" title="زمان شروع" type="datetime-local" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+            <input className="gaming-input" title="زمان پایان" type="datetime-local" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
             <input className="gaming-input" placeholder="مود بازی" value={form.gameMode} readOnly={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY} onChange={(e) => setForm({ ...form, gameMode: e.target.value })} />
             <input className="gaming-input" placeholder="محل برگزاری" value={form.mapName} readOnly={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY} onChange={(e) => setForm({ ...form, mapName: e.target.value })} />
             {form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY ? (

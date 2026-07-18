@@ -26,6 +26,7 @@ async function createClash1v1Schema(client: any) {
     submitted_at timestamp,
     matched_match_id uuid REFERENCES matches(id),
     matched_at timestamp,
+    ready_at timestamp,
     completed_at timestamp,
     cancelled_at timestamp,
     created_at timestamp NOT NULL DEFAULT now(),
@@ -33,6 +34,7 @@ async function createClash1v1Schema(client: any) {
     metadata jsonb
   );`));
 
+  await client.execute(sql.raw(`ALTER TABLE clash_1v1_entries ADD COLUMN IF NOT EXISTS ready_at timestamp;`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_user_status_idx ON clash_1v1_entries(user_id, status);`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_status_submitted_idx ON clash_1v1_entries(status, submitted_at);`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_match_idx ON clash_1v1_entries(matched_match_id);`));

@@ -276,6 +276,7 @@ export const tournaments = pgTable("tournaments", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
   startDate: timestamp("start_date"),
+  endDate: timestamp("end_date"),
 });
 
 // Uploaded Clash Royale private-tournament leaderboard screenshots.
@@ -467,6 +468,7 @@ export const clash1v1Entries = pgTable("clash_1v1_entries", {
   submittedAt: timestamp("submitted_at"),
   matchedMatchId: uuid("matched_match_id").references(() => matches.id),
   matchedAt: timestamp("matched_at"),
+  readyAt: timestamp("ready_at"),
   completedAt: timestamp("completed_at"),
   cancelledAt: timestamp("cancelled_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -17,6 +17,7 @@ async function createSchema(client: any) {
     ADD COLUMN IF NOT EXISTS no_show_at timestamp,
     ADD COLUMN IF NOT EXISTS cancellation_policy_accepted_at timestamp`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS registrations_tournament_attendance_idx ON registrations(tournament_id, attendance_status)`));
+  await client.execute(sql.raw(`ALTER TABLE tournaments ADD COLUMN IF NOT EXISTS end_date timestamp`));
 }
 
 export function ensurePrivateTournamentAttendanceSchema(client: any = db) {

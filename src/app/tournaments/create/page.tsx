@@ -133,6 +133,7 @@ interface FormState {
   rules: string;
   bannerUrl: string;
   startDate: string;
+  endDate: string;
 }
 
 const initialGame = GAME_CONFIG.clash_royale;
@@ -155,6 +156,7 @@ const initialForm: FormState = {
   rules: initialGame.rulesPlaceholder,
   bannerUrl: "",
   startDate: "",
+  endDate: "",
 };
 
 export default function CreateTournamentPage() {
@@ -261,6 +263,7 @@ export default function CreateTournamentPage() {
     if (!form.mapName.trim()) errors.mapName = "مپ یا محل برگزاری را وارد کن.";
     if (!form.maxPlayers || form.maxPlayers < 2) errors.maxPlayers = "حداکثر بازیکنان را انتخاب کن.";
     if (!form.serverSlots || form.serverSlots < 2) errors.serverSlots = "ظرفیت سرور را انتخاب کن.";
+    if (form.startDate && form.endDate && new Date(form.endDate) <= new Date(form.startDate)) errors.endDate = "زمان پایان باید بعد از شروع باشد.";
     if (form.game === "clash_royale") {
       if (!CLASH_PRIVATE_DRAFT_CAPACITIES.includes(form.maxPlayers as (typeof CLASH_PRIVATE_DRAFT_CAPACITIES)[number])) {
         errors.maxPlayers = "ظرفیت کلش فقط ۱۰، ۵۰، ۱۰۰ یا ۲۰۰ نفر است.";
@@ -303,6 +306,7 @@ export default function CreateTournamentPage() {
         description: form.description.trim(),
         rules: form.rules.trim(),
         startDate: form.startDate || null,
+        endDate: form.endDate || null,
       };
 
       const res = await fetch("/api/tournaments", {
@@ -611,9 +615,16 @@ export default function CreateTournamentPage() {
             </div>
           )}
 
-          <div>
-            <label className="block text-sm font-medium text-gray-300 mb-2">⏰ زمان شروع</label>
-            <input type="datetime-local" className="gaming-input" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">⏰ زمان شروع</label>
+              <input type="datetime-local" className="gaming-input" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">🏁 زمان پایان</label>
+              <input type="datetime-local" className={`gaming-input ${fieldErrors.endDate ? "border-red-500/70" : ""}`} value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
+              {fieldErrors.endDate && <p className="text-red-400 text-xs mt-2">{fieldErrors.endDate}</p>}
+            </div>
           </div>
 
           <div>

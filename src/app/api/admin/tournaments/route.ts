@@ -56,6 +56,7 @@ function normalizeTournamentBody(rawBody: Record<string, unknown>) {
     lobbyNotes: body.lobbyNotes ? String(body.lobbyNotes) : null,
     roomVisibleAt: body.roomVisibleAt ? new Date(String(body.roomVisibleAt)) : null,
     startDate: body.startDate ? new Date(String(body.startDate)) : null,
+    endDate: body.endDate ? new Date(String(body.endDate)) : null,
   };
 }
 
@@ -93,6 +94,7 @@ export async function GET(request: NextRequest) {
         lobbyNotes: tournaments.lobbyNotes,
         roomVisibleAt: tournaments.roomVisibleAt,
         startDate: tournaments.startDate,
+        endDate: tournaments.endDate,
         createdAt: tournaments.createdAt,
         updatedAt: tournaments.updatedAt,
         registrations: count(registrations.id),

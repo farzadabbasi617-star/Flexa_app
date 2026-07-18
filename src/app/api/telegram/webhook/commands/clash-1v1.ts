@@ -21,6 +21,7 @@ import { sendMessage, sendPhoto } from "../transport";
 import { getLinkedUserByTelegram } from "../user-service";
 import { extractInviteReference, html } from "../utils";
 import { isSupportedClashInvite } from "./clash-1v1-policy";
+import { getAdminIds } from "../admin-access";
 
 const QUEUE_LOCK_ID = 7_100_171;
 const RECENT_INVITE_REUSE_MS = 24 * 60 * 60 * 1000;
@@ -31,6 +32,8 @@ interface QueueParticipant {
   userId: string;
   telegramId: string;
   inviteLink: string | null;
+  matchedAt: Date | null;
+  readyAt: Date | null;
   displayName: string;
   username: string | null;
   gameId: string | null;
@@ -234,6 +237,8 @@ async function loadPair(matchId: string): Promise<QueuePair | null> {
       userId: clash1v1Entries.userId,
       telegramId: clash1v1Entries.telegramId,
       inviteLink: clash1v1Entries.inviteLink,
+      matchedAt: clash1v1Entries.matchedAt,
+      readyAt: clash1v1Entries.readyAt,
       displayName: players.displayName,
       username: players.username,
       gameId: players.gameId,
@@ -292,12 +297,12 @@ async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: Q
     [{ text: "🔗 باز کردن پیوند دوستی حریف", url: opponent.inviteLink! }],
   ];
   keyboard.push([
-    { text: "⚔️ ثبت نتیجه", callback_data: `match:${pair.matchId}` },
+    { text: me.readyAt ? "✅ آماده‌ام" : "🎮 آماده‌ام", callback_data: `clash1v1:ready:${me.entryId}` },
     { text: "🚨 مشکل با حریف", callback_data: `dispute:${pair.matchId}` },
   ]);
 
   const details = [
-    "✅ <b>حریف پیدا شد؛ بازی را شروع کنید</b>",
+    "✅ <b>حریف پیدا شد؛ آماده شوید</b>",
     "",
     `👤 حریف: <b>${html(participantName(opponent))}</b>`,
     `🏷 Player Tag: <code>${html(participantTag(opponent))}</code>`,
@@ -305,8 +310,9 @@ async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: Q
     "",
     "1) دکمه «باز کردن پیوند دوستی حریف» را بزن.",
     "2) در Clash Royale حریف را Add Friend کن.",
-    "3) Friendly Battle را شروع کنید.",
-    "4) بعد از بازی، نتیجه و اسکرین‌شات را ثبت کن.",
+    "3) وقتی آماده شدی دکمه «آماده‌ام» را بزن.",
+    "4) بازی را فقط بعد از پیام رسمی شروع Match آغاز کنید.",
+    "5) بعد از بازی، نتیجه را ثبت کن؛ Battle Log خودکار بررسی می‌شود.",
     "",
     `Match ID: <code>${html(pair.matchId.slice(0, 8))}</code>`,
   ].join("\n");
@@ -325,7 +331,7 @@ async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: Q
     // gets stuck after both players have already paid and submitted links.
     messageResult = await sendMessage(chatId, details, {
       inline_keyboard: [[
-        { text: "⚔️ ثبت نتیجه", callback_data: `match:${pair.matchId}` },
+        { text: "🎮 آماده‌ام", callback_data: `clash1v1:ready:${me.entryId}` },
         { text: "🚨 مشکل با حریف", callback_data: `dispute:${pair.matchId}` },
       ]],
     });
@@ -379,6 +385,120 @@ async function notifyPairs(pairs: QueuePair[]) {
       }
     });
   }
+}
+
+function matchStartedNotificationKey(matchId: string, telegramId: string) {
+  return `clash1v1:started:${matchId}:${telegramId}`;
+}
+
+async function notifyMatchStartedSide(pair: QueuePair, player: QueueParticipant) {
+  const chatId = Number(player.telegramId);
+  if (!Number.isFinite(chatId)) return;
+  const key = matchStartedNotificationKey(pair.matchId, player.telegramId);
+  try {
+    const [existing] = await db.select({ id: telegramSentNotifications.id }).from(telegramSentNotifications)
+      .where(eq(telegramSentNotifications.dedupeKey, key)).limit(1);
+    if (existing) return;
+  } catch (err) {
+    logger.warn({ err, matchId: pair.matchId }, "1V1 start notification dedupe unavailable");
+  }
+
+  const result = await sendMessage(chatId, [
+    "🚀 <b>Match شروع شد</b>",
+    "",
+    "هر دو بازیکن آماده‌اند. همین الان Friendly Battle را آغاز کنید.",
+    "پس از پایان، نتیجه را مستقل ثبت کنید؛ سیستم Battle Log کلش رویال را بررسی می‌کند.",
+    "",
+    `Match ID: <code>${html(pair.matchId.slice(0, 8))}</code>`,
+  ].join("\n"), {
+    inline_keyboard: [
+      [{ text: "✅ بردم", callback_data: `result:win:${pair.matchId}` }, { text: "❌ باختم", callback_data: `result:lose:${pair.matchId}` }],
+      [{ text: "📎 ارسال اسکرین‌شات", callback_data: `evidence:${pair.matchId}` }, { text: "🚨 اعتراض", callback_data: `dispute:${pair.matchId}` }],
+    ],
+  });
+  if (!result?.ok) return;
+  await db.insert(telegramSentNotifications).values({
+    dedupeKey: key,
+    telegramId: player.telegramId,
+    tournamentId: pair.tournamentId,
+    type: "clash_1v1_started",
+  }).onConflictDoNothing({ target: telegramSentNotifications.dedupeKey }).catch(() => undefined);
+}
+
+async function startReadyPair(pair: QueuePair) {
+  await db.update(matches).set({ status: "in_progress", scheduledAt: new Date() })
+    .where(and(eq(matches.id, pair.matchId), eq(matches.status, "pending")));
+  await Promise.allSettled([
+    notifyMatchStartedSide(pair, pair.player1),
+    notifyMatchStartedSide(pair, pair.player2),
+  ]);
+}
+
+export async function markClash1v1Ready(chatId: number, telegramId: string, entryId: string) {
+  await ensureClash1v1QueueTournament();
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) return openClash1v1Queue(chatId, telegramId);
+
+  const [entry] = await db.update(clash1v1Entries).set({ readyAt: new Date(), updatedAt: new Date() })
+    .where(and(
+      eq(clash1v1Entries.id, entryId),
+      eq(clash1v1Entries.userId, linked.userId),
+      eq(clash1v1Entries.status, "matched"),
+    ))
+    .returning({ matchId: clash1v1Entries.matchedMatchId });
+  if (!entry?.matchId) {
+    await sendMessage(chatId, "این Match برای حساب شما فعال نیست.");
+    return;
+  }
+
+  const pair = await loadPair(entry.matchId);
+  if (!pair) {
+    await sendMessage(chatId, "اطلاعات Match کامل نیست؛ وضعیت را دوباره بررسی کن.");
+    return;
+  }
+  if (pair.player1.readyAt && pair.player2.readyAt) {
+    await sendMessage(chatId, "✅ آمادگی هر دو بازیکن تأیید شد؛ Match شروع می‌شود.");
+    await startReadyPair(pair);
+    return;
+  }
+  await sendMessage(chatId, "✅ آمادگی شما ثبت شد. منتظر آماده‌شدن حریف هستیم.", {
+    inline_keyboard: [[{ text: "🔄 بررسی وضعیت", callback_data: "clash1v1:status" }]],
+  });
+}
+
+export async function processClash1v1ReadyTimeouts(timeoutMinutes = 10) {
+  await ensureClash1v1QueueTournament();
+  const cutoff = new Date(Date.now() - Math.max(5, timeoutMinutes) * 60 * 1000);
+  const rows = await db.select({ matchId: clash1v1Entries.matchedMatchId })
+    .from(clash1v1Entries)
+    .innerJoin(matches, eq(clash1v1Entries.matchedMatchId, matches.id))
+    .where(and(
+      eq(clash1v1Entries.status, "matched"),
+      eq(matches.status, "pending"),
+      lte(clash1v1Entries.matchedAt, cutoff),
+      isNotNull(clash1v1Entries.matchedMatchId),
+    ));
+  const matchIds = [...new Set(rows.map((row) => row.matchId).filter(Boolean) as string[])];
+  let timedOut = 0;
+
+  for (const matchId of matchIds) {
+    const pair = await loadPair(matchId);
+    if (!pair) continue;
+    if (pair.player1.readyAt && pair.player2.readyAt) {
+      await startReadyPair(pair);
+      continue;
+    }
+    await db.update(matches).set({ status: "disputed" }).where(and(eq(matches.id, matchId), eq(matches.status, "pending")));
+    const missing = [pair.player1, pair.player2].filter((player) => !player.readyAt);
+    const ready = [pair.player1, pair.player2].filter((player) => player.readyAt);
+    await Promise.allSettled([
+      ...missing.map((player) => sendMessage(Number(player.telegramId), "⚠️ مهلت اعلام آمادگی تمام شد و عدم حضور شما برای بررسی ثبت شد.")),
+      ...ready.map((player) => sendMessage(Number(player.telegramId), "⚠️ حریف در مهلت مقرر آماده نشد؛ پرونده برای تصمیم Refund/Forfeit به ادمین ارسال شد.")),
+      ...getAdminIds().map((adminId) => sendMessage(Number(adminId), `🚨 <b>Ready timeout در 1V1</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>\nغایب: ${missing.map((player) => html(participantName(player))).join("، ") || "—"}`)),
+    ]);
+    timedOut += 1;
+  }
+  return { checked: matchIds.length, timedOut };
 }
 
 async function retryPendingMatchNotifications(limit = 50) {
@@ -450,7 +570,20 @@ async function showActiveEntry(chatId: number, telegramId: string, entry: Awaite
         return;
       }
 
+      if (me.readyAt && opponent.readyAt) {
+        await startReadyPair(pair);
+        return;
+      }
+      if (me.readyAt) {
+        await sendMessage(chatId, "✅ شما آماده‌ای؛ منتظر اعلام آمادگی حریف هستیم.", {
+          inline_keyboard: [[{ text: "🔄 بررسی وضعیت", callback_data: "clash1v1:status" }]],
+        });
+        return;
+      }
       await notifyPairSide(pair, me, opponent);
+      await sendMessage(chatId, "برای شروع Match، بعد از افزودن حریف آمادگی خودت را ثبت کن.", {
+        inline_keyboard: [[{ text: "🎮 آماده‌ام", callback_data: `clash1v1:ready:${me.entryId}` }]],
+      });
       return;
     }
   }
@@ -793,6 +926,8 @@ export async function runClash1v1Matchmaking(): Promise<QueuePair[]> {
         userId: clash1v1Entries.userId,
         telegramId: clash1v1Entries.telegramId,
         inviteLink: clash1v1Entries.inviteLink,
+        matchedAt: clash1v1Entries.matchedAt,
+        readyAt: clash1v1Entries.readyAt,
         displayName: players.displayName,
         username: players.username,
         gameId: players.gameId,

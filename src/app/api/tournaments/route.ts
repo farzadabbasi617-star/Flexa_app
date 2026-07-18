@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = normalizeClashPrivateDraftSettings(await request.json());
     const {
-      name, game, format, description, maxPlayers, prizePool, rules, startDate,
+      name, game, format, description, maxPlayers, prizePool, rules, startDate, endDate,
       entryFee, gameMode, mapName, serverSlots, winnersCount, categoryLabel,
       prize1st, prize2nd, prize3rd, prize4to10, bannerUrl, lobbyNotes
     } = body;
@@ -173,6 +173,7 @@ export async function POST(request: NextRequest) {
         rules: rules || null,
         lobbyNotes: lobbyNotes || null,
         startDate: startDate ? new Date(startDate) : null,
+        endDate: endDate ? new Date(endDate) : null,
       })
       .returning();
 

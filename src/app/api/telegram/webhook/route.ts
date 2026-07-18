@@ -44,6 +44,7 @@ import {
   openClash1v1Queue,
   promptClash1v1Qr,
   registerClash1v1Queue,
+  markClash1v1Ready,
   sendClashFriendLinkGuide,
   submitClash1v1Qr,
 } from "./commands/clash-1v1";
@@ -1583,6 +1584,7 @@ async function loadMatchResultContext(matchId: string, client: any = db) {
       player2Id: matches.player2Id,
       winnerId: matches.winnerId,
       status: matches.status,
+      scheduledAt: matches.scheduledAt,
       createdAt: matches.createdAt,
     })
     .from(matches)
@@ -1697,7 +1699,7 @@ async function verifyAndFinalizeAgreedMatch(matchId: string): Promise<ClashApiSe
     const battle = await verifyClashRoyaleHeadToHead({
       player1Tag,
       player2Tag,
-      notBefore: new Date(new Date(context.createdAt).getTime() - 30_000),
+      notBefore: new Date(new Date(context.scheduledAt || context.createdAt).getTime() - 30_000),
     });
     if (!battle) return { state: "pending_api" };
     const claimedWinner = resolution.winnerId === context.player1.id ? player1Tag : player2Tag;
@@ -1787,6 +1789,7 @@ async function submitTelegramResult(chatId: number, telegramId: string, matchId:
     const [match] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1);
     if (!match?.player1Id || !match.player2Id) return { kind: "missing" as const };
     if (match.status === "completed") return { kind: "completed" as const, winnerId: match.winnerId };
+    if (match.status === "pending") return { kind: "not_started" as const };
 
     const participants = await tx
       .select({ id: players.id, userId: players.visibleUserId })
@@ -1850,6 +1853,10 @@ async function submitTelegramResult(chatId: number, telegramId: string, matchId:
   }
   if (outcome.kind === "completed") {
     await sendMessage(chatId, "✅ نتیجه این مسابقه قبلاً نهایی شده است.");
+    return;
+  }
+  if (outcome.kind === "not_started") {
+    await sendMessage(chatId, "ثبت نتیجه هنوز فعال نیست. هر دو بازیکن باید ابتدا دکمه «آماده‌ام» را بزنند تا Match رسمی شروع شود.");
     return;
   }
 
@@ -3491,6 +3498,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:clash_qr" || data === "clash1v1:status") return openClash1v1Queue(chatId, telegramId);
   if (data === "clash1v1:register") return registerClash1v1Queue(chatId, telegramId);
   if (data.startsWith("clash1v1:qr:")) return promptClash1v1Qr(chatId, telegramId, data.replace("clash1v1:qr:", ""));
+  if (data.startsWith("clash1v1:ready:")) return markClash1v1Ready(chatId, telegramId, data.replace("clash1v1:ready:", ""));
   if (data.startsWith("clash1v1:cancel:")) return cancelClash1v1Queue(chatId, telegramId, data.replace("clash1v1:cancel:", ""));
   if (data.startsWith("qr:")) return startClashQrSubmission(chatId, telegramId, data.replace("qr:", ""));
   if (data === "menu:checkin") return checkInCommand(chatId, telegramId);
