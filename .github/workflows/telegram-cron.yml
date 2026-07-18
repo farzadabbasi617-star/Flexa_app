@@ -24,10 +24,17 @@ jobs:
           CRON_SECRET: ${{ secrets.TELEGRAM_CRON_SECRET }}
         run: |
           test -n "$CRON_SECRET" || { echo "TELEGRAM_CRON_SECRET repository secret is missing"; exit 1; }
-          response="$(curl --fail-with-body --silent --show-error \
+          status="$(curl --silent --show-error \
             --retry 2 --retry-all-errors --max-time 90 \
+            -o /tmp/gament-cron-response.json -w '%{http_code}' \
             -H "Authorization: Bearer $CRON_SECRET" \
-            -H "User-Agent: Gament-GitHub-Cron/1.0" \
+            -H "Accept: application/json" \
+            -H "User-Agent: Mozilla/5.0 (compatible; GamentAutomation/1.0; +https://www.gament1.ir)" \
             https://www.gament1.ir/api/telegram/cron)"
-          printf '%s' "$response" | jq -e '.ok == true' >/dev/null
+          if [ "$status" != "200" ]; then
+            echo "Gament cron returned HTTP $status"
+            head -c 1000 /tmp/gament-cron-response.json
+            exit 1
+          fi
+          jq -e '.ok == true' /tmp/gament-cron-response.json >/dev/null
           echo "Gament cron completed successfully"
