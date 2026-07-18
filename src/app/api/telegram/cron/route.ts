@@ -38,9 +38,10 @@ function gameLabel(game?: string | null) {
 
 function validateCron(request: NextRequest) {
   const secret = process.env.TELEGRAM_CRON_SECRET || process.env.CRON_SECRET || "";
-  if (!secret) return true;
+  if (!secret) return { ok: false as const, status: 503, error: "TELEGRAM_CRON_SECRET is not configured" };
   const provided = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || request.nextUrl.searchParams.get("secret") || "";
-  return provided === secret;
+  if (provided !== secret) return { ok: false as const, status: 401, error: "Unauthorized" };
+  return { ok: true as const, status: 200, error: null };
 }
 
 async function hasSent(dedupeKey: string) {
@@ -674,7 +675,8 @@ async function safeCronStep<T>(name: string, fn: () => Promise<T>): Promise<T | 
 }
 
 export async function GET(request: NextRequest) {
-  if (!validateCron(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const auth = validateCron(request);
+  if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
   await ensurePrivateTournamentAttendanceSchema();
 
   // Drain old work first, enqueue this cron cycle's notifications, then drain

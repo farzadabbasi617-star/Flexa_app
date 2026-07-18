@@ -129,6 +129,7 @@ async function checkHealthAndRelease() {
   assert(health?.database === true, "/api/health: database is not ready");
   assert(health?.email?.configured === true, "/api/health: transactional email is not configured");
   assert(health?.clashRoyaleApi?.configured === true, "/api/health: Clash Royale API is not configured");
+  assert(health?.telegramCron?.protected === true, "/api/health: Telegram cron is not protected by a secret");
 
   if (expectedRelease) {
     const liveRelease = String(health?.release || "").toLowerCase();
@@ -196,6 +197,7 @@ async function checkAuthenticationBoundaries() {
   await expectJson(`/api/debug/images?smoke=${requestNonce}`, [401]);
   await expectJson(`/api/wallet/balance?smoke=${requestNonce}`, [401]);
   await expectJson(`/api/admin/users?smoke=${requestNonce}`, [401, 404]);
+  await expectJson(`/api/telegram/cron?smoke=${requestNonce}`, [401, 503]);
 }
 
 async function checkOptimizedAssets() {

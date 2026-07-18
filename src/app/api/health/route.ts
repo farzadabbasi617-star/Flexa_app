@@ -45,6 +45,9 @@ export async function GET() {
           configured: clashRoyaleApi.configured,
           provider: clashRoyaleApi.provider,
         },
+        telegramCron: {
+          protected: Boolean(process.env.TELEGRAM_CRON_SECRET || process.env.CRON_SECRET),
+        },
         email: {
           configured: email.configured,
           provider: email.provider,
