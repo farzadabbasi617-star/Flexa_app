@@ -53,6 +53,8 @@ services:
         sync: false
       - key: GAMING_NEWS_TELEGRAM_CHANNELS
         sync: false
+      - key: GAMING_NEWS_MAX_PER_RUN
+        value: '4'
       - key: FARAZSMS_API_KEY
         sync: false
       - key: FARAZSMS_PATTERN_CODE

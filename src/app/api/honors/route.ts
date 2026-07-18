@@ -67,7 +67,7 @@ export async function GET() {
         .select()
         .from(honors)
         .where(eq(honors.status, "approved"))
-        .orderBy(desc(honors.highlight), desc(honors.publishedAt), desc(honors.createdAt))
+        .orderBy(desc(honors.publishedAt), desc(honors.createdAt))
         .limit(100);
 
       const counts = await engagementCounts(rows.map((row) => row.id));
@@ -96,7 +96,11 @@ export async function GET() {
         viewsCount: counts.get(row.id)?.views || 0,
       }));
 
-      return [...staticRows, ...dbRows];
+      return [...staticRows, ...dbRows].sort((a, b) => {
+        const aTime = new Date(a.publishedAt || 0).getTime();
+        const bTime = new Date(b.publishedAt || 0).getTime();
+        return bTime - aTime;
+      });
     });
 
     return NextResponse.json(payload, { headers: publicCacheHeaders(60, 300) });

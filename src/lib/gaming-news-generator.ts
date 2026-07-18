@@ -361,21 +361,11 @@ function sourceFingerprint(items: NewsItem[]) {
     .slice(0, 24);
 }
 
-async function generateNewsForGame(game: NewsItem["game"], items: NewsItem[], today: string, force: boolean) {
-  if (!items.length) return { generated: false as const, game, reason: "no_recent_sources" };
-  const dailyKey = `daily-gaming-news:${today}:${game}`;
+async function generateNewsFromItem(item: NewsItem, force: boolean) {
+  const game = item.game;
+  const items = [item];
   const fingerprint = sourceFingerprint(items);
   const sourceKey = `gaming-news-source:${fingerprint}`;
-  if (!force) {
-    const dayStart = new Date(`${today}T00:00:00+03:30`);
-    const [existingToday] = await db.select({ id: honors.id }).from(honors).where(and(
-      eq(honors.type, "news"),
-      eq(honors.source, "ai_news"),
-      eq(honors.game, game),
-      sql`COALESCE(${honors.publishedAt}, ${honors.createdAt}) >= ${dayStart}`,
-    )).limit(1);
-    if (existingToday || await hasGenerated(dailyKey)) return { generated: false as const, game, reason: "already_today" };
-  }
   if (!force && await hasGenerated(sourceKey)) return { generated: false as const, game, reason: "source_already_used" };
 
   const brand = GAME_BRAND[game];
@@ -448,28 +438,37 @@ ${sourcesText}
       model: ai?.model || null,
       sources: items,
       seoKeywords,
-      dailyKey,
       sourceFingerprint: fingerprint,
       expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
       imageOrigin: "trusted_source_image",
       contentFramework: "gament_news_v4_source_translation",
     },
   }).returning();
-  await Promise.all([markGenerated(dailyKey), markGenerated(sourceKey)]);
+  await markGenerated(sourceKey);
   logger.info({ honorId: created.id, title, game, sources: items.length }, "Generated daily game news");
   return { generated: true as const, honorId: created.id, title, game, sources: items.length, provider: ai?.provider || "local_fallback" };
 }
 
 export async function generateDailyGamingNews({ force = false } = {}) {
   const cleanup = await cleanupOldNews(7);
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tehran" }).format(new Date());
-  const items = await collectGamingNewsItems();
+  const items = (await collectGamingNewsItems())
+    .sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime());
   if (!items.length) return { generated: false, generatedCount: 0, reason: "no_recent_sources", cleanup };
 
-  const games: NewsItem["game"][] = ["clash_royale", "cod_mobile", "fortnite"];
-  const results = await Promise.all(games.map((game) =>
-    generateNewsForGame(game, items.filter((item) => item.game === game).slice(0, 4), today, force)
-  ));
+  // Publish every new trusted item, not one item per game/day. A small per-run
+  // batch protects provider/runtime limits; the five-minute cron drains the
+  // remaining unseen sources in subsequent runs.
+  const configuredBatch = Number(process.env.GAMING_NEWS_MAX_PER_RUN || "4");
+  const maxPerRun = Math.min(10, Math.max(1, Number.isFinite(configuredBatch) ? Math.floor(configuredBatch) : 4));
+  const candidates: NewsItem[] = [];
+  for (const item of items) {
+    if (candidates.length >= maxPerRun) break;
+    const sourceKey = `gaming-news-source:${sourceFingerprint([item])}`;
+    if (force || !(await hasGenerated(sourceKey))) candidates.push(item);
+  }
+  if (!candidates.length) return { generated: false, generatedCount: 0, reason: "no_new_trusted_sources", cleanup };
+
+  const results = await Promise.all(candidates.map((item) => generateNewsFromItem(item, force)));
   const generated = results.filter((result) => result.generated);
   if (generated.length > 0) {
     await db.update(honors).set({ highlight: false, updatedAt: new Date() })
@@ -480,6 +479,7 @@ export async function generateDailyGamingNews({ force = false } = {}) {
   return {
     generated: generated.length > 0,
     generatedCount: generated.length,
+    pendingSourceCount: Math.max(0, items.length - candidates.length),
     items: results,
     cleanup,
   };
