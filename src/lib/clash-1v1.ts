@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { clash1v1Challenges, clash1v1Entries, matches, players, tournaments, transactions, wallets } from "@/db/schema";
-import { and, eq, inArray, lte, sql } from "drizzle-orm";
+import { clash1v1Challenges, clash1v1Entries, matches, players, telegramSentNotifications, tournaments, transactions, wallets } from "@/db/schema";
+import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { ensureWalletMoneySchema, updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
 
 
@@ -115,6 +115,28 @@ export async function expireClash1v1Challenges() {
     ))
     .returning({ id: clash1v1Challenges.id });
   return { expired: expired.length };
+}
+
+export async function activeClash1v1Suspension(telegramId: string, hours = 24) {
+  const threshold = new Date(Date.now() - Math.max(1, hours) * 60 * 60 * 1000);
+  const [row] = await db.select({ createdAt: telegramSentNotifications.createdAt })
+    .from(telegramSentNotifications)
+    .where(and(
+      eq(telegramSentNotifications.telegramId, telegramId),
+      eq(telegramSentNotifications.type, "clash_1v1_suspension"),
+      gte(telegramSentNotifications.createdAt, threshold),
+    )).orderBy(desc(telegramSentNotifications.createdAt)).limit(1);
+  if (!row) return null;
+  return new Date(new Date(row.createdAt).getTime() + Math.max(1, hours) * 60 * 60 * 1000);
+}
+
+export async function suspendClash1v1Telegram(telegramId: string, matchId: string) {
+  await db.insert(telegramSentNotifications).values({
+    dedupeKey: `clash1v1:suspension:${matchId}:${telegramId}`,
+    telegramId,
+    type: "clash_1v1_suspension",
+  }).onConflictDoNothing({ target: telegramSentNotifications.dedupeKey });
+  return activeClash1v1Suspension(telegramId);
 }
 
 export const CLASH_1V1_CONFIG = {
@@ -250,6 +272,49 @@ export async function payoutClash1v1Prize(tx: any, matchId: string, winnerPlayer
     winnerUserId: winner.userId,
     winnerName: winner.displayName,
   };
+}
+
+export async function refundClash1v1Match(tx: any, matchId: string, reason: string) {
+  await ensureClash1v1Schema(tx);
+  const [match] = await tx.select({ status: matches.status, evidence: matches.evidence })
+    .from(matches).where(eq(matches.id, matchId)).for("update").limit(1);
+  if (!match) return { refunded: false as const, reason: "match_not_found" as const };
+  if (match.status === "completed") return { refunded: false as const, reason: "already_completed" as const };
+  const entries = await tx.select().from(clash1v1Entries).where(eq(clash1v1Entries.matchedMatchId, matchId));
+  let refundedPlayers = 0;
+  let refundedRial = BigInt(0);
+  for (const entry of entries) {
+    const amount = BigInt(entry.entryFeeRial || "0");
+    if (amount <= BigInt(0)) continue;
+    const referenceId = `clash-1v1-admin-refund-${matchId}-${entry.userId}`;
+    const [existing] = await tx.select({ id: transactions.id }).from(transactions)
+      .where(eq(transactions.referenceId, referenceId)).limit(1);
+    if (existing) continue;
+    let [wallet] = await tx.select().from(wallets).where(eq(wallets.userId, entry.userId)).limit(1);
+    if (!wallet) [wallet] = await tx.insert(wallets).values({ userId: entry.userId, balance: "0", currency: "RIAL" }).returning();
+    const [locked] = await tx.select().from(wallets).where(eq(wallets.id, wallet.id)).for("update").limit(1);
+    await tx.update(wallets).set({ balance: (BigInt(locked.balance || "0") + amount).toString(), updatedAt: new Date() })
+      .where(eq(wallets.id, wallet.id));
+    await tx.insert(transactions).values({
+      walletId: wallet.id,
+      amount: amount.toString(),
+      type: "refund",
+      status: "completed",
+      referenceId,
+      metadata: { kind: "clash_1v1_admin_refund", matchId, entryId: entry.id, userId: entry.userId, reason },
+    });
+    refundedPlayers += 1;
+    refundedRial += amount;
+  }
+  await tx.update(clash1v1Entries).set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() })
+    .where(eq(clash1v1Entries.matchedMatchId, matchId));
+  await tx.update(matches).set({
+    status: "completed",
+    winnerId: null,
+    completedAt: new Date(),
+    evidence: { ...((match.evidence as Record<string, unknown> | null) || {}), resolution: "admin_refund", refundReason: reason },
+  }).where(eq(matches.id, matchId));
+  return { refunded: true as const, refundedPlayers, refundedRial: refundedRial.toString() };
 }
 
 /** Complete a match exactly once, apply stats, and settle the 1V1 prize. */

@@ -298,26 +298,26 @@ async function verifyPendingClash1v1Results() {
           actualBattleType: battle.battleType,
           actualDeckSelection: battle.raw.deckSelection || null,
           battleTime: battle.battleTime.toISOString(),
+          responsiblePlayerId: match.player1Id,
+          responsibleRole: "host",
+          stakeMode: duelEntry?.stakeMode || "paid",
+          action: "admin_penalty_required",
         };
-        if (duelEntry?.stakeMode === "free") {
-          await db.transaction(async (tx) => {
-            await tx.update(matches).set({ status: "pending", scheduledAt: null, evidence: { ...evidence, action: "replay_required" } }).where(eq(matches.id, match.id));
-            await tx.delete(matchResultClaims).where(eq(matchResultClaims.matchId, match.id));
-            await tx.update(clash1v1Entries).set({ readyAt: null, updatedAt: new Date() }).where(eq(clash1v1Entries.matchedMatchId, match.id));
-          });
-          for (const player of [player1, player2]) {
-            if (!player?.userId) continue;
-            const [account] = await db.select({ telegramId: telegramAccounts.telegramId }).from(telegramAccounts)
-              .where(eq(telegramAccounts.userId, player.userId)).limit(1);
-            if (account?.telegramId) await sendTelegramMessage(account.telegramId, "⚠️ مود مسابقه رایگان با مود توافق‌شده یکی نبود. نتیجه ثبت نشد؛ Match را با مود درست تکرار کنید.", {
-              inline_keyboard: [[{ text: "🎮 شروع دوباره", callback_data: "clash1v1:status" }]],
-            });
-          }
-        } else {
-          await db.update(matches).set({ status: "disputed", evidence }).where(eq(matches.id, match.id));
-          await sendToAdmins(`🚨 <b>اختلاف مود با Clash API</b>\nMatch: <code>${html(match.id.slice(0, 8))}</code>\nExpected: <code>${html(expectedMode)}</code>`);
-          disputed += 1;
+        await db.update(matches).set({ status: "disputed", evidence }).where(eq(matches.id, match.id));
+        for (const player of [player1, player2]) {
+          if (!player?.userId) continue;
+          const [account] = await db.select({ telegramId: telegramAccounts.telegramId }).from(telegramAccounts)
+            .where(eq(telegramAccounts.userId, player.userId)).limit(1);
+          if (account?.telegramId) await sendTelegramMessage(account.telegramId, "🚨 مود بازی با مود توافق‌شده یکسان نبود. پرونده برای تعیین جریمه میزبان و تصمیم مالی به ادمین ارسال شد.");
         }
+        await sendToAdmins(`🚨 <b>اختلاف مود با Clash API</b>\nMatch: <code>${html(match.id.slice(0, 8))}</code>\nExpected: <code>${html(expectedMode)}</code>\nمیزبان مسئول: <b>${html(player1?.name || "بازیکن ۱")}</b>`, {
+          inline_keyboard: [
+            [{ text: "⚠️ باخت فنی میزبان", callback_data: `judge:mode_forfeit:${match.id}` }],
+            [{ text: "🔁 تکرار", callback_data: `judge:mode_replay:${match.id}` }, { text: "💳 بازپرداخت", callback_data: `judge:mode_refund:${match.id}` }],
+            [{ text: "⛔ تعلیق ۲۴ ساعته", callback_data: `judge:mode_suspend:${match.id}` }],
+          ],
+        });
+        disputed += 1;
         continue;
       }
       const claimedWinnerTag = resolution.winnerId === match.player1Id ? player1Tag : player2Tag;

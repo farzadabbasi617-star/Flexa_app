@@ -11,7 +11,7 @@ import {
   users,
   wallets,
 } from "@/db/schema";
-import { CLASH_1V1_CONFIG, ensureClash1v1Schema } from "@/lib/clash-1v1";
+import { activeClash1v1Suspension, CLASH_1V1_CONFIG, ensureClash1v1Schema } from "@/lib/clash-1v1";
 import { bigIntFromText, formatTomanFromRial } from "@/lib/money";
 import logger from "@/lib/logger";
 import { updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
@@ -34,6 +34,50 @@ import {
 
 const QUEUE_LOCK_ID = 7_100_171;
 const RECENT_INVITE_REUSE_MS = 24 * 60 * 60 * 1000;
+export const CLASH_1V1_RULES_VERSION = "2026-07-friend-modes-v1";
+
+function clash1v1RulesAcceptanceKey(telegramId: string) {
+  return `clash1v1:rules:${CLASH_1V1_RULES_VERSION}:${telegramId}`;
+}
+
+export async function sendClash1v1Rules(chatId: number, telegramId: string, requireAcceptance = true) {
+  await sendMessage(chatId, [
+    "📜 <b>قوانین رقابت 1V1 کلش رویال</b>",
+    "",
+    "1) فقط Player Tag تأییدشده و متعلق به خود بازیکن مجاز است.",
+    "2) نوع حریف، رایگان/پولی بودن و مود بازی قبل از Match مشخص می‌شود.",
+    "3) در بازی با دوست، تا توافق هر دو نفر روی مود هیچ مبلغی کسر نمی‌شود.",
+    "4) در صف تصادفی فقط بازیکنان با نوع مالی و مود یکسان به هم متصل می‌شوند.",
+    "5) ربات یک نفر را به‌عنوان میزبان مشخص می‌کند؛ میزبان موظف است دقیقاً همان مود توافق‌شده را انتخاب کند.",
+    "6) اگر میزبان مود اشتباه انتخاب کند، تخلف به ادمین ارسال و وجه مسابقه پولی تا تصمیم نهایی نگه داشته می‌شود.",
+    "7) فرد مسئول انتخاب مود اشتباه جریمه می‌شود؛ تصمیم ادمین می‌تواند شامل باخت فنی، عدم بازگشت ورودی یا تعلیق موقت از 1V1 باشد.",
+    "8) حریف نباید درخواست مود اشتباه را قبول کند و باید از دکمه «مشکل با حریف» گزارش بدهد.",
+    "9) مسابقه فقط بعد از زدن «آماده‌ام» توسط هر دو نفر و پیام رسمی شروع Match معتبر است.",
+    "10) نتیجه و مود انجام‌شده با Battle Log بررسی می‌شود؛ گزارش خلاف واقع تخلف است.",
+    "11) QR یا Share Link فقط برای افزودن حریف استفاده می‌شود و نباید اطلاعات حساب در چت ارسال شود.",
+    "",
+    requireAcceptance ? "برای ادامه باید قوانین را بپذیری." : `نسخه قوانین: <code>${CLASH_1V1_RULES_VERSION}</code>`,
+  ].join("\n"), requireAcceptance ? {
+    inline_keyboard: [
+      [{ text: "✅ قوانین را می‌پذیرم", callback_data: "clash1v1:rules:accept" }],
+      [{ text: "انصراف", callback_data: "menu:home" }],
+    ],
+  } : undefined);
+}
+
+export async function recordClash1v1RulesAcceptance(telegramId: string) {
+  await db.insert(telegramSentNotifications).values({
+    dedupeKey: clash1v1RulesAcceptanceKey(telegramId),
+    telegramId,
+    type: "clash_1v1_rules_acceptance",
+  }).onConflictDoNothing({ target: telegramSentNotifications.dedupeKey });
+}
+
+export async function acceptClash1v1Rules(chatId: number, telegramId: string) {
+  await recordClash1v1RulesAcceptance(telegramId);
+  await sendMessage(chatId, "✅ پذیرش قوانین ثبت شد.");
+  return openClash1v1Queue(chatId, telegramId, true);
+}
 
 interface QueueParticipant {
   entryId: string;
@@ -352,7 +396,8 @@ async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: Q
     `🏷 Player Tag: <code>${html(participantTag(opponent))}</code>`,
     `🎮 مود توافق‌شده: <b>${html(clashDuelModeLabel(me.gameMode || "normal"))}</b>`,
     `💳 نوع رقابت: <b>${html(clashDuelStakeLabel(me.stakeMode || "paid"))}</b>`,
-    me.opponentType === "friend" ? `👑 میزبان ارسال درخواست بازی: <b>${html(participantName(pair.player1))}</b>` : "",
+    `👑 میزبان ارسال درخواست بازی: <b>${html(participantName(pair.player1))}</b>`,
+    me.playerId === pair.player1.playerId ? "⚠️ شما میزبان هستی و مسئول انتخاب دقیق مود توافق‌شده‌ای." : "⚠️ اگر میزبان مود اشتباه فرستاد، درخواست را قبول نکن و گزارش بده.",
     ...(opponentHasLink ? [`🔗 پیوند دوستی: ${html(opponent.inviteLink!)}`] : ["📷 QR حریف ارسال شد."]),
     "",
     opponentHasLink ? "1) دکمه «باز کردن پیوند دوستی حریف» را بزن." : "1) QR ارسال‌شده را داخل Clash Royale اسکن کن.",
@@ -424,7 +469,7 @@ async function notifyMatchStartedSide(pair: QueuePair, player: QueueParticipant)
     "",
     "هر دو بازیکن آماده‌اند. همین الان Friendly Battle را آغاز کنید.",
     `🎮 مود اجباری: <b>${html(clashDuelModeLabel(player.gameMode || "normal"))}</b>`,
-    player.opponentType === "friend" ? `👑 میزبان: <b>${html(participantName(pair.player1))}</b>` : "",
+    `👑 میزبان: <b>${html(participantName(pair.player1))}</b>`,
     "پس از پایان، نتیجه را مستقل ثبت کنید؛ سیستم Battle Log کلش رویال و مود انجام‌شده را بررسی می‌کند.",
     "",
     `Match ID: <code>${html(pair.matchId.slice(0, 8))}</code>`,
@@ -611,7 +656,7 @@ async function showActiveEntry(chatId: number, telegramId: string, entry: Awaite
   await sendMessage(chatId, "وضعیت صف قابل بازیابی نبود. دوباره /qr را بزن.", mainMenuKeyboard());
 }
 
-export async function openClash1v1Queue(chatId: number, telegramId: string): Promise<void> {
+export async function openClash1v1Queue(chatId: number, telegramId: string, rulesAccepted = false): Promise<void> {
   try {
     await ensureClash1v1QueueTournament();
     const linked = await getLinkedUserByTelegram(telegramId);
@@ -630,6 +675,17 @@ export async function openClash1v1Queue(chatId: number, telegramId: string): Pro
       if (active.status === "queued") await runClash1v1MatchmakingAndNotify();
       const refreshed = await getActiveEntry(linked.userId);
       return showActiveEntry(chatId, telegramId, refreshed || active);
+    }
+
+    if (!rulesAccepted) {
+      const [acceptance] = await db.select({ id: telegramSentNotifications.id })
+        .from(telegramSentNotifications)
+        .where(eq(telegramSentNotifications.dedupeKey, clash1v1RulesAcceptanceKey(telegramId)))
+        .limit(1);
+      if (!acceptance) {
+        await sendClash1v1Rules(chatId, telegramId, true);
+        return;
+      }
     }
 
     const [pendingChallenge] = await db.select().from(clash1v1Challenges).where(and(
@@ -673,6 +729,7 @@ export async function openClash1v1Queue(chatId: number, telegramId: string): Pro
         [{ text: "🎲 حریف تصادفی", callback_data: "clash1v1:opponent:random" }],
         [{ text: "👥 بازی با دوست", callback_data: "clash1v1:opponent:friend" }],
         [{ text: "📦 وضعیت رقابت من", callback_data: "clash1v1:status" }],
+        [{ text: "📜 مشاهده قوانین 1V1", callback_data: "clash1v1:rules:show" }],
       ],
     });
   } catch (err) {
@@ -728,6 +785,11 @@ export async function registerClash1v1Queue(
     await ensureClash1v1QueueTournament();
     const linked = await getLinkedUserByTelegram(telegramId);
     if (!linked?.userId) return openClash1v1Queue(chatId, telegramId);
+    const suspendedUntil = await activeClash1v1Suspension(telegramId);
+    if (suspendedUntil) {
+      await sendMessage(chatId, `⛔ به‌دلیل جریمه ثبت‌شده، دسترسی شما به 1V1 تا <b>${html(suspendedUntil.toLocaleString("fa-IR", { timeZone: "Asia/Tehran" }))}</b> تعلیق است.`);
+      return;
+    }
     if (!linked.clashRoyaleId || linked.clashRoyaleStatus !== "verified") {
       await sendMessage(chatId, "برای ورود به 1V1 باید Player Tag کلش رویال شما با Supercell API تأیید شده باشد.", {
         inline_keyboard: [[{ text: "⚔️ ثبت و تأیید Player Tag", url: `${APP_URL}/profile/edit` }]],

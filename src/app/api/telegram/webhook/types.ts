@@ -79,6 +79,7 @@ export interface SessionData {
   qrRegistrationId?: string;
   clash1v1EntryId?: string;
   selectedAdIds?: string[];
+  pendingStartPayload?: string;
 }
 
 export interface BotSession {

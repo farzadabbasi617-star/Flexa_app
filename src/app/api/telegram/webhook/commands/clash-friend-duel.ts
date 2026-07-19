@@ -10,7 +10,7 @@ import {
   users,
   wallets,
 } from "@/db/schema";
-import { CLASH_1V1_CONFIG, ensureClash1v1Schema } from "@/lib/clash-1v1";
+import { activeClash1v1Suspension, CLASH_1V1_CONFIG, ensureClash1v1Schema } from "@/lib/clash-1v1";
 import {
   CLASH_DUEL_GAME_MODES,
   challengeCanBeAccepted,
@@ -31,7 +31,9 @@ import { html } from "../utils";
 import {
   ensureClash1v1QueueTournament,
   openClash1v1Queue,
+  recordClash1v1RulesAcceptance,
   runClash1v1MatchmakingAndNotify,
+  sendClash1v1Rules,
 } from "./clash-1v1";
 import { isSupportedClashInvite } from "./clash-1v1-policy";
 
@@ -68,6 +70,11 @@ async function requireDuelUser(chatId: number, telegramId: string) {
     await sendMessage(chatId, "برای 1V1 باید Player Tag کلش رویال شما با Supercell API تأیید شده باشد.", {
       inline_keyboard: [[{ text: "⚔️ ثبت و تأیید Player Tag", url: `${APP_URL}/profile/edit` }]],
     });
+    return null;
+  }
+  const suspendedUntil = await activeClash1v1Suspension(telegramId);
+  if (suspendedUntil) {
+    await sendMessage(chatId, `⛔ دسترسی شما به 1V1 تا <b>${html(suspendedUntil.toLocaleString("fa-IR", { timeZone: "Asia/Tehran" }))}</b> تعلیق است.`);
     return null;
   }
   return result.linked!;
@@ -232,6 +239,7 @@ export async function openClashFriendChallenge(chatId: number, telegramId: strin
   if (challenge.proposedByUserId === linked.userId) {
     return sendMessage(chatId, "پیشنهاد مود شما ارسال شده و منتظر پاسخ سازنده دعوت است.");
   }
+  await sendClash1v1Rules(chatId, telegramId, false);
   await sendMessage(chatId, [
     "⚔️ <b>دعوت خصوصی 1V1 کلش رویال</b>",
     "",
@@ -496,6 +504,10 @@ export async function acceptFriendChallenge(chatId: number, telegramId: string, 
   }
 
   const challenge = result.challenge;
+  await Promise.allSettled([
+    recordClash1v1RulesAcceptance(challenge.challengerTelegramId),
+    recordClash1v1RulesAcceptance(challenge.opponentTelegramId!),
+  ]);
   const common = [
     "✅ <b>شرایط دوئل تأیید و Match خصوصی ساخته شد</b>",
     `🎮 مود: <b>${html(clashDuelModeLabel(challenge.gameMode))}</b>`,

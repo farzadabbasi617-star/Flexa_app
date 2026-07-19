@@ -48,7 +48,7 @@ services:
       - key: TELEGRAM_SETUP_SECRET
         sync: false
       - key: TELEGRAM_REQUIRE_CHANNEL_MEMBERSHIP
-        value: 'false'
+        value: 'true'
       - key: TELEGRAM_INTEGRATION_SECRET
         sync: false
       - key: GAMING_NEWS_TELEGRAM_CHANNELS

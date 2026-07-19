@@ -11,7 +11,7 @@ import { getEntryFeeRial } from "@/lib/tournament-finance";
 import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
 import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achievement-service";
 import { LevelingService } from "@/lib/leveling-service";
-import { CLASH_1V1_CONFIG, ensureClash1v1Schema, finalizeMatchResult } from "@/lib/clash-1v1";
+import { CLASH_1V1_CONFIG, ensureClash1v1Schema, finalizeMatchResult, refundClash1v1Match, suspendClash1v1Telegram } from "@/lib/clash-1v1";
 import { resolveMatchResultClaims, type MatchResultClaimValue } from "@/lib/match-result-policy";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 import {
@@ -39,6 +39,7 @@ import { isChannelMember, promptChannelMembership } from "./membership";
 import { getLinkedUserByTelegram } from "./user-service";
 import { aiCommand } from "./commands/ai";
 import {
+  acceptClash1v1Rules,
   cancelClash1v1Queue,
   ensureClash1v1QueueTournament,
   openClash1v1Queue,
@@ -47,6 +48,7 @@ import {
   markClash1v1Ready,
   showClash1v1ModeMenu,
   showClash1v1StakeMenu,
+  sendClash1v1Rules,
   sendClashFriendLinkGuide,
   submitClash1v1Qr,
 } from "./commands/clash-1v1";
@@ -276,6 +278,10 @@ async function handleStartPayload(chatId: number, telegramId: string, user: Tele
     return true;
   }
 
+  if (["clash", "clash_1v1", "duel"].includes(payload)) {
+    await openClash1v1Queue(chatId, telegramId);
+    return true;
+  }
   if (payload === "profile") {
     await profileCommand(chatId, telegramId);
     return true;
@@ -1610,6 +1616,7 @@ async function loadMatchResultContext(matchId: string, client: any = db) {
       winnerId: matches.winnerId,
       status: matches.status,
       scheduledAt: matches.scheduledAt,
+      evidence: matches.evidence,
       createdAt: matches.createdAt,
     })
     .from(matches)
@@ -1657,8 +1664,8 @@ function resultClaimLabel(claim?: string | null) {
   return claim === "win" ? "برد" : claim === "lose" ? "باخت" : "ثبت نشده";
 }
 
-async function notifyResultAdmins(matchId: string, message: string) {
-  const keyboard = {
+async function notifyResultAdmins(matchId: string, message: string, customKeyboard?: Record<string, unknown>) {
+  const keyboard = customKeyboard || {
     inline_keyboard: [[
       { text: "⚖️ مشاهده ادعا و مدارک", callback_data: `judge:info:${matchId}` },
       { text: "🏆 بازیکن ۱ برنده", callback_data: `judge:p1:${matchId}` },
@@ -1716,7 +1723,6 @@ type ClashApiSettlementResult =
   | { state: "missing_tags" }
   | { state: "api_error"; reason: string }
   | { state: "disputed"; reason: string }
-  | { state: "replay_required"; reason: string }
   | { state: "no_consensus" };
 
 async function verifyAndFinalizeAgreedMatch(matchId: string): Promise<ClashApiSettlementResult> {
@@ -1754,15 +1760,11 @@ async function verifyAndFinalizeAgreedMatch(matchId: string): Promise<ClashApiSe
         actualBattleType: battle.battleType,
         actualDeckSelection: battle.raw.deckSelection || null,
         battleTime: battle.battleTime.toISOString(),
+        responsiblePlayerId: context.player1.id,
+        responsibleRole: "host",
+        stakeMode: context.duel.stakeMode,
+        action: "admin_penalty_required",
       };
-      if (context.duel.stakeMode === "free") {
-        await db.transaction(async (tx) => {
-          await tx.update(matches).set({ status: "pending", scheduledAt: null, evidence: { ...evidence, action: "replay_required" } }).where(eq(matches.id, matchId));
-          await tx.delete(matchResultClaims).where(eq(matchResultClaims.matchId, matchId));
-          await tx.update(clash1v1Entries).set({ readyAt: null, updatedAt: new Date() }).where(eq(clash1v1Entries.matchedMatchId, matchId));
-        });
-        return { state: "replay_required", reason: "api_mode_mismatch" };
-      }
       await db.update(matches).set({ status: "disputed", evidence }).where(eq(matches.id, matchId));
       return { state: "disputed", reason: "api_mode_mismatch" };
     }
@@ -1970,16 +1972,6 @@ async function submitTelegramResult(chatId: number, telegramId: string, matchId:
     await notifyFinalMatchResult(matchId, settlement.winnerId, settlement.prizePaid);
     return;
   }
-  if (settlement.state === "replay_required") {
-    const replayText = `⚠️ مود مسابقه رایگان با مود توافق‌شده «${html(clashDuelModeLabel(context?.duel.gameMode || "normal"))}» یکسان نبود. نتیجه ثبت نشد؛ لطفاً Match را با مود درست تکرار کنید و دوباره «آماده‌ام» بزنید.`;
-    if (context) {
-      await Promise.allSettled([
-        notifyLinkedUserOnTelegram(context.player1.userId, replayText, { inline_keyboard: [[{ text: "🎮 شروع دوباره", callback_data: "clash1v1:status" }]] }),
-        notifyLinkedUserOnTelegram(context.player2.userId, replayText, { inline_keyboard: [[{ text: "🎮 شروع دوباره", callback_data: "clash1v1:status" }]] }),
-      ]);
-    }
-    return;
-  }
   if (settlement.state === "disputed") {
     const mismatchText = settlement.reason === "api_mode_mismatch"
       ? `🚨 مود بازی انجام‌شده با مود توافق‌شده «${html(clashDuelModeLabel(context?.duel.gameMode || "normal"))}» مطابقت ندارد و برای داوری ارسال شد.`
@@ -1990,7 +1982,15 @@ async function submitTelegramResult(chatId: number, telegramId: string, matchId:
         notifyLinkedUserOnTelegram(context.player2.userId, mismatchText),
       ]);
     }
-    await notifyResultAdmins(matchId, `🚨 <b>اختلاف با Clash Royale API</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>\nReason: <code>${html(settlement.reason)}</code>`);
+    const adminKeyboard = settlement.reason === "api_mode_mismatch" ? {
+      inline_keyboard: [
+        [{ text: "⚠️ باخت فنی میزبان", callback_data: `judge:mode_forfeit:${matchId}` }],
+        [{ text: "🔁 تکرار مسابقه", callback_data: `judge:mode_replay:${matchId}` }, { text: "💳 بازپرداخت", callback_data: `judge:mode_refund:${matchId}` }],
+        [{ text: "⛔ تعلیق ۲۴ ساعته میزبان", callback_data: `judge:mode_suspend:${matchId}` }],
+        [{ text: "⚖️ جزئیات و مدارک", callback_data: `judge:info:${matchId}` }],
+      ],
+    } : undefined;
+    await notifyResultAdmins(matchId, `🚨 <b>اختلاف با Clash Royale API</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>\nReason: <code>${html(settlement.reason)}</code>${settlement.reason === "api_mode_mismatch" ? `\nمیزبان مسئول: <b>${html(context?.player1.name || context?.player1.username || "بازیکن ۱")}</b>` : ""}`, adminKeyboard);
     return;
   }
   if (settlement.state === "missing_tags") {
@@ -2749,6 +2749,39 @@ async function handleJudgeAction(chatId: number, telegramId: string, action: str
     .map((claim) => ({ playerId: claim.playerId, claim: claim.claim as MatchResultClaimValue }));
   const resolution = resolveMatchResultClaims(context.player1.id, context.player2.id, claims);
 
+  if (action === "mode_replay") {
+    await db.transaction(async (tx) => {
+      await tx.update(matches).set({ status: "pending", scheduledAt: null, evidence: { source: "admin_mode_replay", previousEvidence: context.evidence || null } }).where(eq(matches.id, matchId));
+      await tx.delete(matchResultClaims).where(eq(matchResultClaims.matchId, matchId));
+      await tx.update(clash1v1Entries).set({ readyAt: null, updatedAt: new Date() }).where(eq(clash1v1Entries.matchedMatchId, matchId));
+    });
+    const text = `🔁 ادمین دستور تکرار مسابقه با مود صحیح «${html(clashDuelModeLabel(context.duel.gameMode || "normal"))}» را صادر کرد.`;
+    await Promise.allSettled([
+      notifyLinkedUserOnTelegram(context.player1.userId, text, { inline_keyboard: [[{ text: "🎮 شروع دوباره", callback_data: "clash1v1:status" }]] }),
+      notifyLinkedUserOnTelegram(context.player2.userId, text, { inline_keyboard: [[{ text: "🎮 شروع دوباره", callback_data: "clash1v1:status" }]] }),
+    ]);
+    return sendMessage(chatId, "✅ Match برای تکرار با مود صحیح بازنشانی شد.");
+  }
+
+  if (action === "mode_refund") {
+    const refunded = await db.transaction((tx) => refundClash1v1Match(tx, matchId, "wrong_game_mode_admin_resolution"));
+    if (!refunded.refunded) return sendMessage(chatId, `بازپرداخت انجام نشد: <code>${html(refunded.reason)}</code>`);
+    await Promise.allSettled([
+      notifyLinkedUserOnTelegram(context.player1.userId, "💳 مسابقه به‌دلیل اختلاف مود توسط ادمین لغو و ورودی بازپرداخت شد."),
+      notifyLinkedUserOnTelegram(context.player2.userId, "💳 مسابقه به‌دلیل اختلاف مود توسط ادمین لغو و ورودی بازپرداخت شد."),
+    ]);
+    return sendMessage(chatId, `✅ بازپرداخت انجام شد؛ تعداد بازیکنان: <b>${refunded.refundedPlayers}</b>.`);
+  }
+
+  if (action === "mode_suspend") {
+    const [hostAccount] = await db.select({ telegramId: telegramAccounts.telegramId }).from(telegramAccounts)
+      .where(eq(telegramAccounts.userId, context.player1.userId)).limit(1);
+    if (!hostAccount?.telegramId) return sendMessage(chatId, "حساب تلگرام میزبان برای ثبت تعلیق پیدا نشد.");
+    const until = await suspendClash1v1Telegram(hostAccount.telegramId, matchId);
+    await notifyLinkedUserOnTelegram(context.player1.userId, `⛔ به‌دلیل انتخاب مود اشتباه، دسترسی شما به 1V1 تا <b>${html(until?.toLocaleString("fa-IR", { timeZone: "Asia/Tehran" }) || "۲۴ ساعت آینده")}</b> تعلیق شد.`);
+    return sendMessage(chatId, "✅ تعلیق ۲۴ ساعته میزبان ثبت شد. پرونده نتیجه همچنان برای تصمیم نهایی باز است.");
+  }
+
   if (action === "info") {
     const evidenceRows = await db
       .select()
@@ -2789,6 +2822,7 @@ async function handleJudgeAction(chatId: number, telegramId: string, action: str
   let winnerId: string | null = null;
   if (action === "p1") winnerId = context.player1.id;
   if (action === "p2") winnerId = context.player2.id;
+  if (action === "mode_forfeit") winnerId = context.player2.id;
   if (action === "approve" && resolution.state === "agreed") winnerId = resolution.winnerId;
   if (action === "approve" && !winnerId) {
     return sendMessage(chatId, "نتیجه دو طرف موافق نیست؛ لطفاً صریحاً «بازیکن ۱» یا «بازیکن ۲» را به‌عنوان برنده انتخاب کن.");
@@ -3533,6 +3567,19 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   });
   if (!chatId) return;
 
+  if (data === "membership:check") {
+    if (!(await isChannelMember(telegramId, true))) return promptChannelMembership(chatId);
+    const session = await getSession(telegramId);
+    const pendingPayload = session.data.pendingStartPayload;
+    if (pendingPayload) await clearSession(telegramId);
+    await sendMessage(chatId, "✅ عضویت شما تأیید شد. حالا می‌توانی از Flexa استفاده کنی.");
+    if (callback.message?.chat.type && callback.message.chat.type !== "private") {
+      return handleGroupUpdate({ update_id: 0, callback_query: callback });
+    }
+    if (pendingPayload && await handleStartPayload(chatId, telegramId, callback.from, pendingPayload)) return;
+    return startCommand(chatId);
+  }
+
   if (data === "support:mine") return myTicketsCommand(chatId, telegramId);
   if (data === "menu:home") return startCommand(chatId);
   if (data === "mission:invite") return inviteCommand(chatId, telegramId);
@@ -3579,6 +3626,8 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:my_tournaments") return myTournamentsCommand(chatId, telegramId);
   if (data === "menu:matches") return matchesCommand(chatId, telegramId);
   if (data === "menu:clash_private") return clashPrivateTournamentsCommand(chatId, telegramId);
+  if (data === "clash1v1:rules:accept") return acceptClash1v1Rules(chatId, telegramId);
+  if (data === "clash1v1:rules:show") return sendClash1v1Rules(chatId, telegramId, false);
   if (data.startsWith("clash1v1:opponent:")) {
     const opponentType = data.replace("clash1v1:opponent:", "");
     if (isClashDuelOpponentType(opponentType)) return showClash1v1StakeMenu(chatId, opponentType);
@@ -3627,11 +3676,6 @@ async function handleCallback(callback: TelegramCallbackQuery) {
       if (settlement.state === "completed") {
         await notifyFinalMatchResult(matchId, settlement.winnerId, settlement.prizePaid);
         return sendMessage(chatId, "✅ Battle Log تأیید شد و نتیجه/جایزه نهایی شد.");
-      }
-      if (settlement.state === "replay_required") {
-        return sendMessage(chatId, "⚠️ مود بازی رایگان با مود توافق‌شده یکی نبود. نتیجه حذف شد؛ از وضعیت 1V1 مسابقه را با مود درست دوباره شروع کنید.", {
-          inline_keyboard: [[{ text: "🎮 شروع دوباره", callback_data: "clash1v1:status" }]],
-        });
       }
       if (settlement.state === "disputed") {
         await notifyResultAdmins(matchId, `🚨 <b>اختلاف با Clash Royale API</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>`);
@@ -3716,7 +3760,73 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   await sendMessage(chatId, "این دکمه قدیمی یا نامعتبر است. منوی جدید را باز کردم؛ برای 1V1 کلش رویال روی دکمه ⚔️ بزن یا دستور /qr را ارسال کن.", mainMenuKeyboard());
 }
 
+function updateActor(update: TelegramUpdate) {
+  return update.callback_query?.from || update.message?.from || null;
+}
+
+function updateChat(update: TelegramUpdate) {
+  return update.callback_query?.message?.chat || update.message?.chat || null;
+}
+
+async function enforceChannelMembership(update: TelegramUpdate) {
+  const actor = updateActor(update);
+  const chat = updateChat(update);
+  if (!actor || !chat || hasAdminAccess(String(actor.id))) return true;
+  if (update.callback_query?.data === "membership:check") return true;
+  const telegramId = String(actor.id);
+  if (await isChannelMember(telegramId)) return true;
+
+  const parsed = update.message?.text ? parseTelegramCommand(update.message.text) : null;
+  if (parsed?.command === "/start" && parsed.args[0]) {
+    await setSession(telegramId, "idle", { pendingStartPayload: parsed.args[0] });
+  }
+  await promptChannelMembership(chat.id);
+  return false;
+}
+
+async function handleGroupUpdate(update: TelegramUpdate) {
+  const chat = updateChat(update);
+  const actor = updateActor(update);
+  if (!chat || !actor) return;
+  const privateClashUrl = telegramStartLink("clash");
+  const botUsername = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
+  const keyboard = {
+    inline_keyboard: [
+      [{ text: "⚔️ اجرای 1V1 در چت خصوصی", url: privateClashUrl }],
+      [{ text: "🏟 تورنومنت‌های فعال", url: `${APP_URL}/tournaments` }],
+      [{ text: "🤖 باز کردن Flexa", url: `https://t.me/${botUsername}` }],
+    ],
+  };
+  if (update.callback_query) {
+    await sendMessage(chat.id, "برای حفظ اطلاعات حساب و کیف پول، این عملیات فقط در چت خصوصی Flexa انجام می‌شود.", keyboard);
+    return;
+  }
+  const parsed = parseTelegramCommand(update.message?.text || "");
+  if (!parsed) return;
+  if (parsed.command === "/rules") {
+    await sendMessage(chat.id, html(DEFAULT_RULES));
+    await sendClash1v1Rules(chat.id, String(actor.id), false);
+    return;
+  }
+  if (["/start", "/clash", "/qr", "/clash_qr", "/rooms"].includes(parsed.command)) {
+    await sendMessage(chat.id, [
+      "⚔️ <b>Flexa در گروه فعال است</b>",
+      "",
+      "در گروه می‌توانید قوانین و لینک تورنومنت‌ها را ببینید. ثبت‌نام، کیف پول، Player Tag، دعوت خصوصی و نتیجه فقط در چت خصوصی انجام می‌شوند.",
+    ].join("\n"), keyboard);
+    return;
+  }
+  await sendMessage(chat.id, "🔒 این فرمان شامل اطلاعات شخصی است و فقط در چت خصوصی Flexa اجرا می‌شود.", keyboard);
+}
+
 async function handleUpdate(update: TelegramUpdate) {
+  if (!(await enforceChannelMembership(update))) return;
+  const chat = updateChat(update);
+  if (chat?.type && chat.type !== "private" && update.callback_query?.data !== "membership:check") {
+    await handleGroupUpdate(update);
+    return;
+  }
+
   if (update.callback_query) {
     try {
       await handleCallback(update.callback_query);

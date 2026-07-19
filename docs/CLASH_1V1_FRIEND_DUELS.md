@@ -41,6 +41,28 @@ Supercell Battle Log's `gameMode`, `deckSelection`, and battle type:
 Free matches update competitive stats after a valid result but never create a
 wallet prize transaction.
 
+## Rules, mode violations and penalties
+
+Players must accept the versioned 1V1 rules inside Flexa before opening a new
+queue or private challenge. The first player in the Match is explicitly named
+as host and is responsible for sending the Friendly Battle request with the
+agreed mode. A Battle Log mode mismatch is never settled automatically. It is
+sent to admins with four explicit actions: host forfeit, replay, refund, or a
+24-hour 1V1 suspension. Paid entry funds remain unreleased until an admin acts.
+
+## Telegram channel and groups
+
+`TELEGRAM_REQUIRE_CHANNEL_MEMBERSHIP=true` enforces membership for every
+non-admin interaction. Flexa must be an admin of `TELEGRAM_CHANNEL_ID` so
+`getChatMember` is reliable. Deep-link payloads are retained while a user joins
+the channel and resumed after the membership check.
+
+Flexa supports a privacy-safe group mode. Groups can display rules and public
+tournament/private-bot links, but account, wallet, Player Tag, private challenge,
+payment, evidence, and result operations are redirected to the user's private
+chat with Flexa. BotFather group joining must remain enabled; Telegram privacy
+mode may remain enabled because the group integration only needs commands.
+
 ## Schema
 
 Migration: `drizzle/manual/0032_add_clash_duel_modes_and_friend_challenges.sql`

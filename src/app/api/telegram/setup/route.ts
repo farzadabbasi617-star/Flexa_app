@@ -18,6 +18,15 @@ function requireSetupSecret(request: NextRequest) {
   return { ok: true, status: 200, error: null };
 }
 
+function groupCommands() {
+  return [
+    { command: "start", description: "معرفی Flexa و ورود به چت خصوصی" },
+    { command: "rules", description: "قوانین Gament و مسابقات 1V1" },
+    { command: "rooms", description: "لینک تورنومنت‌های فعال" },
+    { command: "clash", description: "شروع 1V1 کلش در چت خصوصی" },
+  ];
+}
+
 function commands() {
   return [
     { command: "start", description: "شروع و منوی اصلی Gament" },
@@ -52,6 +61,7 @@ async function configureBot(setWebhook: boolean) {
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET || "";
   const results: Record<string, unknown> = {};
 
+  results.botInfo = await telegramApi("getMe", {});
   results.commandsDefault = await telegramApi("setMyCommands", {
     commands: commands(),
     scope: { type: "default" },
@@ -61,6 +71,12 @@ async function configureBot(setWebhook: boolean) {
   results.commandsAllPrivate = await telegramApi("setMyCommands", {
     commands: commands(),
     scope: { type: "all_private_chats" },
+    language_code: "fa",
+  });
+
+  results.commandsAllGroups = await telegramApi("setMyCommands", {
+    commands: groupCommands(),
+    scope: { type: "all_group_chats" },
     language_code: "fa",
   });
 
