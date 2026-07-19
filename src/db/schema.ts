@@ -783,6 +783,152 @@ export const matchResultClaims = pgTable("match_result_claims", {
   userIdx: index("match_result_claims_user_idx").on(table.userId),
 }));
 
+// =========================================================================
+// MEDIA PARTNERS / AFFILIATE PROGRAM
+// =========================================================================
+
+export const mediaPartners = pgTable("media_partners", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id).unique(),
+  referralCode: varchar("referral_code", { length: 24 }).notNull().unique(),
+  legalName: varchar("legal_name", { length: 160 }).notNull(),
+  nationalId: varchar("national_id", { length: 10 }).notNull(),
+  sheba: varchar("sheba", { length: 26 }).notNull(),
+  mediaName: varchar("media_name", { length: 160 }).notNull(),
+  mediaType: varchar("media_type", { length: 30 }).notNull(),
+  mediaUrl: varchar("media_url", { length: 500 }).notNull(),
+  followerCount: integer("follower_count").notNull().default(0),
+  ownershipProofUrl: text("ownership_proof_url"),
+  status: varchar("status", { length: 30 }).notNull().default("draft"),
+  commissionRialPerMatch: numeric("commission_rial_per_match", { precision: 20, scale: 0 }).notNull().default("70000"),
+  attributionDays: integer("attribution_days").notNull().default(30),
+  minimumPayoutRial: numeric("minimum_payout_rial", { precision: 20, scale: 0 }).notNull().default("3000000"),
+  contractAcceptedAt: timestamp("contract_accepted_at"),
+  approvedById: uuid("approved_by_id").references(() => users.id),
+  approvedAt: timestamp("approved_at"),
+  rejectionReason: text("rejection_reason"),
+  settings: jsonb("settings").notNull().default('{}'),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  statusIdx: index("media_partners_status_idx").on(table.status),
+  referralIdx: uniqueIndex("media_partners_referral_code_idx").on(table.referralCode),
+  nationalIdx: index("media_partners_national_id_idx").on(table.nationalId),
+}));
+
+export const mediaPartnerAgreements = pgTable("media_partner_agreements", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  partnerId: uuid("partner_id").notNull().references(() => mediaPartners.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  contractVersion: varchar("contract_version", { length: 60 }).notNull(),
+  contentHash: varchar("content_hash", { length: 64 }).notNull(),
+  contentSnapshot: text("content_snapshot").notNull(),
+  signerName: varchar("signer_name", { length: 160 }).notNull(),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  userAgent: varchar("user_agent", { length: 500 }),
+  otpVerifiedAt: timestamp("otp_verified_at").notNull(),
+  acceptedAt: timestamp("accepted_at").defaultNow().notNull(),
+}, (table) => ({
+  partnerVersionIdx: index("media_partner_agreements_partner_version_idx").on(table.partnerId, table.contractVersion),
+  userIdx: index("media_partner_agreements_user_idx").on(table.userId),
+}));
+
+export const mediaProperties = pgTable("media_properties", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  partnerId: uuid("partner_id").notNull().references(() => mediaPartners.id),
+  platform: varchar("platform", { length: 30 }).notNull(),
+  externalId: varchar("external_id", { length: 100 }),
+  title: varchar("title", { length: 200 }),
+  url: varchar("url", { length: 500 }),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  verifiedByUserId: uuid("verified_by_user_id").references(() => users.id),
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  externalUnique: uniqueIndex("media_properties_platform_external_idx").on(table.platform, table.externalId),
+  partnerIdx: index("media_properties_partner_idx").on(table.partnerId),
+  statusIdx: index("media_properties_status_idx").on(table.status),
+}));
+
+export const affiliateAttributions = pgTable("affiliate_attributions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  partnerId: uuid("partner_id").notNull().references(() => mediaPartners.id),
+  telegramId: varchar("telegram_id", { length: 32 }).notNull().unique(),
+  userId: uuid("user_id").references(() => users.id).unique(),
+  campaignCode: varchar("campaign_code", { length: 60 }),
+  source: varchar("source", { length: 30 }).notNull().default("telegram_deep_link"),
+  status: varchar("status", { length: 30 }).notNull().default("active"),
+  attributedAt: timestamp("attributed_at").defaultNow().notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  metadata: jsonb("metadata").notNull().default('{}'),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  partnerStatusIdx: index("affiliate_attributions_partner_status_idx").on(table.partnerId, table.status),
+  expiresIdx: index("affiliate_attributions_expires_idx").on(table.status, table.expiresAt),
+}));
+
+export const affiliateClicks = pgTable("affiliate_clicks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  partnerId: uuid("partner_id").notNull().references(() => mediaPartners.id),
+  telegramId: varchar("telegram_id", { length: 32 }),
+  campaignCode: varchar("campaign_code", { length: 60 }),
+  source: varchar("source", { length: 30 }).notNull().default("telegram"),
+  metadata: jsonb("metadata").notNull().default('{}'),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  partnerCreatedIdx: index("affiliate_clicks_partner_created_idx").on(table.partnerId, table.createdAt),
+  telegramIdx: index("affiliate_clicks_telegram_idx").on(table.telegramId),
+}));
+
+export const affiliateCommissionEvents = pgTable("affiliate_commission_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  matchId: uuid("match_id").notNull().references(() => matches.id).unique(),
+  totalAmountRial: numeric("total_amount_rial", { precision: 20, scale: 0 }).notNull().default("70000"),
+  status: varchar("status", { length: 20 }).notNull().default("shadow"),
+  availableAt: timestamp("available_at").notNull(),
+  paidAt: timestamp("paid_at"),
+  reversedAt: timestamp("reversed_at"),
+  reversalReason: text("reversal_reason"),
+  risk: jsonb("risk").notNull().default('{}'),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  statusAvailableIdx: index("affiliate_commission_events_status_available_idx").on(table.status, table.availableAt),
+}));
+
+export const affiliatePayouts = pgTable("affiliate_payouts", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  partnerId: uuid("partner_id").notNull().references(() => mediaPartners.id),
+  amountRial: numeric("amount_rial", { precision: 20, scale: 0 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("requested"),
+  shebaSnapshot: varchar("sheba_snapshot", { length: 26 }).notNull(),
+  requestedAt: timestamp("requested_at").defaultNow().notNull(),
+  reviewedById: uuid("reviewed_by_id").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  paidAt: timestamp("paid_at"),
+  reference: varchar("reference", { length: 120 }),
+  adminNote: text("admin_note"),
+}, (table) => ({
+  partnerStatusIdx: index("affiliate_payouts_partner_status_idx").on(table.partnerId, table.status),
+}));
+
+export const affiliateCommissionShares = pgTable("affiliate_commission_shares", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  eventId: uuid("event_id").notNull().references(() => affiliateCommissionEvents.id),
+  partnerId: uuid("partner_id").notNull().references(() => mediaPartners.id),
+  referredUserId: uuid("referred_user_id").references(() => users.id),
+  amountRial: numeric("amount_rial", { precision: 20, scale: 0 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("shadow"),
+  payoutId: uuid("payout_id").references(() => affiliatePayouts.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  eventPartnerUnique: uniqueIndex("affiliate_commission_shares_event_partner_idx").on(table.eventId, table.partnerId),
+  partnerStatusIdx: index("affiliate_commission_shares_partner_status_idx").on(table.partnerId, table.status),
+  payoutIdx: index("affiliate_commission_shares_payout_idx").on(table.payoutId),
+}));
+
 // Match evidence
 export const matchEvidence = pgTable("match_evidence", {
   id: uuid("id").defaultRandom().primaryKey(),

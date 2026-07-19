@@ -249,6 +249,7 @@ export default function AdminPage() {
               { href: "/admin/maintenance", icon: "🧹", title: "نگهداری سیستم", desc: "پاکسازی نشست‌ها، rate limitها، چت اضافه و لاگ‌های قدیمی" },
               { href: "/admin/tournaments", icon: "🧩", title: "کنترل کامل تورنومنت", desc: "ویرایش کامل رویدادها، جوایز، قوانین، وضعیت و بنر" },
               { href: "/admin/honors", icon: "🏆", title: "تالار افتخارات", desc: "مدیریت محتوا، تأیید پیشنهادات هوش مصنوعی و انتشار اخبار" },
+              { href: "/admin/media-partners", icon: "📣", title: "شرکای رسانه‌ای", desc: "تأیید قراردادها، رسانه‌ها، کمیسیون‌ها و تسویه افیلیت" },
             ].map((item) => (
               <Link key={item.href} href={item.href} onClick={() => item.href === "#telegram" && setActiveTab("telegram")} className="gaming-card p-6 group hover:border-neon-purple/50 transition-all relative overflow-hidden">
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-neon-purple/10 to-neon-blue/5" />

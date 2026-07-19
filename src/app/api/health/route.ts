@@ -5,6 +5,7 @@ import { getEmailDeliveryConfiguration } from "@/lib/email-service";
 import { getClashRoyaleApiConfiguration } from "@/lib/clash-royale-api";
 import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
 import { ensureStoreOrderLifecycleSchema } from "@/lib/store-service";
+import { affiliateProgramLive, ensureAffiliateSchema } from "@/lib/affiliate-service";
 
 export const dynamic = "force-dynamic";
 
@@ -38,6 +39,7 @@ export async function GET() {
     await Promise.all([
       ensurePrivateTournamentAttendanceSchema(),
       ensureStoreOrderLifecycleSchema(),
+      ensureAffiliateSchema(),
     ]);
     await db.execute(sql`select 1`);
     return Response.json(
@@ -51,6 +53,12 @@ export async function GET() {
         },
         telegramCron: {
           protected: Boolean(process.env.TELEGRAM_CRON_SECRET || process.env.CRON_SECRET),
+        },
+        affiliateProgram: {
+          configured: true,
+          live: affiliateProgramLive(),
+          attributionDays: 30,
+          commissionTomanPerMatch: 7000,
         },
         email: {
           configured: email.configured,

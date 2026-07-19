@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { clash1v1Challenges, clash1v1Entries, matches, players, telegramSentNotifications, tournaments, transactions, wallets } from "@/db/schema";
 import { and, desc, eq, gte, inArray, lte, sql } from "drizzle-orm";
 import { ensureWalletMoneySchema, updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
+import { createAffiliateCommissionForMatch } from "@/lib/affiliate-service";
 
 
 let clash1v1SchemaReady: Promise<void> | null = null;
@@ -318,7 +319,12 @@ export async function refundClash1v1Match(tx: any, matchId: string, reason: stri
 }
 
 /** Complete a match exactly once, apply stats, and settle the 1V1 prize. */
-export async function finalizeMatchResult(tx: any, matchId: string, winnerId: string) {
+export async function finalizeMatchResult(
+  tx: any,
+  matchId: string,
+  winnerId: string,
+  options: { affiliateEligible?: boolean } = {},
+) {
   await ensureClash1v1Schema(tx);
   const [before] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1);
   if (!before) return { completed: false as const, reason: "match_not_found" as const };
@@ -355,6 +361,9 @@ export async function finalizeMatchResult(tx: any, matchId: string, winnerId: st
     .where(eq(players.id, loserId));
 
   const prize = await payoutClash1v1Prize(tx, matchId, winnerId);
+  const affiliateCommission = options.affiliateEligible
+    ? await createAffiliateCommissionForMatch(tx, matchId)
+    : { created: false as const, reason: "not_api_verified" as const };
   return {
     completed: true as const,
     transitioned: true as const,
@@ -362,5 +371,6 @@ export async function finalizeMatchResult(tx: any, matchId: string, winnerId: st
     loserId,
     tournamentId: before.tournamentId,
     prize,
+    affiliateCommission,
   };
 }

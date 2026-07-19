@@ -24,6 +24,10 @@ function passwordResetIdentifier(email: string) {
   return `password-reset:${normalizedEmail(email)}`;
 }
 
+function mediaContractIdentifier(userId: string, contractVersion: string) {
+  return `media-contract:${userId}:${contractVersion}`;
+}
+
 function hashOtpToken(identifier: string, token: string) {
   return crypto.createHmac("sha256", getOtpTokenPepper()).update(`${identifier}:${token}`).digest("hex");
 }
@@ -349,6 +353,22 @@ export const EmailService = {
 
   consumePasswordResetCode(email: string, code: string, client: any = db) {
     return consumeOtp(client, passwordResetIdentifier(email), code);
+  },
+
+  sendMediaContractCode(email: string, userId: string, contractVersion: string) {
+    const normalized = normalizedEmail(email);
+    return createAndSendOtp({
+      identifier: mediaContractIdentifier(userId, contractVersion),
+      email: normalized,
+      subject: "کد امضای قرارداد همکاری رسانه‌ای Gament",
+      heading: "تأیید قرارداد همکاری رسانه‌ای",
+      description: `کد یک‌بارمصرف برای پذیرش قرارداد نسخه ${contractVersion}:`,
+      warning: "این کد ۱۵ دقیقه و فقط برای امضای قرارداد رسانه‌ای شما معتبر است. آن را در اختیار دیگران قرار ندهید.",
+    });
+  },
+
+  consumeMediaContractCode(userId: string, contractVersion: string, code: string, client: any = db) {
+    return consumeOtp(client, mediaContractIdentifier(userId, contractVersion), code);
   },
 
   async sendPasswordChangedNotice(email: string) {

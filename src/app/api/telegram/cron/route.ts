@@ -18,6 +18,7 @@ import { resolveMatchResultClaims, type MatchResultClaimValue } from "@/lib/matc
 import { clashBattleMatchesExpectedMode, isClashDuelGameMode } from "@/lib/clash-duel-policy";
 import { getClashRoyaleApiConfiguration, normalizeClashRoyaleTag, verifyClashRoyaleHeadToHead } from "@/lib/clash-royale-api";
 import { processStoreOrderDeadlines } from "@/lib/store-service";
+import { ensureAffiliateSchema, processAffiliateCommissions } from "@/lib/affiliate-service";
 
 export const dynamic = "force-dynamic";
 
@@ -341,7 +342,7 @@ async function verifyPendingClash1v1Results() {
         continue;
       }
 
-      const finalized = await db.transaction((tx) => finalizeMatchResult(tx, match.id, resolution.winnerId));
+      const finalized = await db.transaction((tx) => finalizeMatchResult(tx, match.id, resolution.winnerId, { affiliateEligible: true }));
       if (!finalized.completed) continue;
       const winner = byId.get(finalized.winnerId);
       const loser = byId.get(finalized.loserId);
@@ -712,7 +713,7 @@ async function safeCronStep<T>(name: string, fn: () => Promise<T>): Promise<T | 
 export async function GET(request: NextRequest) {
   const auth = validateCron(request);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
-  await ensurePrivateTournamentAttendanceSchema();
+  await Promise.all([ensurePrivateTournamentAttendanceSchema(), ensureAffiliateSchema()]);
 
   // Drain old work first, enqueue this cron cycle's notifications, then drain
   // again. If Render stops between these phases, the next invocation resumes
@@ -732,6 +733,7 @@ export async function GET(request: NextRequest) {
   const matchResults = await safeCronStep("matchResults", sendMatchResultNotifications);
   const results = await safeCronStep("results", publishCompletedResults);
   const storeOrderDeadlines = await safeCronStep("storeOrderDeadlines", () => processStoreOrderDeadlines(50));
+  const affiliateCommissions = await safeCronStep("affiliateCommissions", () => processAffiliateCommissions(100));
   const classifiedScrape = await safeCronStep("classifiedScrape", runHourlyClassifiedScrape);
   const classifiedCleanup = await safeCronStep("classifiedCleanup", cleanupClassifiedAds);
   const dailyReports = await safeCronStep("dailyReports", sendDailyAdminReport);
@@ -760,6 +762,7 @@ export async function GET(request: NextRequest) {
     matchResults,
     results,
     storeOrderDeadlines,
+    affiliateCommissions,
     classifiedScrape,
     classifiedCleanup,
     dailyReports,

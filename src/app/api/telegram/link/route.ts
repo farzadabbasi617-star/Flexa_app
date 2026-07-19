@@ -7,6 +7,7 @@ import { requireUser } from "@/lib/auth";
 import { sendTelegramMessage } from "@/lib/telegram";
 import { LevelingService } from "@/lib/leveling-service";
 import logger from "@/lib/logger";
+import { bindAffiliateAttribution } from "@/lib/affiliate-service";
 
 export const dynamic = "force-dynamic";
 
@@ -102,6 +103,10 @@ export async function POST(request: NextRequest) {
         .where(eq(telegramPreRegistrations.telegramId, linkCode.telegramId));
 
       return created;
+    });
+
+    await bindAffiliateAttribution(linkCode.telegramId, user.id).catch((err) => {
+      logger.warn({ err, userId: user.id, telegramId: linkCode.telegramId }, "Failed to bind affiliate attribution");
     });
 
     await db.transaction(async (tx) => {

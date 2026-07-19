@@ -79,6 +79,15 @@ import {
   type TelegramUpdateClaim,
 } from "@/lib/telegram-reliability";
 import { shouldRetryTelegramUpdate } from "@/lib/telegram-reliability-policy";
+import {
+  affiliatePartnerForTelegramChat,
+  affiliatePublicLink,
+  connectTelegramMediaGroup,
+  ensureAffiliateSchema,
+  getMediaPartnerDashboard,
+  normalizeAffiliateCode,
+  recordAffiliateStart,
+} from "@/lib/affiliate-service";
 
 export const dynamic = "force-dynamic";
 
@@ -268,6 +277,22 @@ function deepLinkKeyboard(url: string, label = "باز کردن در Gament") {
 async function handleStartPayload(chatId: number, telegramId: string, user: TelegramUser, rawPayload?: string) {
   const payload = normalizeStartPayload(rawPayload);
   if (!payload || payload.startsWith("ref_") || payload.startsWith("campaign_") || payload.startsWith("streamer_") || payload.startsWith("utm_")) return false;
+
+  const affiliatePayload = payload.match(/^aff_([A-Za-z0-9]{6,24})(?:_([A-Za-z0-9]{2,24}))?$/);
+  if (affiliatePayload) {
+    const result = await recordAffiliateStart({
+      telegramId,
+      referralCode: affiliatePayload[1],
+      campaignCode: affiliatePayload[2] || null,
+      source: "telegram_deep_link",
+      metadata: { telegramUsername: user.username || null },
+    });
+    if (result.attributed) {
+      await sendMessage(chatId, `✅ ورود شما از طرف رسانه <b>${html(result.mediaName || "همکار Gament")}</b> ثبت شد و تا ۳۰ روز معتبر است.`);
+    }
+    await startCommand(chatId);
+    return true;
+  }
 
   if (["wallet", "wallet_deposit", "deposit", "charge"].includes(payload)) {
     if (payload === "deposit" || payload === "wallet_deposit" || payload === "charge") {
@@ -1784,7 +1809,8 @@ async function verifyAndFinalizeAgreedMatch(matchId: string): Promise<ClashApiSe
       return { state: "disputed", reason: "api_result_mismatch" };
     }
 
-    const finalized = await db.transaction(async (tx) => finalizeMatchResult(tx, matchId, resolution.winnerId));
+    await ensureAffiliateSchema();
+    const finalized = await db.transaction(async (tx) => finalizeMatchResult(tx, matchId, resolution.winnerId, { affiliateEligible: true }));
     if (!finalized.completed) return { state: "api_error", reason: finalized.reason };
     return {
       state: "completed",
@@ -2016,6 +2042,50 @@ async function startDispute(chatId: number, telegramId: string, matchId: string)
 async function startEvidenceUpload(chatId: number, telegramId: string, matchId: string) {
   await setSession(telegramId, "evidence_upload", { evidenceMatchId: matchId });
   await sendMessage(chatId, "📎 لطفاً اسکرین‌شات نتیجه را به‌صورت عکس ارسال کن. کپشن اختیاری است.", replyKeyboard([[CANCEL_TEXT]]));
+}
+
+async function affiliateCommand(chatId: number, telegramId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) return sendMessage(chatId, "برای همکاری رسانه‌ای ابتدا حساب را با /link به Gament وصل کن.", {
+    inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]],
+  });
+  const dashboard = await getMediaPartnerDashboard(linked.userId);
+  if (!dashboard.partner) return sendMessage(chatId, [
+    "📣 <b>همکاری رسانه‌ای با Gament</b>",
+    "",
+    "اگر کانال، گروه یا رسانه فعال داری، می‌توانی برای هر Match پولی واجد شرایط از استخر کمیسیون ۷ هزار تومانی سهم بگیری.",
+    "درخواست، احراز هویت و قرارداد OTPشده فقط داخل سایت انجام می‌شوند.",
+  ].join("\n"), { inline_keyboard: [[{ text: "📝 ثبت درخواست همکاری", url: `${APP_URL}/media-partners` }]] });
+  const partner = dashboard.partner;
+  const totals = dashboard.stats?.totals || {};
+  const available = formatTomanFromRial(BigInt(totals.available || "0"));
+  const pending = formatTomanFromRial(BigInt(totals.pending || "0") + BigInt(totals.shadow || "0"));
+  const rows: Array<Array<Record<string, string>>> = [[{ text: "📊 داشبورد کامل", url: `${APP_URL}/media-partners` }]];
+  if (partner.status === "active") rows.unshift([{ text: "📤 اشتراک لینک اختصاصی", url: `https://t.me/share/url?url=${encodeURIComponent(affiliatePublicLink(partner.referralCode))}` }]);
+  await sendMessage(chatId, [
+    "📣 <b>داشبورد رسانه Gament</b>",
+    `رسانه: <b>${html(partner.mediaName)}</b>`,
+    `وضعیت: <b>${html(partner.status)}</b>`,
+    partner.status === "active" ? `کد معرفی: <code>${html(partner.referralCode)}</code>` : "",
+    "",
+    `کلیک‌ها: <b>${Number(dashboard.stats?.clicks || 0).toLocaleString("fa-IR")}</b>`,
+    `Matchهای واجد: <b>${Number(dashboard.stats?.qualifiedMatches || 0).toLocaleString("fa-IR")}</b>`,
+    `در انتظار: <b>${html(pending)}</b>`,
+    `قابل برداشت: <b>${html(available)}</b>`,
+  ].filter(Boolean).join("\n"), { inline_keyboard: rows });
+}
+
+async function connectMediaGroupCommand(chatId: number, chatTitle: string | undefined, telegramId: string, referralCode: string) {
+  const normalized = normalizeAffiliateCode(referralCode);
+  if (!normalized) return sendMessage(chatId, "کد رسانه را وارد کن: <code>/connect_media CODE</code>");
+  const admins = await telegramApi<Array<{ user?: { id?: number } }>>("getChatAdministrators", { chat_id: chatId });
+  const isAdmin = Boolean(admins.ok && admins.result?.some((item) => String(item.user?.id || "") === telegramId));
+  if (!isAdmin) return sendMessage(chatId, "فقط مدیر همین گروه می‌تواند رسانه را به Gament متصل کند.");
+  const result = await connectTelegramMediaGroup({ referralCode: normalized, telegramUserId: telegramId, chatId: String(chatId), title: chatTitle || null });
+  if (!result.connected) return sendMessage(chatId, result.reason === "group_already_connected"
+    ? "این گروه قبلاً به رسانه دیگری متصل شده است؛ انتقال فقط پس از بررسی ادمین Gament انجام می‌شود."
+    : "کد رسانه فعال و متعلق به حساب شما پیدا نشد.");
+  return sendMessage(chatId, `✅ گروه <b>${html(chatTitle || String(chatId))}</b> به رسانه <b>${html(result.partner.mediaName)}</b> متصل شد. از این پس لینک‌های Flexa در این گروه با کد همین رسانه ساخته می‌شوند.`);
 }
 
 async function inviteCommand(chatId: number, telegramId: string) {
@@ -3115,6 +3185,8 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/coupon") return couponCommand(chatId, telegramId, args.join(" "));
   if (normalizedCommand === "/shop") return shopCommand(chatId);
   if (normalizedCommand === "/invite") return inviteCommand(chatId, telegramId);
+  if (normalizedCommand === "/affiliate") return affiliateCommand(chatId, telegramId);
+  if (normalizedCommand === "/connect_media") return sendMessage(chatId, "این دستور باید توسط مدیر داخل گروه موردنظر اجرا شود: <code>/connect_media CODE</code>");
   if (normalizedCommand === "/missions") { if (!(await ensureFeatureEnabled(chatId, "telegram_missions_enabled", "مأموریت‌ها"))) return; return missionsCommand(chatId, telegramId); }
   if (normalizedCommand === "/claim_missions") return missionsCommand(chatId, telegramId);
   if (normalizedCommand === "/leaderboard") return leaderboardCommand(chatId);
@@ -3661,6 +3733,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data.startsWith("clash1v1:cancel:")) return cancelClash1v1Queue(chatId, telegramId, data.replace("clash1v1:cancel:", ""));
   if (data.startsWith("qr:")) return startClashQrSubmission(chatId, telegramId, data.replace("qr:", ""));
   if (data === "menu:checkin") return checkInCommand(chatId, telegramId);
+  if (data === "menu:affiliate") return affiliateCommand(chatId, telegramId);
   if (data === "menu:missions") { if (!(await ensureFeatureEnabled(chatId, "telegram_missions_enabled", "مأموریت‌ها"))) return; return missionsCommand(chatId, telegramId); }
   if (data === "menu:quiz") { if (!(await ensureFeatureEnabled(chatId, "telegram_quiz_enabled", "کوییز روزانه"))) return; return quizCommand(chatId, telegramId); }
   if (data === "menu:support") { if (!(await ensureFeatureEnabled(chatId, "telegram_support_enabled", "پشتیبانی"))) return; return supportStartCommand(chatId, telegramId); }
@@ -3788,7 +3861,10 @@ async function handleGroupUpdate(update: TelegramUpdate) {
   const chat = updateChat(update);
   const actor = updateActor(update);
   if (!chat || !actor) return;
-  const privateClashUrl = telegramStartLink("clash");
+  const connectedMedia = await affiliatePartnerForTelegramChat(String(chat.id)).catch(() => null);
+  const privateClashUrl = connectedMedia
+    ? affiliatePublicLink(connectedMedia.referralCode, "GROUP")
+    : telegramStartLink("clash");
   const botUsername = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
   const keyboard = {
     inline_keyboard: [
@@ -3803,6 +3879,9 @@ async function handleGroupUpdate(update: TelegramUpdate) {
   }
   const parsed = parseTelegramCommand(update.message?.text || "");
   if (!parsed) return;
+  if (parsed.command === "/connect_media") {
+    return connectMediaGroupCommand(chat.id, chat.title, String(actor.id), parsed.args[0] || "");
+  }
   if (parsed.command === "/rules") {
     await sendMessage(chat.id, html(DEFAULT_RULES));
     await sendClash1v1Rules(chat.id, String(actor.id), false);
@@ -3813,6 +3892,7 @@ async function handleGroupUpdate(update: TelegramUpdate) {
       "⚔️ <b>Flexa در گروه فعال است</b>",
       "",
       "در گروه می‌توانید قوانین و لینک تورنومنت‌ها را ببینید. ثبت‌نام، کیف پول، Player Tag، دعوت خصوصی و نتیجه فقط در چت خصوصی انجام می‌شوند.",
+      connectedMedia ? `📣 رسانه متصل: <b>${html(connectedMedia.mediaName)}</b>` : "مدیر گروه می‌تواند با <code>/connect_media CODE</code> کد رسانه فعال را متصل کند.",
     ].join("\n"), keyboard);
     return;
   }

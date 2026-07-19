@@ -55,6 +55,16 @@ services:
         sync: false
       - key: GAMING_NEWS_MAX_PER_RUN
         value: '4'
+      - key: AFFILIATE_PROGRAM_LIVE
+        value: 'false'
+      - key: AFFILIATE_ATTRIBUTION_DAYS
+        value: '30'
+      - key: AFFILIATE_COMMISSION_TOMAN
+        value: '7000'
+      - key: AFFILIATE_HOLD_HOURS
+        value: '72'
+      - key: AFFILIATE_MINIMUM_PAYOUT_TOMAN
+        value: '300000'
       - key: FARAZSMS_API_KEY
         sync: false
       - key: FARAZSMS_PATTERN_CODE

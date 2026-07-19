@@ -24,6 +24,7 @@ export function mainMenuKeyboard() {
     [{ text: "✅ چک‌این", callback_data: "menu:checkin" }, { text: "⚔️ مسابقات من", callback_data: "menu:matches" }],
     [{ text: "⚔️ 1V1 کلش رویال", callback_data: "menu:clash_qr" }, { text: "🏅 کلش چندنفره", callback_data: "menu:clash_private" }],
     [{ text: "🎯 مأموریت‌ها", callback_data: "menu:missions" }, { text: "🧠 کوییز روزانه", callback_data: "menu:quiz" }],
+    [{ text: "📣 همکاری رسانه‌ای", callback_data: "menu:affiliate" }],
     [{ text: "📜 قوانین", callback_data: "menu:rules" }, { text: "🎧 پشتیبانی", callback_data: "menu:support" }],
     [{ text: "🔗 اتصال حساب", callback_data: "menu:link" }, { text: "👤 پروفایل", callback_data: "menu:profile" }],
     [{ text: "👤 وضعیت من", callback_data: "menu:status" }],

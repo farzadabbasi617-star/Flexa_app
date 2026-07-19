@@ -24,6 +24,7 @@ function groupCommands() {
     { command: "rules", description: "قوانین Gament و مسابقات 1V1" },
     { command: "rooms", description: "لینک تورنومنت‌های فعال" },
     { command: "clash", description: "شروع 1V1 کلش در چت خصوصی" },
+    { command: "connect_media", description: "اتصال امن گروه به کد رسانه" },
   ];
 }
 
@@ -45,6 +46,7 @@ function commands() {
     { command: "my_tickets", description: "تیکت‌های من" },
     { command: "missions", description: "مأموریت‌ها و پاداش XP" },
     { command: "invite", description: "لینک دعوت اختصاصی" },
+    { command: "affiliate", description: "همکاری رسانه‌ای، لینک و کمیسیون" },
     { command: "daily", description: "جایزه روزانه" },
     { command: "quiz", description: "کوییز روزانه" },
     { command: "leaderboard", description: "لیدربورد Gament" },
