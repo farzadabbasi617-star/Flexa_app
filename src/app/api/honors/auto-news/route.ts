@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { generateDailyGamingNews } from "@/lib/gaming-news-generator";
 import { normalizeAIEnvValue } from "@/lib/ai-provider-manager";
@@ -6,12 +7,22 @@ import logger from "@/lib/logger";
 export const dynamic = "force-dynamic";
 
 function isAuthorized(request: NextRequest) {
-  const secret = normalizeAIEnvValue(process.env.HONORS_AI_SECRET || process.env.TELEGRAM_CRON_SECRET || process.env.CRON_SECRET);
-  if (!secret) return process.env.NODE_ENV !== "production";
-  const auth = request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "";
-  const querySecret = request.nextUrl.searchParams.get("secret") || "";
-  const headerSecret = request.headers.get("x-gament-ai-secret") || "";
-  return auth === secret || querySecret === secret || headerSecret === secret;
+  const validSecrets = [
+    process.env.HONORS_AI_SECRET,
+    process.env.TELEGRAM_CRON_SECRET,
+    process.env.CRON_SECRET,
+  ].map(normalizeAIEnvValue).filter(Boolean);
+  if (!validSecrets.length) return process.env.NODE_ENV !== "production";
+  const provided = [
+    request.headers.get("authorization")?.replace(/^Bearer\s+/i, "") || "",
+    request.nextUrl.searchParams.get("secret") || "",
+    request.headers.get("x-gament-ai-secret") || "",
+  ].map((value) => normalizeAIEnvValue(value)).filter(Boolean);
+  return provided.some((candidate) => validSecrets.some((secret) => {
+    const left = Buffer.from(candidate);
+    const right = Buffer.from(secret);
+    return left.length === right.length && crypto.timingSafeEqual(left, right);
+  }));
 }
 
 export async function GET(request: NextRequest) {
