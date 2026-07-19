@@ -463,6 +463,10 @@ export const clash1v1Entries = pgTable("clash_1v1_entries", {
   status: clash1v1EntryStatusEnum("status").notNull().default("waiting_qr"),
   entryFeeRial: numeric("entry_fee_rial", { precision: 20, scale: 0 }).notNull().default("500000"),
   prizeRial: numeric("prize_rial", { precision: 20, scale: 0 }).notNull().default("800000"),
+  opponentType: varchar("opponent_type", { length: 16 }).notNull().default("random"),
+  stakeMode: varchar("stake_mode", { length: 16 }).notNull().default("paid"),
+  gameMode: varchar("game_mode", { length: 32 }).notNull().default("normal"),
+  challengeId: uuid("challenge_id"),
   inviteLink: text("invite_link"),
   qrFileId: varchar("qr_file_id", { length: 255 }),
   submittedAt: timestamp("submitted_at"),
@@ -477,8 +481,39 @@ export const clash1v1Entries = pgTable("clash_1v1_entries", {
 }, (table) => ({
   userStatusIdx: index("clash_1v1_entries_user_status_idx").on(table.userId, table.status),
   statusSubmittedIdx: index("clash_1v1_entries_status_submitted_idx").on(table.status, table.submittedAt),
+  queueModeIdx: index("clash_1v1_entries_queue_mode_idx").on(table.status, table.opponentType, table.stakeMode, table.gameMode, table.submittedAt),
+  challengeIdx: index("clash_1v1_entries_challenge_idx").on(table.challengeId),
   matchIdx: index("clash_1v1_entries_match_idx").on(table.matchedMatchId),
   telegramIdx: index("clash_1v1_entries_telegram_idx").on(table.telegramId),
+}));
+
+// Private friend challenges are negotiated before either wallet is debited.
+// The active proposal has one proposer; only the other party can accept it.
+export const clash1v1Challenges = pgTable("clash_1v1_challenges", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  tokenHash: varchar("token_hash", { length: 64 }).notNull().unique(),
+  tournamentId: uuid("tournament_id").notNull().references(() => tournaments.id),
+  challengerUserId: uuid("challenger_user_id").notNull().references(() => users.id),
+  challengerTelegramId: varchar("challenger_telegram_id", { length: 32 }).notNull(),
+  opponentUserId: uuid("opponent_user_id").references(() => users.id),
+  opponentTelegramId: varchar("opponent_telegram_id", { length: 32 }),
+  proposedByUserId: uuid("proposed_by_user_id").notNull().references(() => users.id),
+  stakeMode: varchar("stake_mode", { length: 16 }).notNull(),
+  gameMode: varchar("game_mode", { length: 32 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  proposalVersion: integer("proposal_version").notNull().default(1),
+  matchId: uuid("match_id").references(() => matches.id),
+  expiresAt: timestamp("expires_at").notNull(),
+  acceptedAt: timestamp("accepted_at"),
+  cancelledAt: timestamp("cancelled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  metadata: jsonb("metadata"),
+}, (table) => ({
+  challengerStatusIdx: index("clash_1v1_challenges_challenger_status_idx").on(table.challengerUserId, table.status),
+  opponentStatusIdx: index("clash_1v1_challenges_opponent_status_idx").on(table.opponentUserId, table.status),
+  expiresIdx: index("clash_1v1_challenges_expires_idx").on(table.status, table.expiresAt),
+  matchIdx: index("clash_1v1_challenges_match_idx").on(table.matchId),
 }));
 
 // Telegram pre-registrations

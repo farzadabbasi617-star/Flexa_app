@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import crypto from "crypto";
 import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { classifiedAds, classifiedScrapeLogs, couponRedemptions, coupons, disputes, matchEvidence, matchResultClaims, matches, players, registrations, telegramAccounts, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews } from "@/db/schema";
+import { classifiedAds, classifiedScrapeLogs, clash1v1Entries, couponRedemptions, coupons, disputes, matchEvidence, matchResultClaims, matches, players, registrations, telegramAccounts, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
 import { notifyLinkedUserOnTelegram, publishHonorToTelegramChannel, publishTournamentToTelegramChannel, telegramApi } from "@/lib/telegram";
 import { getGameIdGuide, gameGuideKeyboard } from "./guide";
@@ -45,10 +45,27 @@ import {
   promptClash1v1Qr,
   registerClash1v1Queue,
   markClash1v1Ready,
+  showClash1v1ModeMenu,
+  showClash1v1StakeMenu,
   sendClashFriendLinkGuide,
   submitClash1v1Qr,
 } from "./commands/clash-1v1";
 import { isSupportedClashInvite } from "./commands/clash-1v1-policy";
+import {
+  acceptFriendChallenge,
+  closeFriendChallenge,
+  counterFriendChallengeMode,
+  createClashFriendChallenge,
+  openClashFriendChallenge,
+  showFriendChallengeModeMenu,
+} from "./commands/clash-friend-duel";
+import {
+  clashBattleMatchesExpectedMode,
+  clashDuelModeLabel,
+  isClashDuelGameMode,
+  isClashDuelOpponentType,
+  isClashDuelStakeMode,
+} from "@/lib/clash-duel-policy";
 import { getAdminIds, hasAdminAccess } from "./admin-access";
 import { downloadTelegramPhotoAsDataUrl, downloadTelegramQrPhoto } from "./files";
 import { parseTelegramCommand } from "./command-router";
@@ -293,6 +310,12 @@ async function handleStartPayload(chatId: number, telegramId: string, user: Tele
 
   if (payload === "link") {
     await linkCommand(chatId, user);
+    return true;
+  }
+
+  const friendDuelToken = payload.match(/^duel_([A-Za-z0-9_-]{20,40})$/)?.[1];
+  if (friendDuelToken) {
+    await openClashFriendChallenge(chatId, telegramId, friendDuelToken);
     return true;
   }
 
@@ -544,7 +567,7 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
     tournament.game === CLASH_1V1_CONFIG.game &&
     (tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel || tournament.name === CLASH_1V1_CONFIG.name)
   ) {
-    await registerClash1v1Queue(chatId, telegramId);
+    await openClash1v1Queue(chatId, telegramId);
     return;
   }
 
@@ -1612,7 +1635,22 @@ async function loadMatchResultContext(matchId: string, client: any = db) {
   const player1 = byId.get(match.player1Id);
   const player2 = byId.get(match.player2Id);
   if (!player1?.userId || !player2?.userId) return null;
-  return { ...match, player1, player2 };
+  const [duelEntry] = await client
+    .select({
+      stakeMode: clash1v1Entries.stakeMode,
+      gameMode: clash1v1Entries.gameMode,
+      opponentType: clash1v1Entries.opponentType,
+      prizeRial: clash1v1Entries.prizeRial,
+    })
+    .from(clash1v1Entries)
+    .where(eq(clash1v1Entries.matchedMatchId, matchId))
+    .limit(1);
+  return {
+    ...match,
+    player1,
+    player2,
+    duel: duelEntry || { stakeMode: "paid", gameMode: "normal", opponentType: "random", prizeRial: "800000" },
+  };
 }
 
 function resultClaimLabel(claim?: string | null) {
@@ -1647,9 +1685,11 @@ async function notifyFinalMatchResult(matchId: string, winnerId: string, prizePa
   if (!context) return;
   const winner = context.player1.id === winnerId ? context.player1 : context.player2;
   const loser = winner === context.player1 ? context.player2 : context.player1;
-  const prizeLine = prizePaid
-    ? `\n💰 جایزه <b>${html(CLASH_1V1_CONFIG.prize1st)}</b> به کیف پول شما واریز شد.`
-    : "\n💰 وضعیت جایزه در سوابق کیف پول قابل پیگیری است.";
+  const prizeLine = context.duel.stakeMode === "free"
+    ? "\n🆓 این رقابت رایگان بود و جایزه مالی ندارد."
+    : prizePaid
+      ? `\n💰 جایزه <b>${html(CLASH_1V1_CONFIG.prize1st)}</b> به کیف پول شما واریز شد.`
+      : "\n💰 وضعیت جایزه در سوابق کیف پول قابل پیگیری است.";
 
   await Promise.allSettled([
     evaluateUserAchievements(winner.userId),
@@ -1676,6 +1716,7 @@ type ClashApiSettlementResult =
   | { state: "missing_tags" }
   | { state: "api_error"; reason: string }
   | { state: "disputed"; reason: string }
+  | { state: "replay_required"; reason: string }
   | { state: "no_consensus" };
 
 async function verifyAndFinalizeAgreedMatch(matchId: string): Promise<ClashApiSettlementResult> {
@@ -1704,6 +1745,27 @@ async function verifyAndFinalizeAgreedMatch(matchId: string): Promise<ClashApiSe
       notBefore: new Date(new Date(context.scheduledAt || context.createdAt).getTime() - 30_000),
     });
     if (!battle) return { state: "pending_api" };
+    const expectedMode = context.duel.gameMode || "normal";
+    if (isClashDuelGameMode(expectedMode) && !clashBattleMatchesExpectedMode(expectedMode, battle)) {
+      const evidence = {
+        source: "clash_api_mode_mismatch",
+        expectedGameMode: expectedMode,
+        actualGameMode: battle.gameMode,
+        actualBattleType: battle.battleType,
+        actualDeckSelection: battle.raw.deckSelection || null,
+        battleTime: battle.battleTime.toISOString(),
+      };
+      if (context.duel.stakeMode === "free") {
+        await db.transaction(async (tx) => {
+          await tx.update(matches).set({ status: "pending", scheduledAt: null, evidence: { ...evidence, action: "replay_required" } }).where(eq(matches.id, matchId));
+          await tx.delete(matchResultClaims).where(eq(matchResultClaims.matchId, matchId));
+          await tx.update(clash1v1Entries).set({ readyAt: null, updatedAt: new Date() }).where(eq(clash1v1Entries.matchedMatchId, matchId));
+        });
+        return { state: "replay_required", reason: "api_mode_mismatch" };
+      }
+      await db.update(matches).set({ status: "disputed", evidence }).where(eq(matches.id, matchId));
+      return { state: "disputed", reason: "api_mode_mismatch" };
+    }
     const claimedWinner = resolution.winnerId === context.player1.id ? player1Tag : player2Tag;
     if (!battle.winnerTag || battle.winnerTag !== claimedWinner) {
       await db.update(matches).set({
@@ -1908,14 +1970,27 @@ async function submitTelegramResult(chatId: number, telegramId: string, matchId:
     await notifyFinalMatchResult(matchId, settlement.winnerId, settlement.prizePaid);
     return;
   }
-  if (settlement.state === "disputed") {
+  if (settlement.state === "replay_required") {
+    const replayText = `⚠️ مود مسابقه رایگان با مود توافق‌شده «${html(clashDuelModeLabel(context?.duel.gameMode || "normal"))}» یکسان نبود. نتیجه ثبت نشد؛ لطفاً Match را با مود درست تکرار کنید و دوباره «آماده‌ام» بزنید.`;
     if (context) {
       await Promise.allSettled([
-        notifyLinkedUserOnTelegram(context.player1.userId, "🚨 نتیجه ثبت‌شده با Battle Log کلش رویال مطابقت ندارد و برای داوری ارسال شد."),
-        notifyLinkedUserOnTelegram(context.player2.userId, "🚨 نتیجه ثبت‌شده با Battle Log کلش رویال مطابقت ندارد و برای داوری ارسال شد."),
+        notifyLinkedUserOnTelegram(context.player1.userId, replayText, { inline_keyboard: [[{ text: "🎮 شروع دوباره", callback_data: "clash1v1:status" }]] }),
+        notifyLinkedUserOnTelegram(context.player2.userId, replayText, { inline_keyboard: [[{ text: "🎮 شروع دوباره", callback_data: "clash1v1:status" }]] }),
       ]);
     }
-    await notifyResultAdmins(matchId, `🚨 <b>اختلاف با Clash Royale API</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>`);
+    return;
+  }
+  if (settlement.state === "disputed") {
+    const mismatchText = settlement.reason === "api_mode_mismatch"
+      ? `🚨 مود بازی انجام‌شده با مود توافق‌شده «${html(clashDuelModeLabel(context?.duel.gameMode || "normal"))}» مطابقت ندارد و برای داوری ارسال شد.`
+      : "🚨 نتیجه ثبت‌شده با Battle Log کلش رویال مطابقت ندارد و برای داوری ارسال شد.";
+    if (context) {
+      await Promise.allSettled([
+        notifyLinkedUserOnTelegram(context.player1.userId, mismatchText),
+        notifyLinkedUserOnTelegram(context.player2.userId, mismatchText),
+      ]);
+    }
+    await notifyResultAdmins(matchId, `🚨 <b>اختلاف با Clash Royale API</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>\nReason: <code>${html(settlement.reason)}</code>`);
     return;
   }
   if (settlement.state === "missing_tags") {
@@ -3504,8 +3579,34 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:my_tournaments") return myTournamentsCommand(chatId, telegramId);
   if (data === "menu:matches") return matchesCommand(chatId, telegramId);
   if (data === "menu:clash_private") return clashPrivateTournamentsCommand(chatId, telegramId);
+  if (data.startsWith("clash1v1:opponent:")) {
+    const opponentType = data.replace("clash1v1:opponent:", "");
+    if (isClashDuelOpponentType(opponentType)) return showClash1v1StakeMenu(chatId, opponentType);
+  }
+  if (data.startsWith("clash1v1:stake:")) {
+    const [, , opponentType, stakeMode] = data.split(":");
+    if (isClashDuelOpponentType(opponentType) && isClashDuelStakeMode(stakeMode)) {
+      return showClash1v1ModeMenu(chatId, opponentType, stakeMode);
+    }
+  }
+  if (data.startsWith("clash1v1:mode:")) {
+    const [, , opponentType, stakeMode, gameMode] = data.split(":");
+    if (isClashDuelOpponentType(opponentType) && isClashDuelStakeMode(stakeMode) && isClashDuelGameMode(gameMode)) {
+      return opponentType === "random"
+        ? registerClash1v1Queue(chatId, telegramId, { stakeMode, gameMode })
+        : createClashFriendChallenge(chatId, telegramId, stakeMode, gameMode);
+    }
+  }
+  if (data.startsWith("c1f:")) {
+    const [, action, value, challengeIdMaybe] = data.split(":");
+    if (action === "accept" && value) return acceptFriendChallenge(chatId, telegramId, value);
+    if (action === "modes" && value) return showFriendChallengeModeMenu(chatId, telegramId, value);
+    if (action === "mode" && value && challengeIdMaybe) return counterFriendChallengeMode(chatId, telegramId, challengeIdMaybe, value);
+    if (action === "cancel" && value) return closeFriendChallenge(chatId, telegramId, value, "cancel");
+    if (action === "reject" && value) return closeFriendChallenge(chatId, telegramId, value, "reject");
+  }
   if (data === "menu:clash_qr" || data === "clash1v1:status") return openClash1v1Queue(chatId, telegramId);
-  if (data === "clash1v1:register") return registerClash1v1Queue(chatId, telegramId);
+  if (data === "clash1v1:register") return openClash1v1Queue(chatId, telegramId);
   if (data.startsWith("clash1v1:qr:")) return promptClash1v1Qr(chatId, telegramId, data.replace("clash1v1:qr:", ""));
   if (data.startsWith("clash1v1:ready:")) return markClash1v1Ready(chatId, telegramId, data.replace("clash1v1:ready:", ""));
   if (data.startsWith("clash1v1:cancel:")) return cancelClash1v1Queue(chatId, telegramId, data.replace("clash1v1:cancel:", ""));
@@ -3526,6 +3627,11 @@ async function handleCallback(callback: TelegramCallbackQuery) {
       if (settlement.state === "completed") {
         await notifyFinalMatchResult(matchId, settlement.winnerId, settlement.prizePaid);
         return sendMessage(chatId, "✅ Battle Log تأیید شد و نتیجه/جایزه نهایی شد.");
+      }
+      if (settlement.state === "replay_required") {
+        return sendMessage(chatId, "⚠️ مود بازی رایگان با مود توافق‌شده یکی نبود. نتیجه حذف شد؛ از وضعیت 1V1 مسابقه را با مود درست دوباره شروع کنید.", {
+          inline_keyboard: [[{ text: "🎮 شروع دوباره", callback_data: "clash1v1:status" }]],
+        });
       }
       if (settlement.state === "disputed") {
         await notifyResultAdmins(matchId, `🚨 <b>اختلاف با Clash Royale API</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>`);

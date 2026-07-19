@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { clash1v1Entries, matches, players, tournaments, transactions, wallets } from "@/db/schema";
-import { and, eq, sql } from "drizzle-orm";
+import { clash1v1Challenges, clash1v1Entries, matches, players, tournaments, transactions, wallets } from "@/db/schema";
+import { and, eq, inArray, lte, sql } from "drizzle-orm";
 import { ensureWalletMoneySchema, updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
 
 
@@ -36,10 +36,40 @@ async function createClash1v1Schema(client: any) {
 
   await client.execute(sql.raw(`ALTER TABLE clash_1v1_entries ADD COLUMN IF NOT EXISTS ready_at timestamp;`));
   await client.execute(sql.raw(`ALTER TABLE clash_1v1_entries ADD COLUMN IF NOT EXISTS qr_file_id varchar(255);`));
+  await client.execute(sql.raw(`ALTER TABLE clash_1v1_entries ADD COLUMN IF NOT EXISTS opponent_type varchar(16) NOT NULL DEFAULT 'random';`));
+  await client.execute(sql.raw(`ALTER TABLE clash_1v1_entries ADD COLUMN IF NOT EXISTS stake_mode varchar(16) NOT NULL DEFAULT 'paid';`));
+  await client.execute(sql.raw(`ALTER TABLE clash_1v1_entries ADD COLUMN IF NOT EXISTS game_mode varchar(32) NOT NULL DEFAULT 'normal';`));
+  await client.execute(sql.raw(`ALTER TABLE clash_1v1_entries ADD COLUMN IF NOT EXISTS challenge_id uuid;`));
+  await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS clash_1v1_challenges (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    token_hash varchar(64) NOT NULL UNIQUE,
+    tournament_id uuid NOT NULL REFERENCES tournaments(id),
+    challenger_user_id uuid NOT NULL REFERENCES users(id),
+    challenger_telegram_id varchar(32) NOT NULL,
+    opponent_user_id uuid REFERENCES users(id),
+    opponent_telegram_id varchar(32),
+    proposed_by_user_id uuid NOT NULL REFERENCES users(id),
+    stake_mode varchar(16) NOT NULL,
+    game_mode varchar(32) NOT NULL,
+    status varchar(20) NOT NULL DEFAULT 'pending',
+    proposal_version integer NOT NULL DEFAULT 1,
+    match_id uuid REFERENCES matches(id),
+    expires_at timestamp NOT NULL,
+    accepted_at timestamp,
+    cancelled_at timestamp,
+    created_at timestamp NOT NULL DEFAULT now(),
+    updated_at timestamp NOT NULL DEFAULT now(),
+    metadata jsonb
+  );`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_user_status_idx ON clash_1v1_entries(user_id, status);`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_status_submitted_idx ON clash_1v1_entries(status, submitted_at);`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_queue_mode_idx ON clash_1v1_entries(status, opponent_type, stake_mode, game_mode, submitted_at);`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_challenge_idx ON clash_1v1_entries(challenge_id);`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_match_idx ON clash_1v1_entries(matched_match_id);`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_entries_telegram_idx ON clash_1v1_entries(telegram_id);`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_challenges_challenger_status_idx ON clash_1v1_challenges(challenger_user_id, status);`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_challenges_opponent_status_idx ON clash_1v1_challenges(opponent_user_id, status);`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS clash_1v1_challenges_expires_idx ON clash_1v1_challenges(status, expires_at);`));
 
   await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS match_result_claims (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -74,6 +104,19 @@ export async function ensureClash1v1Schema(client: any = db) {
   return createClash1v1Schema(client);
 }
 
+export async function expireClash1v1Challenges() {
+  await ensureClash1v1Schema();
+  const expired = await db
+    .update(clash1v1Challenges)
+    .set({ status: "expired", updatedAt: new Date() })
+    .where(and(
+      inArray(clash1v1Challenges.status, ["pending", "countered"]),
+      lte(clash1v1Challenges.expiresAt, new Date()),
+    ))
+    .returning({ id: clash1v1Challenges.id });
+  return { expired: expired.length };
+}
+
 export const CLASH_1V1_CONFIG = {
   name: "1V1 کلش رویال",
   categoryLabel: "clash_1v1_queue",
@@ -89,9 +132,9 @@ export const CLASH_1V1_CONFIG = {
   gameMode: "1V1 Friendly Battle",
   mapName: "Arena",
   description:
-    "صف خودکار 1V1 کلش رویال: هر بازیکن ۵۰ هزار تومان ورودی می‌دهد، QR یا پیوند دوستی رسمی کلش رویال را برای بات می‌فرستد، دو نفر به هم وصل می‌شوند و برنده ۸۰ هزار تومان جایزه می‌گیرد.",
+    "رقابت 1V1 کلش رویال با حریف تصادفی یا دعوت خصوصی دوست، در حالت رایگان یا پولی و مودهای معمولی، انتخاب کارت، Triple Draft و Sudden Death. نتیجه و مود با Battle Log بررسی می‌شوند.",
   rules:
-    "• فقط آیدی/اکانت کلش رویال خودتان مجاز است.\n• بعد از پرداخت، از بخش افزودن دوست QR یا «اشتراک‌گذاری پیوند» را برای بات بفرستید.\n• دو بازیکن به‌صورت خودکار به هم معرفی می‌شوند.\n• هر دو بازیکن نتیجه را مستقل ثبت می‌کنند؛ نتایج موافق خودکار نهایی و اختلاف‌ها توسط داور بررسی می‌شوند.\n• ارسال اسکرین‌شات نتیجه برای بررسی اختلاف توصیه می‌شود.\n• جایزه نفر اول هر 1V1: ۸۰,۰۰۰ تومان.",
+    "• فقط Player Tag تأییدشده خودتان مجاز است.\n• نوع حریف، رایگان/پولی بودن و مود بازی پیش از ورود مشخص می‌شود.\n• در بازی با دوست، تا توافق دو طرف روی مود هیچ مبلغی کسر نمی‌شود.\n• بعد از توافق، QR یا «اشتراک‌گذاری پیوند» رسمی کلش رویال را برای بات بفرستید.\n• در صف تصادفی فقط بازیکنان دارای نوع مالی و مود یکسان به هم معرفی می‌شوند.\n• هر دو بازیکن نتیجه را مستقل ثبت می‌کنند؛ Battle Log نتیجه و مود انجام‌شده را بررسی می‌کند.\n• مود اشتباه در رقابت پولی به داوری می‌رود و در رقابت رایگان نیاز به تکرار دارد.\n• جایزه هر 1V1 پولی: ۸۰,۰۰۰ تومان.",
   lobbyNotes:
     "این حالت نیاز به Room ID یا Password ندارد. بات QR یا پیوند دوستی دو حریف را برای یکدیگر ارسال می‌کند.",
  } as const;
@@ -147,6 +190,16 @@ export async function payoutClash1v1Prize(tx: any, matchId: string, winnerPlayer
 
   if (!winner?.userId) return { paid: false as const, reason: "winner_user_not_found" };
 
+  const [duelEntry] = await tx
+    .select({ prizeRial: clash1v1Entries.prizeRial, stakeMode: clash1v1Entries.stakeMode })
+    .from(clash1v1Entries)
+    .where(eq(clash1v1Entries.matchedMatchId, matchId))
+    .limit(1);
+  const configuredPrize = duelEntry ? BigInt(duelEntry.prizeRial || "0") : clash1v1PrizeRial();
+  if (duelEntry?.stakeMode === "free" || configuredPrize <= BigInt(0)) {
+    return { paid: false as const, reason: "free_match_no_prize" as const };
+  }
+
   const referenceId = `clash-1v1-prize-${matchId}`;
   const [existing] = await tx
     .select({ id: transactions.id })
@@ -161,7 +214,7 @@ export async function payoutClash1v1Prize(tx: any, matchId: string, winnerPlayer
     [wallet] = await tx.insert(wallets).values({ userId: winner.userId, balance: "0", currency: "RIAL" }).returning();
   }
 
-  const amountRial = clash1v1PrizeRial();
+  const amountRial = configuredPrize;
   const credited = await updateWalletBalanceSafely(tx, wallet.id, amountRial, "increase");
   if (!credited) throw new Error("CLASH_1V1_PRIZE_WALLET_UPDATE_FAILED");
 

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { matchResultClaims, matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions, users, honors, honorLikes, honorViews } from "@/db/schema";
+import { clash1v1Entries, matchResultClaims, matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions, users, honors, honorLikes, honorViews } from "@/db/schema";
 import { getTelegramChannelChatId } from "@/lib/telegram";
 import {
   cleanupTelegramReliability,
@@ -13,8 +13,9 @@ import logger from "@/lib/logger";
 import { processClash1v1ReadyTimeouts, runClash1v1MatchmakingAndNotify } from "../webhook/commands/clash-1v1";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 import { ensurePrivateTournamentAttendanceSchema, privateCheckInWindow } from "@/lib/private-tournament-attendance";
-import { CLASH_1V1_CONFIG, finalizeMatchResult } from "@/lib/clash-1v1";
+import { CLASH_1V1_CONFIG, expireClash1v1Challenges, finalizeMatchResult } from "@/lib/clash-1v1";
 import { resolveMatchResultClaims, type MatchResultClaimValue } from "@/lib/match-result-policy";
+import { clashBattleMatchesExpectedMode, isClashDuelGameMode } from "@/lib/clash-duel-policy";
 import { getClashRoyaleApiConfiguration, normalizeClashRoyaleTag, verifyClashRoyaleHeadToHead } from "@/lib/clash-royale-api";
 import { processStoreOrderDeadlines } from "@/lib/store-service";
 
@@ -286,6 +287,39 @@ async function verifyPendingClash1v1Results() {
         notBefore: new Date(new Date(match.scheduledAt).getTime() - 30_000),
       });
       if (!battle) continue;
+      const [duelEntry] = await db.select({ gameMode: clash1v1Entries.gameMode, stakeMode: clash1v1Entries.stakeMode })
+        .from(clash1v1Entries).where(eq(clash1v1Entries.matchedMatchId, match.id)).limit(1);
+      const expectedMode = duelEntry?.gameMode || "normal";
+      if (isClashDuelGameMode(expectedMode) && !clashBattleMatchesExpectedMode(expectedMode, battle)) {
+        const evidence = {
+          source: "clash_api_cron_mode_mismatch",
+          expectedGameMode: expectedMode,
+          actualGameMode: battle.gameMode,
+          actualBattleType: battle.battleType,
+          actualDeckSelection: battle.raw.deckSelection || null,
+          battleTime: battle.battleTime.toISOString(),
+        };
+        if (duelEntry?.stakeMode === "free") {
+          await db.transaction(async (tx) => {
+            await tx.update(matches).set({ status: "pending", scheduledAt: null, evidence: { ...evidence, action: "replay_required" } }).where(eq(matches.id, match.id));
+            await tx.delete(matchResultClaims).where(eq(matchResultClaims.matchId, match.id));
+            await tx.update(clash1v1Entries).set({ readyAt: null, updatedAt: new Date() }).where(eq(clash1v1Entries.matchedMatchId, match.id));
+          });
+          for (const player of [player1, player2]) {
+            if (!player?.userId) continue;
+            const [account] = await db.select({ telegramId: telegramAccounts.telegramId }).from(telegramAccounts)
+              .where(eq(telegramAccounts.userId, player.userId)).limit(1);
+            if (account?.telegramId) await sendTelegramMessage(account.telegramId, "⚠️ مود مسابقه رایگان با مود توافق‌شده یکی نبود. نتیجه ثبت نشد؛ Match را با مود درست تکرار کنید.", {
+              inline_keyboard: [[{ text: "🎮 شروع دوباره", callback_data: "clash1v1:status" }]],
+            });
+          }
+        } else {
+          await db.update(matches).set({ status: "disputed", evidence }).where(eq(matches.id, match.id));
+          await sendToAdmins(`🚨 <b>اختلاف مود با Clash API</b>\nMatch: <code>${html(match.id.slice(0, 8))}</code>\nExpected: <code>${html(expectedMode)}</code>`);
+          disputed += 1;
+        }
+        continue;
+      }
       const claimedWinnerTag = resolution.winnerId === match.player1Id ? player1Tag : player2Tag;
       if (!battle.winnerTag || battle.winnerTag !== claimedWinnerTag) {
         await db.update(matches).set({ status: "disputed", evidence: {
@@ -691,6 +725,7 @@ export async function GET(request: NextRequest) {
   const privateLeaderboardPrompts = await safeCronStep("privateLeaderboardPrompts", promptPrivateTournamentLeaderboardUploads);
   const clash1v1Matchmaking = await safeCronStep("clash1v1Matchmaking", runClash1v1MatchmakingAndNotify);
   const clash1v1ReadyTimeouts = await safeCronStep("clash1v1ReadyTimeouts", () => processClash1v1ReadyTimeouts(10));
+  const clash1v1ExpiredChallenges = await safeCronStep("clash1v1ExpiredChallenges", expireClash1v1Challenges);
   const clash1v1ApiVerification = await safeCronStep("clash1v1ApiVerification", verifyPendingClash1v1Results);
   const matchAssigned = await safeCronStep("matchAssigned", sendMatchAssignmentNotifications);
   const matchScheduled = await safeCronStep("matchScheduled", sendMatchScheduleNotifications);
@@ -718,6 +753,7 @@ export async function GET(request: NextRequest) {
     privateLeaderboardPrompts,
     clash1v1Matchmaking,
     clash1v1ReadyTimeouts,
+    clash1v1ExpiredChallenges,
     clash1v1ApiVerification,
     matchAssigned,
     matchScheduled,

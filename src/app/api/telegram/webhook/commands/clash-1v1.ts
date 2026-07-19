@@ -1,6 +1,7 @@
 import { and, count, desc, eq, gte, inArray, isNotNull, lte, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  clash1v1Challenges,
   clash1v1Entries,
   matches,
   players,
@@ -23,6 +24,13 @@ import { getLinkedUserByTelegram } from "../user-service";
 import { extractInviteReference, html } from "../utils";
 import { isSupportedClashInvite } from "./clash-1v1-policy";
 import { getAdminIds } from "../admin-access";
+import {
+  CLASH_DUEL_GAME_MODES,
+  clashDuelModeLabel,
+  clashDuelStakeLabel,
+  type ClashDuelGameMode,
+  type ClashDuelStakeMode,
+} from "@/lib/clash-duel-policy";
 
 const QUEUE_LOCK_ID = 7_100_171;
 const RECENT_INVITE_REUSE_MS = 24 * 60 * 60 * 1000;
@@ -41,6 +49,10 @@ interface QueueParticipant {
   gameId: string | null;
   clashRoyaleId: string | null;
   clashRoyaleUsername: string | null;
+  opponentType: string;
+  stakeMode: string;
+  gameMode: string;
+  challengeId: string | null;
 }
 
 interface QueuePair {
@@ -175,13 +187,22 @@ async function getActiveEntry(userId: string) {
   return entry || null;
 }
 
-async function queuePosition(entry: { id: string; submittedAt: Date | null }) {
+async function queuePosition(entry: {
+  id: string;
+  submittedAt: Date | null;
+  opponentType?: string;
+  stakeMode?: string;
+  gameMode?: string;
+}) {
   if (!entry.submittedAt) return null;
   const [{ value }] = await db
     .select({ value: count() })
     .from(clash1v1Entries)
     .where(and(
       eq(clash1v1Entries.status, "queued"),
+      eq(clash1v1Entries.opponentType, entry.opponentType || "random"),
+      eq(clash1v1Entries.stakeMode, entry.stakeMode || "paid"),
+      eq(clash1v1Entries.gameMode, entry.gameMode || "normal"),
       lte(clash1v1Entries.submittedAt, entry.submittedAt)
     ));
   return Math.max(1, Number(value || 1));
@@ -233,7 +254,12 @@ export async function promptClash1v1Qr(chatId: number, telegramId: string, entry
   // Keep the legacy function/state name so users already in this conversation
   // survive a rolling deploy; the accepted input is now an invite link only.
   await setSession(telegramId, "clash_1v1_qr_submission", { clash1v1EntryId: entryId });
-  await sendMessage(chatId, inviteLinkPrompt(entryId), replyKeyboard([[CANCEL_TEXT]]));
+  const [entry] = await db.select({ gameMode: clash1v1Entries.gameMode, stakeMode: clash1v1Entries.stakeMode })
+    .from(clash1v1Entries).where(eq(clash1v1Entries.id, entryId)).limit(1);
+  const selection = entry
+    ? `\n\n🎮 مود: <b>${html(clashDuelModeLabel(entry.gameMode))}</b>\n💳 نوع: <b>${html(clashDuelStakeLabel(entry.stakeMode))}</b>`
+    : "";
+  await sendMessage(chatId, `${inviteLinkPrompt(entryId)}${selection}`, replyKeyboard([[CANCEL_TEXT]]));
   await sendClashFriendLinkGuide(chatId);
 }
 
@@ -268,6 +294,10 @@ async function loadPair(matchId: string): Promise<QueuePair | null> {
       gameId: players.gameId,
       clashRoyaleId: users.clashRoyaleId,
       clashRoyaleUsername: users.clashRoyaleUsername,
+      opponentType: clash1v1Entries.opponentType,
+      stakeMode: clash1v1Entries.stakeMode,
+      gameMode: clash1v1Entries.gameMode,
+      challengeId: clash1v1Entries.challengeId,
     })
     .from(clash1v1Entries)
     .innerJoin(players, eq(clash1v1Entries.playerId, players.id))
@@ -316,18 +346,46 @@ async function notifyPairSide(pair: QueuePair, me: QueueParticipant, opponent: Q
   keyboard.push([{ text: me.readyAt ? "✅ آماده‌ام" : "🎮 آماده‌ام", callback_data: `clash1v1:ready:${me.entryId}` }, { text: "🚨 مشکل با حریف", callback_data: `dispute:${pair.matchId}` }]);
   if (opponentHasQr) await sendPhoto(chatId, opponent.qrFileId!, "📷 QR دوستی حریف — آن را داخل Clash Royale اسکن کن.");
   const details = [
-    "✅ <b>حریف پیدا شد؛ آماده شوید</b>", "",
-    `👤 حریف: <b>${html(participantName(opponent))}</b>`, `🏷 Player Tag: <code>${html(participantTag(opponent))}</code>`,
-    ...(opponentHasLink ? [`🔗 پیوند دوستی: ${html(opponent.inviteLink!)}`] : ["📷 QR حریف ارسال شد."]), "",
+    "✅ <b>حریف پیدا شد؛ آماده شوید</b>",
+    "",
+    `👤 حریف: <b>${html(participantName(opponent))}</b>`,
+    `🏷 Player Tag: <code>${html(participantTag(opponent))}</code>`,
+    `🎮 مود توافق‌شده: <b>${html(clashDuelModeLabel(me.gameMode || "normal"))}</b>`,
+    `💳 نوع رقابت: <b>${html(clashDuelStakeLabel(me.stakeMode || "paid"))}</b>`,
+    me.opponentType === "friend" ? `👑 میزبان ارسال درخواست بازی: <b>${html(participantName(pair.player1))}</b>` : "",
+    ...(opponentHasLink ? [`🔗 پیوند دوستی: ${html(opponent.inviteLink!)}`] : ["📷 QR حریف ارسال شد."]),
+    "",
     opponentHasLink ? "1) دکمه «باز کردن پیوند دوستی حریف» را بزن." : "1) QR ارسال‌شده را داخل Clash Royale اسکن کن.",
-    "2) در Clash Royale حریف را Add Friend کن.", "3) وقتی آماده شدی دکمه «آماده‌ام» را بزن.",
-    "4) بازی را فقط بعد از پیام رسمی شروع Match آغاز کنید.", "5) بعد از بازی، نتیجه را ثبت کن؛ Battle Log خودکار بررسی می‌شود.", "",
+    "2) در Clash Royale حریف را Add Friend کن.",
+    "3) وقتی آماده شدی دکمه «آماده‌ام» را بزن.",
+    "4) بازی را فقط بعد از پیام رسمی شروع Match آغاز کنید.",
+    "5) بعد از بازی، نتیجه را ثبت کن؛ Battle Log نتیجه و مود را بررسی می‌کند.",
+    "",
     `Match ID: <code>${html(pair.matchId.slice(0, 8))}</code>`,
-  ].join("\n");
-  const sent = await sendMessage(chatId, details, { inline_keyboard: keyboard });
-  if (!sent?.ok) return false;
-  try { await db.insert(telegramSentNotifications).values({ dedupeKey: matchNotificationKey(pair.matchId, me.telegramId), telegramId: me.telegramId, tournamentId: pair.tournamentId, type: "clash_1v1_matched" }).onConflictDoNothing({ target: telegramSentNotifications.dedupeKey }); }
-  catch (err) { logger.warn({ err, matchId: pair.matchId }, "Clash notification dedupe write failed"); }
+  ].filter(Boolean).join("\n");
+
+  let messageResult = await sendMessage(chatId, details, { inline_keyboard: keyboard });
+  if (!messageResult?.ok && opponentHasLink) {
+    logger.warn({ chatId, matchId: pair.matchId }, "Clash notification URL button failed; retrying actions only");
+    messageResult = await sendMessage(chatId, details, {
+      inline_keyboard: [[
+        { text: "🎮 آماده‌ام", callback_data: `clash1v1:ready:${me.entryId}` },
+        { text: "🚨 مشکل با حریف", callback_data: `dispute:${pair.matchId}` },
+      ]],
+    });
+  }
+  if (!messageResult?.ok) messageResult = await sendMessage(chatId, details);
+  if (!messageResult?.ok) return false;
+  try {
+    await db.insert(telegramSentNotifications).values({
+      dedupeKey: matchNotificationKey(pair.matchId, me.telegramId),
+      telegramId: me.telegramId,
+      tournamentId: pair.tournamentId,
+      type: "clash_1v1_matched",
+    }).onConflictDoNothing({ target: telegramSentNotifications.dedupeKey });
+  } catch (err) {
+    logger.warn({ err, matchId: pair.matchId }, "Clash notification dedupe write failed");
+  }
   return true;
 }
 
@@ -365,10 +423,12 @@ async function notifyMatchStartedSide(pair: QueuePair, player: QueueParticipant)
     "🚀 <b>Match شروع شد</b>",
     "",
     "هر دو بازیکن آماده‌اند. همین الان Friendly Battle را آغاز کنید.",
-    "پس از پایان، نتیجه را مستقل ثبت کنید؛ سیستم Battle Log کلش رویال را بررسی می‌کند.",
+    `🎮 مود اجباری: <b>${html(clashDuelModeLabel(player.gameMode || "normal"))}</b>`,
+    player.opponentType === "friend" ? `👑 میزبان: <b>${html(participantName(pair.player1))}</b>` : "",
+    "پس از پایان، نتیجه را مستقل ثبت کنید؛ سیستم Battle Log کلش رویال و مود انجام‌شده را بررسی می‌کند.",
     "",
     `Match ID: <code>${html(pair.matchId.slice(0, 8))}</code>`,
-  ].join("\n"), {
+  ].filter(Boolean).join("\n"), {
     inline_keyboard: [
       [{ text: "✅ بردم", callback_data: `result:win:${pair.matchId}` }, { text: "❌ باختم", callback_data: `result:lose:${pair.matchId}` }],
       [{ text: "📎 ارسال اسکرین‌شات", callback_data: `evidence:${pair.matchId}` }, { text: "🚨 اعتراض", callback_data: `dispute:${pair.matchId}` }],
@@ -495,8 +555,10 @@ async function showActiveEntry(chatId: number, telegramId: string, entry: Awaite
     await sendMessage(chatId, [
       "🔎 <b>در حال جست‌وجوی حریف...</b>",
       "",
-      position ? `جایگاه تقریبی در صف: <b>${position.toLocaleString("fa-IR")}</b>` : "",
-      "به محض ورود بازیکن آماده بعدی، پیوند دوستی شما برای یکدیگر ارسال می‌شود.",
+      `🎮 مود: <b>${html(clashDuelModeLabel(entry.gameMode || "normal"))}</b>`,
+      `💳 نوع: <b>${html(clashDuelStakeLabel(entry.stakeMode || "paid"))}</b>`,
+      position ? `جایگاه تقریبی در صف مشابه: <b>${position.toLocaleString("fa-IR")}</b>` : "",
+      "فقط با بازیکنی که همین نوع و مود را انتخاب کرده باشد مچ می‌شوی.",
     ].filter(Boolean).join("\n"), {
       inline_keyboard: [
         [{ text: "🔄 بررسی وضعیت", callback_data: "clash1v1:status" }],
@@ -570,21 +632,47 @@ export async function openClash1v1Queue(chatId: number, telegramId: string): Pro
       return showActiveEntry(chatId, telegramId, refreshed || active);
     }
 
-    const [wallet] = await db.select().from(wallets).where(eq(wallets.userId, linked.userId)).limit(1);
-    const balance = bigIntFromText(wallet?.balance || "0");
-    const feeRial = BigInt(CLASH_1V1_CONFIG.entryFeeToman) * BigInt(10);
+    const [pendingChallenge] = await db.select().from(clash1v1Challenges).where(and(
+      or(
+        eq(clash1v1Challenges.challengerUserId, linked.userId),
+        eq(clash1v1Challenges.opponentUserId, linked.userId),
+      ),
+      inArray(clash1v1Challenges.status, ["pending", "countered"]),
+    )).orderBy(desc(clash1v1Challenges.updatedAt)).limit(1);
+    if (pendingChallenge && pendingChallenge.expiresAt > new Date()) {
+      const myProposal = pendingChallenge.proposedByUserId === linked.userId;
+      const isChallenger = pendingChallenge.challengerUserId === linked.userId;
+      const keyboard: Array<Array<Record<string, string>>> = [];
+      if (!myProposal) {
+        keyboard.push([{ text: "✅ قبول شرایط", callback_data: `c1f:accept:${pendingChallenge.id}` }]);
+        keyboard.push([{ text: "🔄 پیشنهاد مود دیگر", callback_data: `c1f:modes:${pendingChallenge.id}` }]);
+      }
+      keyboard.push([{
+        text: isChallenger ? "❌ لغو دعوت" : "❌ رد دعوت",
+        callback_data: `c1f:${isChallenger ? "cancel" : "reject"}:${pendingChallenge.id}`,
+      }]);
+      await sendMessage(chatId, [
+        "👥 <b>دعوت خصوصی فعال</b>",
+        `🎮 مود فعلی: <b>${html(clashDuelModeLabel(pendingChallenge.gameMode))}</b>`,
+        `💳 نوع: <b>${html(clashDuelStakeLabel(pendingChallenge.stakeMode))}</b>`,
+        myProposal ? "منتظر تأیید طرف مقابل هستیم." : "پیشنهاد طرف مقابل منتظر پاسخ شماست.",
+        `⏳ اعتبار تا: <b>${html(new Date(pendingChallenge.expiresAt).toLocaleTimeString("fa-IR", { timeZone: "Asia/Tehran" }))}</b>`,
+      ].join("\n"), { inline_keyboard: keyboard });
+      return;
+    }
+
     await sendMessage(chatId, [
-      "⚔️ <b>مچ‌میکینگ 1V1 کلش رویال</b>",
+      "⚔️ <b>رقابت 1V1 کلش رویال</b>",
       "",
-      `💳 ورودی: <b>${html(CLASH_1V1_CONFIG.entryFee)}</b>`,
-      `🏆 جایزه برنده: <b>${html(CLASH_1V1_CONFIG.prize1st)}</b>`,
-      `💰 موجودی شما: <b>${html(formatTomanFromRial(balance))}</b>`,
+      "اول مشخص کن می‌خواهی با یک حریف تصادفی بازی کنی یا برای دوستت دعوت خصوصی بفرستی.",
       "",
-      "بعد از ثبت‌نام، «پیوند دوستی» را از Clash Royale برای بات Share می‌کنی و وارد صف می‌شوی. وقتی حریف پیدا شد، بات پیوند شما را برای یکدیگر می‌فرستد.",
+      "🎲 <b>حریف تصادفی:</b> فقط با بازیکنی مچ می‌شوی که حالت مالی و مود یکسان انتخاب کرده باشد.",
+      "👥 <b>بازی با دوست:</b> دعوت خصوصی می‌سازی و تا توافق هر دو روی مود، هیچ مبلغی کسر نمی‌شود.",
     ].join("\n"), {
       inline_keyboard: [
-        [{ text: "🎮 ثبت‌نام و ورود به صف", callback_data: "clash1v1:register" }],
-        ...(balance < feeRial ? [[{ text: "💳 شارژ کیف پول", callback_data: "wallet:deposit" }]] : []),
+        [{ text: "🎲 حریف تصادفی", callback_data: "clash1v1:opponent:random" }],
+        [{ text: "👥 بازی با دوست", callback_data: "clash1v1:opponent:friend" }],
+        [{ text: "📦 وضعیت رقابت من", callback_data: "clash1v1:status" }],
       ],
     });
   } catch (err) {
@@ -593,18 +681,66 @@ export async function openClash1v1Queue(chatId: number, telegramId: string): Pro
   }
 }
 
-export async function registerClash1v1Queue(chatId: number, telegramId: string) {
+export async function showClash1v1StakeMenu(chatId: number, opponentType: "random" | "friend") {
+  await sendMessage(chatId, [
+    `⚔️ نوع حریف: <b>${opponentType === "friend" ? "بازی با دوست" : "حریف تصادفی"}</b>`,
+    "",
+    "نوع رقابت را انتخاب کن:",
+    "🆓 رایگان: بدون ورودی و جایزه مالی",
+    `💰 پولی: ورودی هر نفر <b>${html(CLASH_1V1_CONFIG.entryFee)}</b> و جایزه برنده <b>${html(CLASH_1V1_CONFIG.prize1st)}</b>`,
+  ].join("\n"), {
+    inline_keyboard: [
+      [{ text: "🆓 رقابت رایگان", callback_data: `clash1v1:stake:${opponentType}:free` }],
+      [{ text: "💰 رقابت پولی", callback_data: `clash1v1:stake:${opponentType}:paid` }],
+      [{ text: "⬅️ بازگشت", callback_data: "menu:clash_qr" }],
+    ],
+  });
+}
+
+export async function showClash1v1ModeMenu(
+  chatId: number,
+  opponentType: "random" | "friend",
+  stakeMode: ClashDuelStakeMode,
+) {
+  await sendMessage(chatId, [
+    `نوع رقابت: <b>${html(clashDuelStakeLabel(stakeMode))}</b>`,
+    "",
+    "مودی را انتخاب کن که باید داخل Friendly Battle اجرا شود:",
+  ].join("\n"), {
+    inline_keyboard: [
+      ...CLASH_DUEL_GAME_MODES.map((mode) => ([{
+        text: `${mode.emoji} ${mode.label}`,
+        callback_data: `clash1v1:mode:${opponentType}:${stakeMode}:${mode.id}`,
+      }])),
+      [{ text: "⬅️ بازگشت", callback_data: `clash1v1:opponent:${opponentType}` }],
+    ],
+  });
+}
+
+export async function registerClash1v1Queue(
+  chatId: number,
+  telegramId: string,
+  options: { stakeMode?: ClashDuelStakeMode; gameMode?: ClashDuelGameMode } = {},
+) {
+  const stakeMode = options.stakeMode || "paid";
+  const gameMode = options.gameMode || "normal";
   try {
     await ensureClash1v1QueueTournament();
     const linked = await getLinkedUserByTelegram(telegramId);
     if (!linked?.userId) return openClash1v1Queue(chatId, telegramId);
+    if (!linked.clashRoyaleId || linked.clashRoyaleStatus !== "verified") {
+      await sendMessage(chatId, "برای ورود به 1V1 باید Player Tag کلش رویال شما با Supercell API تأیید شده باشد.", {
+        inline_keyboard: [[{ text: "⚔️ ثبت و تأیید Player Tag", url: `${APP_URL}/profile/edit` }]],
+      });
+      return;
+    }
 
     const active = await getActiveEntry(linked.userId);
     if (active) return openClash1v1Queue(chatId, telegramId);
 
     const tournament = await ensureClash1v1QueueTournament();
-    const feeRial = BigInt(CLASH_1V1_CONFIG.entryFeeToman) * BigInt(10);
-    const prizeRial = BigInt(CLASH_1V1_CONFIG.prizeToman) * BigInt(10);
+    const feeRial = stakeMode === "paid" ? BigInt(CLASH_1V1_CONFIG.entryFeeToman) * BigInt(10) : BigInt(0);
+    const prizeRial = stakeMode === "paid" ? BigInt(CLASH_1V1_CONFIG.prizeToman) * BigInt(10) : BigInt(0);
 
     const result = await db.transaction(async (tx) => {
       await tx.execute(sql`SELECT pg_advisory_xact_lock(${QUEUE_LOCK_ID})`);
@@ -626,18 +762,21 @@ export async function registerClash1v1Queue(chatId: number, telegramId: string) 
         tx
       );
 
-      let [wallet] = await tx.select().from(wallets).where(eq(wallets.userId, linked.userId)).limit(1);
-      if (!wallet) {
-        [wallet] = await tx
-          .insert(wallets)
-          .values({ userId: linked.userId, balance: "0", currency: "RIAL" })
-          .returning();
-      }
+      let wallet: typeof wallets.$inferSelect | null = null;
+      if (feeRial > BigInt(0)) {
+        [wallet] = await tx.select().from(wallets).where(eq(wallets.userId, linked.userId)).limit(1);
+        if (!wallet) {
+          [wallet] = await tx
+            .insert(wallets)
+            .values({ userId: linked.userId, balance: "0", currency: "RIAL" })
+            .returning();
+        }
 
-      const debited = await updateWalletBalanceSafely(tx, wallet.id, feeRial, "decrease");
-      if (!debited) {
-        const [current] = await tx.select({ balance: wallets.balance }).from(wallets).where(eq(wallets.id, wallet.id)).limit(1);
-        return { kind: "insufficient" as const, balance: bigIntFromText(current?.balance || "0") };
+        const debited = await updateWalletBalanceSafely(tx, wallet.id, feeRial, "decrease");
+        if (!debited) {
+          const [current] = await tx.select({ balance: wallets.balance }).from(wallets).where(eq(wallets.id, wallet.id)).limit(1);
+          return { kind: "insufficient" as const, balance: bigIntFromText(current?.balance || "0") };
+        }
       }
 
       const cutoff = new Date(Date.now() - RECENT_INVITE_REUSE_MS);
@@ -667,28 +806,42 @@ export async function registerClash1v1Queue(chatId: number, telegramId: string) 
           status: canReuse ? "queued" : "waiting_qr",
           entryFeeRial: feeRial.toString(),
           prizeRial: prizeRial.toString(),
+          opponentType: "random",
+          stakeMode,
+          gameMode,
           inviteLink: canReuse ? recentInvite?.inviteLink || null : null,
           qrFileId: null,
           submittedAt: canReuse ? now : null,
-          metadata: { source: "telegram_queue_v3_invite_link", reusedInviteLink: canReuse },
+          metadata: {
+            source: "telegram_queue_v4_modes",
+            opponentType: "random",
+            stakeMode,
+            gameMode,
+            reusedInviteLink: canReuse,
+          },
         })
         .returning();
 
-      await tx.insert(transactions).values({
-        walletId: wallet.id,
-        amount: feeRial.toString(),
-        type: "entry_fee",
-        status: "completed",
-        referenceId: `clash-1v1-entry-${entry.id}`,
-        metadata: {
-          kind: "clash_1v1_entry_fee",
-          entryId: entry.id,
-          tournamentId: tournament.id,
-          playerId: player.id,
-          userId: linked.userId,
-          telegramId,
-        },
-      });
+      if (wallet && feeRial > BigInt(0)) {
+        await tx.insert(transactions).values({
+          walletId: wallet.id,
+          amount: feeRial.toString(),
+          type: "entry_fee",
+          status: "completed",
+          referenceId: `clash-1v1-entry-${entry.id}`,
+          metadata: {
+            kind: "clash_1v1_entry_fee",
+            entryId: entry.id,
+            tournamentId: tournament.id,
+            playerId: player.id,
+            userId: linked.userId,
+            telegramId,
+            opponentType: "random",
+            stakeMode,
+            gameMode,
+          },
+        });
+      }
       return { kind: "created" as const, entry, reusedInviteLink: canReuse };
     });
 
@@ -704,15 +857,20 @@ export async function registerClash1v1Queue(chatId: number, telegramId: string) 
       return;
     }
 
+    const selectionLine = `\n🎮 مود: <b>${html(clashDuelModeLabel(gameMode))}</b>\n💳 نوع: <b>${html(clashDuelStakeLabel(stakeMode))}</b>`;
     if (result.reusedInviteLink) {
       await clearSession(telegramId);
-      await sendMessage(chatId, "✅ مبلغ کسر شد و با پیوند دوستی معتبر قبلی مستقیماً وارد صف شدی. در حال جست‌وجوی حریف...", removeKeyboard());
+      const paymentLine = stakeMode === "paid" ? `\n💰 ورودی ${html(CLASH_1V1_CONFIG.entryFee)} کسر شد.` : "\n🆓 این رقابت ورودی مالی ندارد.";
+      await sendMessage(chatId, `✅ با پیوند دوستی معتبر قبلی وارد صف شدی.${selectionLine}${paymentLine}\n\nفقط با بازیکن دارای همین نوع و مود مچ می‌شوی.`, removeKeyboard());
       const matchmaking = await runClash1v1MatchmakingAndNotify();
       if (!matchmaking.matchedPairs) await showActiveEntry(chatId, telegramId, result.entry);
       return;
     }
 
-    await sendMessage(chatId, `✅ مبلغ <b>${html(CLASH_1V1_CONFIG.entryFee)}</b> کسر شد. حالا از Clash Royale روی «اشتراک‌گذاری پیوند» بزن و پیوند دوستی را برای بات بفرست.`);
+    const paymentLine = stakeMode === "paid"
+      ? `مبلغ <b>${html(CLASH_1V1_CONFIG.entryFee)}</b> کسر شد.`
+      : "این رقابت رایگان است و مبلغی کسر نشد.";
+    await sendMessage(chatId, `✅ ${paymentLine}${selectionLine}\n\nحالا از Clash Royale روی «اشتراک‌گذاری پیوند» بزن و پیوند دوستی را برای بات بفرست.`);
     await promptClash1v1Qr(chatId, telegramId, result.entry.id);
   } catch (err) {
     logger.error({ err, telegramId }, "Clash 1V1 queue registration failed");
@@ -721,7 +879,7 @@ export async function registerClash1v1Queue(chatId: number, telegramId: string) 
       "تراکنش Rollback شد و در این تلاش وجهی کسر نشده است.",
       "چند لحظه دیگر دوباره امتحان کن یا با پشتیبانی تماس بگیر.",
     ].join("\n"), {
-      inline_keyboard: [[{ text: "🔁 تلاش دوباره", callback_data: "clash1v1:register" }]],
+      inline_keyboard: [[{ text: "🔁 تلاش دوباره", callback_data: `clash1v1:mode:random:${stakeMode}:${gameMode}` }]],
     });
   }
 }
@@ -750,11 +908,30 @@ export async function submitClash1v1Qr(input: {
     return;
   }
 
+  const [currentEntry] = await db.select({ status: clash1v1Entries.status })
+    .from(clash1v1Entries)
+    .where(and(
+      eq(clash1v1Entries.id, entryId),
+      eq(clash1v1Entries.userId, linked.userId),
+      inArray(clash1v1Entries.status, ["waiting_qr", "queued", "matched"]),
+    ))
+    .limit(1);
+  if (!currentEntry) {
+    await clearSession(telegramId);
+    await sendMessage(chatId, "این ورودی دیگر فعال نیست. برای مشاهده وضعیت /qr را بزن.", removeKeyboard());
+    return;
+  }
+
   const [updated] = await db.update(clash1v1Entries).set({
-    status: "queued", inviteLink, qrFileId, submittedAt: new Date(), updatedAt: new Date(),
+    status: currentEntry.status === "matched" ? "matched" : "queued",
+    inviteLink,
+    qrFileId,
+    submittedAt: new Date(),
+    updatedAt: new Date(),
   }).where(and(
-    eq(clash1v1Entries.id, entryId), eq(clash1v1Entries.userId, linked.userId),
-    inArray(clash1v1Entries.status, ["waiting_qr", "queued", "matched"])
+    eq(clash1v1Entries.id, entryId),
+    eq(clash1v1Entries.userId, linked.userId),
+    inArray(clash1v1Entries.status, ["waiting_qr", "queued", "matched"]),
   )).returning();
 
   if (!updated) {
@@ -797,17 +974,13 @@ export async function cancelClash1v1Queue(chatId: number, telegramId: string, en
         .from(transactions)
         .where(eq(transactions.referenceId, referenceId))
         .limit(1);
-      if (!existingRefund) {
+      const refundAmount = bigIntFromText(entry.entryFeeRial);
+      if (!existingRefund && refundAmount > BigInt(0)) {
         let [wallet] = await tx.select().from(wallets).where(eq(wallets.userId, linked.userId)).limit(1);
         if (!wallet) {
           [wallet] = await tx.insert(wallets).values({ userId: linked.userId, balance: "0", currency: "RIAL" }).returning();
         }
-        const refunded = await updateWalletBalanceSafely(
-          tx,
-          wallet.id,
-          bigIntFromText(entry.entryFeeRial),
-          "increase"
-        );
+        const refunded = await updateWalletBalanceSafely(tx, wallet.id, refundAmount, "increase");
         if (!refunded) throw new Error("CLASH_QUEUE_REFUND_WALLET_UPDATE_FAILED");
         await tx.insert(transactions).values({
           walletId: wallet.id,
@@ -829,7 +1002,14 @@ export async function cancelClash1v1Queue(chatId: number, telegramId: string, en
     if (result.kind === "matched") {
       await sendMessage(chatId, "حریف پیدا شده و دیگر امکان خروج از صف و بازگشت وجه وجود ندارد. نتیجه را از بخش مسابقات ثبت کن.");
     } else if (result.kind === "refunded") {
-      await sendMessage(chatId, `✅ از صف خارج شدی و <b>${html(formatTomanFromRial(bigIntFromText(result.amount)))}</b> به کیف پول برگشت.`, mainMenuKeyboard());
+      const amount = bigIntFromText(result.amount);
+      await sendMessage(
+        chatId,
+        amount > BigInt(0)
+          ? `✅ از صف خارج شدی و <b>${html(formatTomanFromRial(amount))}</b> به کیف پول برگشت.`
+          : "✅ از صف رایگان خارج شدی و رقابت لغو شد.",
+        mainMenuKeyboard(),
+      );
     } else {
       await sendMessage(chatId, "این ورودی قبلاً بسته یا لغو شده است.", mainMenuKeyboard());
     }
@@ -870,12 +1050,17 @@ export async function runClash1v1Matchmaking(): Promise<QueuePair[]> {
         gameId: players.gameId,
         clashRoyaleId: users.clashRoyaleId,
         clashRoyaleUsername: users.clashRoyaleUsername,
+        opponentType: clash1v1Entries.opponentType,
+        stakeMode: clash1v1Entries.stakeMode,
+        gameMode: clash1v1Entries.gameMode,
+        challengeId: clash1v1Entries.challengeId,
       })
       .from(clash1v1Entries)
       .innerJoin(players, eq(clash1v1Entries.playerId, players.id))
       .leftJoin(users, eq(clash1v1Entries.userId, users.id))
       .where(and(
         eq(clash1v1Entries.status, "queued"),
+        eq(clash1v1Entries.opponentType, "random"),
         isNotNull(clash1v1Entries.submittedAt),
         or(isNotNull(clash1v1Entries.inviteLink), isNotNull(clash1v1Entries.qrFileId))
       ))
@@ -887,8 +1072,13 @@ export async function runClash1v1Matchmaking(): Promise<QueuePair[]> {
     const created: QueuePair[] = [];
     while (candidates.length >= 2) {
       const player1 = candidates.shift()!;
-      const opponentIndex = candidates.findIndex((item) => item.userId !== player1.userId);
-      if (opponentIndex < 0) break;
+      const opponentIndex = candidates.findIndex((item) =>
+        item.userId !== player1.userId
+        && item.opponentType === "random"
+        && item.stakeMode === player1.stakeMode
+        && item.gameMode === player1.gameMode
+      );
+      if (opponentIndex < 0) continue;
       const [player2] = candidates.splice(opponentIndex, 1);
 
       const [{ value }] = await tx.select({ value: count() }).from(matches).where(eq(matches.tournamentId, tournament.id));
