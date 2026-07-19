@@ -3,6 +3,9 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import ParticleField from "@/components/fx/ParticleField";
+import HonorsIcon from "@/components/honors/HonorsIcon";
+import styles from "../honors.module.css";
 
 interface HonorDetail {
   id: string;
@@ -38,6 +41,11 @@ const GAME_LABELS: Record<string, string> = {
   fortnite: "فورتنایت",
 };
 
+const GAME_ICONS: Record<string, string> = {
+  clash_royale: "/icons/icon-clash_royale.png",
+  cod_mobile: "/icons/icon-cod_mobile.png",
+  fortnite: "/icons/icon-fortnite.png",
+};
 
 
 function absoluteUrl(path?: string) {
@@ -185,7 +193,7 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
   async function shareHonor() {
     if (!honor) return;
     const url = `${window.location.origin}/honors/${honor.id}`;
-    const text = `${honor.icon} ${honor.title}\n${honor.description}\n${url}`;
+    const text = `${honor.title}\n${honor.summary || honor.description.slice(0, 220)}\n${url}`;
     if (navigator.share) {
       await navigator.share({ title: honor.title, text, url }).catch(() => undefined);
     } else {
@@ -194,159 +202,184 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
     }
   }
 
-  if (honor?.htmlUrl) {
+  if (loading) {
     return (
-      <div className="min-h-screen bg-[#050508] text-white">
-        <header className="sticky top-0 z-50 h-14 bg-[#050508]/95 backdrop-blur-xl border-b border-white/10 px-3 flex items-center gap-2">
-          <Link href="/honors" className="shrink-0 text-[11px] font-black text-purple-100 bg-white/5 border border-white/10 rounded-2xl px-3 py-2">
-            ← بازگشت
-          </Link>
-          <div className="min-w-0 flex-1 text-right">
-            <div className="text-[10px] text-cyan-300 font-black">{TYPE_LABELS[honor.type] || "خبر"}{honor.game ? ` • ${GAME_LABELS[honor.game] || honor.game}` : ""}</div>
-            <h1 className="text-xs font-black truncate">{honor.title}</h1>
-          </div>
-          <button onClick={shareHonor} className="shrink-0 text-[11px] font-black text-white bg-gradient-to-r from-purple-600 to-cyan-600 rounded-2xl px-3 py-2">
-            اشتراک
-          </button>
-        </header>
-        <iframe
-          src={honor.htmlUrl}
-          title={honor.title}
-          className="block w-full h-[calc(100dvh-56px)] border-0 bg-[#0a0a2e]"
-        />
-      </div>
+      <main className={`${styles.page} min-h-[100dvh] px-4 py-8 text-white`}>
+        <div className="mx-auto max-w-7xl animate-pulse">
+          <div className="h-12 w-52 rounded-2xl bg-white/[.05]" />
+          <div className="mt-6 h-[520px] rounded-[38px] bg-white/[.045]" />
+          <div className="mx-auto -mt-20 h-80 max-w-4xl rounded-[32px] bg-[#101117]" />
+        </div>
+      </main>
     );
   }
 
-  return (
-    <div className="min-h-screen bg-[#050508] text-white">
-      {honor && (
-        <>
-          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleJsonLd(honor)) }} />
-          <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd(honor)) }} />
-        </>
-      )}
-      <div className="relative min-h-[300px] overflow-hidden">
-        {honor?.image ? (
-          <img src={honor.image} alt={honor.imageAlt || honor.title} className="absolute inset-0 w-full h-full object-cover opacity-80" loading="lazy" decoding="async" />
-        ) : (
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-950 via-[#050508] to-cyan-950" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-[#050508] via-[#050508]/65 to-black/20" />
-        
-        {/* Added pb-16 to ensure title never overlaps with the content card on multiline wrapping! */}
-        <div className="relative max-w-[560px] mx-auto px-5 pt-8 pb-16">
-          <Link href="/honors" className="inline-flex text-xs text-purple-200 bg-white/5 border border-white/10 rounded-full px-4 py-2 mb-10">
-            ← بازگشت به تالار افتخارات
-          </Link>
-          <div className="text-6xl mb-4">{honor?.icon || "🏆"}</div>
-          <div className="inline-flex items-center gap-2 text-[10px] font-black text-purple-200 bg-purple-500/15 border border-purple-500/20 rounded-full px-3 py-1 mb-3">
-            {honor ? TYPE_LABELS[honor.type] || honor.type : "افتخار"}
-            {honor?.game && <span>• {GAME_LABELS[honor.game] || honor.game}</span>}
+  if (error || !honor) {
+    return (
+      <main className={`${styles.page} grid min-h-[75dvh] place-items-center px-5 text-center text-white`}>
+        <div>
+          <span className="mx-auto grid h-20 w-20 place-items-center rounded-[26px] border border-white/[.09] bg-white/[.035] text-amber-300"><HonorsIcon name="trophy" className="h-10 w-10" /></span>
+          <h1 className="mt-5 text-xl font-black">این محتوا پیدا نشد</h1>
+          <p className="mt-2 text-sm text-gray-600">{error || "ممکن است از آرشیو عمومی خارج شده باشد."}</p>
+          <Link href="/honors" className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-amber-400 px-5 py-3 text-xs font-black text-black">بازگشت به تالار <HonorsIcon name="arrow" className="h-4 w-4" /></Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (honor.htmlUrl) {
+    return (
+      <main className={`${styles.page} min-h-screen text-white`}>
+        <header className="sticky top-0 z-50 border-b border-white/[.08] bg-[#08090e]/90 backdrop-blur-2xl">
+          <div className="mx-auto flex h-16 max-w-7xl items-center gap-3 px-3 sm:px-6">
+            <Link href="/honors" className="inline-flex shrink-0 items-center gap-2 rounded-xl border border-white/[.08] bg-white/[.04] px-3 py-2 text-[10px] font-black text-gray-300"><HonorsIcon name="arrow" className="h-4 w-4 rotate-180" /> تالار</Link>
+            <div className="min-w-0 flex-1">
+              <span className="text-[8px] font-black tracking-[.18em] text-amber-300">{TYPE_LABELS[honor.type] || "خبر"}{honor.game ? ` · ${GAME_LABELS[honor.game] || honor.game}` : ""}</span>
+              <h1 className="truncate text-xs font-black sm:text-sm">{honor.title}</h1>
+            </div>
+            <button onClick={shareHonor} className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-amber-400 px-3 py-2 text-[10px] font-black text-black"><HonorsIcon name="share" className="h-4 w-4" /> اشتراک</button>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-black leading-tight">{loading ? "در حال بارگذاری..." : honor?.title || "افتخار پیدا نشد"}</h1>
-          {honor?.summary && <p className="mt-4 text-sm leading-7 text-white/75 max-w-xl">{honor.summary}</p>}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {honor?.readTimeMinutes && <div className="inline-flex text-[10px] font-black text-cyan-200 bg-cyan-500/10 border border-cyan-400/20 rounded-full px-3 py-1">زمان مطالعه: {honor.readTimeMinutes.toLocaleString("fa-IR")} دقیقه</div>}
-            {honor?.type === "news" && <div className="inline-flex text-[10px] font-black text-purple-200 bg-purple-500/10 border border-purple-400/20 rounded-full px-3 py-1">{(honor.viewsCount || 0).toLocaleString("fa-IR")} سین / بازدید</div>}
+        </header>
+        <iframe src={honor.htmlUrl} title={honor.title} className="block h-[calc(100dvh-64px)] w-full border-0 bg-[#0a0a2e]" />
+      </main>
+    );
+  }
+
+  const gameIcon = honor.game ? GAME_ICONS[honor.game] : undefined;
+
+  return (
+    <main className={`${styles.page} min-h-[100dvh] pb-28 text-white`} dir="rtl">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleJsonLd(honor)) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd(honor)) }} />
+
+      <header className="relative z-40 border-b border-white/[.07] bg-[#08090e]/82 backdrop-blur-2xl">
+        <div className="mx-auto flex h-18 max-w-7xl items-center gap-3 px-4 sm:px-6">
+          <Link href="/honors" className="flex items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/icons/gament-icon-192.png" alt="گیمنت" className="h-10 w-10 object-contain" />
+            <div className="hidden sm:block"><div className="text-[8px] font-black tracking-[.22em] text-amber-300">GAMENT ARCHIVES</div><div className="text-sm font-black">تالار افتخارات</div></div>
+          </Link>
+          <nav className="mr-auto flex items-center gap-2">
+            <Link href="/honors" className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-white/[.08] bg-white/[.04] px-3 text-[10px] font-black text-gray-300"><HonorsIcon name="arrow" className="h-4 w-4 rotate-180" /> بازگشت</Link>
+            <button onClick={shareHonor} className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-amber-400 px-3 text-[10px] font-black text-black"><HonorsIcon name="share" className="h-4 w-4" /><span className="hidden min-[390px]:inline">اشتراک</span></button>
+          </nav>
+        </div>
+      </header>
+
+      <section className="relative mx-auto max-w-7xl px-4 pt-5 sm:px-6 sm:pt-8">
+        <div className={`${styles.heroTexture} relative min-h-[510px] overflow-hidden rounded-[32px] border border-white/[.09] shadow-[0_30px_100px_rgba(0,0,0,.38)] sm:min-h-[590px] sm:rounded-[42px]`}>
+          <ParticleField count={26} className="opacity-35" />
+          {honor.image ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={honor.image} alt={honor.imageAlt || honor.title} className="absolute inset-0 h-full w-full object-cover opacity-75" decoding="async" />
+          ) : (
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_15%,rgba(245,158,11,.18),transparent_32%),linear-gradient(145deg,#21180e,#12101c_55%,#06161c)]" />
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-[#08090e] via-black/52 to-black/15" />
+          <div className="absolute inset-x-0 bottom-0 z-10 p-5 sm:p-9 lg:p-12">
+            <nav className="mb-6 flex flex-wrap items-center gap-2 text-[9px] font-bold text-gray-400" aria-label="مسیر صفحه">
+              <Link href="/" className="hover:text-white">گیمنت</Link><span>/</span><Link href="/honors" className="hover:text-white">تالار افتخارات</Link><span>/</span><span className="max-w-[220px] truncate text-gray-300">{honor.title}</span>
+            </nav>
+            <div className="flex flex-wrap items-center gap-2 text-[9px] font-black">
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-amber-200/15 bg-amber-400/15 px-2.5 py-1.5 text-amber-200 backdrop-blur-xl"><HonorsIcon name={honor.type === "news" ? "news" : "trophy"} className="h-3.5 w-3.5" /> {TYPE_LABELS[honor.type] || honor.type}</span>
+              {honor.game && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/35 px-2.5 py-1.5 text-gray-200 backdrop-blur-xl">
+                  {gameIcon && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={gameIcon} alt="" className="h-3.5 w-3.5 object-contain" />
+                  )}
+                  {GAME_LABELS[honor.game] || honor.game}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5 text-gray-400"><HonorsIcon name="clock" className="h-3.5 w-3.5" /> {honor.time}</span>
+            </div>
+            <h1 className="mt-5 max-w-5xl text-3xl font-black leading-[1.45] tracking-tight sm:text-5xl lg:text-6xl">{honor.title}</h1>
+            {honor.summary && <p className="mt-4 max-w-3xl text-xs leading-7 text-gray-300 sm:text-sm sm:leading-8">{honor.summary}</p>}
+            <div className="mt-5 flex flex-wrap items-center gap-3 text-[10px] font-bold text-gray-400">
+              {honor.readTimeMinutes && <span className="inline-flex items-center gap-1.5"><HonorsIcon name="clock" className="h-4 w-4 text-cyan-300" /> {honor.readTimeMinutes.toLocaleString("fa-IR")} دقیقه مطالعه</span>}
+              {honor.type === "news" && <><span className="inline-flex items-center gap-1.5"><HonorsIcon name="eye" className="h-4 w-4 text-violet-300" /> {(honor.viewsCount || 0).toLocaleString("fa-IR")} بازدید</span><span className="inline-flex items-center gap-1.5"><HonorsIcon name="heart" className="h-4 w-4 text-pink-300" /> {(honor.likesCount || 0).toLocaleString("fa-IR")} پسند</span></>}
+            </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      {/* Adjusted margin to -mt-8 to pull the glass panel card beautifully over the gradient header */}
-      <main className="max-w-[560px] mx-auto px-5 -mt-8 relative z-10" style={{ paddingBottom: "var(--bottom-nav-space)" }}>
-        {error ? (
-          <div className="glass-panel rounded-3xl border border-red-500/20 p-6 text-red-300">{error}</div>
-        ) : honor ? (
-          <div className="space-y-5">
-            <section className="glass-panel rounded-[34px] border border-white/10 p-6">
-              {honor.htmlUrl ? (
-                <div className="overflow-hidden rounded-[28px] border border-white/10 bg-black/30">
-                  <iframe
-                    src={honor.htmlUrl}
-                    title={honor.title}
-                    className="w-full h-[82vh] bg-[#0a0a2e]"
-                    loading="lazy"
-                  />
-                </div>
-              ) : (
-                <article className="space-y-5">
-                  {honor.description.split(/\n\s*\n/).filter(Boolean).map((paragraph, index) => (
-                    <p key={index} className={`leading-8 whitespace-pre-wrap ${index === 0 ? "text-base text-white font-medium" : "text-sm text-gray-200"}`}>{linkifyText(paragraph)}</p>
-                  ))}
-                </article>
-              )}
+      <div className="relative z-10 mx-auto -mt-2 grid max-w-6xl items-start gap-5 px-4 sm:px-6 lg:-mt-10 lg:grid-cols-[minmax(0,1fr)_310px]">
+        <article className={`${styles.cardTexture} overflow-hidden rounded-[30px] border border-white/[.09] bg-[#0e0f15] p-5 shadow-[0_24px_65px_rgba(0,0,0,.26)] sm:p-8`}>
+          <div className="mb-7 flex items-center justify-between gap-3 border-b border-white/[.07] pb-5">
+            <div><span className="text-[8px] font-black tracking-[.22em] text-amber-400">THE FULL STORY</span><h2 className="mt-1 text-lg font-black">متن کامل</h2></div>
+            <span className="grid h-10 w-10 place-items-center rounded-2xl border border-white/[.08] bg-white/[.035] text-amber-300"><HonorsIcon name={honor.type === "news" ? "news" : "trophy"} className="h-5 w-5" /></span>
+          </div>
 
-              {honor.galleryImages?.length ? (
-                <div className="grid grid-cols-1 gap-3 mt-6">
-                  {honor.galleryImages.map((image) => (
-                    <figure key={image.src} className="overflow-hidden rounded-[26px] border border-white/10 bg-black/25">
-                      <img src={image.src} alt={image.alt} className="w-full h-auto object-cover" loading="lazy" />
-                      <figcaption className="px-4 py-3 text-[11px] text-gray-400 leading-6">{image.alt}</figcaption>
-                    </figure>
-                  ))}
-                </div>
-              ) : null}
+          <div className={styles.articleBody}>
+            {honor.description.split(/\n\s*\n/).filter(Boolean).map((paragraph, index) => <p key={index} className="whitespace-pre-wrap">{linkifyText(paragraph)}</p>)}
+          </div>
 
-              {honor.seoKeywords?.length ? (
-                <div className="flex flex-wrap gap-2 mt-6 pt-5 border-t border-white/10">
-                  {honor.seoKeywords.map((tag) => <span key={tag} className="text-[10px] px-3 py-1.5 rounded-full bg-purple-500/10 text-purple-200 border border-purple-400/20">#{tag}</span>)}
-                </div>
-              ) : null}
+          {honor.galleryImages?.length ? (
+            <div className="mt-8 grid gap-4">
+              {honor.galleryImages.map((image) => (
+                <figure key={image.src} className="overflow-hidden rounded-[24px] border border-white/[.08] bg-black/20">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={image.src} alt={image.alt} className="h-auto w-full object-cover" loading="lazy" />
+                  <figcaption className="border-t border-white/[.06] px-4 py-3 text-[10px] leading-6 text-gray-500">{image.alt}</figcaption>
+                </figure>
+              ))}
+            </div>
+          ) : null}
 
-              <div className="grid grid-cols-2 gap-3 mt-6">
-                {honor.username && <div className="stat-box"><span>بازیکن</span><b dir="ltr">@{honor.username}</b></div>}
-                {honor.level && <div className="stat-box"><span>سطح</span><b>{honor.level.toLocaleString("fa-IR")}</b></div>}
-                {honor.prize && <div className="stat-box col-span-2"><span>جایزه</span><b className="text-yellow-300">{honor.prize}</b></div>}
-                <div className="stat-box col-span-2"><span>زمان انتشار</span><b>{honor.time}</b></div>
+          {honor.seoKeywords?.length ? (
+            <div className="mt-8 border-t border-white/[.07] pt-5">
+              <span className="mb-3 block text-[9px] font-black text-gray-600">موضوعات مرتبط</span>
+              <div className="flex flex-wrap gap-2">{honor.seoKeywords.map((tag) => <span key={tag} className="rounded-lg border border-violet-300/10 bg-violet-500/[.06] px-2.5 py-1.5 text-[9px] font-bold text-violet-200">#{tag}</span>)}</div>
+            </div>
+          ) : null}
+
+          {(honor.username || honor.level || honor.prize) && (
+            <div className="mt-8 grid grid-cols-2 gap-3 border-t border-white/[.07] pt-6">
+              {honor.username && <div className="rounded-2xl border border-white/[.07] bg-white/[.025] p-4"><span className="text-[9px] text-gray-600">بازیکن</span><strong dir="ltr" className="mt-2 block text-sm">@{honor.username}</strong></div>}
+              {honor.level && <div className="rounded-2xl border border-white/[.07] bg-white/[.025] p-4"><span className="text-[9px] text-gray-600">سطح</span><strong className="mt-2 block text-sm">{honor.level.toLocaleString("fa-IR")}</strong></div>}
+              {honor.prize && <div className="col-span-2 rounded-2xl border border-amber-300/10 bg-amber-400/[.055] p-4"><span className="text-[9px] text-gray-600">جایزه</span><strong className="mt-2 block text-sm text-amber-200">{honor.prize}</strong></div>}
+            </div>
+          )}
+        </article>
+
+        <aside className="space-y-4 lg:sticky lg:top-4">
+          {honor.sources?.length ? (
+            <section className={`${styles.cardTexture} rounded-[26px] border border-cyan-300/10 bg-cyan-500/[.035] p-4`}>
+              <div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-2xl bg-cyan-400/[.08] text-cyan-300"><HonorsIcon name="shield" className="h-5 w-5" /></span><div><span className="text-[8px] font-black tracking-[.18em] text-cyan-400">VERIFIED SOURCES</span><h2 className="mt-1 text-sm font-black">منابع خبر</h2></div></div>
+              <p className="mt-3 text-[9px] leading-5 text-gray-600">این مطلب فقط از متن منابع زیر ترجمه و ویرایش شده است.</p>
+              <div className="mt-4 space-y-2">
+                {honor.sources.slice(0, 5).map((source, index) => (
+                  <a key={`${source.link}-${index}`} href={source.link} target="_blank" rel="noopener noreferrer" className="group flex items-start gap-2 rounded-2xl border border-white/[.06] bg-black/15 p-3 transition hover:border-cyan-300/20">
+                    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/[.04] text-[9px] font-black text-cyan-300">{(index + 1).toLocaleString("fa-IR")}</span>
+                    <span className="min-w-0 flex-1"><strong className="line-clamp-2 block text-[10px] font-black leading-5 text-gray-300 group-hover:text-white">{source.title}</strong><span className="mt-1 block text-[8px] text-gray-700">{source.source}</span></span>
+                    <HonorsIcon name="external" className="h-3.5 w-3.5 shrink-0 text-gray-700" />
+                  </a>
+                ))}
               </div>
             </section>
+          ) : null}
 
-            {honor.sources?.length ? (
-              <section className="glass-panel rounded-[28px] border border-white/10 p-5">
-                <h2 className="font-black text-sm mb-3 text-cyan-200">منابع و ردپای خبر</h2>
-                <div className="space-y-2">
-                  {honor.sources.slice(0, 4).map((source, index) => (
-                    <a key={`${source.link}-${index}`} href={source.link} target="_blank" rel="noopener noreferrer" className="block bg-black/20 rounded-2xl p-3 border border-white/5 hover:border-cyan-400/30">
-                      <div className="text-xs font-bold line-clamp-1">{source.title}</div>
-                      <div className="text-[10px] text-gray-500 mt-1">{source.source}</div>
-                    </a>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            {honor.type === "news" && (
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={toggleLike}
-                  disabled={engagementBusy}
-                  className={`rounded-[28px] py-4 text-sm font-black border transition-all disabled:opacity-60 ${honor.likedByMe ? "bg-pink-500/20 border-pink-400/40 text-pink-200" : "bg-white/5 border-white/10 text-white/80"}`}
-                >
-                  {honor.likedByMe ? "♥ پسندیده شد" : "♡ لایک"} • {(honor.likesCount || 0).toLocaleString("fa-IR")}
-                </button>
-                <div className="rounded-[28px] py-4 text-sm font-black bg-cyan-500/10 border border-cyan-400/20 text-cyan-200 text-center">
-                  👁 {(honor.viewsCount || 0).toLocaleString("fa-IR")} سین
-                </div>
+          {honor.type === "news" && (
+            <section className="rounded-[26px] border border-white/[.08] bg-white/[.025] p-4">
+              <h2 className="text-sm font-black">تعامل با این خبر</h2>
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button onClick={toggleLike} disabled={engagementBusy} className={`inline-flex flex-col items-center justify-center rounded-2xl border py-3 text-[10px] font-black transition disabled:opacity-50 ${honor.likedByMe ? "border-pink-300/25 bg-pink-500/12 text-pink-200" : "border-white/[.08] bg-white/[.03] text-gray-400 hover:text-pink-200"}`}><HonorsIcon name="heart" className={`mb-1.5 h-5 w-5 ${honor.likedByMe ? "fill-current" : ""}`} /> {(honor.likesCount || 0).toLocaleString("fa-IR")} پسند</button>
+                <div className="inline-flex flex-col items-center justify-center rounded-2xl border border-white/[.08] bg-white/[.03] py-3 text-[10px] font-black text-gray-400"><HonorsIcon name="eye" className="mb-1.5 h-5 w-5 text-violet-300" /> {(honor.viewsCount || 0).toLocaleString("fa-IR")} بازدید</div>
               </div>
-            )}
+              <button onClick={shareHonor} className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-l from-amber-300 to-yellow-500 py-3 text-[10px] font-black text-black"><HonorsIcon name="share" className="h-4 w-4" /> اشتراک‌گذاری مطلب</button>
+            </section>
+          )}
 
-            <button onClick={shareHonor} className="w-full rounded-[28px] bg-gradient-to-r from-purple-600 to-cyan-600 py-4 text-sm font-black shadow-[0_0_30px_rgba(168,85,247,.25)]">
-              اشتراک‌گذاری خبر
-            </button>
+          <div className="rounded-[26px] border border-amber-300/10 bg-[radial-gradient(circle_at_80%_0%,rgba(245,158,11,.12),transparent_35%),rgba(255,255,255,.02)] p-4">
+            <HonorsIcon name="crown" className="h-6 w-6 text-amber-300" />
+            <h3 className="mt-3 text-sm font-black">تالار افتخارات گیمنت</h3>
+            <p className="mt-2 text-[9px] leading-5 text-gray-600">آرشیو قهرمانان، رکوردها و خبرهای رسمی بازی‌ها.</p>
+            <Link href="/honors" className="mt-4 inline-flex items-center gap-1 text-[9px] font-black text-amber-300">مشاهده همه <HonorsIcon name="arrow" className="h-3.5 w-3.5" /></Link>
           </div>
-        ) : (
-          <div className="glass-panel rounded-3xl border border-white/10 p-6 text-gray-400">در حال دریافت اطلاعات...</div>
-        )}
-      </main>
+        </aside>
+      </div>
 
       <BottomNav />
-      <style jsx global>{`
-        .glass-panel { background: rgba(20, 20, 25, 0.76); backdrop-filter: blur(24px); }
-        .stat-box { border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.22); border-radius: 24px; padding: 14px; }
-        .stat-box span { display: block; font-size: 10px; color: rgb(107,114,128); margin-bottom: 6px; }
-        .stat-box b { font-size: 13px; }
-      `}</style>
-    </div>
+    </main>
   );
 }

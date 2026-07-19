@@ -41,3 +41,5 @@ jobs:
           fi
           jq -e '.ok == true' /tmp/gament-cron-response.json >/dev/null
           echo "Gament cron completed successfully"
+          echo "Gaming news result:"
+          jq -c '.dailyGamingNews' /tmp/gament-cron-response.json

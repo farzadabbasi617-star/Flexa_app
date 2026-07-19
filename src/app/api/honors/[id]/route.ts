@@ -32,6 +32,11 @@ async function engagementCount(honorId: string) {
   }
 }
 
+function newsExpired(date: Date | string | null | undefined) {
+  const published = new Date(date || 0).getTime();
+  return !Number.isFinite(published) || published < Date.now() - 7 * 24 * 60 * 60 * 1000;
+}
+
 function relativeTime(date: Date | string | null | undefined) {
   if (!date) return "به‌تازگی";
   const diffMs = Date.now() - new Date(date).getTime();
@@ -49,6 +54,9 @@ export async function GET(_request: NextRequest, context: { params: Promise<{ id
     const { id } = await context.params;
     const staticHonor = getStaticHonorById(id);
     if (staticHonor) {
+      if (staticHonor.type === "news" && newsExpired(staticHonor.publishedAt || staticHonor.createdAt)) {
+        return NextResponse.json({ error: "Honor not found" }, { status: 404 });
+      }
       const engagement = await engagementCount(staticHonor.id);
       return NextResponse.json({
         ...staticHonor,

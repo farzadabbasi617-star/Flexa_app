@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/db";
 import { honorContentLikes, honorContentViews, honors } from "@/db/schema";
-import { desc, eq, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import logger from "@/lib/logger";
 import { STATIC_HONORS } from "@/lib/static-honors";
 import { publicCacheHeaders, ttlCache } from "@/lib/server-cache";
@@ -40,6 +40,15 @@ async function engagementCounts(honorIds: string[]) {
   }
 }
 
+function activeStaticHonors() {
+  const newsThreshold = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  return STATIC_HONORS.filter((item) => {
+    if (item.type !== "news") return true;
+    const published = new Date(item.publishedAt || item.createdAt || 0).getTime();
+    return Number.isFinite(published) && published >= newsThreshold;
+  });
+}
+
 function relativeTime(date: Date | string | null | undefined) {
   if (!date) return "به‌تازگی";
   const diffMs = Date.now() - new Date(date).getTime();
@@ -55,8 +64,9 @@ function relativeTime(date: Date | string | null | undefined) {
 export async function GET() {
   try {
     const payload = await ttlCache("public-honors", 60_000, async () => {
-      const staticCounts = await engagementCounts(STATIC_HONORS.map((item) => item.id));
-      const staticRows = STATIC_HONORS.map((item) => ({
+      const currentStaticHonors = activeStaticHonors();
+      const staticCounts = await engagementCounts(currentStaticHonors.map((item) => item.id));
+      const staticRows = currentStaticHonors.map((item) => ({
         ...item,
         time: relativeTime(item.publishedAt || item.createdAt),
         likesCount: staticCounts.get(item.id)?.likes || 0,
@@ -66,7 +76,10 @@ export async function GET() {
       const rows = await db
         .select()
         .from(honors)
-        .where(eq(honors.status, "approved"))
+        .where(and(
+          eq(honors.status, "approved"),
+          sql`(${honors.source} <> 'ai_news' OR COALESCE(${honors.publishedAt}, ${honors.createdAt}) >= NOW() - INTERVAL '7 days')`,
+        ))
         .orderBy(desc(honors.publishedAt), desc(honors.createdAt))
         .limit(100);
 
@@ -106,6 +119,6 @@ export async function GET() {
     return NextResponse.json(payload, { headers: publicCacheHeaders(60, 300) });
   } catch (err) {
     logger.error({ err }, "Public honors GET failed");
-    return NextResponse.json(STATIC_HONORS.map((item) => ({ ...item, time: relativeTime(item.publishedAt || item.createdAt), likesCount: 0, viewsCount: 0 })), { status: 200, headers: publicCacheHeaders(30, 120) });
+    return NextResponse.json(activeStaticHonors().map((item) => ({ ...item, time: relativeTime(item.publishedAt || item.createdAt), likesCount: 0, viewsCount: 0 })), { status: 200, headers: publicCacheHeaders(30, 120) });
   }
 }
