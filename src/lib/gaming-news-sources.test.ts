@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   articleTextFromHtml,
   extractOfficialArticleLinks,
+  hasAcceptablePersianNewsQuality,
   isTrustedArticleImage,
   isTrustedArticleUrl,
   parseTrustedArticleMarkdown,
@@ -77,5 +78,16 @@ Unrelated recommendations`;
   it("keeps article paragraph boundaries while stripping markup", () => {
     expect(articleTextFromHtml("<p>First paragraph</p><p>Second <b>paragraph</b></p>"))
       .toBe("First paragraph\nSecond paragraph");
+  });
+
+  it("rejects mixed-script provider leakage while allowing exact English game names", () => {
+    const clean = {
+      title: "تغییرات جدید فورتنایت منتشر شد",
+      summary: "جزئیات رسمی این به‌روزرسانی از منبع Fortnite منتشر شده است.",
+      description: "اپیک گیمز جزئیات به‌روزرسانی جدید فورتنایت را اعلام کرد. در این نسخه چند قابلیت تازه برای بازیکنان Battle Royale در دسترس قرار گرفته است و زمان شروع رویداد نیز در خبر رسمی توضیح داده شده است.",
+    };
+    expect(hasAcceptablePersianNewsQuality(clean)).toBe(true);
+    expect(hasAcceptablePersianNewsQuality({ ...clean, description: `${clean.description} ماموریت‌های新的 را 完 کنید.` })).toBe(false);
+    expect(hasAcceptablePersianNewsQuality({ ...clean, description: `${clean.description} phần thưởng riêng.` })).toBe(false);
   });
 });

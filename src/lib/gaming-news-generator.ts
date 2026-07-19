@@ -7,6 +7,7 @@ import { gamentSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import {
   extractOfficialArticleLinks,
+  hasAcceptablePersianNewsQuality,
   isTrustedArticleImage,
   isTrustedArticleUrl,
   parseTrustedArticleMarkdown,
@@ -456,14 +457,29 @@ async function markGenerated(dedupeKey: string) {
 export async function cleanupOldNews(days = 7) {
   try {
     const threshold = new Date(Date.now() - Math.max(1, days) * 24 * 60 * 60 * 1000);
-    const oldRows = await db.select({ id: honors.id }).from(honors).where(and(
-      eq(honors.type, "news"),
-      eq(honors.source, "ai_news"),
-      sql`(
-        COALESCE(${honors.publishedAt}, ${honors.createdAt}) < ${threshold}
-        OR COALESCE(${honors.metadata}->>'contentFramework', '') <> 'gament_news_v4_source_translation'
-      )`,
-    ));
+    const rows = await db.select({
+      id: honors.id,
+      title: honors.title,
+      description: honors.description,
+      publishedAt: honors.publishedAt,
+      createdAt: honors.createdAt,
+      metadata: honors.metadata,
+    }).from(honors).where(and(eq(honors.type, "news"), eq(honors.source, "ai_news")));
+    const invalidFingerprints: string[] = [];
+    const oldRows = rows.filter((row) => {
+      const metadata = row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+        ? row.metadata as Record<string, unknown>
+        : {};
+      const expired = new Date(row.publishedAt || row.createdAt).getTime() < threshold.getTime();
+      const wrongFramework = String(metadata.contentFramework || "") !== "gament_news_v4_source_translation";
+      const badQuality = !hasAcceptablePersianNewsQuality({
+        title: row.title,
+        summary: String(metadata.summary || ""),
+        description: row.description,
+      });
+      if (badQuality && typeof metadata.sourceFingerprint === "string") invalidFingerprints.push(metadata.sourceFingerprint);
+      return expired || wrongFramework || badQuality;
+    });
     const ids = oldRows.map((row) => row.id);
     if (!ids.length) return { deleted: 0 };
 
@@ -473,9 +489,11 @@ export async function cleanupOldNews(days = 7) {
       await tx.delete(honorContentLikes).where(inArray(honorContentLikes.contentId, ids));
       await tx.delete(honorContentViews).where(inArray(honorContentViews.contentId, ids));
       await tx.delete(honors).where(inArray(honors.id, ids));
+      const keys = [...new Set(invalidFingerprints.map((fingerprint) => `gaming-news-source:${fingerprint}`))];
+      if (keys.length) await tx.delete(telegramSentNotifications).where(inArray(telegramSentNotifications.dedupeKey, keys));
     });
-    logger.info({ days, deleted: ids.length }, "Cleaned up expired AI news from honors table");
-    return { deleted: ids.length };
+    logger.info({ days, deleted: ids.length, invalidQuality: invalidFingerprints.length }, "Cleaned up expired or invalid AI news from honors table");
+    return { deleted: ids.length, invalidQuality: invalidFingerprints.length };
   } catch (err) {
     logger.error({ err }, "Failed to cleanup old news");
     return { deleted: 0, error: true };
@@ -525,19 +543,36 @@ ${sourcesText}
   "imageAlt":"Alt فارسی دقیق برای تصویر خبر",
   "seoKeywords":["حداکثر ۸ عبارت مرتبط"]
 }`;
-  const systemPrompt = gamentSystemPrompt("honors", "You are a strict Persian translator of trusted gaming source text. Preserve facts exactly, add nothing, and return valid JSON only. If the source lacks enough text, set reject=true.");
-  const ai = await fetchAIResponse(prompt, systemPrompt).catch((error) => {
-    logger.warn({ error, game }, "AI news generation failed; using source-grounded local template");
+  const systemPrompt = gamentSystemPrompt("honors", "You are a strict Persian translator of trusted gaming source text. Preserve facts exactly, add nothing, use Persian script only except exact game/item names, never output Chinese/CJK/Cyrillic/Thai/Korean fragments, and return valid JSON only. If the source lacks enough text, set reject=true.");
+  let ai = await fetchAIResponse(prompt, systemPrompt).catch((error) => {
+    logger.warn({ error, game }, "AI news generation failed");
     return null;
   });
-  const parsed = ai ? safeParseAIJson<GeneratedNews>(ai.content) : null;
-  if (!ai) {
-    return { generated: false as const, game, reason: "ai_provider_unavailable" };
+  let parsed = ai ? safeParseAIJson<GeneratedNews>(ai.content) : null;
+  if (!ai) return { generated: false as const, game, reason: "ai_provider_unavailable" };
+  const structurallyValid = (value: GeneratedNews | null) => Boolean(
+    value && !value.reject && value.title && value.description && value.game === game
+  );
+  const qualityValid = (value: GeneratedNews | null) => Boolean(
+    structurallyValid(value) && hasAcceptablePersianNewsQuality({
+      title: String(value!.title),
+      summary: String(value!.summary || ""),
+      description: String(value!.description),
+    })
+  );
+  if (structurallyValid(parsed) && !qualityValid(parsed)) {
+    const repairPrompt = `${prompt}\n\nخروجی قبلی به‌دلیل وجود نویسه‌های چینی/غیرفارسی یا کیفیت ترجمه رد شد. دوباره فقط از متن منبع بالا، فارسی روان و یکدست تولید کن. هیچ بخش خروجی قبلی را کپی نکن. شناسه تلاش: persian-quality-v2`;
+    const repaired = await fetchAIResponse(repairPrompt, systemPrompt).catch(() => null);
+    const repairedParsed = repaired ? safeParseAIJson<GeneratedNews>(repaired.content) : null;
+    if (repaired && qualityValid(repairedParsed)) {
+      ai = repaired;
+      parsed = repairedParsed;
+    }
   }
-  if (!parsed || parsed.reject || !parsed.title || !parsed.description || parsed.game !== game) {
-    return { generated: false as const, game, reason: "source_translation_rejected" };
+  if (!qualityValid(parsed)) {
+    return { generated: false as const, game, reason: structurallyValid(parsed) ? "persian_quality_rejected" : "source_translation_rejected" };
   }
-  const news = parsed;
+  const news = parsed!;
   const title = shortText(String(news.title), 100);
   const description = String(news.description).trim();
   const summary = shortText(String(news.summary || description.split("\n")[0] || title), 190);

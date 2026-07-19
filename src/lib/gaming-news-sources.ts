@@ -207,6 +207,26 @@ export function parseTrustedArticleMarkdown(
   return { title: title.slice(0, 220), content, imageUrl, publishedAt: new Date(timestamp).toISOString() };
 }
 
+export function hasAcceptablePersianNewsQuality(input: {
+  title: string;
+  summary?: string | null;
+  description: string;
+}) {
+  const combined = `${input.title}\n${input.summary || ""}\n${input.description}`.trim();
+  if (input.title.trim().length < 8 || input.description.trim().length < 120) return false;
+  // Reject provider leakage from unrelated writing systems. Proper English
+  // game/item names remain allowed, but CJK/Hangul/Thai/Cyrillic fragments and
+  // replacement characters indicate a broken translation.
+  if (/[\u2E80-\u2EFF\u3040-\u30FF\u3400-\u9FFF\uF900-\uFAFF\uAC00-\uD7AF\u0E00-\u0E7F\u0400-\u04FF\uFFFD]/u.test(combined)) return false;
+  const extendedLatin = (combined.match(/\p{Script=Latin}/gu) || [])
+    .filter((character) => (character.codePointAt(0) || 0) > 127).length;
+  if (extendedLatin > 1) return false;
+  const letters = combined.match(/\p{L}/gu) || [];
+  const persian = combined.match(/[\u0600-\u06FF]/g) || [];
+  if (persian.length < 60) return false;
+  return letters.length > 0 && persian.length / letters.length >= 0.42;
+}
+
 export function extractOfficialArticleLinks(html: string, indexUrl: string, game: GamingNewsGame) {
   const links: string[] = [];
   const candidates = [
