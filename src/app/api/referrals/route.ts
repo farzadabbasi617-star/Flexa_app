@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     if (!limited.success) return NextResponse.json({ error: "تعداد درخواست‌ها زیاد است" }, { status: 429 });
     const [user] = await db.select({ displayName: users.displayName, firstName: users.firstName, lastName: users.lastName, nationalId: users.nationalId, email: users.email, emailVerifiedAt: users.emailVerifiedAt })
       .from(users).where(eq(users.id, auth.user.id)).limit(1);
-    if (!user?.nationalId) return NextResponse.json({ error: "برای فعال‌سازی معرفی، کد ملی حساب باید تکمیل باشد" }, { status: 403 });
+    if (!user?.nationalId) return NextResponse.json({ error: "برای فعال‌سازی معرفی، اطلاعات هویتی و کد ملی را از تب پروفایل تکمیل کنید", redirect: "/profile/user" }, { status: 403 });
     if (!user.email || !user.emailVerifiedAt) return NextResponse.json({ error: "ایمیل حساب باید تأیید شده باشد" }, { status: 403 });
     const legalName = `${user.firstName || ""} ${user.lastName || ""}`.trim() || user.displayName;
     const result = await createPersonalReferralAccount({ userId: auth.user.id, displayName: legalName, nationalId: user.nationalId });

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
+import JalaliDatePicker from "@/components/JalaliDatePicker";
 
 interface TelegramLinkAccount {
   telegramId: string;
@@ -11,6 +12,19 @@ interface TelegramLinkAccount {
   telegramFirstName: string | null;
   telegramLastName: string | null;
   linkedAt: string;
+}
+
+interface IdentityState {
+  firstName: string | null;
+  lastName: string | null;
+  birthDate: string | null;
+  nationalIdMasked: string | null;
+  phoneNumber: string;
+  email: string | null;
+  emailVerified: boolean;
+  phoneVerified: boolean;
+  complete: boolean;
+  locked: { firstName: boolean; lastName: boolean; birthDate: boolean; nationalId: boolean };
 }
 
 const AVATAR_OPTIONS = [
@@ -30,6 +44,12 @@ export default function UserProfileSettingsPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
+  const [identity, setIdentity] = useState<IdentityState | null>(null);
+  const [identityForm, setIdentityForm] = useState({ firstName: "", lastName: "", birthDate: "", nationalId: "" });
+  const [identityLoading, setIdentityLoading] = useState(false);
+  const [identityMessage, setIdentityMessage] = useState("");
+  const [identityError, setIdentityError] = useState("");
+
   const [telegramAccount, setTelegramAccount] = useState<TelegramLinkAccount | null>(null);
   const [telegramLoading, setTelegramLoading] = useState(false);
   const [telegramCode, setTelegramCode] = useState("");
@@ -40,6 +60,28 @@ export default function UserProfileSettingsPage() {
     if (!user) return;
     setDisplayName(user.displayName || "");
     setSelectedAvatar(user.avatarUrl || "/icons/profile_icon.png");
+  }, [user]);
+
+  const loadIdentity = useCallback(async () => {
+    if (!user) return;
+    setIdentityLoading(true);
+    try {
+      const res = await fetch("/api/profile/identity", { cache: "no-store", credentials: "include" });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || "اطلاعات هویتی دریافت نشد");
+      const next = json.identity as IdentityState;
+      setIdentity(next);
+      setIdentityForm({
+        firstName: next.firstName || user.firstName || "",
+        lastName: next.lastName || user.lastName || "",
+        birthDate: next.birthDate || user.birthDate || "",
+        nationalId: "",
+      });
+    } catch (err) {
+      setIdentityError(err instanceof Error ? err.message : "اطلاعات هویتی دریافت نشد");
+    } finally {
+      setIdentityLoading(false);
+    }
   }, [user]);
 
   const loadTelegramLink = useCallback(async () => {
@@ -58,7 +100,8 @@ export default function UserProfileSettingsPage() {
 
   useEffect(() => {
     loadTelegramLink();
-  }, [loadTelegramLink]);
+    loadIdentity();
+  }, [loadTelegramLink, loadIdentity]);
 
   async function saveProfile(nextAvatar?: string) {
     if (!user) return;
@@ -88,6 +131,35 @@ export default function UserProfileSettingsPage() {
   async function chooseAvatar(url: string) {
     setSelectedAvatar(url);
     await saveProfile(url);
+  }
+
+  async function saveIdentity() {
+    setIdentityLoading(true);
+    setIdentityMessage("");
+    setIdentityError("");
+    try {
+      const res = await fetch("/api/profile/identity", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({
+          ...(!identity?.locked.firstName ? { firstName: identityForm.firstName } : {}),
+          ...(!identity?.locked.lastName ? { lastName: identityForm.lastName } : {}),
+          ...(!identity?.locked.birthDate ? { birthDate: identityForm.birthDate } : {}),
+          ...(!identity?.locked.nationalId ? { nationalId: identityForm.nationalId } : {}),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(json.error || "ثبت اطلاعات هویتی انجام نشد");
+      setIdentity(json.identity);
+      setIdentityForm((current) => ({ ...current, nationalId: "" }));
+      setIdentityMessage("اطلاعات هویتی با موفقیت ثبت و قفل شد.");
+      await refreshUser();
+    } catch (err) {
+      setIdentityError(err instanceof Error ? err.message : "ثبت اطلاعات هویتی انجام نشد");
+    } finally {
+      setIdentityLoading(false);
+    }
   }
 
   async function submitTelegramCode() {
@@ -176,7 +248,7 @@ export default function UserProfileSettingsPage() {
             پروفایل کاربری
           </div>
           <h1 className="text-3xl font-black">پروفایل</h1>
-          <p className="text-xs text-gray-500 mt-1 leading-6">نام نمایشی، آواتار، آیدی بازی‌ها و اتصال تلگرام</p>
+          <p className="text-xs text-gray-500 mt-1 leading-6">اطلاعات هویتی، نام نمایشی، آواتار، آیدی بازی‌ها و اتصال تلگرام</p>
         </header>
 
         <section className="glass-panel rounded-[32px] sm:rounded-[38px] p-4 sm:p-6 border border-white/5 mb-6">
@@ -221,6 +293,61 @@ export default function UserProfileSettingsPage() {
             {message && <div className="text-green-300 text-xs mt-2">{message}</div>}
             {error && <div className="text-red-300 text-xs mt-2">{error}</div>}
           </div>
+        </section>
+
+        <section className="glass-panel rounded-[34px] p-5 border border-emerald-500/20 bg-emerald-950/5 mb-6">
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-sm font-black">🪪 اطلاعات شخصی و هویتی</h2>
+              <p className="text-[10px] text-gray-500 mt-1 leading-5">برای طرح معرفی، برداشت، کیف پول و مسابقات پولی تکمیل این قسمت لازم است.</p>
+            </div>
+            <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black ${identity?.complete ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
+              {identityLoading ? "در حال بررسی" : identity?.complete ? "✅ تکمیل‌شده" : "نیاز به تکمیل"}
+            </span>
+          </div>
+
+          {identity && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-black text-gray-500 mb-1.5">نام واقعی</label>
+                  <input value={identityForm.firstName} onChange={(e) => setIdentityForm({ ...identityForm, firstName: e.target.value })} disabled={identity.locked.firstName} className="w-full bg-black/25 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-emerald-400 disabled:opacity-60" placeholder="نام مطابق مدرک هویتی" />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-black text-gray-500 mb-1.5">نام خانوادگی واقعی</label>
+                  <input value={identityForm.lastName} onChange={(e) => setIdentityForm({ ...identityForm, lastName: e.target.value })} disabled={identity.locked.lastName} className="w-full bg-black/25 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-emerald-400 disabled:opacity-60" placeholder="نام خانوادگی مطابق مدرک" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-gray-500 mb-1.5">تاریخ تولد شمسی</label>
+                <JalaliDatePicker value={identityForm.birthDate} onChange={(birthDate) => setIdentityForm({ ...identityForm, birthDate })} disabled={identity.locked.birthDate} />
+              </div>
+
+              <div>
+                <label className="block text-[10px] font-black text-gray-500 mb-1.5">کد ملی</label>
+                {identity.locked.nationalId ? (
+                  <div className="w-full bg-black/25 border border-emerald-500/20 rounded-2xl px-4 py-3 text-sm text-emerald-200 font-mono" dir="ltr">{identity.nationalIdMasked}</div>
+                ) : (
+                  <input value={identityForm.nationalId} onChange={(e) => setIdentityForm({ ...identityForm, nationalId: e.target.value.replace(/\D/g, "").slice(0, 10) })} inputMode="numeric" maxLength={10} dir="ltr" className="w-full bg-black/25 border border-white/10 rounded-2xl px-4 py-3 text-sm text-left outline-none focus:border-emerald-400" placeholder="0012345678" />
+                )}
+                <p className="text-[9px] text-gray-600 mt-1.5 leading-5">اطلاعات هویتی پس از ثبت قفل می‌شوند؛ برای اصلاح باید با پشتیبانی تماس بگیری.</p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-[10px]">
+                <div className="rounded-2xl bg-black/20 border border-white/5 p-3"><span className="text-gray-500">شماره موبایل</span><div className="mt-1 font-bold" dir="ltr">{identity.phoneNumber}</div></div>
+                <div className="rounded-2xl bg-black/20 border border-white/5 p-3"><span className="text-gray-500">ایمیل {identity.emailVerified ? "✅" : "⚠️"}</span><div className="mt-1 font-bold truncate" dir="ltr">{identity.email || "ثبت نشده"}</div></div>
+              </div>
+
+              {!identity.complete && (
+                <button onClick={saveIdentity} disabled={identityLoading || (!identity.locked.firstName && identityForm.firstName.trim().length < 2) || (!identity.locked.lastName && identityForm.lastName.trim().length < 2) || (!identity.locked.birthDate && !identityForm.birthDate) || (!identity.locked.nationalId && identityForm.nationalId.length !== 10)} className="w-full rounded-2xl bg-emerald-600 py-3.5 text-xs font-black disabled:opacity-40">
+                  {identityLoading ? "در حال ثبت..." : "ثبت و قفل اطلاعات هویتی"}
+                </button>
+              )}
+              {identityMessage && <div className="text-emerald-300 text-xs">{identityMessage}</div>}
+              {identityError && <div className="text-red-300 text-xs">{identityError}</div>}
+            </div>
+          )}
         </section>
 
         <section className="glass-panel rounded-[34px] p-5 border border-white/10 mb-6">

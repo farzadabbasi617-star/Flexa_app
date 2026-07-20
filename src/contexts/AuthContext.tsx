@@ -10,6 +10,8 @@ interface User {
   phoneVerifiedAt: string | null;
   emailVerifiedAt?: string | null;
   username: string;
+  firstName?: string | null;
+  lastName?: string | null;
   displayName: string;
   gamentId: string;
   role: string;
