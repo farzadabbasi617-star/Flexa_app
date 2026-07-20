@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { copyTextSafely } from "@/lib/client-clipboard";
 
 interface Registration {
   registration: { id: string; isOwner?: boolean; checkedInAt: string | null; registeredAt: string };
@@ -126,7 +127,11 @@ export default function TournamentLobby() {
   }, [canViewLobby, tournament, params.id]);
 
   const copyToClipboard = async (text: string, type: string) => {
-    await navigator.clipboard.writeText(text);
+    const copiedSuccessfully = await copyTextSafely(text);
+    if (!copiedSuccessfully) {
+      setError("کپی خودکار در این مرورگر انجام نشد؛ روی مقدار نگه دار و دستی Copy کن.");
+      return;
+    }
     setCopied(type);
     setTimeout(() => setCopied(null), 2000);
   };

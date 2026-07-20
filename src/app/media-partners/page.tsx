@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 import ImageUploader from "@/components/ImageUploader";
+import { copyTextSafely } from "@/lib/client-clipboard";
 
 interface DashboardData {
   partner: null | Record<string, any>;
@@ -157,6 +158,14 @@ export default function MediaPartnersPage() {
     finally { setBusy(false); }
   }
 
+  async function copyReferralLink(link: string) {
+    const copied = await copyTextSafely(link);
+    setMessage({
+      ok: copied,
+      text: copied ? "لینک اختصاصی با موفقیت کپی شد." : "کپی خودکار در این مرورگر انجام نشد؛ از دکمه اشتراک‌گذاری یا نگه‌داشتن روی لینک استفاده کن.",
+    });
+  }
+
   if (loading) return <main className="grid min-h-[70dvh] place-items-center bg-[#07080d] text-white">در حال بارگذاری همکاری رسانه‌ای...</main>;
 
   const partner = data?.partner;
@@ -224,7 +233,7 @@ export default function MediaPartnersPage() {
             <div className="rounded-[28px] border border-white/[.08] bg-white/[.025] p-5 sm:p-7">
               <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-xl font-black">{partner.mediaName}</h2><p className="mt-1 text-xs text-gray-500">وضعیت همکاری: <b className="text-violet-300">{statusLabel(partner.status)}</b></p></div>{data?.live ? <span className="rounded-full bg-emerald-500/10 px-3 py-1.5 text-[10px] font-black text-emerald-300">LIVE</span> : <span className="rounded-full bg-amber-500/10 px-3 py-1.5 text-[10px] font-black text-amber-300">SHADOW MODE</span>}</div>
               {partner.status === "pending" && <p className="mt-5 rounded-2xl bg-cyan-500/[.07] p-4 text-xs leading-6 text-cyan-200">قرارداد ثبت شده و درخواست در صف بررسی ادمین است. لینک پس از تأیید فعال می‌شود.</p>}
-              {partner.status === "active" && <><div className="mt-5 rounded-2xl border border-violet-300/15 bg-violet-500/[.07] p-4"><span className="text-[9px] text-gray-500">لینک اختصاصی</span><code dir="ltr" className="mt-2 block break-all text-xs text-violet-200">{partner.referralLink}</code><button onClick={()=>navigator.clipboard.writeText(partner.referralLink)} className="mt-3 rounded-xl bg-violet-600 px-4 py-2 text-[10px] font-black">کپی لینک</button></div>
+              {partner.status === "active" && <><div className="mt-5 rounded-2xl border border-violet-300/15 bg-violet-500/[.07] p-4"><span className="text-[9px] text-gray-500">لینک اختصاصی</span><code dir="ltr" className="mt-2 block select-all break-all text-xs text-violet-200">{partner.referralLink}</code><button type="button" onClick={()=>copyReferralLink(partner.referralLink)} className="mt-3 rounded-xl bg-violet-600 px-4 py-2 text-[10px] font-black active:scale-95">کپی لینک</button></div>
               <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">{[[data?.stats?.clicks||0,"کلیک"],[data?.stats?.activeAttributions||0,"انتساب فعال"],[data?.stats?.qualifiedMatches||0,"Match واجد"],[tomanFromRial(totals.available||0),"قابل برداشت"]].map(([value,label])=><div key={label} className="rounded-2xl border border-white/[.07] bg-black/15 p-3"><strong className="block text-lg text-violet-200">{typeof value==='number'?value.toLocaleString('fa-IR'):value}</strong><span className="text-[9px] text-gray-600">{label}</span></div>)}</div>
               <div className="mt-4 grid gap-3 sm:grid-cols-3"><div className="rounded-2xl bg-white/[.025] p-3 text-xs">Pending/Shadow: <b>{tomanFromRial(pendingAmount.toString())}</b></div><div className="rounded-2xl bg-white/[.025] p-3 text-xs">پرداخت‌شده: <b>{tomanFromRial(totals.paid||0)}</b></div><button onClick={requestPayout} disabled={busy||!data?.live} className="rounded-2xl bg-emerald-600 p-3 text-xs font-black disabled:opacity-40">درخواست تسویه</button></div></>}
             </div>
