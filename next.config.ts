@@ -54,6 +54,10 @@ const nextConfig: NextConfig = {
     config.parallelism = 1;
     return config;
   },
+  // Development and Playwright use Next 16's default Turbopack server. An
+  // explicit empty config confirms that the webpack override above is only
+  // intended for `next build --webpack` and prevents the dev server exiting.
+  turbopack: {},
 
   // بهینه‌سازی تصاویر
   images: {
