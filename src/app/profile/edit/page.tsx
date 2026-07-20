@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -19,6 +20,7 @@ export default function EditProfilePage() {
     clashRoyaleUsername: "",
     codMobileId: "",
     codMobileUsername: "",
+    codMobileRegion: "global" as "global" | "garena",
     fortniteId: "",
     fortniteUsername: "",
   });
@@ -34,6 +36,7 @@ export default function EditProfilePage() {
         clashRoyaleUsername: user.clashRoyaleUsername || "",
         codMobileId: user.codMobileId || "",
         codMobileUsername: user.codMobileUsername || "",
+        codMobileRegion: user.codMobileRegion || "global",
         fortniteId: user.fortniteId || "",
         fortniteUsername: user.fortniteUsername || "",
       });
@@ -178,7 +181,7 @@ export default function EditProfilePage() {
                 <span className="text-2xl">🎯</span>
                 <span className="font-bold text-neon-orange">{t.games.cod_mobile}</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs text-gray-500 mb-1">
                     {t.auth.codMobileId}
@@ -198,11 +201,26 @@ export default function EditProfilePage() {
                   <input
                     type="text"
                     className="gaming-input text-sm"
-                    placeholder={lang === "fa" ? "نام کاربری شما" : "Your username"}
+                    placeholder={lang === "fa" ? "نام داخل بازی" : "In-game name"}
                     value={form.codMobileUsername}
                     onChange={(e) => setForm({ ...form, codMobileUsername: e.target.value })}
                   />
                 </div>
+                <div>
+                  <label className="block text-xs text-gray-500 mb-1">ریجن COD Mobile</label>
+                  <select
+                    className="gaming-input text-sm"
+                    value={form.codMobileRegion}
+                    onChange={(e) => setForm({ ...form, codMobileRegion: e.target.value as "global" | "garena" })}
+                  >
+                    <option value="global">Global</option>
+                    <option value="garena">Garena</option>
+                  </select>
+                </div>
+              </div>
+              <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-orange-500/15 bg-orange-500/5 px-3 py-2 text-[11px] text-gray-400">
+                <span>وضعیت مالکیت: {user.codMobileStatus === "verified" ? "✅ تأییدشده" : user.codMobileStatus === "pending" ? "⏳ در انتظار بررسی" : "ثبت‌نشده"}</span>
+                <Link href="/cod-arena" className="font-black text-orange-300">ورود به COD Arena ←</Link>
               </div>
             </div>
 

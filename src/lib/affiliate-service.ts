@@ -8,6 +8,8 @@ import {
   affiliateCommissionShares,
   affiliatePayouts,
   clash1v1Entries,
+  codRoomEntries,
+  codRooms,
   disputes,
   matches,
   mediaPartnerAgreements,
@@ -101,12 +103,17 @@ async function createAffiliateSchema(client: any) {
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamp NOT NULL DEFAULT now()
   )`));
   await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS affiliate_commission_events (
-    id uuid PRIMARY KEY DEFAULT gen_random_uuid(), match_id uuid NOT NULL UNIQUE REFERENCES matches(id),
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(), match_id uuid UNIQUE REFERENCES matches(id),
+    source_type varchar(30) NOT NULL DEFAULT 'clash_match', source_id varchar(100),
     total_amount_rial numeric(20,0) NOT NULL DEFAULT 70000, status varchar(20) NOT NULL DEFAULT 'shadow',
     available_at timestamp NOT NULL, paid_at timestamp, reversed_at timestamp, reversal_reason text,
     risk jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamp NOT NULL DEFAULT now(),
     updated_at timestamp NOT NULL DEFAULT now()
   )`));
+  await client.execute(sql.raw(`ALTER TABLE affiliate_commission_events ALTER COLUMN match_id DROP NOT NULL`));
+  await client.execute(sql.raw(`ALTER TABLE affiliate_commission_events ADD COLUMN IF NOT EXISTS source_type varchar(30) NOT NULL DEFAULT 'clash_match'`));
+  await client.execute(sql.raw(`ALTER TABLE affiliate_commission_events ADD COLUMN IF NOT EXISTS source_id varchar(100)`));
+  await client.execute(sql.raw(`UPDATE affiliate_commission_events SET source_type='clash_match', source_id=match_id::text WHERE source_id IS NULL AND match_id IS NOT NULL`));
   await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS affiliate_payouts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(), partner_id uuid NOT NULL REFERENCES media_partners(id),
     amount_rial numeric(20,0) NOT NULL, destination varchar(20) NOT NULL DEFAULT 'bank', status varchar(20) NOT NULL DEFAULT 'requested',
@@ -128,6 +135,7 @@ async function createAffiliateSchema(client: any) {
     `CREATE INDEX IF NOT EXISTS affiliate_attributions_expires_idx ON affiliate_attributions(status,expires_at)`,
     `CREATE INDEX IF NOT EXISTS affiliate_clicks_partner_created_idx ON affiliate_clicks(partner_id,created_at)`,
     `CREATE INDEX IF NOT EXISTS affiliate_commission_events_status_available_idx ON affiliate_commission_events(status,available_at)`,
+    `CREATE UNIQUE INDEX IF NOT EXISTS affiliate_commission_events_source_unique_idx ON affiliate_commission_events(source_type,source_id) WHERE source_id IS NOT NULL`,
     `CREATE INDEX IF NOT EXISTS affiliate_commission_shares_partner_status_idx ON affiliate_commission_shares(partner_id,status)`,
     `CREATE INDEX IF NOT EXISTS affiliate_payouts_partner_status_idx ON affiliate_payouts(partner_id,status)`,
   ];
@@ -162,13 +170,23 @@ export function normalizeIranSheba(value: unknown) {
 
 async function hasRecentPaidMatch(userId: string, referenceDate = new Date()) {
   const threshold = new Date(referenceDate.getTime() - AFFILIATE_ATTRIBUTION_DAYS * 24 * 60 * 60 * 1000);
-  const [row] = await db.select({ id: clash1v1Entries.id }).from(clash1v1Entries).where(and(
+  const [clashRow] = await db.select({ id: clash1v1Entries.id }).from(clash1v1Entries).where(and(
     eq(clash1v1Entries.userId, userId),
     eq(clash1v1Entries.stakeMode, "paid"),
     eq(clash1v1Entries.status, "completed"),
     gte(clash1v1Entries.completedAt, threshold),
   )).limit(1);
-  return Boolean(row);
+  if (clashRow) return true;
+  // COD Arena entries use the same first-touch eligibility principle. Shadow
+  // entries deliberately count as activity so a player cannot become "new"
+  // again merely because the COD financial switch is still off.
+  const [codRow] = await db.select({ id: codRoomEntries.id }).from(codRoomEntries).where(and(
+    eq(codRoomEntries.userId, userId),
+    gt(codRoomEntries.entryFeeRial, "0"),
+    eq(codRoomEntries.status, "settled"),
+    gte(codRoomEntries.settledAt, threshold),
+  )).limit(1);
+  return Boolean(codRow);
 }
 
 export async function recordAffiliateStart(input: {
@@ -316,6 +334,8 @@ export async function createAffiliateCommissionForMatch(client: any, matchId: st
   const eventStatus = affiliateProgramLive() ? "pending" : "shadow";
   const [event] = await client.insert(affiliateCommissionEvents).values({
     matchId,
+    sourceType: "clash_match",
+    sourceId: matchId,
     totalAmountRial: AFFILIATE_COMMISSION_RIAL.toString(),
     status: eventStatus,
     availableAt: new Date(now.getTime() + AFFILIATE_HOLD_HOURS * 60 * 60 * 1000),
@@ -338,7 +358,21 @@ export async function createAffiliateCommissionForMatch(client: any, matchId: st
   return { created: true as const, eventId: event.id, status: eventStatus, partnerCount: allocations.length };
 }
 
-async function affiliateMatchStillEligible(matchId: string) {
+async function affiliateEventStillEligible(event: { matchId: string | null; sourceType?: string | null; sourceId?: string | null }) {
+  if (event.sourceType === "cod_room_entry") {
+    if (!event.sourceId) return false;
+    const [entry] = await db.select({ status: codRoomEntries.status, roomStatus: codRooms.status })
+      .from(codRoomEntries)
+      .innerJoin(codRooms, eq(codRoomEntries.roomId, codRooms.id))
+      .where(eq(codRoomEntries.id, event.sourceId)).limit(1);
+    const [refund] = await db.select({ id: transactions.id }).from(transactions).where(and(
+      eq(transactions.type, "refund"),
+      sql`${transactions.metadata}->>'entryId' = ${event.sourceId}`,
+    )).limit(1);
+    return entry?.status === "settled" && entry.roomStatus === "completed" && !refund;
+  }
+  const matchId = event.matchId || event.sourceId;
+  if (!matchId) return false;
   const [match] = await db.select({ status: matches.status }).from(matches).where(eq(matches.id, matchId)).limit(1);
   const [openDispute] = await db.select({ id: disputes.id }).from(disputes)
     .where(and(eq(disputes.matchId, matchId), eq(disputes.status, "open"))).limit(1);
@@ -362,7 +396,7 @@ export async function processAffiliateCommissions(limit = 100) {
   let available = 0;
   let reversed = 0;
   for (const event of due) {
-    const valid = await affiliateMatchStillEligible(event.matchId);
+    const valid = await affiliateEventStillEligible(event);
     await db.transaction(async (tx) => {
       await tx.update(affiliateCommissionEvents).set(valid
         ? { status: "available", updatedAt: now }
@@ -375,11 +409,15 @@ export async function processAffiliateCommissions(limit = 100) {
     });
     if (valid) available += 1; else reversed += 1;
   }
-  const alreadyAvailable = await db.select({ id: affiliateCommissionEvents.id, matchId: affiliateCommissionEvents.matchId })
-    .from(affiliateCommissionEvents).where(eq(affiliateCommissionEvents.status, "available")).limit(limit);
+  const alreadyAvailable = await db.select({
+    id: affiliateCommissionEvents.id,
+    matchId: affiliateCommissionEvents.matchId,
+    sourceType: affiliateCommissionEvents.sourceType,
+    sourceId: affiliateCommissionEvents.sourceId,
+  }).from(affiliateCommissionEvents).where(eq(affiliateCommissionEvents.status, "available")).limit(limit);
   let invalidatedAvailable = 0;
   for (const event of alreadyAvailable) {
-    if (await affiliateMatchStillEligible(event.matchId)) continue;
+    if (await affiliateEventStillEligible(event)) continue;
     await db.transaction(async (tx) => {
       await tx.update(affiliateCommissionEvents).set({ status: "reversed", reversedAt: now, reversalReason: "match_became_ineligible", updatedAt: now })
         .where(and(eq(affiliateCommissionEvents.id, event.id), eq(affiliateCommissionEvents.status, "available")));
@@ -611,11 +649,15 @@ export async function adminUpdateAffiliatePayout(input: {
 }) {
   await ensureAffiliateSchema();
   if (input.action !== "reject") {
-    const eventRows = await db.select({ id: affiliateCommissionEvents.id, matchId: affiliateCommissionEvents.matchId })
-      .from(affiliateCommissionShares).innerJoin(affiliateCommissionEvents, eq(affiliateCommissionShares.eventId, affiliateCommissionEvents.id))
+    const eventRows = await db.select({
+      id: affiliateCommissionEvents.id,
+      matchId: affiliateCommissionEvents.matchId,
+      sourceType: affiliateCommissionEvents.sourceType,
+      sourceId: affiliateCommissionEvents.sourceId,
+    }).from(affiliateCommissionShares).innerJoin(affiliateCommissionEvents, eq(affiliateCommissionShares.eventId, affiliateCommissionEvents.id))
       .where(eq(affiliateCommissionShares.payoutId, input.payoutId));
     for (const event of eventRows) {
-      if (await affiliateMatchStillEligible(event.matchId)) continue;
+      if (await affiliateEventStillEligible(event)) continue;
       return db.transaction(async (tx) => {
         await tx.update(affiliateCommissionEvents).set({ status: "reversed", reversedAt: new Date(), reversalReason: "payout_review_match_ineligible", updatedAt: new Date() })
           .where(eq(affiliateCommissionEvents.id, event.id));

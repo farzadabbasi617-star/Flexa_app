@@ -3219,6 +3219,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/shop") return shopCommand(chatId);
   if (normalizedCommand === "/invite") return inviteCommand(chatId, telegramId);
   if (normalizedCommand === "/affiliate") return affiliateCommand(chatId, telegramId);
+  if (["/cod", "/cod_arena", "/codmobile"].includes(normalizedCommand)) return sendMessage(chatId, "🎯 <b>COD Arena Gament</b>\n\nکاستوم‌روم‌های Global و Garena با جایزه Kill و جایگاه، Check-in امن، رنک و زنجیره مدرک ضدچیت.", { inline_keyboard: [[{ text: "بازکردن COD Arena", url: `${APP_URL}/cod-arena` }]] });
   if (normalizedCommand === "/connect_media") return sendMessage(chatId, "این دستور باید توسط مدیر داخل گروه موردنظر اجرا شود: <code>/connect_media CODE</code>");
   if (normalizedCommand === "/missions") { if (!(await ensureFeatureEnabled(chatId, "telegram_missions_enabled", "مأموریت‌ها"))) return; return missionsCommand(chatId, telegramId); }
   if (normalizedCommand === "/claim_missions") return missionsCommand(chatId, telegramId);
@@ -3921,6 +3922,10 @@ async function handleGroupUpdate(update: TelegramUpdate) {
   if (parsed.command === "/rules") {
     await sendMessage(chat.id, html(DEFAULT_RULES));
     await sendClash1v1Rules(chat.id, String(actor.id), false);
+    return;
+  }
+  if (["/cod", "/cod_arena", "/codmobile"].includes(parsed.command)) {
+    await sendMessage(chat.id, "🎯 <b>COD Arena Gament</b>\n\nکاستوم‌روم‌های Global و Garena، جایزه Kill و جایگاه و Check-in امن.", { inline_keyboard: [[{ text: "مشاهده روم‌های کالاف", url: `${APP_URL}/cod-arena` }]] });
     return;
   }
   if (["/start", "/clash", "/qr", "/clash_qr", "/rooms"].includes(parsed.command)) {

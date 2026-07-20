@@ -157,6 +157,7 @@ export const users = pgTable("users", {
   clashRoyaleStatus: verificationStatusEnum("cr_status").default("unlinked"),
   codMobileId: varchar("cod_mobile_id", { length: 100 }),
   codMobileUsername: varchar("cod_mobile_username", { length: 100 }),
+  codMobileRegion: varchar("cod_mobile_region", { length: 16 }).notNull().default("global"),
   codMobileStatus: verificationStatusEnum("codm_status").default("unlinked"),
   fortniteId: varchar("fortnite_id", { length: 100 }),
   fortniteUsername: varchar("fortnite_username", { length: 100 }),
@@ -885,7 +886,9 @@ export const affiliateClicks = pgTable("affiliate_clicks", {
 
 export const affiliateCommissionEvents = pgTable("affiliate_commission_events", {
   id: uuid("id").defaultRandom().primaryKey(),
-  matchId: uuid("match_id").notNull().references(() => matches.id).unique(),
+  matchId: uuid("match_id").references(() => matches.id).unique(),
+  sourceType: varchar("source_type", { length: 30 }).notNull().default("clash_match"),
+  sourceId: varchar("source_id", { length: 100 }),
   totalAmountRial: numeric("total_amount_rial", { precision: 20, scale: 0 }).notNull().default("70000"),
   status: varchar("status", { length: 20 }).notNull().default("shadow"),
   availableAt: timestamp("available_at").notNull(),
@@ -897,6 +900,7 @@ export const affiliateCommissionEvents = pgTable("affiliate_commission_events", 
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   statusAvailableIdx: index("affiliate_commission_events_status_available_idx").on(table.status, table.availableAt),
+  sourceUniqueIdx: uniqueIndex("affiliate_commission_events_source_unique_idx").on(table.sourceType, table.sourceId),
 }));
 
 export const affiliatePayouts = pgTable("affiliate_payouts", {
@@ -1062,6 +1066,150 @@ export const transactions = pgTable("transactions", {
 }, (table) => ({
   walletIdIdx: index("transactions_wallet_id_idx").on(table.walletId),
   referenceIdx: index("transactions_reference_id_idx").on(table.referenceId),
+}));
+
+// COD Mobile custom-room engine. Financial actions remain shadow-only until
+// COD_ARENA_LIVE=true is explicitly enabled after private-beta review.
+export const codRooms = pgTable("cod_rooms", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  title: varchar("title", { length: 180 }).notNull(),
+  description: text("description"),
+  region: varchar("region", { length: 16 }).notNull().default("global"),
+  map: varchar("map", { length: 40 }).notNull().default("isolated"),
+  teamMode: varchar("team_mode", { length: 16 }).notNull().default("solo"),
+  perspective: varchar("perspective", { length: 8 }).notNull().default("tpp"),
+  status: varchar("status", { length: 24 }).notNull().default("draft"),
+  isPublished: boolean("is_published").notNull().default(false),
+  capacity: integer("capacity").notNull().default(40),
+  entryFeeRial: numeric("entry_fee_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  serviceFeeRial: numeric("service_fee_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  prizeBudgetRial: numeric("prize_budget_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  referralRateBps: integer("referral_rate_bps").notNull().default(2000),
+  rewardConfig: jsonb("reward_config").notNull().default('{}'),
+  minRankPoints: integer("min_rank_points").notNull().default(0),
+  rules: text("rules"),
+  rulesVersion: varchar("rules_version", { length: 40 }).notNull().default("cod-beta-1"),
+  requiresRecording: boolean("requires_recording").notNull().default(true),
+  roomCode: varchar("room_code", { length: 100 }),
+  roomPassword: varchar("room_password", { length: 100 }),
+  officialJoinUrl: text("official_join_url"),
+  checkInOpensAt: timestamp("check_in_opens_at"),
+  checkInClosesAt: timestamp("check_in_closes_at"),
+  credentialsRevealAt: timestamp("credentials_reveal_at"),
+  startsAt: timestamp("starts_at").notNull(),
+  endsAt: timestamp("ends_at"),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  statusStartIdx: index("cod_rooms_status_start_idx").on(table.status, table.startsAt),
+  regionPublishedIdx: index("cod_rooms_region_published_idx").on(table.region, table.isPublished),
+}));
+
+export const codRoomStaff = pgTable("cod_room_staff", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  roomId: uuid("room_id").notNull().references(() => codRooms.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  role: varchar("role", { length: 20 }).notNull(),
+  assignedAt: timestamp("assigned_at").defaultNow().notNull(),
+}, (table) => ({
+  roomUserRoleUnique: uniqueIndex("cod_room_staff_room_user_role_unique").on(table.roomId, table.userId, table.role),
+  userIdx: index("cod_room_staff_user_idx").on(table.userId),
+}));
+
+export const codRoomEntries = pgTable("cod_room_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  roomId: uuid("room_id").notNull().references(() => codRooms.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  playerId: uuid("player_id").references(() => players.id),
+  teamId: uuid("team_id").references(() => teams.id),
+  codUidSnapshot: varchar("cod_uid_snapshot", { length: 100 }).notNull(),
+  codUsernameSnapshot: varchar("cod_username_snapshot", { length: 100 }).notNull(),
+  region: varchar("region", { length: 16 }).notNull(),
+  status: varchar("status", { length: 24 }).notNull().default("registered"),
+  paymentMode: varchar("payment_mode", { length: 16 }).notNull().default("shadow"),
+  entryFeeRial: numeric("entry_fee_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  serviceFeeRial: numeric("service_fee_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  paymentTransactionId: uuid("payment_transaction_id").references(() => transactions.id),
+  rulesVersion: varchar("rules_version", { length: 40 }).notNull(),
+  rulesAcceptedAt: timestamp("rules_accepted_at").notNull(),
+  checkedInAt: timestamp("checked_in_at"),
+  joinedAt: timestamp("joined_at"),
+  kills: integer("kills"),
+  placement: integer("placement"),
+  rewardRial: numeric("reward_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  resultStatus: varchar("result_status", { length: 24 }).notNull().default("pending"),
+  settledAt: timestamp("settled_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  roomUserUnique: uniqueIndex("cod_room_entries_room_user_unique").on(table.roomId, table.userId),
+  roomStatusIdx: index("cod_room_entries_room_status_idx").on(table.roomId, table.status),
+  userCreatedIdx: index("cod_room_entries_user_created_idx").on(table.userId, table.createdAt),
+}));
+
+export const codRoomEvidence = pgTable("cod_room_evidence", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  roomId: uuid("room_id").notNull().references(() => codRooms.id),
+  entryId: uuid("entry_id").references(() => codRoomEntries.id),
+  uploadedById: uuid("uploaded_by_id").notNull().references(() => users.id),
+  kind: varchar("kind", { length: 24 }).notNull(),
+  fileUrl: text("file_url").notNull(),
+  contentHash: varchar("content_hash", { length: 64 }),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  metadata: jsonb("metadata").notNull().default('{}'),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  roomKindIdx: index("cod_room_evidence_room_kind_idx").on(table.roomId, table.kind),
+  roomHashUnique: uniqueIndex("cod_room_evidence_room_hash_unique").on(table.roomId, table.contentHash),
+}));
+
+export const codRoomSettlements = pgTable("cod_room_settlements", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  roomId: uuid("room_id").notNull().references(() => codRooms.id),
+  entryId: uuid("entry_id").notNull().references(() => codRoomEntries.id),
+  kills: integer("kills").notNull().default(0),
+  placement: integer("placement"),
+  killRewardRial: numeric("kill_reward_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  placementRewardRial: numeric("placement_reward_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  participationRewardRial: numeric("participation_reward_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  totalRewardRial: numeric("total_reward_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  status: varchar("status", { length: 20 }).notNull().default("shadow"),
+  rewardTransactionId: uuid("reward_transaction_id").references(() => transactions.id),
+  verifiedById: uuid("verified_by_id").references(() => users.id),
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  roomEntryUnique: uniqueIndex("cod_room_settlements_room_entry_unique").on(table.roomId, table.entryId),
+  statusIdx: index("cod_room_settlements_status_idx").on(table.status),
+}));
+
+export const codPlayerRanks = pgTable("cod_player_ranks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  region: varchar("region", { length: 16 }).notNull(),
+  points: integer("points").notNull().default(0),
+  tier: varchar("tier", { length: 20 }).notNull().default("rookie"),
+  verifiedRooms: integer("verified_rooms").notNull().default(0),
+  totalKills: integer("total_kills").notNull().default(0),
+  wins: integer("wins").notNull().default(0),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  userRegionUnique: uniqueIndex("cod_player_ranks_user_region_unique").on(table.userId, table.region),
+  regionPointsIdx: index("cod_player_ranks_region_points_idx").on(table.region, table.points),
+}));
+
+export const codRoomAuditEvents = pgTable("cod_room_audit_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  roomId: uuid("room_id").notNull().references(() => codRooms.id),
+  actorId: uuid("actor_id").references(() => users.id),
+  eventType: varchar("event_type", { length: 40 }).notNull(),
+  payload: jsonb("payload").notNull().default('{}'),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  roomCreatedIdx: index("cod_room_audit_room_created_idx").on(table.roomId, table.createdAt),
 }));
 
 // Support Tickets

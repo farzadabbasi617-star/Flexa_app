@@ -43,6 +43,8 @@ export async function GET(request: NextRequest) {
         clashRoyaleUsername: user.clashRoyaleUsername,
         codMobileId: user.codMobileId,
         codMobileUsername: user.codMobileUsername,
+        codMobileRegion: user.codMobileRegion,
+        codMobileStatus: user.codMobileStatus,
         fortniteId: user.fortniteId,
         fortniteUsername: user.fortniteUsername,
         // Age-gate fields — used purely for UI state (disabling paid

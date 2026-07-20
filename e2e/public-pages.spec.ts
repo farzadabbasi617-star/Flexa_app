@@ -30,3 +30,11 @@ test("public tournament page is reachable", async ({ page }) => {
   expect(response?.ok()).toBe(true);
   await expect(page.locator("body")).toBeVisible();
 });
+
+test("COD Arena private-beta landing is reachable", async ({ page }) => {
+  const response = await page.goto("/cod-arena");
+
+  expect(response?.ok()).toBe(true);
+  await expect(page).toHaveTitle(/COD Arena/i);
+  await expect(page.getByRole("heading", { level: 1, name: /^Gament COD Arena$/i })).toBeVisible();
+});

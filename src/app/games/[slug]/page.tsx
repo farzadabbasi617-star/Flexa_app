@@ -37,7 +37,7 @@ export default async function GameLandingPage({ params }: { params: Promise<{ sl
 
   if (!game) notFound();
 
-  const tournamentUrl = `/tournaments?game=${game.gameId}`;
+  const tournamentUrl = game.gameId === "cod_mobile" ? "/cod-arena" : `/tournaments?game=${game.gameId}`;
   const pageUrl = `${SITE_URL}/games/${game.slug}`;
   const faqJsonLd = {
     "@context": "https://schema.org",

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { clash1v1Entries, matchResultClaims, matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions, users, honors, honorLikes, honorViews } from "@/db/schema";
+import { clash1v1Entries, codRoomEntries, codRooms, matchResultClaims, matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions, users, honors, honorLikes, honorViews } from "@/db/schema";
 import { getTelegramChannelChatId } from "@/lib/telegram";
 import {
   cleanupTelegramReliability,
@@ -19,6 +19,8 @@ import { clashBattleMatchesExpectedMode, isClashDuelGameMode } from "@/lib/clash
 import { getClashRoyaleApiConfiguration, normalizeClashRoyaleTag, verifyClashRoyaleHeadToHead } from "@/lib/clash-royale-api";
 import { processStoreOrderDeadlines } from "@/lib/store-service";
 import { ensureAffiliateSchema, processAffiliateCommissions } from "@/lib/affiliate-service";
+import { ensureCodArenaSchema } from "@/lib/cod-room-service";
+import { advanceCodRoomLifecycle } from "@/lib/cod-room-lifecycle";
 
 export const dynamic = "force-dynamic";
 
@@ -152,6 +154,57 @@ async function sendLobbyNotices() {
       );
       await markSent(key, "lobby", tournament.id, recipient.telegramId);
       sent += 1;
+    }
+  }
+  return sent;
+}
+
+async function sendCodRoomNotices() {
+  const now = Date.now();
+  const rooms = await db.select().from(codRooms).where(and(
+    eq(codRooms.isPublished, true),
+    inArray(codRooms.status, ["registration", "check_in", "lobby_open", "in_progress"]),
+  ));
+  let sent = 0;
+  for (const room of rooms) {
+    const recipients = await db.select({
+      telegramId: telegramAccounts.telegramId,
+      checkedInAt: codRoomEntries.checkedInAt,
+      status: codRoomEntries.status,
+    }).from(codRoomEntries)
+      .innerJoin(telegramAccounts, eq(codRoomEntries.userId, telegramAccounts.userId))
+      .where(eq(codRoomEntries.roomId, room.id));
+    const minutes = Math.round((room.startsAt.getTime() - now) / 60_000);
+    const reminderBucket = minutes > 45 && minutes <= 65 ? 60 : minutes > 8 && minutes <= 18 ? 15 : 0;
+    const revealReady = Boolean(room.credentialsRevealAt && room.credentialsRevealAt.getTime() <= now);
+    for (const recipient of recipients) {
+      if (reminderBucket) {
+        const key = `cod-room-reminder:${room.id}:${reminderBucket}:${recipient.telegramId}`;
+        if (!(await hasSent(key))) {
+          await sendTelegramMessage(recipient.telegramId, [
+            "🎯 <b>یادآوری COD Arena</b>",
+            "",
+            `🔥 ${html(room.title)}`,
+            `🌍 ${html(room.region.toUpperCase())} • ${html(room.teamMode.toUpperCase())} • ${html(room.map)}`,
+            `⏱ شروع حدود <b>${reminderBucket} دقیقه</b> دیگر`,
+            recipient.checkedInAt ? "✅ حضور شما تأیید شده است." : "⚠️ Check-in را قبل از بسته‌شدن پنجره انجام بده.",
+          ].join("\n"), { inline_keyboard: [[{ text: "بازکردن روم امن", url: `${process.env.APP_URL || "https://www.gament1.ir"}/cod-arena/${room.id}` }]] });
+          await markSent(key, "cod_room_reminder", undefined, recipient.telegramId);
+          sent += 1;
+        }
+      }
+      if (revealReady && recipient.checkedInAt) {
+        const key = `cod-room-lobby:${room.id}:${recipient.telegramId}`;
+        if (!(await hasSent(key))) {
+          // Never put room credentials in Telegram. The authenticated Gament
+          // page performs the final participant/check-in/reveal authorization.
+          await sendTelegramMessage(recipient.telegramId, `🔐 <b>Lobby COD Arena آماده است</b>\n\n🔥 ${html(room.title)}\n\nبرای مشاهده Room Code و لینک رسمی ورود، صفحه امن روم را باز کن.`, {
+            inline_keyboard: [[{ text: "مشاهده اطلاعات ورود", url: `${process.env.APP_URL || "https://www.gament1.ir"}/cod-arena/${room.id}` }]],
+          });
+          await markSent(key, "cod_room_lobby", undefined, recipient.telegramId);
+          sent += 1;
+        }
+      }
     }
   }
   return sent;
@@ -713,7 +766,7 @@ async function safeCronStep<T>(name: string, fn: () => Promise<T>): Promise<T | 
 export async function GET(request: NextRequest) {
   const auth = validateCron(request);
   if (!auth.ok) return NextResponse.json({ error: auth.error }, { status: auth.status });
-  await Promise.all([ensurePrivateTournamentAttendanceSchema(), ensureAffiliateSchema()]);
+  await Promise.all([ensurePrivateTournamentAttendanceSchema(), ensureAffiliateSchema(), ensureCodArenaSchema()]);
 
   // Drain old work first, enqueue this cron cycle's notifications, then drain
   // again. If Render stops between these phases, the next invocation resumes
@@ -722,6 +775,7 @@ export async function GET(request: NextRequest) {
   const reminders = await safeCronStep("reminders", sendReminders);
   const capacity = await safeCronStep("capacity", sendCapacityAlerts);
   const lobby = await safeCronStep("lobby", sendLobbyNotices);
+  const codRoomNotices = await safeCronStep("codRoomNotices", sendCodRoomNotices);
   const privateNoShows = await safeCronStep("privateNoShows", markPrivateTournamentNoShows);
   const privateLeaderboardPrompts = await safeCronStep("privateLeaderboardPrompts", promptPrivateTournamentLeaderboardUploads);
   const clash1v1Matchmaking = await safeCronStep("clash1v1Matchmaking", runClash1v1MatchmakingAndNotify);
@@ -733,6 +787,7 @@ export async function GET(request: NextRequest) {
   const matchResults = await safeCronStep("matchResults", sendMatchResultNotifications);
   const results = await safeCronStep("results", publishCompletedResults);
   const storeOrderDeadlines = await safeCronStep("storeOrderDeadlines", () => processStoreOrderDeadlines(50));
+  const codRoomLifecycle = await safeCronStep("codRoomLifecycle", () => advanceCodRoomLifecycle());
   const affiliateCommissions = await safeCronStep("affiliateCommissions", () => processAffiliateCommissions(100));
   const classifiedScrape = await safeCronStep("classifiedScrape", runHourlyClassifiedScrape);
   const classifiedCleanup = await safeCronStep("classifiedCleanup", cleanupClassifiedAds);
@@ -751,6 +806,7 @@ export async function GET(request: NextRequest) {
     reminders,
     capacity,
     lobby,
+    codRoomNotices,
     privateNoShows,
     privateLeaderboardPrompts,
     clash1v1Matchmaking,
@@ -762,6 +818,7 @@ export async function GET(request: NextRequest) {
     matchResults,
     results,
     storeOrderDeadlines,
+    codRoomLifecycle,
     affiliateCommissions,
     classifiedScrape,
     classifiedCleanup,

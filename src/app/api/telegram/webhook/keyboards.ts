@@ -20,6 +20,7 @@ export function mainMenuKeyboard() {
     ],
     ...(CHANNEL_URL ? [[{ text: "📣 کانال Gament Games", url: CHANNEL_URL }]] : []),
     [{ text: "🏟 روم‌های فعال", callback_data: "menu:rooms" }, { text: "🎮 پیش‌ثبت‌نام", callback_data: "menu:register" }],
+    [{ text: "🎯 COD Arena — کاستوم‌روم کالاف", url: `${APP_URL}/cod-arena` }],
     [{ text: "💳 کیف پول", callback_data: "menu:wallet" }, { text: "🏆 تورنومنت‌های من", callback_data: "menu:my_tournaments" }],
     [{ text: "✅ چک‌این", callback_data: "menu:checkin" }, { text: "⚔️ مسابقات من", callback_data: "menu:matches" }],
     [{ text: "⚔️ 1V1 کلش رویال", callback_data: "menu:clash_qr" }, { text: "🏅 کلش چندنفره", callback_data: "menu:clash_private" }],

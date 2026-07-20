@@ -18,6 +18,7 @@ export default function Navbar() {
   const navItems = [
     { href: "/", label: t.nav.home, icon: "🏠" },
     { href: "/tournaments", label: t.nav.tournaments, icon: "🏆" },
+    { href: "/cod-arena", label: lang === "fa" ? "COD Arena" : "COD Arena", icon: "🎯" },
     { href: "/store", label: lang === "fa" ? "فروشگاه" : "Store", icon: "🛒" },
     { href: "/leaderboard", label: t.nav.leaderboard, icon: "📊" },
     { href: "/judging", label: t.nav.judging, icon: "⚖️" },
@@ -148,6 +149,9 @@ export default function Navbar() {
                             </Link>
                             <Link href="/admin/tournaments" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                               <span>🏆</span> مدیریت تورنومنت‌ها
+                            </Link>
+                            <Link href="/admin/cod-arena" className="flex items-center gap-3 px-4 py-2.5 text-sm text-orange-300 hover:bg-orange-500/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                              <span>🎯</span> عملیات COD Arena
                             </Link>
                             <Link href="/admin/matches" className="flex items-center gap-3 px-4 py-2.5 text-sm text-neon-pink hover:bg-neon-pink/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                               <span>⚔️</span> مدیریت مسابقات

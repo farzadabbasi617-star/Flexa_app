@@ -25,6 +25,7 @@ function groupCommands() {
     { command: "rules", description: "قوانین Gament و مسابقات 1V1" },
     { command: "rooms", description: "لینک تورنومنت‌های فعال" },
     { command: "clash", description: "شروع 1V1 کلش در چت خصوصی" },
+    { command: "cod", description: "لینک COD Arena و روم‌های کالاف" },
     { command: "connect_media", description: "اتصال امن گروه به کد رسانه" },
   ];
 }
@@ -40,6 +41,7 @@ function commands() {
     { command: "matches", description: "مسابقات، نتیجه، مدرک و اعتراض" },
     { command: "qr", description: "1V1 کلش و ارسال پیوند دوستی" },
     { command: "clash", description: "1V1 کلش رویال" },
+    { command: "cod", description: "COD Arena و کاستوم‌روم‌های کالاف" },
     { command: "clash_link", description: "ارسال پیوند دوستی کلش رویال" },
     { command: "clash_tournament", description: "مسابقات چندنفره کلش رویال" },
     { command: "checkin", description: "چک‌این سریع تورنومنت" },

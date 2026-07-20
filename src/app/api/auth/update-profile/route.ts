@@ -44,6 +44,7 @@ export async function PATCH(request: NextRequest) {
       clashRoyaleUsername,
       codMobileId,
       codMobileUsername,
+      codMobileRegion,
       fortniteId,
       fortniteUsername,
     } = body;
@@ -93,8 +94,24 @@ export async function PATCH(request: NextRequest) {
     // Clash Royale username is authoritative from Supercell and cannot be
     // overwritten manually. Keep the old request field only for compatibility.
     void clashRoyaleUsername;
-    if (codMobileId !== undefined) updateData.codMobileId = codMobileId || null;
-    if (codMobileUsername !== undefined) updateData.codMobileUsername = codMobileUsername || null;
+    let codIdentityChanged = false;
+    if (codMobileRegion !== undefined) {
+      const region = String(codMobileRegion || "").toLowerCase();
+      if (!["global", "garena"].includes(region)) {
+        return NextResponse.json({ error: "ریجن کالاف باید Global یا Garena باشد." }, { status: 400 });
+      }
+      updateData.codMobileRegion = region;
+      codIdentityChanged ||= region !== user.codMobileRegion;
+    }
+    if (codMobileId !== undefined || codMobileUsername !== undefined) {
+      const nextId = codMobileId !== undefined ? String(codMobileId || "").trim().slice(0, 100) : user.codMobileId;
+      const nextUsername = codMobileUsername !== undefined ? String(codMobileUsername || "").trim().slice(0, 100) : user.codMobileUsername;
+      updateData.codMobileId = nextId || null;
+      updateData.codMobileUsername = nextUsername || null;
+      codIdentityChanged ||= (nextId || null) !== user.codMobileId || (nextUsername || null) !== user.codMobileUsername;
+      if (!nextId || !nextUsername) updateData.codMobileStatus = "unlinked";
+    }
+    if (codIdentityChanged && updateData.codMobileStatus !== "unlinked") updateData.codMobileStatus = "pending";
     if (fortniteId !== undefined) updateData.fortniteId = fortniteId || null;
     if (fortniteUsername !== undefined) updateData.fortniteUsername = fortniteUsername || null;
 
@@ -149,6 +166,8 @@ export async function PATCH(request: NextRequest) {
         clashRoyaleStatus: updated.clashRoyaleStatus,
         codMobileId: updated.codMobileId,
         codMobileUsername: updated.codMobileUsername,
+        codMobileRegion: updated.codMobileRegion,
+        codMobileStatus: updated.codMobileStatus,
         fortniteId: updated.fortniteId,
         fortniteUsername: updated.fortniteUsername,
         metadata: updated.metadata,

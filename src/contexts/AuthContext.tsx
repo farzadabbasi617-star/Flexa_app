@@ -24,6 +24,8 @@ interface User {
   clashRoyaleUsername: string | null;
   codMobileId: string | null;
   codMobileUsername: string | null;
+  codMobileRegion: "global" | "garena";
+  codMobileStatus: "unlinked" | "pending" | "verified" | "rejected" | null;
   fortniteId: string | null;
   fortniteUsername: string | null;
   // Age-gate fields — used by the UI to disable paid actions client-side.

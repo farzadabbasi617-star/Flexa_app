@@ -7,6 +7,7 @@ import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournamen
 import { ensureStoreOrderLifecycleSchema } from "@/lib/store-service";
 import { affiliateProgramLive, ensureAffiliateSchema } from "@/lib/affiliate-service";
 import { ensurePublicIdentitySeparation } from "@/lib/public-profile";
+import { codArenaLive, ensureCodArenaSchema } from "@/lib/cod-room-service";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,7 @@ export async function GET() {
       ensureStoreOrderLifecycleSchema(),
       ensureAffiliateSchema(),
       ensurePublicIdentitySeparation(),
+      ensureCodArenaSchema(),
     ]);
     await db.execute(sql`select 1`);
     return Response.json(
@@ -63,6 +65,15 @@ export async function GET() {
           commissionTomanPerMatch: 7000,
           personalMinimumPayoutToman: 200000,
           destinations: ["bank", "gaming_wallet"],
+        },
+        codArena: {
+          configured: true,
+          live: codArenaLive(),
+          privateBeta: !codArenaLive(),
+          regions: ["global", "garena"],
+          modes: ["solo", "duo", "squad"],
+          rewards: ["kill", "placement", "participation"],
+          referralModel: "service_fee_percentage",
         },
         email: {
           configured: email.configured,
