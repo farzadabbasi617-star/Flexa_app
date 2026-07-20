@@ -2057,6 +2057,9 @@ async function affiliateCommand(chatId: number, telegramId: string) {
     "درخواست، احراز هویت و قرارداد OTPشده فقط داخل سایت انجام می‌شوند.",
   ].join("\n"), { inline_keyboard: [[{ text: "📝 ثبت درخواست همکاری", url: `${APP_URL}/media-partners` }]] });
   const partner = dashboard.partner;
+  if (partner.partnerType === "personal") return sendMessage(chatId, "حساب شما در طرح معرفی کاربران فعال است؛ آمار و لینک را از بخش درآمد معرفی ببین.", {
+    inline_keyboard: [[{ text: "🎁 داشبورد معرفی", url: `${APP_URL}/referrals` }], [{ text: "📤 نمایش لینک در بات", callback_data: "mission:invite" }]],
+  });
   const totals = dashboard.stats?.totals || {};
   const available = formatTomanFromRial(BigInt(totals.available || "0"));
   const pending = formatTomanFromRial(BigInt(totals.pending || "0") + BigInt(totals.shadow || "0"));
@@ -2089,11 +2092,39 @@ async function connectMediaGroupCommand(chatId: number, chatTitle: string | unde
 }
 
 async function inviteCommand(chatId: number, telegramId: string) {
-  const username = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
-  const link = `https://t.me/${username}?start=ref_${telegramId}`;
-  const [{ value }] = await db.select({ value: count() }).from(telegramReferrals).where(eq(telegramReferrals.referrerTelegramId, telegramId));
-  await sendMessage(chatId, `🎁 <b>لینک دعوت اختصاصی شما</b>\n\n${html(link)}\n\nدعوت‌های ثبت‌شده: <b>${value}</b>\n\nاین لینک را برای دوستات بفرست؛ در فاز جایزه، دعوت‌های معتبر امتیاز می‌گیرند.`, {
-    inline_keyboard: [[{ text: "اشتراک‌گذاری", url: `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("به Gament بپیوند و توی تورنومنت‌های گیمینگ شرکت کن!")}` }]],
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) return sendMessage(chatId, "برای دریافت لینک معرفی درآمدزا، ابتدا حساب را با /link به Gament وصل کن.", {
+    inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]],
+  });
+  const dashboard = await getMediaPartnerDashboard(linked.userId);
+  if (!dashboard.partner) return sendMessage(chatId, [
+    "🎁 <b>درآمد از معرفی کاربران</b>",
+    "",
+    "با فعال‌سازی رایگان، یک لینک اختصاصی می‌گیری. برای هر Match پولی واجد شرایط در مجموع ۷ هزار تومان کمیسیون ثبت می‌شود.",
+    "انتساب ۳۰ روز است و دو معرف متفاوت هرکدام ۳,۵۰۰ تومان می‌گیرند.",
+  ].join("\n"), { inline_keyboard: [[{ text: "🚀 فعال‌سازی طرح معرفی", url: `${APP_URL}/referrals` }]] });
+  const partner = dashboard.partner;
+  if (partner.status !== "active") return sendMessage(chatId, "برای فعال‌شدن لینک، شرایط طرح معرفی را با OTP داخل سایت تأیید کن.", {
+    inline_keyboard: [[{ text: "📜 تکمیل شرایط و OTP", url: `${APP_URL}/${partner.partnerType === "media" ? "media-partners" : "referrals"}` }]],
+  });
+  const link = affiliatePublicLink(partner.referralCode);
+  const pending = BigInt(dashboard.stats?.totals.pending || "0") + BigInt(dashboard.stats?.totals.shadow || "0");
+  const available = BigInt(dashboard.stats?.totals.available || "0");
+  await sendMessage(chatId, [
+    "🎁 <b>لینک معرفی اختصاصی شما</b>",
+    "",
+    `<code>${html(link)}</code>`,
+    "",
+    `کلیک‌ها: <b>${Number(dashboard.stats?.clicks || 0).toLocaleString("fa-IR")}</b>`,
+    `معرفی‌های فعال: <b>${Number(dashboard.stats?.activeAttributions || 0).toLocaleString("fa-IR")}</b>`,
+    `Matchهای واجد: <b>${Number(dashboard.stats?.qualifiedMatches || 0).toLocaleString("fa-IR")}</b>`,
+    `در انتظار: <b>${html(formatTomanFromRial(pending))}</b>`,
+    `قابل استفاده: <b>${html(formatTomanFromRial(available))}</b>`,
+  ].join("\n"), {
+    inline_keyboard: [
+      [{ text: "📤 اشتراک‌گذاری", url: `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("با لینک من وارد Gament شو و در رقابت‌های گیمینگ شرکت کن!")}` }],
+      [{ text: "📊 داشبورد معرفی", url: `${APP_URL}/${partner.partnerType === "media" ? "media-partners" : "referrals"}` }],
+    ],
   });
 }
 
@@ -2396,7 +2427,9 @@ function missionsKeyboard(status: { channelMember: boolean; linked: boolean; pre
 async function getMissionStatus(telegramId: string) {
   const linked = await getLinkedUserByTelegram(telegramId);
   const [preReg] = await db.select({ id: telegramPreRegistrations.id }).from(telegramPreRegistrations).where(eq(telegramPreRegistrations.telegramId, telegramId)).limit(1);
-  const [{ value: invites }] = await db.select({ value: count() }).from(telegramReferrals).where(eq(telegramReferrals.referrerTelegramId, telegramId));
+  const [{ value: legacyInvites }] = await db.select({ value: count() }).from(telegramReferrals).where(eq(telegramReferrals.referrerTelegramId, telegramId));
+  const referralDashboard = linked?.userId ? await getMediaPartnerDashboard(linked.userId).catch(() => null) : null;
+  const invites = Math.max(Number(legacyInvites || 0), Number(referralDashboard?.stats?.activeAttributions || 0));
   const channelMember = await isChannelMember(telegramId);
   return { linked, preReg: Boolean(preReg), invites, channelMember };
 }

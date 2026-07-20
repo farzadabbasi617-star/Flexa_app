@@ -371,6 +371,22 @@ export const EmailService = {
     return consumeOtp(client, mediaContractIdentifier(userId, contractVersion), code);
   },
 
+  sendPersonalReferralContractCode(email: string, userId: string, contractVersion: string) {
+    const normalized = normalizedEmail(email);
+    return createAndSendOtp({
+      identifier: mediaContractIdentifier(userId, contractVersion),
+      email: normalized,
+      subject: "کد فعال‌سازی طرح معرفی کاربران Gament",
+      heading: "پذیرش شرایط کسب درآمد از معرفی",
+      description: `کد یک‌بارمصرف برای پذیرش شرایط نسخه ${contractVersion}:`,
+      warning: "این کد ۱۵ دقیقه و فقط برای فعال‌سازی طرح معرفی شما معتبر است. آن را در اختیار دیگران قرار ندهید.",
+    });
+  },
+
+  consumePersonalReferralContractCode(userId: string, contractVersion: string, code: string, client: any = db) {
+    return consumeOtp(client, mediaContractIdentifier(userId, contractVersion), code);
+  },
+
   async sendPasswordChangedNotice(email: string) {
     const html = `
       <div dir="rtl" style="font-family:Tahoma,sans-serif;background:#050508;padding:32px;color:#fff;">

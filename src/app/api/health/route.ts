@@ -59,6 +59,8 @@ export async function GET() {
           live: affiliateProgramLive(),
           attributionDays: 30,
           commissionTomanPerMatch: 7000,
+          personalMinimumPayoutToman: 200000,
+          destinations: ["bank", "gaming_wallet"],
         },
         email: {
           configured: email.configured,

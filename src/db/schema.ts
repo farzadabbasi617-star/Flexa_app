@@ -790,10 +790,11 @@ export const matchResultClaims = pgTable("match_result_claims", {
 export const mediaPartners = pgTable("media_partners", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").notNull().references(() => users.id).unique(),
+  partnerType: varchar("partner_type", { length: 20 }).notNull().default("media"),
   referralCode: varchar("referral_code", { length: 24 }).notNull().unique(),
   legalName: varchar("legal_name", { length: 160 }).notNull(),
   nationalId: varchar("national_id", { length: 10 }).notNull(),
-  sheba: varchar("sheba", { length: 26 }).notNull(),
+  sheba: varchar("sheba", { length: 26 }),
   mediaName: varchar("media_name", { length: 160 }).notNull(),
   mediaType: varchar("media_type", { length: 30 }).notNull(),
   mediaUrl: varchar("media_url", { length: 500 }).notNull(),
@@ -812,6 +813,7 @@ export const mediaPartners = pgTable("media_partners", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => ({
   statusIdx: index("media_partners_status_idx").on(table.status),
+  typeStatusIdx: index("media_partners_type_status_idx").on(table.partnerType, table.status),
   referralIdx: uniqueIndex("media_partners_referral_code_idx").on(table.referralCode),
   nationalIdx: index("media_partners_national_id_idx").on(table.nationalId),
 }));
@@ -901,6 +903,7 @@ export const affiliatePayouts = pgTable("affiliate_payouts", {
   id: uuid("id").defaultRandom().primaryKey(),
   partnerId: uuid("partner_id").notNull().references(() => mediaPartners.id),
   amountRial: numeric("amount_rial", { precision: 20, scale: 0 }).notNull(),
+  destination: varchar("destination", { length: 20 }).notNull().default("bank"),
   status: varchar("status", { length: 20 }).notNull().default("requested"),
   shebaSnapshot: varchar("sheba_snapshot", { length: 26 }).notNull(),
   requestedAt: timestamp("requested_at").defaultNow().notNull(),

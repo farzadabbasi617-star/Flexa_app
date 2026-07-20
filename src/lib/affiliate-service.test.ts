@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { AFFILIATE_COMMISSION_RIAL, affiliateAttributionExpiresAt, allocateAffiliateCommission, normalizeAffiliateCode, normalizeIranSheba } from "./affiliate-service";
+import { AFFILIATE_COMMISSION_RIAL, PERSONAL_REFERRAL_MINIMUM_PAYOUT_RIAL, affiliateAttributionExpiresAt, allocateAffiliateCommission, normalizeAffiliateCode, normalizeIranSheba } from "./affiliate-service";
 import { MEDIA_PARTNER_CONTRACT_HASH, MEDIA_PARTNER_CONTRACT_TEXT } from "./media-partner-contract";
+import { PERSONAL_REFERRAL_CONTRACT_HASH, PERSONAL_REFERRAL_CONTRACT_TEXT } from "./personal-referral-contract";
 import crypto from "crypto";
 
 describe("affiliate financial policy", () => {
@@ -40,5 +41,10 @@ describe("affiliate financial policy", () => {
 
   it("keeps the stored contract hash tied to the exact immutable snapshot", () => {
     expect(crypto.createHash("sha256").update(MEDIA_PARTNER_CONTRACT_TEXT).digest("hex")).toBe(MEDIA_PARTNER_CONTRACT_HASH);
+    expect(crypto.createHash("sha256").update(PERSONAL_REFERRAL_CONTRACT_TEXT).digest("hex")).toBe(PERSONAL_REFERRAL_CONTRACT_HASH);
+  });
+
+  it("uses the approved 200,000-Toman personal cash-out minimum", () => {
+    expect(PERSONAL_REFERRAL_MINIMUM_PAYOUT_RIAL).toBe(BigInt(2_000_000));
   });
 });

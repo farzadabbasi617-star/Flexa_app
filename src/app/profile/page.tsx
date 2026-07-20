@@ -512,9 +512,13 @@ export default function ProfilePage() {
             <img src="/icons/profile_support_center.png" alt="پشتیبانی" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black">پشتیبانی</span>
           </Link>
-          <Link href="/media-partners" className="col-span-2 settings-tile flex items-center justify-center gap-2 bg-violet-500/[.08] border border-violet-400/20 rounded-2xl py-4 hover:border-violet-400/40 active:scale-95 transition-transform">
+          <Link href="/referrals" className="settings-tile flex items-center justify-center gap-2 bg-cyan-500/[.07] border border-cyan-400/20 rounded-2xl py-4 hover:border-cyan-400/40 active:scale-95 transition-transform">
+            <span className="text-xl">🎁</span>
+            <span className="text-xs font-black text-cyan-200">درآمد از معرفی</span>
+          </Link>
+          <Link href="/media-partners" className="settings-tile flex items-center justify-center gap-2 bg-violet-500/[.08] border border-violet-400/20 rounded-2xl py-4 hover:border-violet-400/40 active:scale-95 transition-transform">
             <span className="text-xl">📣</span>
-            <span className="text-xs font-black text-violet-200">همکاری رسانه‌ای و کمیسیون Match</span>
+            <span className="text-xs font-black text-violet-200">همکاری رسانه‌ای</span>
           </Link>
           {isAdmin && (
             <Link href="/admin" className="col-span-2 flex items-center justify-center gap-2 bg-[#111114] border border-fuchsia-500/20 rounded-2xl py-4 hover:border-fuchsia-500/40 active:scale-95 transition-transform">

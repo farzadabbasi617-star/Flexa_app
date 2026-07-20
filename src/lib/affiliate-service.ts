@@ -15,13 +15,18 @@ import {
   mediaProperties,
   telegramAccounts,
   transactions,
+  wallets,
 } from "@/db/schema";
+import { updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
+
 export const AFFILIATE_ATTRIBUTION_DAYS = 30;
 export const AFFILIATE_COMMISSION_TOMAN = 7_000;
 export const AFFILIATE_COMMISSION_RIAL = BigInt(AFFILIATE_COMMISSION_TOMAN * 10);
 export const AFFILIATE_HOLD_HOURS = 72;
 export const AFFILIATE_MINIMUM_PAYOUT_TOMAN = 300_000;
 export const AFFILIATE_MINIMUM_PAYOUT_RIAL = BigInt(AFFILIATE_MINIMUM_PAYOUT_TOMAN * 10);
+export const PERSONAL_REFERRAL_MINIMUM_PAYOUT_TOMAN = 200_000;
+export const PERSONAL_REFERRAL_MINIMUM_PAYOUT_RIAL = BigInt(PERSONAL_REFERRAL_MINIMUM_PAYOUT_TOMAN * 10);
 export const AFFILIATE_DAILY_MATCH_CAP_PER_USER = 3;
 
 export function affiliateProgramLive() {
@@ -55,8 +60,8 @@ let affiliateSchemaReady: Promise<void> | null = null;
 async function createAffiliateSchema(client: any) {
   await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS media_partners (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(), user_id uuid NOT NULL UNIQUE REFERENCES users(id),
-    referral_code varchar(24) NOT NULL UNIQUE, legal_name varchar(160) NOT NULL,
-    national_id varchar(10) NOT NULL, sheba varchar(26) NOT NULL, media_name varchar(160) NOT NULL,
+    partner_type varchar(20) NOT NULL DEFAULT 'media', referral_code varchar(24) NOT NULL UNIQUE, legal_name varchar(160) NOT NULL,
+    national_id varchar(10) NOT NULL, sheba varchar(26), media_name varchar(160) NOT NULL,
     media_type varchar(30) NOT NULL, media_url varchar(500) NOT NULL, follower_count integer NOT NULL DEFAULT 0,
     ownership_proof_url text, status varchar(30) NOT NULL DEFAULT 'draft',
     commission_rial_per_match numeric(20,0) NOT NULL DEFAULT 70000, attribution_days integer NOT NULL DEFAULT 30,
@@ -65,6 +70,9 @@ async function createAffiliateSchema(client: any) {
     settings jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamp NOT NULL DEFAULT now(),
     updated_at timestamp NOT NULL DEFAULT now()
   )`));
+  await client.execute(sql.raw(`ALTER TABLE media_partners ADD COLUMN IF NOT EXISTS partner_type varchar(20) NOT NULL DEFAULT 'media'`));
+  await client.execute(sql.raw(`ALTER TABLE media_partners ALTER COLUMN sheba DROP NOT NULL`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS media_partners_type_status_idx ON media_partners(partner_type,status)`));
   await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS media_partner_agreements (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(), partner_id uuid NOT NULL REFERENCES media_partners(id),
     user_id uuid NOT NULL REFERENCES users(id), contract_version varchar(60) NOT NULL,
@@ -101,11 +109,12 @@ async function createAffiliateSchema(client: any) {
   )`));
   await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS affiliate_payouts (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(), partner_id uuid NOT NULL REFERENCES media_partners(id),
-    amount_rial numeric(20,0) NOT NULL, status varchar(20) NOT NULL DEFAULT 'requested',
+    amount_rial numeric(20,0) NOT NULL, destination varchar(20) NOT NULL DEFAULT 'bank', status varchar(20) NOT NULL DEFAULT 'requested',
     sheba_snapshot varchar(26) NOT NULL, requested_at timestamp NOT NULL DEFAULT now(),
     reviewed_by_id uuid REFERENCES users(id), reviewed_at timestamp, paid_at timestamp,
     reference varchar(120), admin_note text
   )`));
+  await client.execute(sql.raw(`ALTER TABLE affiliate_payouts ADD COLUMN IF NOT EXISTS destination varchar(20) NOT NULL DEFAULT 'bank'`));
   await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS affiliate_commission_shares (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(), event_id uuid NOT NULL REFERENCES affiliate_commission_events(id),
     partner_id uuid NOT NULL REFERENCES media_partners(id), referred_user_id uuid REFERENCES users(id),
@@ -408,6 +417,106 @@ export async function getMediaPartnerDashboard(userId: string) {
   };
 }
 
+export async function createPersonalReferralAccount(input: {
+  userId: string;
+  displayName: string;
+  nationalId?: string | null;
+}) {
+  await ensureAffiliateSchema();
+  if (!input.nationalId || !/^\d{10}$/.test(input.nationalId)) {
+    return { created: false as const, reason: "identity_required" as const };
+  }
+  const [existing] = await db.select().from(mediaPartners).where(eq(mediaPartners.userId, input.userId)).limit(1);
+  if (existing) {
+    return existing.partnerType === "personal"
+      ? { created: false as const, reason: "already_exists" as const, partner: existing }
+      : { created: false as const, reason: "media_partner_exists" as const, partner: existing };
+  }
+  for (let attempt = 0; attempt < 4; attempt += 1) {
+    try {
+      const [partner] = await db.insert(mediaPartners).values({
+        userId: input.userId,
+        partnerType: "personal",
+        referralCode: generateAffiliateCode(),
+        legalName: input.displayName,
+        nationalId: input.nationalId,
+        sheba: null,
+        mediaName: input.displayName,
+        mediaType: "personal_referrer",
+        mediaUrl: "https://www.gament1.ir/referrals",
+        followerCount: 0,
+        status: "draft",
+        attributionDays: AFFILIATE_ATTRIBUTION_DAYS,
+        commissionRialPerMatch: AFFILIATE_COMMISSION_RIAL.toString(),
+        minimumPayoutRial: PERSONAL_REFERRAL_MINIMUM_PAYOUT_RIAL.toString(),
+        settings: { destinationChoice: true },
+      }).returning();
+      return { created: true as const, partner };
+    } catch (error: any) {
+      if (error?.code !== "23505" || attempt === 3) throw error;
+    }
+  }
+  throw new Error("PERSONAL_REFERRAL_CODE_GENERATION_FAILED");
+}
+
+export async function updatePersonalReferralSheba(userId: string, rawSheba: string) {
+  await ensureAffiliateSchema();
+  const sheba = normalizeIranSheba(rawSheba);
+  if (!sheba) return { updated: false as const, reason: "invalid_sheba" as const };
+  const [partner] = await db.update(mediaPartners).set({ sheba, updatedAt: new Date() }).where(and(
+    eq(mediaPartners.userId, userId), eq(mediaPartners.partnerType, "personal"), eq(mediaPartners.status, "active"),
+  )).returning();
+  return partner ? { updated: true as const, partner } : { updated: false as const, reason: "partner_not_active" as const };
+}
+
+export async function convertAffiliateBalanceToGamingWallet(userId: string) {
+  await ensureAffiliateSchema();
+  await processAffiliateCommissions(100);
+  if (!affiliateProgramLive()) return { ok: false as const, reason: "shadow_mode" as const };
+  return db.transaction(async (tx) => {
+    const [partner] = await tx.select().from(mediaPartners).where(eq(mediaPartners.userId, userId)).for("update").limit(1);
+    if (!partner || partner.status !== "active" || !partner.contractAcceptedAt) return { ok: false as const, reason: "partner_not_active" as const };
+    const shares = await tx.select().from(affiliateCommissionShares).where(and(
+      eq(affiliateCommissionShares.partnerId, partner.id), eq(affiliateCommissionShares.status, "available"), isNull(affiliateCommissionShares.payoutId),
+    )).for("update");
+    const amount = shares.reduce((sum: bigint, share: { amountRial: string }) => sum + BigInt(share.amountRial), BigInt(0));
+    if (amount <= BigInt(0)) return { ok: false as const, reason: "no_available_balance" as const };
+    let [wallet] = await tx.select().from(wallets).where(eq(wallets.userId, userId)).limit(1);
+    if (!wallet) [wallet] = await tx.insert(wallets).values({ userId, balance: "0", currency: "RIAL" }).returning();
+    const [payout] = await tx.insert(affiliatePayouts).values({
+      partnerId: partner.id,
+      amountRial: amount.toString(),
+      destination: "gaming_wallet",
+      status: "paid",
+      shebaSnapshot: "GAMENT_WALLET",
+      reviewedAt: new Date(),
+      paidAt: new Date(),
+      reference: `affiliate-wallet-${Date.now()}`,
+      adminNote: "Irreversible conversion to non-withdrawable Gament gaming credit",
+    }).returning();
+    const credited = await updateWalletBalanceSafely(tx, wallet.id, amount, "increase");
+    if (!credited) throw new Error("AFFILIATE_GAMING_WALLET_CREDIT_FAILED");
+    await tx.insert(transactions).values({
+      walletId: wallet.id,
+      amount: amount.toString(),
+      type: "deposit",
+      status: "completed",
+      referenceId: `affiliate-wallet-credit-${payout.id}`,
+      metadata: { kind: "affiliate_gaming_credit", partnerId: partner.id, payoutId: payout.id, withdrawable: false },
+    });
+    await tx.update(affiliateCommissionShares).set({ status: "paid", payoutId: payout.id, updatedAt: new Date() })
+      .where(inArray(affiliateCommissionShares.id, shares.map((share: { id: string }) => share.id)));
+    const eventIds = [...new Set(shares.map((share: { eventId: string }) => share.eventId))];
+    for (const eventId of eventIds) {
+      const [remaining] = await tx.select({ value: count() }).from(affiliateCommissionShares).where(and(
+        eq(affiliateCommissionShares.eventId, eventId), sql`${affiliateCommissionShares.status} NOT IN ('paid','reversed')`,
+      ));
+      if (Number(remaining?.value || 0) === 0) await tx.update(affiliateCommissionEvents).set({ status: "paid", paidAt: new Date(), updatedAt: new Date() }).where(eq(affiliateCommissionEvents.id, eventId));
+    }
+    return { ok: true as const, amountRial: amount.toString(), payoutId: payout.id };
+  });
+}
+
 export async function requestAffiliatePayout(userId: string) {
   await ensureAffiliateSchema();
   await processAffiliateCommissions(100);
@@ -415,6 +524,7 @@ export async function requestAffiliatePayout(userId: string) {
   return db.transaction(async (tx) => {
     const [partner] = await tx.select().from(mediaPartners).where(eq(mediaPartners.userId, userId)).for("update").limit(1);
     if (!partner || partner.status !== "active" || !partner.contractAcceptedAt) return { ok: false as const, reason: "partner_not_active" as const };
+    if (!partner.sheba) return { ok: false as const, reason: "sheba_required" as const };
     const [pending] = await tx.select({ id: affiliatePayouts.id }).from(affiliatePayouts).where(and(
       eq(affiliatePayouts.partnerId, partner.id), inArray(affiliatePayouts.status, ["requested", "approved"]),
     )).limit(1);
@@ -427,7 +537,7 @@ export async function requestAffiliatePayout(userId: string) {
       return { ok: false as const, reason: "below_minimum" as const, amountRial: amount.toString(), minimumRial: partner.minimumPayoutRial };
     }
     const [payout] = await tx.insert(affiliatePayouts).values({
-      partnerId: partner.id, amountRial: amount.toString(), status: "requested", shebaSnapshot: partner.sheba,
+      partnerId: partner.id, amountRial: amount.toString(), destination: "bank", status: "requested", shebaSnapshot: partner.sheba,
     }).returning();
     await tx.update(affiliateCommissionShares).set({ status: "reserved", payoutId: payout.id, updatedAt: new Date() })
       .where(inArray(affiliateCommissionShares.id, shares.map((share: { id: string }) => share.id)));
@@ -563,6 +673,6 @@ export function affiliatePublicLink(referralCode: string, campaignCode?: string)
   return `https://t.me/${bot}?start=aff_${normalizeAffiliateCode(referralCode)}${suffix}`;
 }
 
-export function redactSheba(sheba: string) {
-  return sheba.length >= 8 ? `${sheba.slice(0, 4)}••••••••••••••••${sheba.slice(-4)}` : "—";
+export function redactSheba(sheba?: string | null) {
+  return sheba && sheba.length >= 8 ? `${sheba.slice(0, 4)}••••••••••••••••${sheba.slice(-4)}` : "—";
 }

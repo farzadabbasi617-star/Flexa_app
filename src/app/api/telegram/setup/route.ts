@@ -45,7 +45,7 @@ function commands() {
     { command: "support", description: "ساخت تیکت پشتیبانی" },
     { command: "my_tickets", description: "تیکت‌های من" },
     { command: "missions", description: "مأموریت‌ها و پاداش XP" },
-    { command: "invite", description: "لینک دعوت اختصاصی" },
+    { command: "invite", description: "لینک معرفی و درآمد از Match" },
     { command: "affiliate", description: "همکاری رسانه‌ای، لینک و کمیسیون" },
     { command: "daily", description: "جایزه روزانه" },
     { command: "quiz", description: "کوییز روزانه" },

@@ -65,6 +65,8 @@ services:
         value: '72'
       - key: AFFILIATE_MINIMUM_PAYOUT_TOMAN
         value: '300000'
+      - key: PERSONAL_REFERRAL_MINIMUM_PAYOUT_TOMAN
+        value: '200000'
       - key: FARAZSMS_API_KEY
         sync: false
       - key: FARAZSMS_PATTERN_CODE

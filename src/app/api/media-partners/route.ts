@@ -67,6 +67,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "کد ملی فرم باید با کد ملی حساب Gament یکسان باشد" }, { status: 409 });
     }
     const [existing] = await db.select().from(mediaPartners).where(eq(mediaPartners.userId, auth.user.id)).limit(1);
+    if (existing?.partnerType === "personal") {
+      return NextResponse.json({ error: "حساب شما در طرح معرفی کاربران فعال است. برای ارتقا به رسانه از پشتیبانی درخواست بدهید تا سابقه و انتساب‌ها حفظ شوند." }, { status: 409 });
+    }
     if (existing && ["pending", "active", "suspended"].includes(existing.status)) {
       return NextResponse.json({ error: "درخواست فعال شما قابل ویرایش نیست" }, { status: 409 });
     }

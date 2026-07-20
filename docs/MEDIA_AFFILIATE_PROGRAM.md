@@ -46,8 +46,23 @@ verified result-settlement transaction. Share sums never exceed the event pool.
 Payout requests atomically reserve available shares, preventing duplicate
 withdrawals. Admin actions are audit logged.
 
+## Personal referrers
+
+Ordinary Gament users use the same one-pool financial ledger as media partners.
+They accept a shorter OTP contract and receive an opaque `aff_` deep link.
+Attribution, self-referral blocking, active-player exclusion, the three-Match
+daily cap, 72-hour hold, Battle Log verification and the 7,000-Toman Match cap
+are identical. Two different referrers split 3,500/3,500; two players from the
+same referrer still create only 7,000 total.
+
+After release, a personal referrer chooses either bank settlement (minimum
+200,000 Toman, verified own IBAN) or an irreversible conversion to
+non-withdrawable Gament gaming credit. Gaming-credit transactions carry
+`withdrawable:false` and cannot be withdrawn as cash.
+
 ## Migration and runtime repair
 
-- Migration: `drizzle/manual/0033_add_media_affiliate_program.sql`
+- Base migration: `drizzle/manual/0033_add_media_affiliate_program.sql`
+- Personal referrals: `drizzle/manual/0034_add_personal_referral_program.sql`
 - Runtime repair: `ensureAffiliateSchema()`
 - Health response exposes Shadow/Live state without secrets.
