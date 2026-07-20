@@ -26,6 +26,12 @@ all other correctly calculated events remain Shadow. After the paid Match,
 Battle Log, 72-hour hold, refund and both payout destinations pass QA, rollout
 may be changed to `public`. No Gament ID allowlist is committed to Git.
 
+The current Render blueprint uses `public` only after the owner confirmed legal
+and finance approval. Cash payout remains manual: the system atomically reserves
+eligible shares, records the verified IBAN snapshot and creates a request; an
+admin must review and mark the bank transfer paid. No bank transfer is executed
+automatically.
+
 ## Contract evidence
 
 The website stores an immutable snapshot of the exact contract, SHA-256 hash,

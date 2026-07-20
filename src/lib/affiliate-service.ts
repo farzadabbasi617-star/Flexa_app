@@ -1,5 +1,5 @@
 import crypto from "crypto";
-import { and, count, desc, eq, gt, gte, inArray, isNull, lte, sql } from "drizzle-orm";
+import { and, count, desc, eq, gt, gte, inArray, isNotNull, isNull, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   affiliateAttributions,
@@ -462,9 +462,14 @@ export async function getMediaPartnerDashboard(userId: string) {
   await ensureAffiliateSchema();
   const [partner] = await db.select().from(mediaPartners).where(eq(mediaPartners.userId, userId)).limit(1);
   if (!partner) return { partner: null, stats: null, properties: [], payouts: [] };
-  const [clicks, attributions, matchesCount, amounts, properties, payouts, agreement] = await Promise.all([
+  const [clicks, activeAttributions, totalReferrals, matchesCount, amounts, properties, payouts, agreement] = await Promise.all([
     db.select({ value: count() }).from(affiliateClicks).where(eq(affiliateClicks.partnerId, partner.id)),
-    db.select({ value: count() }).from(affiliateAttributions).where(and(eq(affiliateAttributions.partnerId, partner.id), eq(affiliateAttributions.status, "active"))),
+    db.select({ value: count() }).from(affiliateAttributions).where(and(
+      eq(affiliateAttributions.partnerId, partner.id), eq(affiliateAttributions.status, "active"), isNotNull(affiliateAttributions.userId),
+    )),
+    db.select({ value: count() }).from(affiliateAttributions).where(and(
+      eq(affiliateAttributions.partnerId, partner.id), inArray(affiliateAttributions.status, ["active", "expired"]), isNotNull(affiliateAttributions.userId),
+    )),
     db.select({ value: count() }).from(affiliateCommissionShares).where(and(eq(affiliateCommissionShares.partnerId, partner.id), inArray(affiliateCommissionShares.status, ["shadow", "pending", "available", "reserved", "paid"]))),
     db.select({ status: affiliateCommissionShares.status, amount: sql<string>`COALESCE(SUM(${affiliateCommissionShares.amountRial}), 0)` })
       .from(affiliateCommissionShares).where(eq(affiliateCommissionShares.partnerId, partner.id)).groupBy(affiliateCommissionShares.status),
@@ -478,7 +483,13 @@ export async function getMediaPartnerDashboard(userId: string) {
   return {
     partner,
     agreement: partner.contractAcceptedAt ? agreement[0] || null : null,
-    stats: { clicks: Number(clicks[0]?.value || 0), activeAttributions: Number(attributions[0]?.value || 0), qualifiedMatches: Number(matchesCount[0]?.value || 0), totals },
+    stats: {
+      clicks: Number(clicks[0]?.value || 0),
+      activeAttributions: Number(activeAttributions[0]?.value || 0),
+      totalReferrals: Number(totalReferrals[0]?.value || 0),
+      qualifiedMatches: Number(matchesCount[0]?.value || 0),
+      totals,
+    },
     properties,
     payouts,
   };

@@ -56,13 +56,13 @@ services:
       - key: GAMING_NEWS_MAX_PER_RUN
         value: '4'
       - key: AFFILIATE_PROGRAM_LIVE
-        value: 'false'
+        value: 'true'
       - key: AFFILIATE_LEGAL_APPROVED
         value: 'true'
       - key: AFFILIATE_FINANCE_APPROVED
         value: 'true'
       - key: AFFILIATE_LIVE_ROLLOUT
-        value: canary
+        value: public
       - key: AFFILIATE_CANARY_GAMENT_IDS
         sync: false
       - key: COD_ARENA_LIVE

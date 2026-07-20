@@ -2062,7 +2062,7 @@ async function affiliateCommand(chatId: number, telegramId: string) {
   });
   const totals = dashboard.stats?.totals || {};
   const available = formatTomanFromRial(BigInt(totals.available || "0"));
-  const pending = formatTomanFromRial(BigInt(totals.pending || "0") + BigInt(totals.shadow || "0"));
+  const pending = formatTomanFromRial(BigInt(totals.pending || "0"));
   const rows: Array<Array<Record<string, string>>> = [[{ text: "📊 داشبورد کامل", url: `${APP_URL}/media-partners` }]];
   if (partner.status === "active") rows.unshift([{ text: "📤 اشتراک لینک اختصاصی", url: `https://t.me/share/url?url=${encodeURIComponent(affiliatePublicLink(partner.referralCode))}` }]);
   await sendMessage(chatId, [
@@ -2108,19 +2108,21 @@ async function inviteCommand(chatId: number, telegramId: string) {
     inline_keyboard: [[{ text: "📜 تکمیل شرایط و OTP", url: `${APP_URL}/${partner.partnerType === "media" ? "media-partners" : "referrals"}` }]],
   });
   const link = affiliatePublicLink(partner.referralCode);
-  const pending = BigInt(dashboard.stats?.totals.pending || "0") + BigInt(dashboard.stats?.totals.shadow || "0");
+  const pending = BigInt(dashboard.stats?.totals.pending || "0");
+  const shadow = BigInt(dashboard.stats?.totals.shadow || "0");
   const available = BigInt(dashboard.stats?.totals.available || "0");
   await sendMessage(chatId, [
     "🎁 <b>لینک معرفی اختصاصی شما</b>",
     "",
     `<code>${html(link)}</code>`,
     "",
-    `کلیک‌ها: <b>${Number(dashboard.stats?.clicks || 0).toLocaleString("fa-IR")}</b>`,
-    `معرفی‌های فعال: <b>${Number(dashboard.stats?.activeAttributions || 0).toLocaleString("fa-IR")}</b>`,
-    `Matchهای واجد: <b>${Number(dashboard.stats?.qualifiedMatches || 0).toLocaleString("fa-IR")}</b>`,
-    `در انتظار: <b>${html(formatTomanFromRial(pending))}</b>`,
-    `قابل استفاده: <b>${html(formatTomanFromRial(available))}</b>`,
-  ].join("\n"), {
+    `کل افراد معرفی‌شده: <b>${Number(dashboard.stats?.totalReferrals || 0).toLocaleString("fa-IR")}</b>`,
+    `انتساب‌های فعال: <b>${Number(dashboard.stats?.activeAttributions || 0).toLocaleString("fa-IR")}</b>`,
+    `Matchهای پولی واجد: <b>${Number(dashboard.stats?.qualifiedMatches || 0).toLocaleString("fa-IR")}</b>`,
+    `در انتظار ۷۲ساعته: <b>${html(formatTomanFromRial(pending))}</b>`,
+    `قابل برداشت: <b>${html(formatTomanFromRial(available))}</b>`,
+    shadow > BigInt(0) ? `محاسبات آزمایشی قدیمی: <b>${html(formatTomanFromRial(shadow))}</b>` : "",
+  ].filter(Boolean).join("\n"), {
     inline_keyboard: [
       [{ text: "📤 اشتراک‌گذاری", url: `https://t.me/share/url?url=${encodeURIComponent(link)}&text=${encodeURIComponent("با لینک من وارد Gament شو و در رقابت‌های گیمینگ شرکت کن!")}` }],
       [{ text: "📊 داشبورد معرفی", url: `${APP_URL}/${partner.partnerType === "media" ? "media-partners" : "referrals"}` }],

@@ -62,7 +62,7 @@ export async function GET() {
           configured: true,
           live: affiliateProgramLive(),
           rollout: affiliateRolloutMode(),
-          canaryConfigured: affiliateCanaryGamentIds().length >= 2,
+          canaryConfigured: affiliateRolloutMode() !== "canary" || affiliateCanaryGamentIds().length >= 2,
           attributionDays: 30,
           commissionTomanPerMatch: 7000,
           personalMinimumPayoutToman: 200000,

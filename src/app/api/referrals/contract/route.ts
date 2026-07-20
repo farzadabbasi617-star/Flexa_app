@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
         userId: auth.user!.id,
         type: "personal_referral_activated",
         title: "طرح معرفی کاربران فعال شد",
-        message: "لینک معرفی اختصاصی شما فعال شد. کمیسیون‌ها در Shadow Mode یا پس از Match معتبر ثبت می‌شوند.",
+        message: "لینک معرفی اختصاصی شما فعال شد. کمیسیون Match پولی تأییدشده پس از دوره بررسی ۷۲ساعته قابل برداشت می‌شود.",
         link: "/referrals",
       });
     });
