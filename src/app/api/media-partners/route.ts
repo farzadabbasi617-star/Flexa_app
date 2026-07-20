@@ -4,7 +4,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { mediaPartners, users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { ensureAffiliateSchema, generateAffiliateCode, getMediaPartnerDashboard, normalizeIranSheba, redactSheba, affiliatePublicLink, affiliateProgramLive } from "@/lib/affiliate-service";
+import { ensureAffiliateSchema, generateAffiliateCode, getMediaPartnerDashboard, normalizeIranSheba, redactSheba, affiliatePublicLink, affiliateProgramLive, affiliateRolloutMode } from "@/lib/affiliate-service";
 import { isValidIranianNationalId } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
@@ -23,7 +23,7 @@ const ApplicationSchema = z.object({
 });
 
 function publicDashboard(data: Awaited<ReturnType<typeof getMediaPartnerDashboard>>) {
-  if (!data.partner) return data;
+  if (!data.partner) return { ...data, live: affiliateProgramLive(), rollout: affiliateRolloutMode() };
   return {
     ...data,
     partner: {
@@ -33,6 +33,7 @@ function publicDashboard(data: Awaited<ReturnType<typeof getMediaPartnerDashboar
       referralLink: affiliatePublicLink(data.partner.referralCode),
     },
     live: affiliateProgramLive(),
+    rollout: affiliateRolloutMode(),
   };
 }
 

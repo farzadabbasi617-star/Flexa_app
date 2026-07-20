@@ -43,7 +43,9 @@ export default function ForgotPasswordPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "ارسال کد انجام نشد");
-      setMessage(data.message || "اگر حسابی وجود داشته باشد، کد ارسال می‌شود.");
+      setMessage(lang === "fa"
+        ? `${data.message || "اگر حسابی وجود داشته باشد، کد ارسال می‌شود."} اگر پیام را در Inbox ندیدی، پوشه Spam / Junk را بررسی کن.`
+        : `${data.message || "If an account exists, a code will be sent."} If it is not in your inbox, check Spam / Junk.`);
       setStep("reset");
       startResendCooldown();
     } catch (err) {
@@ -113,9 +115,9 @@ export default function ForgotPasswordPage() {
             </h1>
             <p className="text-sm text-gray-400 mt-2 leading-7">
               {step === "email"
-                ? (lang === "fa" ? "ایمیل حساب را وارد کن تا کد یک‌بارمصرف دریافت کنی." : "Enter your account email to receive a one-time code.")
+                ? (lang === "fa" ? "ایمیل حساب را وارد کن تا کد یک‌بارمصرف دریافت کنی؛ پوشه Spam / Junk را هم بررسی کن." : "Enter your account email to receive a one-time code; check Spam / Junk too.")
                 : step === "reset"
-                  ? (lang === "fa" ? "کد ایمیل و رمز عبور جدید را وارد کن." : "Enter the emailed code and your new password.")
+                  ? (lang === "fa" ? "کد ایمیل و رمز جدید را وارد کن. اگر کد را ندیدی، پوشه Spam / Junk را بررسی کن." : "Enter the emailed code and your new password. Check Spam / Junk if the code is missing.")
                   : (lang === "fa" ? "بازیابی حساب کامل شد." : "Account recovery is complete.")}
             </p>
           </div>

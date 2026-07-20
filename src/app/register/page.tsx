@@ -190,8 +190,8 @@ export default function RegisterPage() {
                   </h1>
                   <p className="text-gray-400 mt-2 text-sm leading-7">
                     {lang === "fa"
-                      ? <>کد ۶ رقمی تایید به آدرس <span dir="ltr" className="text-white font-bold">{pendingEmail}</span> ارسال شد.</>
-                      : <>A 6-digit code was sent to <span dir="ltr" className="text-white font-bold">{pendingEmail}</span>.</>}
+                      ? <>کد ۶ رقمی تایید به آدرس <span dir="ltr" className="text-white font-bold">{pendingEmail}</span> ارسال شد. اگر در Inbox ندیدی، حتماً پوشه <b className="text-amber-300">Spam / Junk</b> را بررسی کن.</>
+                      : <>A 6-digit code was sent to <span dir="ltr" className="text-white font-bold">{pendingEmail}</span>. If it is not in your inbox, check <b className="text-amber-300">Spam / Junk</b>.</>}
                   </p>
                 </div>
 
@@ -281,8 +281,8 @@ export default function RegisterPage() {
 
           <div className="bg-neon-blue/10 border border-neon-blue/30 text-neon-blue px-4 py-3 rounded-xl mb-6 text-xs leading-6">
             {lang === "fa"
-              ? "برای تایید حساب، یک کد ۶ رقمی به ایمیل شما ارسال می‌شود. شماره موبایل هم برای ارتباط و شناسایی شما ثبت می‌شود."
-              : "A 6-digit code will be emailed to confirm your account. Your mobile number is also required for contact/identification."}
+              ? "برای تایید حساب، یک کد ۶ رقمی به ایمیل شما ارسال می‌شود. ممکن است پیام وارد پوشه Spam یا Junk شود؛ آن پوشه را هم بررسی کنید. شماره موبایل برای ارتباط و شناسایی ثبت می‌شود."
+              : "A 6-digit code will be emailed to confirm your account. The message may arrive in Spam or Junk, so check those folders too. Your mobile number is also required for contact/identification."}
           </div>
 
           {/* Error */}
@@ -326,8 +326,8 @@ export default function RegisterPage() {
               />
               <p className="text-[11px] text-gray-500 mt-1.5">
                 {lang === "fa"
-                  ? "کد تایید حساب به این ایمیل ارسال می‌شود. لطفاً از یک ایمیل واقعی و همیشگی استفاده کنید — ایمیل‌های موقت/یک‌بارمصرف پذیرفته نمی‌شوند."
-                  : "The account verification code is sent to this email. Please use a real, permanent email — temporary/disposable emails are not accepted."}
+                  ? "کد تایید به این ایمیل ارسال می‌شود و ممکن است در Spam/Junk دیده شود. از ایمیل واقعی و همیشگی استفاده کنید؛ ایمیل موقت پذیرفته نمی‌شود."
+                  : "The verification code is sent here and may appear in Spam/Junk. Use a real permanent email; temporary addresses are not accepted."}
               </p>
             </div>
 

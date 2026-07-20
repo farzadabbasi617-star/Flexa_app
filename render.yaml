@@ -57,6 +57,14 @@ services:
         value: '4'
       - key: AFFILIATE_PROGRAM_LIVE
         value: 'false'
+      - key: AFFILIATE_LEGAL_APPROVED
+        value: 'true'
+      - key: AFFILIATE_FINANCE_APPROVED
+        value: 'true'
+      - key: AFFILIATE_LIVE_ROLLOUT
+        value: canary
+      - key: AFFILIATE_CANARY_GAMENT_IDS
+        sync: false
       - key: COD_ARENA_LIVE
         value: 'false'
       - key: COD_ARENA_FINANCE_APPROVED

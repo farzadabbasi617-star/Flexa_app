@@ -14,10 +14,17 @@
 
 ## Safe rollout
 
-`AFFILIATE_PROGRAM_LIVE=false` is the production default. In this Shadow Mode,
-commission events and shares are calculated but cannot be withdrawn. Review at
-least 30 days of data and risk signals before changing the environment variable
-to true.
+`AFFILIATE_PROGRAM_LIVE=false` is the production default. In Shadow Mode,
+commission events and shares are calculated but cannot be withdrawn. Real
+accrual additionally requires `AFFILIATE_LEGAL_APPROVED=true` and
+`AFFILIATE_FINANCE_APPROVED=true`.
+
+The first real-money rollout uses `AFFILIATE_LIVE_ROLLOUT=canary` plus a
+comma-separated `AFFILIATE_CANARY_GAMENT_IDS` allowlist. Only Match commissions
+whose attributed players are in that allowlist become real Pending events;
+all other correctly calculated events remain Shadow. After the paid Match,
+Battle Log, 72-hour hold, refund and both payout destinations pass QA, rollout
+may be changed to `public`. No Gament ID allowlist is committed to Git.
 
 ## Contract evidence
 

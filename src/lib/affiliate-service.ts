@@ -17,6 +17,7 @@ import {
   mediaProperties,
   telegramAccounts,
   transactions,
+  users,
   wallets,
 } from "@/db/schema";
 import { updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
@@ -31,8 +32,34 @@ export const PERSONAL_REFERRAL_MINIMUM_PAYOUT_TOMAN = 200_000;
 export const PERSONAL_REFERRAL_MINIMUM_PAYOUT_RIAL = BigInt(PERSONAL_REFERRAL_MINIMUM_PAYOUT_TOMAN * 10);
 export const AFFILIATE_DAILY_MATCH_CAP_PER_USER = 3;
 
+export type AffiliateRolloutMode = "shadow" | "canary" | "public";
+
 export function affiliateProgramLive() {
-  return process.env.AFFILIATE_PROGRAM_LIVE === "true";
+  return process.env.AFFILIATE_PROGRAM_LIVE === "true"
+    && process.env.AFFILIATE_LEGAL_APPROVED === "true"
+    && process.env.AFFILIATE_FINANCE_APPROVED === "true";
+}
+
+export function affiliateRolloutMode(): AffiliateRolloutMode {
+  if (!affiliateProgramLive()) return "shadow";
+  return process.env.AFFILIATE_LIVE_ROLLOUT === "public" ? "public" : "canary";
+}
+
+export function affiliateCanaryGamentIds() {
+  return [...new Set((process.env.AFFILIATE_CANARY_GAMENT_IDS || "")
+    .split(",")
+    .map((value) => value.trim().toUpperCase())
+    .filter((value) => /^FLX-[A-Z0-9-]{4,16}$/.test(value)))];
+}
+
+export async function affiliateAccrualLiveForUsers(client: any, userIds: string[]) {
+  if (affiliateRolloutMode() === "public") return true;
+  if (affiliateRolloutMode() !== "canary") return false;
+  const allowed = new Set(affiliateCanaryGamentIds());
+  const uniqueUserIds = [...new Set(userIds)];
+  if (!allowed.size || !uniqueUserIds.length) return false;
+  const rows = await client.select({ id: users.id, gamentId: users.gamentId }).from(users).where(inArray(users.id, uniqueUserIds));
+  return rows.length === uniqueUserIds.length && rows.every((row: { gamentId: string }) => allowed.has(row.gamentId.toUpperCase()));
 }
 
 export function affiliateAttributionExpiresAt(start: Date, days = AFFILIATE_ATTRIBUTION_DAYS) {
@@ -331,7 +358,8 @@ export async function createAffiliateCommissionForMatch(client: any, matchId: st
   }
   if (!eligible.length) return { created: false as const, reason: "no_active_attribution" as const };
   const allocations = allocateAffiliateCommission(eligible);
-  const eventStatus = affiliateProgramLive() ? "pending" : "shadow";
+  const liveAccrual = await affiliateAccrualLiveForUsers(client, eligible.map((row) => row.userId));
+  const eventStatus = liveAccrual ? "pending" : "shadow";
   const [event] = await client.insert(affiliateCommissionEvents).values({
     matchId,
     sourceType: "clash_match",
@@ -340,7 +368,8 @@ export async function createAffiliateCommissionForMatch(client: any, matchId: st
     status: eventStatus,
     availableAt: new Date(now.getTime() + AFFILIATE_HOLD_HOURS * 60 * 60 * 1000),
     risk: {
-      mode: affiliateProgramLive() ? "live" : "shadow",
+      mode: eventStatus,
+      rollout: affiliateRolloutMode(),
       referredUsers: eligible.map((row) => row.userId),
       partnerCount: allocations.length,
     },
@@ -706,7 +735,7 @@ export async function affiliateAdminOverview() {
     db.select().from(affiliatePayouts).orderBy(desc(affiliatePayouts.requestedAt)).limit(200),
     db.select().from(affiliateCommissionEvents).orderBy(desc(affiliateCommissionEvents.createdAt)).limit(200),
   ]);
-  return { partners, payouts, events, live: affiliateProgramLive() };
+  return { partners, payouts, events, live: affiliateProgramLive(), rollout: affiliateRolloutMode() };
 }
 
 export function affiliatePublicLink(referralCode: string, campaignCode?: string) {

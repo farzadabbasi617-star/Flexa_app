@@ -3,14 +3,14 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
-import { affiliateProgramLive, affiliatePublicLink, createPersonalReferralAccount, getMediaPartnerDashboard, redactSheba, updatePersonalReferralSheba } from "@/lib/affiliate-service";
+import { affiliateProgramLive, affiliateRolloutMode, affiliatePublicLink, createPersonalReferralAccount, getMediaPartnerDashboard, redactSheba, updatePersonalReferralSheba } from "@/lib/affiliate-service";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
 function publicData(data: Awaited<ReturnType<typeof getMediaPartnerDashboard>>) {
-  if (!data.partner) return { ...data, live: affiliateProgramLive() };
+  if (!data.partner) return { ...data, live: affiliateProgramLive(), rollout: affiliateRolloutMode() };
   return {
     ...data,
     partner: {
@@ -20,6 +20,7 @@ function publicData(data: Awaited<ReturnType<typeof getMediaPartnerDashboard>>) 
       referralLink: data.partner.status === "active" ? affiliatePublicLink(data.partner.referralCode) : null,
     },
     live: affiliateProgramLive(),
+    rollout: affiliateRolloutMode(),
   };
 }
 

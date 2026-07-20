@@ -35,7 +35,7 @@ import {
   type CodRoomStatus,
 } from "@/lib/cod-room-policy";
 import { checkAgeGate } from "@/lib/age-gate";
-import { affiliateProgramLive, ensureAffiliateSchema, AFFILIATE_HOLD_HOURS } from "@/lib/affiliate-service";
+import { affiliateAccrualLiveForUsers, ensureAffiliateSchema, AFFILIATE_HOLD_HOURS } from "@/lib/affiliate-service";
 import { ensureWalletMoneySchema, updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
 import { bigIntFromText } from "@/lib/money";
 
@@ -609,7 +609,7 @@ async function createCodReferralShadow(client: any, input: {
   if (Number(daily?.value || 0) >= COD_ARENA_DAILY_REFERRAL_ENTRY_CAP) {
     return { created: false as const, reason: "daily_cap" as const };
   }
-  const status = codArenaLive() && affiliateProgramLive() ? "pending" : "shadow";
+  const status = codArenaLive() && await affiliateAccrualLiveForUsers(client, [input.userId]) ? "pending" : "shadow";
   const [event] = await client.insert(affiliateCommissionEvents).values({
     matchId: null,
     sourceType: "cod_room_entry",

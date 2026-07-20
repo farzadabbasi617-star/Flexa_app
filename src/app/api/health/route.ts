@@ -5,7 +5,7 @@ import { getEmailDeliveryConfiguration } from "@/lib/email-service";
 import { getClashRoyaleApiConfiguration } from "@/lib/clash-royale-api";
 import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
 import { ensureStoreOrderLifecycleSchema } from "@/lib/store-service";
-import { affiliateProgramLive, ensureAffiliateSchema } from "@/lib/affiliate-service";
+import { affiliateCanaryGamentIds, affiliateProgramLive, affiliateRolloutMode, ensureAffiliateSchema } from "@/lib/affiliate-service";
 import { ensurePublicIdentitySeparation } from "@/lib/public-profile";
 import { codArenaLive, ensureCodArenaSchema } from "@/lib/cod-room-service";
 
@@ -61,6 +61,8 @@ export async function GET() {
         affiliateProgram: {
           configured: true,
           live: affiliateProgramLive(),
+          rollout: affiliateRolloutMode(),
+          canaryConfigured: affiliateCanaryGamentIds().length >= 2,
           attributionDays: 30,
           commissionTomanPerMatch: 7000,
           personalMinimumPayoutToman: 200000,

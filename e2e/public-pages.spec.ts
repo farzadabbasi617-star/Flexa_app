@@ -38,3 +38,15 @@ test("COD Arena private-beta landing is reachable", async ({ page }) => {
   await expect(page).toHaveTitle(/COD Arena/i);
   await expect(page.getByRole("heading", { level: 1, name: /^Gament COD Arena$/i })).toBeVisible();
 });
+
+test("registration warns users to check Spam or Junk for the OTP", async ({ page }) => {
+  const response = await page.goto("/register");
+  expect(response?.ok()).toBe(true);
+  await expect(page.getByText(/Spam|Junk/i).first()).toBeVisible();
+});
+
+test("password recovery warns users to check Spam or Junk", async ({ page }) => {
+  const response = await page.goto("/forgot-password");
+  expect(response?.ok()).toBe(true);
+  await expect(page.getByText(/Spam|Junk/i).first()).toBeVisible();
+});
