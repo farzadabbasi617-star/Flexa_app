@@ -106,16 +106,23 @@ export default function EditProfilePage() {
             </h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">
-                  {t.auth.displayName}
+                <label className="block text-sm text-gray-300 mb-2 font-bold">
+                  {lang === "fa" ? "نام داخل Gament و مسابقات (عمومی)" : "Public Gament gamer name"}
                 </label>
                 <input
                   type="text"
                   required
+                  minLength={2}
+                  maxLength={100}
+                  dir="auto"
                   className="gaming-input"
+                  placeholder={lang === "fa" ? "مثلاً Farzadov" : "e.g. Farzadov"}
                   value={form.displayName}
                   onChange={(e) => setForm({ ...form, displayName: e.target.value })}
                 />
+                <p className="text-[11px] text-gray-500 mt-2 leading-5">
+                  {lang === "fa" ? "این نام از نام و نام خانوادگی واقعی حساب جداست و در پروفایل، جدول‌ها و Matchها نمایش داده می‌شود." : "This is separate from your legal name and appears in profiles, leaderboards and matches."}
+                </p>
               </div>
             </div>
           </div>

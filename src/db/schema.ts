@@ -129,9 +129,9 @@ export const users = pgTable("users", {
   emailVerifiedAt: timestamp("email_verified_at"),
   passwordHash: varchar("password_hash", { length: 255 }).notNull(),
   gamentId: varchar("gament_id", { length: 20 }).notNull().unique(),
-  // Real first/last name, collected at signup. `displayName` remains the
-  // derived "First Last" string used everywhere else in the app (profile
-  // headers, leaderboards, etc.) so no other call site needs to change.
+  // Legal/KYC first and last name are private and must never become the public
+  // gamer identity automatically. `displayName` is the independent nickname
+  // shown in profiles, matchmaking and leaderboards (username is its default).
   firstName: varchar("first_name", { length: 100 }),
   lastName: varchar("last_name", { length: 100 }),
   displayName: varchar("display_name", { length: 100 }).notNull(),

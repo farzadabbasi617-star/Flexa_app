@@ -35,7 +35,7 @@ import { confirmKeyboard, gameKeyboard, mainMenuKeyboard, platformKeyboard, remo
 import { answerCallback, editMessage, sendDocument, sendMessage, sendPhoto } from "./transport";
 import { clearSession, getSession, registrationSummary, setSession } from "./sessions";
 import { ensureFeatureEnabled, telegramFeatureEnabled } from "./settings";
-import { isChannelMember, promptChannelMembership } from "./membership";
+import { checkChannelMembership, isChannelMember, promptChannelMembership } from "./membership";
 import { getLinkedUserByTelegram } from "./user-service";
 import { aiCommand } from "./commands/ai";
 import {
@@ -3673,7 +3673,10 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (!chatId) return;
 
   if (data === "membership:check") {
-    if (!(await isChannelMember(telegramId, true))) return promptChannelMembership(chatId);
+    const membership = await checkChannelMembership(telegramId, true);
+    if (!membership.member) {
+      return promptChannelMembership(chatId, membership.state === "unavailable");
+    }
     const session = await getSession(telegramId);
     const pendingPayload = session.data.pendingStartPayload;
     if (pendingPayload) await clearSession(telegramId);

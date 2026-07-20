@@ -32,14 +32,20 @@ export function getTelegramChannelUrl() {
   return (process.env.TELEGRAM_CHANNEL_URL || process.env.CHANNEL_URL || "https://t.me/Gament_games").trim();
 }
 
-export function getTelegramChannelChatId() {
-  const explicit = (process.env.TELEGRAM_CHANNEL_ID || "").trim();
-  if (explicit) return explicit;
+export function normalizeTelegramChannelChatId(value: string | null | undefined) {
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  if (/^-?\d+$/.test(raw)) return raw;
+  const urlUsername = raw.match(/(?:https?:\/\/)?(?:www\.)?t\.me\/([A-Za-z0-9_]+)/i)?.[1];
+  if (urlUsername) return `@${urlUsername}`;
+  if (/^@?[A-Za-z0-9_]+$/.test(raw)) return raw.startsWith("@") ? raw : `@${raw}`;
+  return null;
+}
 
-  const channelUrl = getTelegramChannelUrl();
-  const match = channelUrl.match(/t\.me\/([A-Za-z0-9_]+)/i);
-  if (match?.[1]) return `@${match[1]}`;
-  return "@Gament_games";
+export function getTelegramChannelChatId() {
+  const explicit = normalizeTelegramChannelChatId(process.env.TELEGRAM_CHANNEL_ID);
+  if (explicit) return explicit;
+  return normalizeTelegramChannelChatId(getTelegramChannelUrl()) || "@Gament_games";
 }
 
 function html(value: unknown) {

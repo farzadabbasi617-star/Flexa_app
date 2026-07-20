@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { telegramApi } from "@/lib/telegram";
+import { getTelegramChannelChatId, telegramApi } from "@/lib/telegram";
 import logger from "@/lib/logger";
+import { canBotVerifyTelegramMembership, type TelegramChatMemberLike } from "@/lib/telegram-membership-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -63,7 +64,35 @@ async function configureBot(setWebhook: boolean) {
   const webhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET || "";
   const results: Record<string, unknown> = {};
 
-  results.botInfo = await telegramApi("getMe", {});
+  const botInfo = await telegramApi<{ id: number; username?: string }>("getMe", {});
+  results.botInfo = botInfo;
+
+  // getChatMember is only guaranteed to verify other users when this bot is a
+  // channel administrator. Surface that prerequisite explicitly instead of
+  // letting every real member get stuck behind the same join button.
+  const channelId = getTelegramChannelChatId();
+  const channel = await telegramApi<{ id: number; type: string; title?: string; username?: string }>("getChat", {
+    chat_id: channelId,
+  });
+  const botMembership = botInfo.ok
+    ? await telegramApi<TelegramChatMemberLike>("getChatMember", {
+        chat_id: channelId,
+        user_id: botInfo.result.id,
+      })
+    : null;
+  results.membershipVerification = {
+    ready: Boolean(channel.ok && botMembership?.ok && canBotVerifyTelegramMembership(botMembership.result)),
+    channelId,
+    channel: channel.ok
+      ? { id: channel.result.id, type: channel.result.type, title: channel.result.title, username: channel.result.username }
+      : { error: channel.description },
+    botStatus: botMembership?.ok ? botMembership.result.status : null,
+    error: botMembership && !botMembership.ok ? botMembership.description : null,
+    requiredAction: botMembership?.ok && !canBotVerifyTelegramMembership(botMembership.result)
+      ? "Promote @FlexaTournamentBot to administrator in the configured channel"
+      : null,
+  };
+
   results.commandsDefault = await telegramApi("setMyCommands", {
     commands: commands(),
     scope: { type: "default" },

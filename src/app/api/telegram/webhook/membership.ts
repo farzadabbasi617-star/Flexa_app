@@ -1,9 +1,17 @@
-import { telegramApi } from "@/lib/telegram";
+import { telegramApi, getTelegramChannelChatId } from "@/lib/telegram";
+import logger from "@/lib/logger";
+import { isActiveTelegramChannelMember, type TelegramChatMemberLike } from "@/lib/telegram-membership-policy";
 import { CHANNEL_URL } from "./config";
 import { getTelegramSetting } from "./settings";
 import { sendMessage } from "./transport";
 
-const membershipCache = new Map<string, { member: boolean; expiresAt: number }>();
+export type ChannelMembershipCheck = {
+  member: boolean;
+  state: "member" | "not_member" | "unavailable";
+  status?: string;
+};
+
+const membershipCache = new Map<string, { check: ChannelMembershipCheck; expiresAt: number }>();
 
 export async function channelMembershipRequired() {
   const setting = await getTelegramSetting("telegram_require_channel_membership", "");
@@ -14,26 +22,56 @@ export async function channelMembershipRequired() {
   return environmentRequires || setting === "true";
 }
 
-export async function isChannelMember(telegramId: string, forceRefresh = false) {
-  if (!(await channelMembershipRequired())) return true;
+export async function checkChannelMembership(telegramId: string, forceRefresh = false): Promise<ChannelMembershipCheck> {
+  if (!(await channelMembershipRequired())) return { member: true, state: "member" };
   const cached = membershipCache.get(telegramId);
-  if (!forceRefresh && cached && cached.expiresAt > Date.now()) return cached.member;
+  if (!forceRefresh && cached && cached.expiresAt > Date.now()) return cached.check;
 
-  const result = await telegramApi<{ status?: string }>("getChatMember", {
-    chat_id: process.env.TELEGRAM_CHANNEL_ID || "@Gament_games",
+  const channelId = getTelegramChannelChatId();
+  const result = await telegramApi<TelegramChatMemberLike>("getChatMember", {
+    chat_id: channelId,
     user_id: Number(telegramId),
   });
-  const member = result.ok ? result.result : undefined;
-  const isMember = Boolean(member?.status && !["left", "kicked"].includes(member.status));
-  membershipCache.set(telegramId, { member: isMember, expiresAt: Date.now() + (isMember ? 60_000 : 10_000) });
-  return isMember;
+
+  if (!result.ok) {
+    // Do not turn a Telegram/channel configuration failure into a false
+    // "you are not a member" response. It is a technical state and should be
+    // visible in logs/setup diagnostics while keeping the gate secure.
+    logger.warn({
+      telegramId,
+      channelId,
+      errorCode: result.error_code,
+      description: result.description,
+    }, "Telegram channel membership verification unavailable");
+    return { member: false, state: "unavailable" };
+  }
+
+  const member = isActiveTelegramChannelMember(result.result);
+  const check: ChannelMembershipCheck = {
+    member,
+    state: member ? "member" : "not_member",
+    status: result.result?.status,
+  };
+  membershipCache.set(telegramId, {
+    check,
+    expiresAt: Date.now() + (member ? 60_000 : 5_000),
+  });
+  return check;
 }
 
-export async function promptChannelMembership(chatId: number) {
+export async function isChannelMember(telegramId: string, forceRefresh = false) {
+  return (await checkChannelMembership(telegramId, forceRefresh)).member;
+}
+
+export async function promptChannelMembership(chatId: number, verificationUnavailable = false) {
   await sendMessage(chatId, [
-    "📣 <b>عضویت در کانال Gament Games الزامی است</b>",
+    verificationUnavailable
+      ? "⚠️ <b>بررسی عضویت از سمت Telegram موقتاً در دسترس نیست</b>"
+      : "📣 <b>عضویت در کانال Gament Games الزامی است</b>",
     "",
-    "برای استفاده از Flexa ابتدا عضو کانال رسمی شو؛ سپس روی «عضو شدم» بزن تا عضویتت بررسی شود.",
+    verificationUnavailable
+      ? "عضویتت رد نشده است. چند لحظه بعد دوباره «عضو شدم» را بزن؛ اگر خطا ادامه داشت، مشکل از دسترسی ربات به کانال است."
+      : "ابتدا عضو کانال رسمی شو؛ سپس به Flexa برگرد و روی «عضو شدم» بزن تا عضویتت بررسی شود.",
   ].join("\n"), {
     inline_keyboard: [
       [{ text: "📣 عضویت در کانال", url: CHANNEL_URL || "https://t.me/Gament_games" }],

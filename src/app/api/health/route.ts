@@ -6,6 +6,7 @@ import { getClashRoyaleApiConfiguration } from "@/lib/clash-royale-api";
 import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
 import { ensureStoreOrderLifecycleSchema } from "@/lib/store-service";
 import { affiliateProgramLive, ensureAffiliateSchema } from "@/lib/affiliate-service";
+import { ensurePublicIdentitySeparation } from "@/lib/public-profile";
 
 export const dynamic = "force-dynamic";
 
@@ -40,6 +41,7 @@ export async function GET() {
       ensurePrivateTournamentAttendanceSchema(),
       ensureStoreOrderLifecycleSchema(),
       ensureAffiliateSchema(),
+      ensurePublicIdentitySeparation(),
     ]);
     await db.execute(sql`select 1`);
     return Response.json(

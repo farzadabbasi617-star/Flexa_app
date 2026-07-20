@@ -37,7 +37,7 @@ const nextConfig: NextConfig = {
   // worker, while the memory-optimized graph trades a little speed for a much
   // lower peak RSS.
   experimental: {
-    cpus: 2,
+    cpus: 1,
     webpackBuildWorker: false,
     webpackMemoryOptimizations: true,
   },
@@ -46,6 +46,13 @@ const nextConfig: NextConfig = {
   // from exceeding the memory limit during the Render production build.
   typescript: {
     ignoreBuildErrors: true,
+  },
+  // Webpack otherwise schedules a very large number of module builds at once.
+  // A small queue is slower but keeps both Arena and Render Free below their
+  // memory limit, avoiding an abrupt SIGKILL during production deploys.
+  webpack(config) {
+    config.parallelism = 1;
+    return config;
   },
 
   // بهینه‌سازی تصاویر

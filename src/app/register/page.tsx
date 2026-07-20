@@ -332,24 +332,29 @@ export default function RegisterPage() {
             </div>
 
             <div>
-              <label className="block text-sm text-gray-400 mb-2">
-                {t.auth.username} *
+              <label className="block text-sm text-gray-300 mb-2 font-bold">
+                {lang === "fa" ? "نام بازیکن در Gament" : "Gament gamer name"} *
               </label>
               <input
                 type="text"
                 required
                 dir="ltr"
                 className="gaming-input text-left"
-                placeholder="ShadowGamer"
+                placeholder="Farzadov"
                 value={form.username}
                 onChange={(e) => setForm({ ...form, username: e.target.value })}
               />
+              <p className="text-[11px] text-purple-300/80 mt-1.5 leading-5">
+                {lang === "fa"
+                  ? "این نام عمومی شما در پروفایل، مسابقات و بازی‌های Gament است و با نام واقعی پایین کاملاً جدا می‌ماند."
+                  : "This is your public name in profiles and matches. It remains separate from your legal name below."}
+              </p>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-2">
-                  {lang === "fa" ? "نام" : "First name"} *
+                  {lang === "fa" ? "نام واقعی (خصوصی)" : "Legal first name (private)"} *
                 </label>
                 <input
                   type="text"
@@ -363,7 +368,7 @@ export default function RegisterPage() {
 
               <div>
                 <label className="block text-sm text-gray-400 mb-2">
-                  {lang === "fa" ? "نام خانوادگی" : "Last name"} *
+                  {lang === "fa" ? "نام خانوادگی واقعی (خصوصی)" : "Legal last name (private)"} *
                 </label>
                 <input
                   type="text"

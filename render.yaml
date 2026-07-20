@@ -4,7 +4,7 @@ services:
     env: node
     plan: free
     # Schema changes are applied as reviewed migrations, never implicitly during every build.
-    buildCommand: npm ci --include=dev && npm run build
+    buildCommand: npm ci --include=dev && NODE_OPTIONS="--max-old-space-size=700 --max-semi-space-size=8" npm run build
     startCommand: npm run start
     healthCheckPath: /api/health
     autoDeploy: true

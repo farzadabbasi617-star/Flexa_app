@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { players, users } from "@/db/schema";
 import { and, eq, ne } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 import { ClashRoyaleApiError, createClashRoyaleApiClient, normalizeClashRoyaleTag } from "@/lib/clash-royale-api";
@@ -50,7 +50,13 @@ export async function PATCH(request: NextRequest) {
 
     const updateData: Record<string, string | null> = {};
 
-    if (displayName !== undefined) updateData.displayName = String(displayName).trim().slice(0, 100);
+    if (displayName !== undefined) {
+      const publicName = String(displayName).trim();
+      if (publicName.length < 2 || publicName.length > 100 || /[\u0000-\u001f\u007f]/.test(publicName)) {
+        return NextResponse.json({ error: "نام داخل Gament باید بین ۲ تا ۱۰۰ کاراکتر باشد." }, { status: 400 });
+      }
+      updateData.displayName = publicName;
+    }
     
     // Strict backend enforcement of premium avatars
     if (avatarUrl !== undefined) {
@@ -92,11 +98,31 @@ export async function PATCH(request: NextRequest) {
     if (fortniteId !== undefined) updateData.fortniteId = fortniteId || null;
     if (fortniteUsername !== undefined) updateData.fortniteUsername = fortniteUsername || null;
 
-    const [updated] = await db
-      .update(users)
-      .set(updateData)
-      .where(eq(users.id, user.id))
-      .returning();
+    if (!Object.keys(updateData).length) {
+      return NextResponse.json({ error: "هیچ تغییری برای ذخیره ارسال نشده است." }, { status: 400 });
+    }
+
+    const updated = await db.transaction(async (tx) => {
+      const [nextUser] = await tx
+        .update(users)
+        .set(updateData)
+        .where(eq(users.id, user.id))
+        .returning();
+
+      if (!nextUser) throw new Error("PROFILE_USER_NOT_FOUND");
+
+      // `players` is the public snapshot used by matchmaking, brackets and
+      // leaderboards. Update it atomically so the legal name can never linger
+      // in a match after the user chooses a gamer name such as "Farzadov".
+      const playerProfile: { displayName?: string; avatarUrl?: string | null } = {};
+      if (updateData.displayName !== undefined) playerProfile.displayName = nextUser.displayName;
+      if (updateData.avatarUrl !== undefined) playerProfile.avatarUrl = nextUser.avatarUrl;
+      if (Object.keys(playerProfile).length) {
+        await tx.update(players).set(playerProfile).where(eq(players.visibleUserId, user.id));
+      }
+
+      return nextUser;
+    });
 
     return NextResponse.json({
       user: {

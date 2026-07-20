@@ -248,7 +248,7 @@ export default function UserProfileSettingsPage() {
             پروفایل کاربری
           </div>
           <h1 className="text-3xl font-black">پروفایل</h1>
-          <p className="text-xs text-gray-500 mt-1 leading-6">اطلاعات هویتی، نام نمایشی، آواتار، آیدی بازی‌ها و اتصال تلگرام</p>
+          <p className="text-xs text-gray-500 mt-1 leading-6">نام بازیکن عمومی، اطلاعات هویتی خصوصی، آواتار، آیدی بازی‌ها و اتصال تلگرام</p>
         </header>
 
         <section className="glass-panel rounded-[32px] sm:rounded-[38px] p-4 sm:p-6 border border-white/5 mb-6">
@@ -265,11 +265,12 @@ export default function UserProfileSettingsPage() {
 
           <div className="space-y-4">
             <div>
-              <label className="block text-[10px] font-black text-gray-500 mb-1.5">نام نمایشی جدید</label>
+              <label className="block text-[11px] font-black text-purple-200 mb-1.5">🎮 نام داخل Gament و مسابقات (عمومی)</label>
               <div className="flex gap-2">
-                <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} className="flex-1 bg-black/25 border border-white/10 rounded-2xl px-4 py-3 text-sm outline-none focus:border-purple-400" placeholder="نام نمایشی" maxLength={100} />
-                <button onClick={() => saveProfile()} disabled={saving || !displayName.trim()} className="px-4 rounded-2xl bg-purple-600 disabled:opacity-50 text-xs font-black">ذخیره</button>
+                <input value={displayName} onChange={(e) => setDisplayName(e.target.value)} dir="auto" className="flex-1 bg-black/25 border border-purple-500/25 rounded-2xl px-4 py-3 text-sm outline-none focus:border-purple-400" placeholder="مثلاً Farzadov" minLength={2} maxLength={100} />
+                <button onClick={() => saveProfile()} disabled={saving || displayName.trim().length < 2} className="px-4 rounded-2xl bg-purple-600 disabled:opacity-50 text-xs font-black">ذخیره</button>
               </div>
+              <p className="text-[9px] text-gray-500 mt-2 leading-5">این نام در پروفایل، جدول‌ها و Matchها دیده می‌شود؛ نام و نام خانوادگی واقعی بخش هویتی پایین خصوصی و مستقل است.</p>
             </div>
 
             <div>
@@ -299,7 +300,7 @@ export default function UserProfileSettingsPage() {
           <div className="flex items-start justify-between gap-3 mb-4">
             <div>
               <h2 className="text-sm font-black">🪪 اطلاعات شخصی و هویتی</h2>
-              <p className="text-[10px] text-gray-500 mt-1 leading-5">برای طرح معرفی، برداشت، کیف پول و مسابقات پولی تکمیل این قسمت لازم است.</p>
+              <p className="text-[10px] text-gray-500 mt-1 leading-5">فقط برای احراز هویت، برداشت، کیف پول و مسابقات پولی است؛ نام عمومی بازیکن را تغییر نمی‌دهد.</p>
             </div>
             <span className={`shrink-0 rounded-full px-2.5 py-1 text-[9px] font-black ${identity?.complete ? "bg-emerald-500/15 text-emerald-300" : "bg-amber-500/15 text-amber-300"}`}>
               {identityLoading ? "در حال بررسی" : identity?.complete ? "✅ تکمیل‌شده" : "نیاز به تکمیل"}

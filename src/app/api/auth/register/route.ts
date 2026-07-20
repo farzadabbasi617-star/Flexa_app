@@ -9,6 +9,7 @@ import { rateLimit } from "@/lib/rate-limit";
 import { EmailService } from "@/lib/email-service";
 import logger from "@/lib/logger";
 import { TERMS_VERSION } from "@/lib/terms";
+import { initialPublicDisplayName } from "@/lib/public-profile-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -55,7 +56,9 @@ export async function POST(request: NextRequest) {
     }
 
     const { email, username, password, firstName, lastName, phoneNumber, birthDate, nationalId } = validation.data;
-    const displayName = `${firstName} ${lastName}`.trim();
+    // Public gamer identity and legal/KYC identity are deliberately separate.
+    // The chosen username is public by default; first/last name stay private.
+    const displayName = initialPublicDisplayName(username);
 
     // 3. Uniqueness check using ilike for case-insensitive checks.
     // National ID is also checked here — each real person may only have one

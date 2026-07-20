@@ -43,4 +43,8 @@ jobs:
             exit 1
           fi
           jq -e '.ok == true' /tmp/telegram-setup.json >/dev/null
-          jq -c '{botInfo:.results.botInfo.result,commandsDefault:.results.commandsDefault.ok,commandsAllPrivate:.results.commandsAllPrivate.ok,commandsAllGroups:.results.commandsAllGroups.ok}' /tmp/telegram-setup.json
+          jq -c '{botInfo:.results.botInfo.result,membershipVerification:.results.membershipVerification,commandsDefault:.results.commandsDefault.ok,commandsAllPrivate:.results.commandsAllPrivate.ok,commandsAllGroups:.results.commandsAllGroups.ok}' /tmp/telegram-setup.json
+          jq -e '.results.membershipVerification.ready == true' /tmp/telegram-setup.json >/dev/null || {
+            echo "Flexa cannot verify channel members. Add @FlexaTournamentBot as an administrator of the configured Gament channel.";
+            exit 1;
+          }
