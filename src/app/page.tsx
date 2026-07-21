@@ -5,7 +5,6 @@ import HeroScene from "@/components/fx/HeroScene";
 import TiltCard from "@/components/fx/TiltCard";
 import Reveal from "@/components/fx/Reveal";
 import MagneticButton from "@/components/fx/MagneticButton";
-import GameCardCountdown from "@/components/GameCardCountdown";
 import { SITE_URL } from "@/lib/seo";
 
 interface SiteImage {
@@ -99,42 +98,13 @@ async function getImages(): Promise<SiteImage[]> {
 
 async function getTournaments(): Promise<TournamentPreview[]> {
   try {
-    // Fetch a wider slice so we can also compute the next upcoming tournament
-    // per game (used by the Arena tab countdown badges).
-    const res = await fetch(`${SITE_URL}/api/tournaments?limit=50`, { next: { revalidate: 60 } });
+    const res = await fetch(`${SITE_URL}/api/tournaments?limit=6`, { next: { revalidate: 60 } });
     if (!res.ok) return [];
     const data = await res.json();
     return Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
   } catch {
     return [];
   }
-}
-
-/**
- * Given the list of tournaments returned by the API, pick the nearest
- * upcoming `startDate` for each game. Used to render a live countdown
- * badge on each game card in the Arena tab.
- * Returns a map: { cod_mobile: ISOString | null, fortnite: ..., clash_royale: ... }
- */
-function pickNextStartDatesByGame(list: TournamentPreview[]): Record<string, string | null> {
-  const now = Date.now();
-  const best: Record<string, number | null> = {
-    cod_mobile: null,
-    fortnite: null,
-    clash_royale: null,
-  };
-  for (const t of list) {
-    if (!t.startDate) continue;
-    const ms = new Date(t.startDate).getTime();
-    if (Number.isNaN(ms) || ms <= now) continue; // only future tournaments
-    if (!(t.game in best)) continue;
-    if (best[t.game] === null || ms < (best[t.game] as number)) {
-      best[t.game] = ms;
-    }
-  }
-  return Object.fromEntries(
-    Object.entries(best).map(([k, v]) => [k, v ? new Date(v).toISOString() : null])
-  );
 }
 
 async function getHonors(): Promise<HonorPreview[]> {
@@ -165,7 +135,6 @@ export default async function LuxuryHomePage() {
   const heroImage = bySlug["home-hero"] || byCategory["hero"];
   const featuredTournament = tournaments[0];
   const featuredHonor = honors[0];
-  const nextStartByGame = pickNextStartDatesByGame(tournaments);
 
   return (
     <main
@@ -345,11 +314,6 @@ export default async function LuxuryHomePage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
             {GAMES.map((game, i) => {
               const gameImage = bySlug[`game-card-${game.id}`] || byCategory[game.id];
-              // Different fallback windows per game so the three timers
-              // don't tick in perfect lock-step when the DB has no scheduled
-              // tournaments (looks more natural + product requirement is
-              // "every card must have a live countdown").
-              const fallbackDays = game.id === "cod_mobile" ? 20 : game.id === "fortnite" ? 14 : 27;
               return (
                 <Reveal key={game.id} delay={i * 0.08} from="up" distance={22}>
                   <TiltCard maxTilt={9} liftZ={16} className="rounded-[30px]">
@@ -388,12 +352,9 @@ export default async function LuxuryHomePage() {
                               />
                             </div>
                           </div>
-                          <div className="flex flex-col items-end gap-1.5">
-                            <GameCardCountdown targetDate={nextStartByGame[game.id]} fallbackDays={fallbackDays} />
-                            <span className="text-[10px] font-black text-white/45 tracking-[.25em]">
-                              ROOMS
-                            </span>
-                          </div>
+                          <span className="text-[10px] font-black text-white/45 tracking-[.25em]">
+                            ROOMS
+                          </span>
                         </div>
                         <div className="relative text-right mt-8" style={{ transform: "translateZ(20px)" }}>
                           <h4 className="text-3xl font-black en-font italic leading-none">
