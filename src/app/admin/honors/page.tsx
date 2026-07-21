@@ -4,6 +4,22 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 
+const AUTO_NEWS_REASON_LABELS: Record<string, string> = {
+  no_recent_complete_sources: "در ۹۶ ساعت اخیر خبر کامل و معتبری همراه تصویر رسمی پیدا نشد.",
+  no_new_trusted_sources: "همه خبرهای معتبر فعلی قبلاً منتشر شده‌اند؛ خبر تکراری ساخته نشد.",
+  ai_provider_not_configured: "سرویس ترجمه هوش مصنوعی تنظیم نشده است.",
+  ai_provider_unavailable: "سرویس ترجمه هوش مصنوعی موقتاً پاسخ نداد.",
+  all_source_translations_rejected: "منبع پیدا شد اما ترجمه‌ها کنترل کیفیت فارسی را پاس نکردند.",
+  source_translation_rejected: "ترجمه وفادار به منبع نبود و برای جلوگیری از خبرسازی رد شد.",
+  persian_quality_rejected: "کیفیت متن فارسی کافی نبود و خبر منتشر نشد.",
+  missing_trusted_source_image: "تصویر رسمی همان منبع پیدا نشد.",
+};
+
+function autoNewsReason(value: unknown) {
+  const key = String(value || "");
+  return AUTO_NEWS_REASON_LABELS[key] || key || "منبع تازه‌ای برای انتشار وجود ندارد.";
+}
+
 interface Honor {
   id: string;
   type: "winner" | "levelup" | "news" | string;
@@ -30,6 +46,8 @@ export default function AdminHonorsPage() {
   const [editData, setEditData] = useState<any>({});
   const [aiDraftLoading, setAiDraftLoading] = useState(false);
   const [autoNewsLoading, setAutoNewsLoading] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [feedback, setFeedback] = useState<{ ok: boolean; text: string; details?: string } | null>(null);
   const [telegramDraft, setTelegramDraft] = useState("");
 
   const [newHonor, setNewHonor] = useState({
@@ -53,10 +71,17 @@ export default function AdminHonorsPage() {
   });
 
   const fetchHonors = async () => {
-    const res = await fetch("/api/admin/honors", { cache: "no-store" });
-    const data = await res.json();
-    setHonors(Array.isArray(data) ? data : []);
-    setLoading(false);
+    try {
+      const res = await fetch("/api/admin/honors", { cache: "no-store", credentials: "include" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "دریافت محتوای تالار انجام نشد");
+      setHonors(Array.isArray(data) ? data : []);
+    } catch (error) {
+      setHonors([]);
+      setFeedback({ ok: false, text: error instanceof Error ? error.message : "دریافت محتوای تالار انجام نشد" });
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -64,26 +89,47 @@ export default function AdminHonorsPage() {
   }, []);
 
   const updateStatus = async (id: string, status: "approved" | "rejected") => {
-    await fetch("/api/admin/honors", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-      body: JSON.stringify({ id, status }),
-    });
-    fetchHonors();
+    try {
+      const response = await fetch("/api/admin/honors", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ id, status }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "تغییر وضعیت انجام نشد");
+      setFeedback({ ok: true, text: status === "approved" ? "محتوا منتشر شد." : "محتوا رد شد." });
+      await fetchHonors();
+    } catch (error) {
+      setFeedback({ ok: false, text: error instanceof Error ? error.message : "تغییر وضعیت انجام نشد" });
+    }
   };
 
   const deleteHonor = async (id: string) => {
     if (!confirm("حذف شود؟")) return;
-    await fetch("/api/admin/honors", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-      body: JSON.stringify({ id }),
-    });
-    fetchHonors();
+    try {
+      const response = await fetch("/api/admin/honors", {
+        method: "DELETE",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ id }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "حذف انجام نشد");
+      setFeedback({ ok: true, text: "محتوا حذف شد." });
+      await fetchHonors();
+    } catch (error) {
+      setFeedback({ ok: false, text: error instanceof Error ? error.message : "حذف انجام نشد" });
+    }
   };
 
   const generateAiDraft = async () => {
+    if (newHonor.type === "news") {
+      setFeedback({ ok: false, text: "برای جلوگیری از خبرسازی، تولید متن AI روی خبر دستی غیرفعال است. از «بررسی و ساخت خبر معتبر» استفاده کن یا ترجمه وفادار، لینک منبع و تصویر همان منبع را وارد کن." });
+      return;
+    }
     setAiDraftLoading(true);
+    setFeedback(null);
     try {
       const res = await fetch("/api/admin/honors/ai-draft", {
         method: "POST",
@@ -94,8 +140,9 @@ export default function AdminHonorsPage() {
       if (!res.ok) throw new Error(data.error || "ساخت متن انجام نشد");
       setNewHonor((prev) => ({ ...prev, title: data.title || prev.title, description: data.description || prev.description }));
       setTelegramDraft(data.telegramPost || "");
+      setFeedback({ ok: true, text: `متن پیشنهادی با موفقیت ساخته شد (${data.provider || "local"}). قبل از انتشار آن را بررسی کن.` });
     } catch (err) {
-      alert(err instanceof Error ? err.message : "ساخت متن انجام نشد");
+      setFeedback({ ok: false, text: err instanceof Error ? err.message : "ساخت متن انجام نشد" });
     } finally {
       setAiDraftLoading(false);
     }
@@ -104,31 +151,55 @@ export default function AdminHonorsPage() {
 
   const generateAutoNews = async () => {
     setAutoNewsLoading(true);
+    setFeedback(null);
     try {
       const res = await fetch("/api/admin/honors/auto-news", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-        body: JSON.stringify({ force: true }),
+        // Never force a duplicate source. Manual runs use the same strict
+        // source, image and Persian-quality policy as the scheduled workflow.
+        body: JSON.stringify({ force: false }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "ساخت خبر خودکار انجام نشد");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.details || data.error || "ساخت خبر خودکار انجام نشد");
+      const diagnostics = data.diagnostics || {};
+      const details = `کشف‌شده: ${Number(diagnostics.discovered || 0).toLocaleString("fa-IR")} · تازه: ${Number(diagnostics.recent || 0).toLocaleString("fa-IR")} · کامل و قابل‌اعتماد: ${Number(diagnostics.accepted || 0).toLocaleString("fa-IR")}`;
       if (data.generated) {
-        const titles = Array.isArray(data.items) ? data.items.filter((item: any) => item.generated).map((item: any) => item.title).filter(Boolean).join("\n• ") : "";
-        alert(`${Number(data.generatedCount || 1).toLocaleString("fa-IR")} خبر خودکار ساخته شد${titles ? `:\n• ${titles}` : ""}`);
-      } else alert(`خبری ساخته نشد: ${data.reason || "منبع تازه‌ای پیدا نشد"}`);
-      fetchHonors();
+        const titles = Array.isArray(data.items)
+          ? data.items.filter((item: any) => item.generated).map((item: any) => item.title).filter(Boolean).join("، ")
+          : "";
+        setFeedback({
+          ok: true,
+          text: `${Number(data.generatedCount || 1).toLocaleString("fa-IR")} خبر معتبر ساخته و منتشر شد${titles ? `: ${titles}` : ""}`,
+          details,
+        });
+        await fetchHonors();
+      } else {
+        setFeedback({ ok: false, text: autoNewsReason(data.reason), details });
+      }
     } catch (err) {
-      alert(err instanceof Error ? err.message : "ساخت خبر خودکار انجام نشد");
+      setFeedback({ ok: false, text: err instanceof Error ? err.message : "ساخت خبر خودکار انجام نشد" });
     } finally {
       setAutoNewsLoading(false);
     }
   };
 
   const createHonor = async () => {
-    if (!newHonor.title || !newHonor.description) {
-      alert("عنوان و توضیحات الزامی است");
+    if (!newHonor.title.trim() || !newHonor.description.trim()) {
+      setFeedback({ ok: false, text: "عنوان و توضیحات برای ایجاد محتوا الزامی است." });
       return;
     }
+    if (newHonor.type === "news" && !newHonor.game) {
+      setFeedback({ ok: false, text: "برای انتشار خبر، ابتدا بازی را انتخاب کن." });
+      return;
+    }
+    if (newHonor.type === "news" && (!newHonor.sourceLink.trim() || !newHonor.image.trim())) {
+      setFeedback({ ok: false, text: "برای انتشار خبر، لینک منبع رسمی و تصویر اصلی همان ناشر الزامی است." });
+      return;
+    }
+    setCreating(true);
+    setFeedback(null);
 
     const payload = {
       ...newHonor,
@@ -137,33 +208,43 @@ export default function AdminHonorsPage() {
       status: "approved",
     };
 
-    await fetch("/api/admin/honors", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-      body: JSON.stringify(payload),
-    });
+    try {
+      const response = await fetch("/api/admin/honors", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify(payload),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "ایجاد محتوا انجام نشد");
 
-    setNewHonor({
-      type: "news",
-      title: "",
-      description: "",
-      prize: "",
-      username: "",
-      level: "",
-      game: "",
-      highlight: false,
-      image: "",
-      imageAlt: "",
-      summary: "",
-      seoKeywords: "",
-      readTimeMinutes: "4",
-      galleryImages: "",
-      sourceTitle: "",
-      sourceLink: "",
-      sourceName: "",
-    });
-
-    fetchHonors();
+      setNewHonor({
+        type: "news",
+        title: "",
+        description: "",
+        prize: "",
+        username: "",
+        level: "",
+        game: "",
+        highlight: false,
+        image: "",
+        imageAlt: "",
+        summary: "",
+        seoKeywords: "",
+        readTimeMinutes: "4",
+        galleryImages: "",
+        sourceTitle: "",
+        sourceLink: "",
+        sourceName: "",
+      });
+      setTelegramDraft("");
+      setFeedback({ ok: true, text: `«${result.honor?.title || payload.title}» با موفقیت ایجاد و منتشر شد.` });
+      await fetchHonors();
+    } catch (error) {
+      setFeedback({ ok: false, text: error instanceof Error ? error.message : "ایجاد محتوا انجام نشد" });
+    } finally {
+      setCreating(false);
+    }
   };
 
   // شروع ویرایش
@@ -175,19 +256,22 @@ export default function AdminHonorsPage() {
   // ذخیره تغییرات
   const saveEdit = async () => {
     if (!editingId) return;
-
-    await fetch("/api/admin/honors", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-      body: JSON.stringify({
-        id: editingId,
-        ...editData,
-      }),
-    });
-
-    setEditingId(null);
-    setEditData({});
-    fetchHonors();
+    try {
+      const response = await fetch("/api/admin/honors", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({ id: editingId, ...editData }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(result.error || "ذخیره تغییرات انجام نشد");
+      setEditingId(null);
+      setEditData({});
+      setFeedback({ ok: true, text: "تغییرات محتوا ذخیره شد." });
+      await fetchHonors();
+    } catch (error) {
+      setFeedback({ ok: false, text: error instanceof Error ? error.message : "ذخیره تغییرات انجام نشد" });
+    }
   };
 
   return (
@@ -205,11 +289,18 @@ export default function AdminHonorsPage() {
               disabled={autoNewsLoading}
               className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 py-2 rounded-xl text-xs font-black transition-all"
             >
-              {autoNewsLoading ? "در حال ساخت خبر..." : "📰 ساخت خبر خودکار"}
+              {autoNewsLoading ? "در حال بررسی منابع رسمی..." : "📰 بررسی و ساخت خبر معتبر"}
             </button>
             <Link href="/admin" className="text-sm text-purple-400">← بازگشت به پنل</Link>
           </div>
         </div>
+
+        {feedback && (
+          <div className={`mb-6 rounded-2xl border p-4 ${feedback.ok ? "border-emerald-400/25 bg-emerald-500/10 text-emerald-200" : "border-amber-400/25 bg-amber-500/10 text-amber-100"}`}>
+            <div className="text-sm font-black leading-7">{feedback.text}</div>
+            {feedback.details && <div className="mt-1 text-[11px] text-white/55">{feedback.details}</div>}
+          </div>
+        )}
 
         {/* فرم ایجاد */}
         <div className="glass-panel p-4 sm:p-6 rounded-3xl mb-10 border border-white/10">
@@ -287,6 +378,11 @@ export default function AdminHonorsPage() {
             className="w-full bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm mb-4 min-h-20 resize-y"
           />
 
+          {newHonor.type === "news" && (
+            <div className="mb-3 rounded-xl border border-amber-400/20 bg-amber-500/10 p-3 text-[11px] leading-6 text-amber-100">
+              خبر دستی فقط با انتخاب بازی، ترجمه وفادار، لینک رسمی ناشر و تصویر رسمی همان ناشر منتشر می‌شود. Gament متن خبری از خودش نمی‌سازد.
+            </div>
+          )}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
             <input placeholder="عنوان منبع" value={newHonor.sourceTitle} onChange={(e) => setNewHonor({...newHonor, sourceTitle: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm" />
             <input placeholder="لینک منبع / لینک خارجی" value={newHonor.sourceLink} onChange={(e) => setNewHonor({...newHonor, sourceLink: e.target.value})} className="bg-[#111114] border border-white/10 rounded-2xl px-4 py-3 text-sm" />
@@ -319,11 +415,12 @@ export default function AdminHonorsPage() {
             >
               {aiDraftLoading ? "در حال ساخت..." : "✨ ساخت متن با AI"}
             </button>
-            <button 
-              onClick={createHonor} 
-              className="bg-purple-600 hover:bg-purple-700 px-8 py-3 rounded-2xl text-sm font-black transition-all"
+            <button
+              onClick={createHonor}
+              disabled={creating}
+              className="bg-purple-600 hover:bg-purple-700 disabled:opacity-50 px-8 py-3 rounded-2xl text-sm font-black transition-all"
             >
-              ایجاد محتوا
+              {creating ? "در حال ذخیره و انتشار..." : "ایجاد و انتشار محتوا"}
             </button>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { validateAdmin } from "@/lib/auth";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import logger from "@/lib/logger";
 import { publishHonorToTelegramChannel } from "@/lib/telegram";
+import { isTrustedArticleImage, isTrustedArticleUrl, type GamingNewsGame } from "@/lib/gaming-news-sources";
 
 export const dynamic = "force-dynamic";
 
@@ -185,6 +186,22 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const data = normalizeHonorBody(body);
     if (!data.title || !data.description) return NextResponse.json({ error: "عنوان و توضیحات الزامی است" }, { status: 400 });
+    const metadata = normalizeHonorMetadata(body);
+    if (data.type === "news") {
+      const sources = Array.isArray(metadata.sources) ? metadata.sources : [];
+      const game = data.game as GamingNewsGame | null;
+      if (!game || !new Set<GamingNewsGame>(["clash_royale", "cod_mobile", "fortnite"]).has(game)) {
+        return NextResponse.json({ error: "برای انتشار خبر، انتخاب بازی الزامی است" }, { status: 400 });
+      }
+      if (!data.imageUrl) return NextResponse.json({ error: "برای انتشار خبر، تصویر اصلی همان منبع الزامی است" }, { status: 400 });
+      if (!sources.length) return NextResponse.json({ error: "برای انتشار خبر، لینک منبع معتبر الزامی است" }, { status: 400 });
+      if (!isTrustedArticleImage(data.imageUrl, game)) {
+        return NextResponse.json({ error: "تصویر خبر باید از دامنه رسمی همان ناشر باشد" }, { status: 400 });
+      }
+      if (sources.some((source) => !isTrustedArticleUrl(String((source as { link?: unknown }).link || ""), game))) {
+        return NextResponse.json({ error: "لینک خبر باید از منبع رسمی و معتبر همان بازی باشد" }, { status: 400 });
+      }
+    }
 
     const now = new Date();
     const [created] = await db
@@ -194,7 +211,7 @@ export async function POST(request: NextRequest) {
         createdById: auth.user.id,
         approvedById: data.status === "approved" ? auth.user.id : null,
         publishedAt: data.status === "approved" ? now : null,
-        metadata: normalizeHonorMetadata(body),
+        metadata,
         updatedAt: now,
       })
       .returning();

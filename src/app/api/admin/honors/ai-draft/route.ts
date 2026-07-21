@@ -94,6 +94,11 @@ export async function POST(request: NextRequest) {
     if (!limit.success) return NextResponse.json({ error: "درخواست‌های AI زیاد است. کمی بعد تلاش کن." }, { status: 429 });
 
     const body = await request.json().catch(() => ({}));
+    if (text(body.type || "news", 30) === "news") {
+      return NextResponse.json({
+        error: "برای جلوگیری از خبرسازی، AI Draft برای خبر دستی غیرفعال است؛ از خبر خودکار منبع‌محور یا ترجمه وفادار استفاده کنید",
+      }, { status: 400 });
+    }
     const fallback = localDraft(body);
 
     const prompt = `برای تالار افتخارات Gament یک متن جذاب بساز.

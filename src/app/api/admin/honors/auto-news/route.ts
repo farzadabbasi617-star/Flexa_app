@@ -15,6 +15,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, ...result });
   } catch (err) {
     logger.error({ err, adminId: auth.user.id }, "Admin auto honors news failed");
-    return NextResponse.json({ error: "ساخت خبر خودکار انجام نشد" }, { status: 500 });
+    return NextResponse.json({
+      error: "ساخت خبر خودکار انجام نشد",
+      details: err instanceof Error ? err.message : "خطای ناشناخته تولید خبر",
+    }, { status: 500 });
   }
 }
