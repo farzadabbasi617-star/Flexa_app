@@ -718,18 +718,19 @@ export async function openClash1v1Queue(chatId: number, telegramId: string, rule
     }
 
     await sendMessage(chatId, [
-      "⚔️ <b>رقابت 1V1 کلش رویال</b>",
+      "⚔️ <b>1V1 کلش رویال</b>",
       "",
-      "اول مشخص کن می‌خواهی با یک حریف تصادفی بازی کنی یا برای دوستت دعوت خصوصی بفرستی.",
+      `💳 ورودی هر نفر: <b>${html(CLASH_1V1_CONFIG.entryFee)}</b>`,
+      `🏆 جایزه نفر اول: <b>${html(CLASH_1V1_CONFIG.prize1st)}</b>`,
+      "🤖 حریف: انتخاب خودکار از صف بازیکنان آماده",
+      "🏟 این بخش روم/تورنومنت چندنفره نمی‌سازد؛ هر پرداخت یک مسابقه دونفره مستقل است.",
       "",
-      "🎲 <b>حریف تصادفی:</b> فقط با بازیکنی مچ می‌شوی که حالت مالی و مود یکسان انتخاب کرده باشد.",
-      "👥 <b>بازی با دوست:</b> دعوت خصوصی می‌سازی و تا توافق هر دو روی مود، هیچ مبلغی کسر نمی‌شود.",
+      "بعد از ثبت‌نام و پرداخت، QR یا Share Link دوستی را می‌فرستی و بات حریف هم‌مود را خودکار پیدا می‌کند.",
     ].join("\n"), {
       inline_keyboard: [
-        [{ text: "🎲 حریف تصادفی", callback_data: "clash1v1:opponent:random" }],
-        [{ text: "👥 بازی با دوست", callback_data: "clash1v1:opponent:friend" }],
-        [{ text: "📦 وضعیت رقابت من", callback_data: "clash1v1:status" }],
-        [{ text: "📜 مشاهده قوانین 1V1", callback_data: "clash1v1:rules:show" }],
+        [{ text: `💳 ثبت‌نام پولی — ${CLASH_1V1_CONFIG.entryFee}`, callback_data: "clash1v1:stake:random:paid" }],
+        [{ text: "📦 وضعیت مسابقه من", callback_data: "clash1v1:status" }],
+        [{ text: "📜 قوانین 1V1", callback_data: "clash1v1:rules:show" }],
       ],
     });
   } catch (err) {
@@ -739,16 +740,38 @@ export async function openClash1v1Queue(chatId: number, telegramId: string, rule
 }
 
 export async function showClash1v1StakeMenu(chatId: number, opponentType: "random" | "friend") {
+  // The public 1V1 product requested by Gament is fixed-price and random.
+  // Keep friend callbacks backward compatible, while the visible random flow
+  // goes directly to the paid mode picker instead of looking like a room form.
+  if (opponentType === "random") {
+    await sendMessage(chatId, [
+      "⚔️ <b>ثبت‌نام 1V1 کلش رویال</b>",
+      "",
+      `💳 ورودی هر نفر: <b>${html(CLASH_1V1_CONFIG.entryFee)}</b>`,
+      `🏆 جایزه نفر اول: <b>${html(CLASH_1V1_CONFIG.prize1st)}</b>`,
+      "مود بازی را انتخاب کن؛ در مرحله بعد مبلغ از کیف پول کسر می‌شود.",
+    ].join("\n"), {
+      inline_keyboard: [
+        ...CLASH_DUEL_GAME_MODES.map((mode) => ([{
+          text: `${mode.emoji} ${mode.label}`,
+          callback_data: `clash1v1:mode:random:paid:${mode.id}`,
+        }])),
+        [{ text: "⬅️ بازگشت", callback_data: "menu:clash_qr" }],
+      ],
+    });
+    return;
+  }
+
   await sendMessage(chatId, [
-    `⚔️ نوع حریف: <b>${opponentType === "friend" ? "بازی با دوست" : "حریف تصادفی"}</b>`,
+    "👥 <b>بازی خصوصی با دوست</b>",
     "",
-    "نوع رقابت را انتخاب کن:",
+    "نوع رقابت خصوصی را انتخاب کن:",
     "🆓 رایگان: بدون ورودی و جایزه مالی",
     `💰 پولی: ورودی هر نفر <b>${html(CLASH_1V1_CONFIG.entryFee)}</b> و جایزه برنده <b>${html(CLASH_1V1_CONFIG.prize1st)}</b>`,
   ].join("\n"), {
     inline_keyboard: [
-      [{ text: "🆓 رقابت رایگان", callback_data: `clash1v1:stake:${opponentType}:free` }],
-      [{ text: "💰 رقابت پولی", callback_data: `clash1v1:stake:${opponentType}:paid` }],
+      [{ text: "🆓 رقابت رایگان", callback_data: "clash1v1:stake:friend:free" }],
+      [{ text: "💰 رقابت پولی", callback_data: "clash1v1:stake:friend:paid" }],
       [{ text: "⬅️ بازگشت", callback_data: "menu:clash_qr" }],
     ],
   });
@@ -791,8 +814,20 @@ export async function registerClash1v1Queue(
       return;
     }
     if (!linked.clashRoyaleId || linked.clashRoyaleStatus !== "verified") {
-      await sendMessage(chatId, "برای ورود به 1V1 باید Player Tag کلش رویال شما با Supercell API تأیید شده باشد.", {
-        inline_keyboard: [[{ text: "⚔️ ثبت و تأیید Player Tag", url: `${APP_URL}/profile/edit` }]],
+      // Never leave a Telegram user at a dead-end. The tag is still verified
+      // by the existing Supercell API profile endpoint, but Mini App/browser
+      // buttons make the next step explicit and let the user return to /clash.
+      await sendMessage(chatId, [
+        "⚠️ <b>برای ثبت‌نام فقط یک مرحله مانده</b>",
+        "Player Tag کلش رویال خودت را در پروفایل ثبت و تأیید کن، سپس به بات برگرد و دوباره دکمه ثبت‌نام را بزن.",
+        "",
+        "مثال Player Tag: <code>#ABC123</code>",
+      ].join("\n"), {
+        inline_keyboard: [
+          [{ text: "⚔️ ثبت و تأیید Player Tag", web_app: { url: `${APP_URL}/profile/edit` } }],
+          [{ text: "🌐 باز کردن در مرورگر", url: `${APP_URL}/profile/edit` }],
+          [{ text: "🔄 بعد از تأیید، ادامه ثبت‌نام", callback_data: `clash1v1:mode:random:${stakeMode}:${gameMode}` }],
+        ],
       });
       return;
     }
@@ -936,12 +971,18 @@ export async function registerClash1v1Queue(
     await promptClash1v1Qr(chatId, telegramId, result.entry.id);
   } catch (err) {
     logger.error({ err, telegramId }, "Clash 1V1 queue registration failed");
+    const detail = err instanceof Error && err.message.includes("relation")
+      ? "ساختار صف در حال آماده‌سازی است. چند ثانیه دیگر دوباره بزن."
+      : "وجه این تلاش کسر نشده یا تراکنش کامل Rollback شده است.";
     await sendMessage(chatId, [
-      "⚠️ <b>ثبت‌نام انجام نشد</b>",
-      "تراکنش Rollback شد و در این تلاش وجهی کسر نشده است.",
-      "چند لحظه دیگر دوباره امتحان کن یا با پشتیبانی تماس بگیر.",
+      "⚠️ <b>ثبت‌نام 1V1 انجام نشد</b>",
+      detail,
+      "از دکمه زیر دوباره امتحان کن؛ اگر ادامه داشت، پشتیبانی را باز کن.",
     ].join("\n"), {
-      inline_keyboard: [[{ text: "🔁 تلاش دوباره", callback_data: `clash1v1:mode:random:${stakeMode}:${gameMode}` }]],
+      inline_keyboard: [
+        [{ text: "🔁 تلاش دوباره", callback_data: `clash1v1:mode:random:${stakeMode}:${gameMode}` }],
+        [{ text: "🎧 پشتیبانی", callback_data: "support:new" }],
+      ],
     });
   }
 }
@@ -957,6 +998,20 @@ export async function submitClash1v1Qr(input: {
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) throw new Error("CLASH_QUEUE_ACCOUNT_NOT_LINKED");
 
+  const [ownedEntry] = await db.select({ status: clash1v1Entries.status })
+    .from(clash1v1Entries)
+    .where(and(
+      eq(clash1v1Entries.id, entryId),
+      eq(clash1v1Entries.userId, linked.userId),
+      inArray(clash1v1Entries.status, ["waiting_qr", "queued", "matched"]),
+    ))
+    .limit(1);
+  if (!ownedEntry) {
+    await clearSession(telegramId);
+    await sendMessage(chatId, "این ثبت‌نام فعال نیست. برای شروع دوباره /clash را بزن.", removeKeyboard());
+    return;
+  }
+
   const extracted = extractInviteReference(input.text || "");
   let inviteLink = isSupportedClashInvite(extracted) ? extracted : null;
   let qrFileId: string | null = null;
@@ -970,22 +1025,8 @@ export async function submitClash1v1Qr(input: {
     return;
   }
 
-  const [currentEntry] = await db.select({ status: clash1v1Entries.status })
-    .from(clash1v1Entries)
-    .where(and(
-      eq(clash1v1Entries.id, entryId),
-      eq(clash1v1Entries.userId, linked.userId),
-      inArray(clash1v1Entries.status, ["waiting_qr", "queued", "matched"]),
-    ))
-    .limit(1);
-  if (!currentEntry) {
-    await clearSession(telegramId);
-    await sendMessage(chatId, "این ورودی دیگر فعال نیست. برای مشاهده وضعیت /qr را بزن.", removeKeyboard());
-    return;
-  }
-
   const [updated] = await db.update(clash1v1Entries).set({
-    status: currentEntry.status === "matched" ? "matched" : "queued",
+    status: ownedEntry.status === "matched" ? "matched" : "queued",
     inviteLink,
     qrFileId,
     submittedAt: new Date(),

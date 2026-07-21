@@ -176,15 +176,20 @@ export function normalizeClash1v1QueueSettings<T extends Record<string, unknown>
   } as T & Record<string, unknown>;
 }
 
-export function isClash1v1TournamentLike(tournament?: {
+export function isClash1v1QueueTournament(tournament?: {
   game?: string | null;
   name?: string | null;
   categoryLabel?: string | null;
 }) {
   if (!tournament) return false;
+  // The paid 1V1 product is a reserved system queue, not an admin-created
+  // room. Category is authoritative; a normal tournament may share its name.
   return tournament.game === CLASH_1V1_CONFIG.game
-    && (tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel || tournament.name === CLASH_1V1_CONFIG.name);
+    && tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel;
 }
+
+// Kept as an alias for existing imports while rolling deployments update.
+export const isClash1v1TournamentLike = isClash1v1QueueTournament;
 
 export function clash1v1PrizeRial() {
   return BigInt(CLASH_1V1_CONFIG.prizeToman) * BigInt(10);
