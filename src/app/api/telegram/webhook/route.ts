@@ -46,6 +46,7 @@ import {
   promptClash1v1Qr,
   registerClash1v1Queue,
   markClash1v1Ready,
+  runClash1v1MatchmakingAndNotify,
   showClash1v1ModeMenu,
   showClash1v1StakeMenu,
   sendClash1v1Rules,
@@ -2766,6 +2767,32 @@ async function healthCommand(chatId: number, telegramId: string) {
   await sendMessage(chatId, `🩺 <b>Health Gament</b>\n\nDB: <b>${dbStatus}</b>\nTelegram Webhook: <b>${webhook?.ok ? "OK" : "ERROR"}</b>\nAI Keys: <b>${process.env.OPENROUTER_API_KEY || process.env.GROQ_API_KEY ? "Configured" : "Local fallback"}</b>\nLatency: <b>${ms}ms</b>`);
 }
 
+async function versionCommand(chatId: number, telegramId: string) {
+  if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+  const appVersion = process.env.RENDER_GIT_COMMIT || process.env.GIT_SHA || process.env.npm_package_version || "unknown";
+  const [{ value: waitingQr }] = await db.select({ value: count() }).from(clash1v1Entries).where(eq(clash1v1Entries.status, "waiting_qr"));
+  const [{ value: queued }] = await db.select({ value: count() }).from(clash1v1Entries).where(eq(clash1v1Entries.status, "queued"));
+  const [{ value: matched }] = await db.select({ value: count() }).from(clash1v1Entries).where(eq(clash1v1Entries.status, "matched"));
+  const [queue] = await db.select({ id: tournaments.id, status: tournaments.status, entryFee: tournaments.entryFee, prize1st: tournaments.prize1st, updatedAt: tournaments.updatedAt })
+    .from(tournaments)
+    .where(and(eq(tournaments.game, CLASH_1V1_CONFIG.game), eq(tournaments.categoryLabel, CLASH_1V1_CONFIG.categoryLabel)))
+    .orderBy(desc(tournaments.createdAt))
+    .limit(1);
+  await sendMessage(chatId, [
+    "🩺 <b>وضعیت 1V1 کلش رویال</b>",
+    "",
+    `🔖 نسخه دیپلوی: <code>${html(String(appVersion).slice(0, 12))}</code>`,
+    `🏟 صف سیستمی: ${queue ? `✅ فعال (${html(queue.status)})` : "❌ پیدا نشد"}`,
+    queue ? `💳 ورودی: <b>${html(queue.entryFee || "-")}</b> | 🏆 جایزه: <b>${html(queue.prize1st || "-")}</b>` : "",
+    "",
+    `⏳ منتظر QR: <b>${waitingQr}</b>`,
+    `🧍 داخل صف: <b>${queued}</b>`,
+    `⚔️ مچ شده: <b>${matched}</b>`,
+  ].filter(Boolean).join("\n"), {
+    inline_keyboard: [[{ text: "🔄 اجرای مچ‌میکینگ دستی", callback_data: "admin:clash1v1_matchmaking" }]],
+  });
+}
+
 async function exportTelegramCommand(chatId: number, telegramId: string) {
   if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
   const rows = await db.select().from(telegramPreRegistrations).orderBy(desc(telegramPreRegistrations.updatedAt)).limit(1000);
@@ -3238,6 +3265,7 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/checkin") return checkInCommand(chatId, telegramId);
   if (normalizedCommand === "/judge") return judgeCommand(chatId, telegramId);
   if (normalizedCommand === "/health") return healthCommand(chatId, telegramId);
+  if (normalizedCommand === "/version" || normalizedCommand === "/clash_queue") return versionCommand(chatId, telegramId);
   if (normalizedCommand === "/export_telegram") return exportTelegramCommand(chatId, telegramId);
   if (normalizedCommand === "/poll") return pollCommand(chatId, telegramId, args.join(" "));
   if (normalizedCommand === "/ads") return classifiedAdsCommand(chatId, telegramId);
@@ -3764,6 +3792,11 @@ async function handleCallback(callback: TelegramCallbackQuery) {
     if (action === "mode" && value && challengeIdMaybe) return counterFriendChallengeMode(chatId, telegramId, challengeIdMaybe, value);
     if (action === "cancel" && value) return closeFriendChallenge(chatId, telegramId, value, "cancel");
     if (action === "reject" && value) return closeFriendChallenge(chatId, telegramId, value, "reject");
+  }
+  if (data === "admin:clash1v1_matchmaking") {
+    if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
+    const result = await runClash1v1MatchmakingAndNotify();
+    return sendMessage(chatId, `✅ مچ‌میکینگ دستی اجرا شد.\nMatch جدید: <b>${result.matchedPairs}</b>\nاعلان‌های تلاش‌شده: <b>${result.checkedMatches ?? 0}</b>`);
   }
   if (data === "menu:clash_qr" || data === "clash1v1:status") return openClash1v1Queue(chatId, telegramId);
   if (data === "clash1v1:register") return openClash1v1Queue(chatId, telegramId);

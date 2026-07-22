@@ -305,6 +305,11 @@ export async function promptClash1v1Qr(chatId: number, telegramId: string, entry
     : "";
   await sendMessage(chatId, `${inviteLinkPrompt(entryId)}${selection}`, replyKeyboard([[CANCEL_TEXT]]));
   await sendClashFriendLinkGuide(chatId);
+  // Re-send the player's own QR photo so they can confirm it is the correct one.
+  const [sent] = await db.select({ qrFileId: clash1v1Entries.qrFileId }).from(clash1v1Entries).where(eq(clash1v1Entries.id, entryId)).limit(1);
+  if (sent?.qrFileId) {
+    await sendPhoto(chatId, sent.qrFileId, "🖼 QR دوستی فعلی شما — همین عکس بعداً برای حریف ارسال می‌شود.").catch(() => undefined);
+  }
 }
 
 async function loadPair(matchId: string): Promise<QueuePair | null> {
@@ -739,6 +744,7 @@ export async function openClash1v1Queue(chatId: number, telegramId: string, rule
     ].join("\n"), {
       inline_keyboard: [
         [{ text: `💳 ثبت‌نام پولی — ${CLASH_1V1_CONFIG.entryFee}`, callback_data: "clash1v1:stake:random:paid" }],
+        [{ text: "👥 دعوت خصوصی دوست", callback_data: "clash1v1:opponent:friend" }],
         [{ text: "📦 وضعیت مسابقه من", callback_data: "clash1v1:status" }],
         [{ text: "📜 قوانین 1V1", callback_data: "clash1v1:rules:show" }],
       ],
