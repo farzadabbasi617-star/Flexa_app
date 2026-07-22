@@ -10,7 +10,7 @@ import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { calculateDynamicTournamentPrizePool } from "@/lib/tournament-finance";
 import { useCountdown } from "@/hooks/useCountdown";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
-import { CLASH_1V1_CONFIG } from "@/lib/clash-1v1";
+import { CLASH_1V1_CONFIG } from "@/lib/clash-1v1-config";
 
 interface Player {
   id: string;
