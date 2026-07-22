@@ -161,10 +161,20 @@ export default function AdminTournamentsPage() {
         winnersCount: 3,
         description: CLASH_PRIVATE_DRAFT_DESCRIPTION,
         rules: CLASH_PRIVATE_DRAFT_RULES,
+        // A private Clash draft is not a manual room: clear stale room fields so
+        // normalizeClashPrivateDraftSettings / the API never receive a leftover
+        // Room ID/Password that has no meaning here (fixes "room creation error").
+        roomId: "",
+        roomPassword: "",
+        roomVisibleAt: "",
+        lobbyNotes: "",
       }));
       return;
     }
-    setForm((current) => ({ ...current, game, categoryLabel: "" }));
+    // Non-Clash games are normal hosted rooms. Make absolutely sure the clash
+    // private-draft category is cleared so the draft-only normalizer does not
+    // reject the capacity of a regular COD/Fortnite room.
+    setForm((current) => ({ ...current, game, categoryLabel: "", gameMode: "", mapName: "" }));
   }
 
   function edit(row: TournamentRow) {
@@ -215,8 +225,16 @@ export default function AdminTournamentsPage() {
         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ ...form, startDate: form.startDate || null, endDate: form.endDate || null, roomVisibleAt: form.roomVisibleAt || null }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "ذخیره نشد");
+      let data: { error?: string } = {};
+      try { data = await res.json(); } catch { /* non-JSON (e.g. auth redirect / 500) */ }
+      if (!res.ok) {
+        const reason = data.error
+          || (res.status === 401 ? "نشست ادمین منقضی شده؛ دوباره وارد شو." : "")
+          || (res.status === 403 ? "دسترسی ادمین نداری." : "")
+          || (res.status === 400 ? "داده‌های فرم نامعتبر است." : "")
+          || `ذخیره نشد (کد ${res.status})`;
+        throw new Error(reason);
+      }
       setShowForm(false);
       setForm(emptyForm);
       load();

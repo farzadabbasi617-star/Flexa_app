@@ -10,6 +10,7 @@ import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { calculateDynamicTournamentPrizePool } from "@/lib/tournament-finance";
 import { useCountdown } from "@/hooks/useCountdown";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
+import { CLASH_1V1_CONFIG } from "@/lib/clash-1v1";
 
 interface Player {
   id: string;
@@ -60,6 +61,7 @@ interface Tournament {
   mapName?: string | null;
   categoryLabel?: string | null;
   rules: string | null;
+  prize1st?: string | null;
   registrations: Registration[];
   matches: Match[];
   leaderboard?: Array<{ rank: number; playerName: string; score: number | null; verified: boolean }>;
@@ -328,6 +330,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   });
   const rounds = Array.from(roundsMap.entries()).sort(([a], [b]) => a - b);
   const isPrivateClashDraft = tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY;
+  const isClash1v1Queue = tournament.game === "clash_royale" && tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel;
 
   const tabs = [
     { key: "overview", label: t.tournamentDetail.overview, icon: "📋" },
@@ -484,7 +487,24 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
               {registrationError && <div className="bg-red-500/10 border border-red-500/30 text-red-300 rounded-xl p-3 mb-4 text-sm leading-6">{registrationError}</div>}
 
-              {!user ? (
+              {isClash1v1Queue ? (
+                <div className="space-y-4">
+                  <div className="bg-cyan-500/10 border border-cyan-500/30 text-cyan-200 rounded-2xl p-4 text-sm leading-7">
+                    ⚔️ <b>این رقابت ۱V۱ کلش رویال است و فقط از داخل بات تلگرام انجام می‌شود.</b>
+                    <br />
+                    ورودی {tournament.entryFee} / جایزه نفر اول {tournament.prize1st || CLASH_1V1_CONFIG.prize1st}.
+                    بعد از پرداخت ورودی از کیف پول، QR یا پیوند دوستی کلشت را به بات بفرست تا بات خودکار حریفت را پیدا کند و شما را به هم وصل کند.
+                  </div>
+                  <a
+                    href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "FlexaTournamentBot"}?start=clash`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="gaming-btn w-full text-sm text-center"
+                  >
+                    🤖 ورود به بات و شروع ۱V۱
+                  </a>
+                </div>
+              ) : !user ? (
                 <div className="space-y-4">
                   <p className="text-gray-400 text-sm leading-7">برای ثبت‌نام در تورنومنت باید وارد حساب شوی.</p>
                   <Link href="/login" className="gaming-btn w-full text-sm">ورود به حساب</Link>

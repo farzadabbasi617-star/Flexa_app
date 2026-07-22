@@ -661,7 +661,17 @@ export async function openClash1v1Queue(chatId: number, telegramId: string, rule
     await ensureClash1v1QueueTournament();
     const linked = await getLinkedUserByTelegram(telegramId);
     if (!linked?.userId) {
-      await sendMessage(chatId, "برای ورود به صف 1V1 ابتدا حساب تلگرام را به Gament وصل کن.", {
+      await sendMessage(chatId, [
+        "🔗 <b>اول حساب تلگرامت رو به Gament وصل کن</b>",
+        "",
+        "برای ورود به صف 1V1 کلش رویال (ورودی ۵۰٬۰۰۰ تومان، جایزه ۸۰٬۰۰۰ تومان) این مراحل رو برو:",
+        "",
+        "۱) روی «🔗 اتصال حساب» بزن تا کد اتصال بگیری.",
+        "۲) داخل وب‌اپ وارد حسابت بشو و کد رو وارد کن.",
+        "۳) Player Tag کلشت رو از پروفایل تأیید کن.",
+        "۴) کیف پولت رو شارژ کن.",
+        "۵) اینجا /qr رو بزن تا وارد صف بشی.",
+      ].join("\n"), {
         inline_keyboard: [
           [{ text: "🔗 اتصال حساب", callback_data: "menu:link" }],
           [{ text: "🆕 ساخت حساب", url: `${APP_URL}/register` }],
@@ -814,19 +824,26 @@ export async function registerClash1v1Queue(
       return;
     }
     if (!linked.clashRoyaleId || linked.clashRoyaleStatus !== "verified") {
-      // Never leave a Telegram user at a dead-end. The tag is still verified
-      // by the existing Supercell API profile endpoint, but Mini App/browser
-      // buttons make the next step explicit and let the user return to /clash.
+      // Never leave a Telegram user at a dead-end: a step-by-step Persian
+      // guide plus Mini App + browser buttons so the user can verify the tag
+      // from inside Telegram and then return to /clash registration.
       await sendMessage(chatId, [
-        "⚠️ <b>برای ثبت‌نام فقط یک مرحله مانده</b>",
-        "Player Tag کلش رویال خودت را در پروفایل ثبت و تأیید کن، سپس به بات برگرد و دوباره دکمه ثبت‌نام را بزن.",
+        "👑 <b>Player Tag کلش رویال هنوز تأیید نشده</b>",
         "",
-        "مثال Player Tag: <code>#ABC123</code>",
+        "برای ورود به صف 1V1 و گرفتن حریف، اول Player Tag خودت رو تأیید کن:",
+        "",
+        "۱) روی دکمه‌ی پایین بزن تا پروفایل باز بشه.",
+        "۲) فیلد <b>Player Tag کلش رویال</b> رو پر کن (مثل #2PP در بازی: پروفایل → بالای اسم).",
+        "۳) ذخیره کن؛ اسم بازیکن از Supercell تأیید می‌شه.",
+        "۴) برگرد اینجا و دوباره /qr رو بزن.",
+        "",
+        "بعد از تأیید، ورودی ۵۰٬۰۰۰ تومان از کیف پولت کسر می‌شه و در صف می‌گیری؛ به‌محض پیدا شدن حریف، بات QR/پیوند دوستیت رو براش می‌فرسته.",
       ].join("\n"), {
         inline_keyboard: [
           [{ text: "⚔️ ثبت و تأیید Player Tag", web_app: { url: `${APP_URL}/profile/edit` } }],
           [{ text: "🌐 باز کردن در مرورگر", url: `${APP_URL}/profile/edit` }],
-          [{ text: "🔄 بعد از تأیید، ادامه ثبت‌نام", callback_data: `clash1v1:mode:random:${stakeMode}:${gameMode}` }],
+          [{ text: "💳 شارژ کیف پول", callback_data: "menu:wallet" }],
+          [{ text: "🔁 دوباره امتحان کن", callback_data: "menu:clash_qr" }],
         ],
       });
       return;
