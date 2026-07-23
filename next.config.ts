@@ -26,6 +26,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+
+  // Heavy, Node-only image/QR libraries used exclusively by the Telegram
+  // webhook (server-side). Marking them external keeps webpack from pulling
+  // their large module graphs into the server bundle during `next build`,
+  // which was pushing Render Free's build over its memory limit (OOM/SIGKILL).
+  serverExternalPackages: ["jimp", "jsqr", "sharp"],
   // Playwright's local server is reached through 127.0.0.1 during development.
   allowedDevOrigins: ["127.0.0.1"],
 
