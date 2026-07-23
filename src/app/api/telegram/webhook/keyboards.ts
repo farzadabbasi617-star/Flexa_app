@@ -14,6 +14,7 @@ export function removeKeyboard() {
 
 export function mainMenuKeyboard() {
   const rows: Array<Array<Record<string, unknown>>> = [
+    [{ text: "⚔️ 1V1 کلش رویال — ورودی ۵۰K / جایزه ۸۰K", callback_data: "clash1v1:quick_register" }],
     [
       { text: "⚡ Open Gament Mini App", web_app: { url: APP_URL } },
       { text: "🌐 وب‌اپ", url: APP_URL },
@@ -23,7 +24,7 @@ export function mainMenuKeyboard() {
     [{ text: "🎯 COD Arena — کاستوم‌روم کالاف", url: `${APP_URL}/cod-arena` }],
     [{ text: "💳 کیف پول", callback_data: "menu:wallet" }, { text: "🏆 تورنومنت‌های من", callback_data: "menu:my_tournaments" }],
     [{ text: "✅ چک‌این", callback_data: "menu:checkin" }, { text: "⚔️ مسابقات من", callback_data: "menu:matches" }],
-    [{ text: "⚔️ 1V1 کلش رویال — ورود ۵۰K", callback_data: "clash1v1:quick_register" }, { text: "🏅 کلش چندنفره", callback_data: "menu:clash_private" }],
+    [{ text: "🏅 کلش چندنفره", callback_data: "menu:clash_private" }, { text: "📦 وضعیت 1V1 من", callback_data: "clash1v1:status" }],
     [{ text: "🎯 مأموریت‌ها", callback_data: "menu:missions" }, { text: "🧠 کوییز روزانه", callback_data: "menu:quiz" }],
     [{ text: "🎁 درآمد از معرفی", callback_data: "mission:invite" }, { text: "📣 همکاری رسانه‌ای", callback_data: "menu:affiliate" }],
     [{ text: "📜 قوانین", callback_data: "menu:rules" }, { text: "🎧 پشتیبانی", callback_data: "menu:support" }],

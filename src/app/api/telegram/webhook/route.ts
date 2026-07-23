@@ -353,7 +353,9 @@ async function handleStartPayload(chatId: number, telegramId: string, user: Tele
 
   const qrTournamentId = payload.match(/^qr_([0-9a-f-]{36})$/i)?.[1];
   if (qrTournamentId) {
-    await startClashQrSubmission(chatId, telegramId, qrTournamentId);
+    // Legacy deep-link path. The system 1V1 queue is a single global product,
+    // so always route to the atomic queue instead of the dead registration flow.
+    await openClash1v1Queue(chatId, telegramId);
     return true;
   }
 
@@ -755,8 +757,9 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
     }
     if (result.code === "DUPLICATE") {
       if (tournament.game === "clash_royale" && tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel) {
-        await sendMessage(chatId, "✅ شما قبلاً در 1V1 کلش رویال ثبت‌نام کرده‌اید. حالا پیوند دوستی را می‌گیریم تا حریف پیدا شود.");
-        return startClashQrSubmission(chatId, telegramId, tournament.id);
+        // The 1V1 product uses its own atomic queue, not registrations. Route
+        // to the queue status flow instead of the dead legacy QR flow.
+        return openClash1v1Queue(chatId, telegramId);
       }
       return sendMessage(chatId, "شما قبلاً در این تورنومنت ثبت‌نام کرده‌اید.", {
         inline_keyboard: [[{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }]],
@@ -792,7 +795,9 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
   });
 
   if (needsClashQr) {
-    await startClashQrSubmission(chatId, telegramId, tournament.id, result.registrationId);
+    // The 1V1 queue is owned by the atomic bot flow; route there instead of
+    // the legacy registration-based QR submission.
+    return openClash1v1Queue(chatId, telegramId);
   }
 }
 
@@ -2215,42 +2220,10 @@ async function startClashQrSubmission(chatId: number, telegramId: string, tourna
 
   const eligible = rows.filter((row) => !isFreeEntryFee(row.entryFee));
   if (!eligible.length) {
-    const activeClashRooms = await db
-      .select({
-        id: tournaments.id,
-        name: tournaments.name,
-        entryFee: tournaments.entryFee,
-        maxPlayers: tournaments.maxPlayers,
-        registeredCount: count(registrations.id),
-      })
-      .from(tournaments)
-      .leftJoin(registrations, eq(registrations.tournamentId, tournaments.id))
-      .where(and(
-        eq(tournaments.game, "clash_royale"),
-        eq(tournaments.categoryLabel, CLASH_1V1_CONFIG.categoryLabel),
-        eq(tournaments.status, "registration")
-      ))
-      .groupBy(tournaments.id)
-      .orderBy(desc(tournaments.createdAt))
-      .limit(6);
-
-    const paidRooms = activeClashRooms.filter((room) => !isFreeEntryFee(room.entryFee));
-    const keyboard: Array<Array<Record<string, string>>> = paidRooms.flatMap((room) => {
-      const title = room.name.slice(0, 32);
-      const isFull = Number(room.registeredCount || 0) >= Number(room.maxPlayers || 0);
-      return [
-        [{ text: isFull ? `ظرفیت تکمیل: ${title}` : `ثبت‌نام 1V1: ${title}`, callback_data: `join:${room.id}` }],
-        [{ text: `جزئیات: ${title}`, url: `${APP_URL}/tournaments/${room.id}` }],
-      ];
-    });
-    keyboard.push([{ text: "🏟 همه روم‌های کلش", url: `${APP_URL}/tournaments?game=clash_royale` }]);
-
-    await sendMessage(
-      chatId,
-      "⚔️ <b>1V1 کلش رویال</b>\n\nبرای واقعی شدن مچ‌میکینگ، اول باید در یک تورنومنت <b>پولی کلش رویال</b> ثبت‌نام کرده باشی و ورودی پرداخت شده باشد.\n\nبعد از ثبت‌نام، «پیوند دوستی» را از گزینه اشتراک‌گذاری پیوند در Clash Royale برای بات بفرست تا حریف را اتوماتیک وصل کنم.",
-      { inline_keyboard: keyboard }
-    );
-    return;
+    // The 1V1 product is a single atomic queue managed by the bot itself; it
+    // does not require a separate `registrations` row. Route to the real queue
+    // flow which handles payment + QR + matchmaking instead of a dead end.
+    return openClash1v1Queue(chatId, telegramId);
   }
 
   if (!tournamentId && !registrationId && eligible.length > 1) {
@@ -3264,9 +3237,10 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (["/clash_join", "/clash_register", "/join_1v1"].includes(normalizedCommand)) {
     return registerClash1v1Queue(chatId, telegramId, { stakeMode: "paid", gameMode: "normal" });
   }
+  // All Clash 1V1 entry points funnel into the single atomic queue flow so
+  // users never hit the dead "no registration found" path of the legacy flow.
   if (["/qr", "/clash_qr", "/clash_link", "/clash", "/clash_1v1", "/1v1"].includes(normalizedCommand)) {
-    const tournamentId = args.join(" ").match(/[0-9a-f-]{36}/i)?.[0];
-    return tournamentId ? startClashQrSubmission(chatId, telegramId, tournamentId) : openClash1v1Queue(chatId, telegramId);
+    return openClash1v1Queue(chatId, telegramId);
   }
   if (normalizedCommand === "/checkin") return checkInCommand(chatId, telegramId);
   if (normalizedCommand === "/judge") return judgeCommand(chatId, telegramId);
@@ -3354,79 +3328,12 @@ async function handleConversationMessage(message: TelegramMessage) {
   }
 
   if (session.state === "clash_qr_submission") {
-    const linked = await getLinkedUserByTelegram(telegramId);
-    if (!linked?.userId || !data.qrRegistrationId || !data.qrTournamentId) {
-      await clearSession(telegramId);
-      await sendMessage(chatId, "اطلاعات پیوند دوستی ناقص است. دوباره /qr یا /clash_link را بزن.", removeKeyboard());
-      return;
-    }
-
-    const [registration] = await db
-      .select({
-        registrationId: registrations.id,
-        tournamentId: registrations.tournamentId,
-        tournamentName: tournaments.name,
-        game: tournaments.game,
-        entryFee: tournaments.entryFee,
-        categoryLabel: tournaments.categoryLabel,
-      })
-      .from(registrations)
-      .innerJoin(tournaments, eq(registrations.tournamentId, tournaments.id))
-      .where(and(eq(registrations.id, data.qrRegistrationId), eq(registrations.visibleUserId, linked.userId)))
-      .limit(1);
-
-    if (
-      !registration ||
-      registration.game !== "clash_royale" ||
-      registration.categoryLabel !== CLASH_1V1_CONFIG.categoryLabel ||
-      isFreeEntryFee(registration.entryFee)
-    ) {
-      await clearSession(telegramId);
-      await sendMessage(chatId, "این ثبت‌نام برای 1V1 کلش رویال معتبر نیست یا تورنومنت پولی کلش نیست.", removeKeyboard());
-      return;
-    }
-
-    const rawInput = normalizeDigits(message.caption || message.text || "").trim();
-    const extractedInvite = extractInviteReference(rawInput);
-    const inviteLink = isSupportedClashInvite(extractedInvite) ? extractedInvite : null;
-
-    if (!inviteLink) {
-      await sendMessage(chatId, [
-        "❌ پیوند دوستی معتبر پیدا نشد.",
-        "",
-        "در Clash Royale برو به:",
-        "<code>اجتماعی → افزودن دوست (+) → اشتراک‌گذاری پیوند</code>",
-        "سپس پیوند رسمی <code>link.clashroyale.com/invite/friend</code> را بفرست.",
-        "⚠️ عکس QR پذیرفته نمی‌شود.",
-        "",
-        "برای لغو، «لغو» را بزن.",
-      ].join("\n"));
-      return;
-    }
-
-    await db
-      .update(registrations)
-      .set({
-        gameInviteLink: inviteLink,
-        gameInviteQrFileId: null,
-        gameInviteSubmittedAt: new Date(),
-      })
-      .where(eq(registrations.id, registration.registrationId));
-
+    // Legacy session state from the old registration-based flow. Clear it and
+    // redirect to the current atomic queue flow which owns payment + QR +
+    // matchmaking. This prevents users stuck in the dead flow from "nothing
+    // happening" after a deploy.
     await clearSession(telegramId);
-    await sendMessage(
-      chatId,
-      [
-        "✅ پیوند دوستی 1V1 کلش رویال شما ثبت شد.",
-        "",
-        "اکنون در صف هستی. هر وقت یک بازیکن دیگر آماده شود، بات پیوند دوستی شما را برای یکدیگر می‌فرستد.",
-      ].join("\n"),
-      removeKeyboard()
-    );
-
-    const pairs = await tryAutoPairClashTournament(registration.tournamentId);
-    await notifyClashPairs(pairs);
-    return;
+    return openClash1v1Queue(chatId, telegramId);
   }
 
 
@@ -3813,7 +3720,9 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data.startsWith("clash1v1:qr:")) return promptClash1v1Qr(chatId, telegramId, data.replace("clash1v1:qr:", ""));
   if (data.startsWith("clash1v1:ready:")) return markClash1v1Ready(chatId, telegramId, data.replace("clash1v1:ready:", ""));
   if (data.startsWith("clash1v1:cancel:")) return cancelClash1v1Queue(chatId, telegramId, data.replace("clash1v1:cancel:", ""));
-  if (data.startsWith("qr:")) return startClashQrSubmission(chatId, telegramId, data.replace("qr:", ""));
+  // Legacy QR callback. The 1V1 product is a single global queue, so route to
+  // the atomic queue flow rather than the dead "find registration" path.
+  if (data.startsWith("qr:")) return openClash1v1Queue(chatId, telegramId);
   if (data === "menu:checkin") return checkInCommand(chatId, telegramId);
   if (data === "menu:affiliate") return affiliateCommand(chatId, telegramId);
   if (data === "menu:missions") { if (!(await ensureFeatureEnabled(chatId, "telegram_missions_enabled", "مأموریت‌ها"))) return; return missionsCommand(chatId, telegramId); }

@@ -354,6 +354,11 @@ export default function AdminTournamentsPage() {
             <input className="gaming-input" placeholder="نفر دوم" value={form.prize2nd} onChange={(e) => setForm({ ...form, prize2nd: e.target.value })} />
             <input className="gaming-input" placeholder="نفر سوم" value={form.prize3rd} onChange={(e) => setForm({ ...form, prize3rd: e.target.value })} />
             <input className="gaming-input" placeholder="نفرات ۴ تا ۱۰" value={form.prize4to10} onChange={(e) => setForm({ ...form, prize4to10: e.target.value })} />
+            {isSystemClash1v1Form() ? (
+              <div className="md:col-span-2 gaming-card p-4 bg-cyan-400/10 border-cyan-400/30 text-sm leading-7 text-cyan-100">
+                🤖 <b>این محصول خودکار است و روم ندارد.</b> Room ID، Password و زمان نمایش روم توسط بات مدیریت نمی‌شوند؛ ثبت‌نام، پرداخت و مچ‌میکینگ فقط در بات تلگرام انجام می‌شود.
+              </div>
+            ) : (
             <div className="md:col-span-2 gaming-card p-4 bg-dark-800/60 border-neon-blue/20">
               <h3 className="font-black text-neon-blue mb-3">🎮 اطلاعات لابی / روم بازی</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -364,6 +369,7 @@ export default function AdminTournamentsPage() {
               </div>
               <p className="text-[11px] text-gray-500 mt-3 leading-6">اگر زمان نمایش را خالی بگذاری، اطلاعات روم ۳۰ دقیقه قبل از شروع برای شرکت‌کنندگان نمایش داده می‌شود. ادمین‌ها همیشه می‌بینند.</p>
             </div>
+            )}
             <textarea className="gaming-input min-h-24 md:col-span-2" placeholder="توضیحات" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
             <textarea className="gaming-input min-h-28 md:col-span-2" placeholder="قوانین" value={form.rules} onChange={(e) => setForm({ ...form, rules: e.target.value })} />
             <div className="md:col-span-2 flex flex-col sm:flex-row gap-3">
