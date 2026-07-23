@@ -4,6 +4,7 @@ export const CLASH_1V1_CONFIG = {
   game: "clash_royale" as const,
   format: "single_elimination" as const,
   status: "registration" as const,
+  // This is a system matchmaking queue, not a manually hosted tournament room.
   maxPlayers: 1000,
   entryFee: "50,000 تومان",
   entryFeeToman: 50_000,
@@ -11,13 +12,13 @@ export const CLASH_1V1_CONFIG = {
   prize1st: "80,000 تومان",
   prizeToman: 80_000,
   gameMode: "1V1 Friendly Battle",
-  mapName: "Arena",
+  mapName: "Clash Royale — بدون Room ID یا Password",
   description:
-    "رقابت 1V1 کلش رویال با حریف تصادفی یا دعوت خصوصی دوست، در حالت رایگان یا پولی و مودهای معمولی، انتخاب کارت، Triple Draft و Sudden Death. نتیجه و مود با Battle Log بررسی می‌شوند.",
+    "مسابقه پولی 1V1 کلش رویال با حریف تصادفی. هر بازیکن ۵۰٬۰۰۰ تومان ورودی پرداخت می‌کند؛ پس از ثبت پیوند/QR دوستی رسمی کلش رویال، بات دو بازیکن آماده را خودکار به هم متصل می‌کند. جایزه برنده ۸۰٬۰۰۰ تومان است.",
   rules:
-    "• فقط Player Tag تأییدشده خودتان مجاز است.\n• نوع حریف، رایگان/پولی بودن و مود بازی پیش از ورود مشخص می‌شود.\n• در بازی با دوست، تا توافق دو طرف روی مود هیچ مبلغی کسر نمی‌شود.\n• بعد از توافق، QR یا «اشتراک‌گذاری پیوند» رسمی کلش رویال را برای بات بفرستید.\n• در صف تصادفی فقط بازیکنان دارای نوع مالی و مود یکسان به هم معرفی می‌شوند.\n• هر دو بازیکن نتیجه را مستقل ثبت می‌کنند؛ Battle Log نتیجه و مود انجام‌شده را بررسی می‌کند.\n• مود اشتباه در رقابت پولی به داوری می‌رود و در رقابت رایگان نیاز به تکرار دارد.\n• جایزه هر 1V1 پولی: ۸۰,۰۰۰ تومان.",
+    "• این بخش روم یا براکت چندنفره نیست؛ هر ورود به صف فقط یک مسابقه مستقل 1V1 است.\n• ورودی هر نفر ۵۰٬۰۰۰ تومان و جایزه برنده ۸۰٬۰۰۰ تومان است.\n• فقط Player Tag تأییدشده خودتان مجاز است.\n• بعد از پرداخت، QR یا «اشتراک‌گذاری پیوند» رسمی Clash Royale را برای بات بفرستید.\n• بات فقط دو بازیکن آماده را به‌صورت خودکار انتخاب و پیوند/QR آن‌ها را برای یکدیگر ارسال می‌کند.\n• مسابقه در Friendly Battle معمولی 1V1 برگزار می‌شود.\n• هر دو بازیکن نتیجه را ثبت می‌کنند و Battle Log برای داوری استفاده می‌شود.",
   lobbyNotes:
-    "این حالت نیاز به Room ID یا Password ندارد. بات QR یا پیوند دوستی دو حریف را برای یکدیگر ارسال می‌کند.",
+    "این محصول روم دستی ندارد. Room ID و Password نباید وارد شود؛ بات تلگرام پس از پرداخت و دریافت QR/پیوند دوستی، حریف را خودکار پیدا می‌کند.",
 } as const;
 
 /** The 1V1 category is matchmaking-only, never a manually hosted room. */
@@ -46,7 +47,7 @@ export function normalizeClash1v1QueueSettings<T extends Record<string, unknown>
     roomId: null,
     roomPassword: null,
     roomVisibleAt: null,
-  } as T & Record<string, unknown>;
+  };
 }
 
 export function isClash1v1QueueTournament(tournament?: {

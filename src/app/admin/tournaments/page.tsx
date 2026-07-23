@@ -14,6 +14,7 @@ import {
   CLASH_PRIVATE_DRAFT_RULES,
   CLASH_PRIVATE_DRAFT_VENUE,
 } from "@/lib/clash-private-tournament";
+import { CLASH_1V1_CONFIG } from "@/lib/clash-1v1-config";
 
 type GameId = "clash_royale" | "cod_mobile" | "fortnite";
 type FormatId = "single_elimination" | "double_elimination" | "round_robin";
@@ -215,6 +216,10 @@ export default function AdminTournamentsPage() {
     setShowForm(true);
   }
 
+  function isSystemClash1v1Form() {
+    return form.categoryLabel === CLASH_1V1_CONFIG.categoryLabel;
+  }
+
   async function save(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -279,15 +284,51 @@ export default function AdminTournamentsPage() {
 
         {showForm && (
           <form onSubmit={save} className="gaming-card p-4 sm:p-5 mb-8 grid grid-cols-1 md:grid-cols-2 gap-4 animate-slide-up">
-            <input className="gaming-input" placeholder="نام تورنومنت" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+            <input className="gaming-input" placeholder="نام تورنومنت" value={form.name} readOnly={isSystemClash1v1Form()} onChange={(e) => setForm({ ...form, name: e.target.value })} />
             <input className="gaming-input" placeholder="لینک تصویر بنر" value={form.bannerUrl} onChange={(e) => setForm({ ...form, bannerUrl: e.target.value })} />
-            <select className="gaming-select" value={form.game} onChange={(e) => changeGame(e.target.value as GameId)}>{games.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}</select>
-            <select className="gaming-select" value={form.format} disabled={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY} onChange={(e) => setForm({ ...form, format: e.target.value as FormatId })}>{formats.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
-            <select className="gaming-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
+            <div className="md:col-span-2 rounded-xl border border-cyan-400/30 bg-cyan-400/10 p-4 text-sm leading-7 text-cyan-100">
+              <b>⚔️ محصول خودکار 1V1 کلش رویال</b><br />
+              این گزینه <b>روم نمی‌سازد</b>. ورودی هر نفر ۵۰٬۰۰۰ تومان و جایزه برنده ۸۰٬۰۰۰ تومان است؛ ثبت‌نام، پرداخت، دریافت QR/Share Link و مچ‌کردن دو بازیکن فقط توسط بات تلگرام انجام می‌شود.
+              <button
+                type="button"
+                className="mt-3 gaming-btn text-xs"
+                onClick={() => setForm({
+                  ...form,
+                  id: "",
+                  name: CLASH_1V1_CONFIG.name,
+                  game: "clash_royale",
+                  format: "single_elimination",
+                  status: "registration",
+                  categoryLabel: CLASH_1V1_CONFIG.categoryLabel,
+                  maxPlayers: CLASH_1V1_CONFIG.maxPlayers,
+                  serverSlots: 2,
+                  winnersCount: 1,
+                  entryFee: CLASH_1V1_CONFIG.entryFee,
+                  prizePool: CLASH_1V1_CONFIG.prizePool,
+                  prize1st: CLASH_1V1_CONFIG.prize1st,
+                  prize2nd: "",
+                  prize3rd: "",
+                  prize4to10: "",
+                  gameMode: CLASH_1V1_CONFIG.gameMode,
+                  mapName: CLASH_1V1_CONFIG.mapName,
+                  description: CLASH_1V1_CONFIG.description,
+                  rules: CLASH_1V1_CONFIG.rules,
+                  lobbyNotes: CLASH_1V1_CONFIG.lobbyNotes,
+                  roomId: "",
+                  roomPassword: "",
+                  roomVisibleAt: "",
+                })}
+              >
+                ⚙️ تنظیم فرم به 1V1 خودکار — ۵۰K / ۸۰K
+              </button>
+            </div>
+            <select className="gaming-select" value={form.game} disabled={isSystemClash1v1Form()} onChange={(e) => changeGame(e.target.value as GameId)}>{games.map((g) => <option key={g.id} value={g.id}>{g.icon} {g.name}</option>)}</select>
+            <select className="gaming-select" value={form.format} disabled={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY || isSystemClash1v1Form()} onChange={(e) => setForm({ ...form, format: e.target.value as FormatId })}>{formats.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}</select>
+            <select className="gaming-select" value={form.status} disabled={isSystemClash1v1Form()} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statuses.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
             <input className="gaming-input" title="زمان شروع" type="datetime-local" value={form.startDate} onChange={(e) => setForm({ ...form, startDate: e.target.value })} />
             <input className="gaming-input" title="زمان پایان" type="datetime-local" value={form.endDate} onChange={(e) => setForm({ ...form, endDate: e.target.value })} />
-            <input className="gaming-input" placeholder="مود بازی" value={form.gameMode} readOnly={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY} onChange={(e) => setForm({ ...form, gameMode: e.target.value })} />
-            <input className="gaming-input" placeholder="محل برگزاری" value={form.mapName} readOnly={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY} onChange={(e) => setForm({ ...form, mapName: e.target.value })} />
+            <input className="gaming-input" placeholder="مود بازی" value={form.gameMode} readOnly={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY || isSystemClash1v1Form()} onChange={(e) => setForm({ ...form, gameMode: e.target.value })} />
+            <input className="gaming-input" placeholder="محل برگزاری" value={form.mapName} readOnly={form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY || isSystemClash1v1Form()} onChange={(e) => setForm({ ...form, mapName: e.target.value })} />
             {form.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY ? (
               <select
                 className="gaming-select md:col-span-2"

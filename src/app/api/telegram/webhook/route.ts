@@ -449,7 +449,7 @@ async function registerStart(chatId: number, telegramId: string) {
   await setSession(telegramId, "idle", {});
   await sendMessage(
     chatId,
-    "🎮 <b>پیش‌ثبت‌نام تلگرامی Gament</b>\n\nبازی موردنظر را انتخاب کن.\n\nنکته: ثبت‌نام قطعی و پرداخت ورودی احتمالی از داخل وب‌اپ انجام می‌شود.",
+    "🎮 <b>پیش‌ثبت‌نام تلگرامی Gament</b>\n\nبازی موردنظر را انتخاب کن.\n\nبرای مسابقه <b>1V1 کلش رویال</b> ثبت‌نام و پرداخت واقعی مستقیم از همین بات انجام می‌شود؛ از دکمه ⚔️ 1V1 کلش رویال در منوی اصلی یا دستور /clash استفاده کن.",
     gameKeyboard()
   );
 }
@@ -3258,6 +3258,12 @@ async function handleCommand(message: TelegramMessage, text: string) {
   if (normalizedCommand === "/my_tickets") return myTicketsCommand(chatId, telegramId);
   if (normalizedCommand === "/matches") return matchesCommand(chatId, telegramId);
   if (["/clash_tournament", "/clash_multi"].includes(normalizedCommand)) return clashPrivateTournamentsCommand(chatId, telegramId);
+  // Direct entry point for the paid 1V1 product.  This deliberately bypasses
+  // the old generic tournament pre-registration flow: after rules acceptance
+  // it deducts 50,000 تومان from the wallet and asks for the Clash friend link.
+  if (["/clash_join", "/clash_register", "/join_1v1"].includes(normalizedCommand)) {
+    return registerClash1v1Queue(chatId, telegramId, { stakeMode: "paid", gameMode: "normal" });
+  }
   if (["/qr", "/clash_qr", "/clash_link", "/clash", "/clash_1v1", "/1v1"].includes(normalizedCommand)) {
     const tournamentId = args.join(" ").match(/[0-9a-f-]{36}/i)?.[0];
     return tournamentId ? startClashQrSubmission(chatId, telegramId, tournamentId) : openClash1v1Queue(chatId, telegramId);
@@ -3765,6 +3771,10 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:my_tournaments") return myTournamentsCommand(chatId, telegramId);
   if (data === "menu:matches") return matchesCommand(chatId, telegramId);
   if (data === "menu:clash_private") return clashPrivateTournamentsCommand(chatId, telegramId);
+  // One clear purchase path for the product: 50K entry, normal Friendly Battle,
+  // automatic random opponent.  The first tap shows the rules; after accepting
+  // them the same action debits the wallet and opens QR/link submission.
+  if (data === "clash1v1:quick_register") return registerClash1v1Queue(chatId, telegramId, { stakeMode: "paid", gameMode: "normal" });
   if (data === "clash1v1:rules:accept") return acceptClash1v1Rules(chatId, telegramId);
   if (data === "clash1v1:rules:show") return sendClash1v1Rules(chatId, telegramId, false);
   if (data.startsWith("clash1v1:opponent:")) {

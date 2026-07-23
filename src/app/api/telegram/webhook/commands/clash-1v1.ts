@@ -34,7 +34,7 @@ import {
 
 const QUEUE_LOCK_ID = 7_100_171;
 const RECENT_INVITE_REUSE_MS = 24 * 60 * 60 * 1000;
-export const CLASH_1V1_RULES_VERSION = "2026-07-friend-modes-v1";
+export const CLASH_1V1_RULES_VERSION = "2026-07-paid-random-v1";
 
 function clash1v1RulesAcceptanceKey(telegramId: string) {
   return `clash1v1:rules:${CLASH_1V1_RULES_VERSION}:${telegramId}`;
@@ -44,17 +44,14 @@ export async function sendClash1v1Rules(chatId: number, telegramId: string, requ
   await sendMessage(chatId, [
     "📜 <b>قوانین رقابت 1V1 کلش رویال</b>",
     "",
-    "1) فقط Player Tag تأییدشده و متعلق به خود بازیکن مجاز است.",
-    "2) نوع حریف، رایگان/پولی بودن و مود بازی قبل از Match مشخص می‌شود.",
-    "3) در بازی با دوست، تا توافق هر دو نفر روی مود هیچ مبلغی کسر نمی‌شود.",
-    "4) در صف تصادفی فقط بازیکنان با نوع مالی و مود یکسان به هم متصل می‌شوند.",
-    "5) ربات یک نفر را به‌عنوان میزبان مشخص می‌کند؛ میزبان موظف است دقیقاً همان مود توافق‌شده را انتخاب کند.",
-    "6) اگر میزبان مود اشتباه انتخاب کند، تخلف به ادمین ارسال و وجه مسابقه پولی تا تصمیم نهایی نگه داشته می‌شود.",
-    "7) فرد مسئول انتخاب مود اشتباه جریمه می‌شود؛ تصمیم ادمین می‌تواند شامل باخت فنی، عدم بازگشت ورودی یا تعلیق موقت از 1V1 باشد.",
-    "8) حریف نباید درخواست مود اشتباه را قبول کند و باید از دکمه «مشکل با حریف» گزارش بدهد.",
-    "9) مسابقه فقط بعد از زدن «آماده‌ام» توسط هر دو نفر و پیام رسمی شروع Match معتبر است.",
-    "10) نتیجه و مود انجام‌شده با Battle Log بررسی می‌شود؛ گزارش خلاف واقع تخلف است.",
-    "11) QR یا Share Link فقط برای افزودن حریف استفاده می‌شود و نباید اطلاعات حساب در چت ارسال شود.",
+    "1) این محصول یک صف خودکار است؛ روم، Room ID، Password یا براکت چندنفره ندارد.",
+    "2) ورودی هر نفر ۵۰٬۰۰۰ تومان و جایزه برنده ۸۰٬۰۰۰ تومان است.",
+    "3) فقط Player Tag تأییدشده و متعلق به خود بازیکن مجاز است.",
+    "4) بعد از پرداخت، Share Link یا عکس QR دوستی رسمی Clash Royale را برای بات بفرست.",
+    "5) بات دو بازیکن آماده را خودکار انتخاب می‌کند و پیوند/QR هر نفر را برای حریف می‌فرستد.",
+    "6) مسابقه فقط بعد از زدن «آماده‌ام» توسط هر دو نفر و پیام رسمی شروع Match معتبر است.",
+    "7) نتیجه با Battle Log بررسی می‌شود؛ گزارش خلاف واقع یا استفاده از حساب دیگر تخلف است.",
+    "8) QR یا Share Link فقط برای افزودن حریف است و نباید اطلاعات حساب در چت ارسال شود.",
     "",
     requireAcceptance ? "برای ادامه باید قوانین را بپذیری." : `نسخه قوانین: <code>${CLASH_1V1_RULES_VERSION}</code>`,
   ].join("\n"), requireAcceptance ? {
@@ -75,8 +72,12 @@ export async function recordClash1v1RulesAcceptance(telegramId: string) {
 
 export async function acceptClash1v1Rules(chatId: number, telegramId: string) {
   await recordClash1v1RulesAcceptance(telegramId);
-  await sendMessage(chatId, "✅ پذیرش قوانین ثبت شد.");
-  return openClash1v1Queue(chatId, telegramId, true);
+  await sendMessage(chatId, "✅ پذیرش قوانین ثبت شد. برای ثبت‌نام واقعی و پرداخت ورودی، دکمه زیر را بزن.", {
+    inline_keyboard: [
+      [{ text: `💳 پرداخت و ورود به صف — ${CLASH_1V1_CONFIG.entryFee}`, callback_data: "clash1v1:quick_register" }],
+      [{ text: "📦 وضعیت مسابقه من", callback_data: "clash1v1:status" }],
+    ],
+  });
 }
 
 interface QueueParticipant {
@@ -736,15 +737,14 @@ export async function openClash1v1Queue(chatId: number, telegramId: string, rule
       "⚔️ <b>1V1 کلش رویال</b>",
       "",
       `💳 ورودی هر نفر: <b>${html(CLASH_1V1_CONFIG.entryFee)}</b>`,
-      `🏆 جایزه نفر اول: <b>${html(CLASH_1V1_CONFIG.prize1st)}</b>`,
-      "🤖 حریف: انتخاب خودکار از صف بازیکنان آماده",
-      "🏟 این بخش روم/تورنومنت چندنفره نمی‌سازد؛ هر پرداخت یک مسابقه دونفره مستقل است.",
+      `🏆 جایزه برنده: <b>${html(CLASH_1V1_CONFIG.prize1st)}</b>`,
+      "🤖 حریف به‌صورت خودکار از صف بازیکنان آماده انتخاب می‌شود.",
+      "🏟 این بخش روم، Room ID، Password یا براکت چندنفره ندارد؛ هر پرداخت فقط یک مسابقه مستقل دو نفره است.",
       "",
-      "بعد از ثبت‌نام و پرداخت، QR یا Share Link دوستی را می‌فرستی و بات حریف هم‌مود را خودکار پیدا می‌کند.",
+      "۱) ثبت‌نام و پرداخت  ۲) ارسال QR/Share Link دوستی  ۳) اتصال خودکار به حریف",
     ].join("\n"), {
       inline_keyboard: [
-        [{ text: `💳 ثبت‌نام پولی — ${CLASH_1V1_CONFIG.entryFee}`, callback_data: "clash1v1:stake:random:paid" }],
-        [{ text: "👥 دعوت خصوصی دوست", callback_data: "clash1v1:opponent:friend" }],
+        [{ text: `💳 ثبت‌نام و پرداخت ${CLASH_1V1_CONFIG.entryFee}`, callback_data: "clash1v1:quick_register" }],
         [{ text: "📦 وضعیت مسابقه من", callback_data: "clash1v1:status" }],
         [{ text: "📜 قوانین 1V1", callback_data: "clash1v1:rules:show" }],
       ],
@@ -824,32 +824,37 @@ export async function registerClash1v1Queue(
     await ensureClash1v1QueueTournament();
     const linked = await getLinkedUserByTelegram(telegramId);
     if (!linked?.userId) return openClash1v1Queue(chatId, telegramId);
+
+    // A rule acknowledgement is intentionally required before money is
+    // debited. The quick-register button is shown again after acceptance.
+    const [acceptedRules] = await db.select({ id: telegramSentNotifications.id })
+      .from(telegramSentNotifications)
+      .where(eq(telegramSentNotifications.dedupeKey, clash1v1RulesAcceptanceKey(telegramId)))
+      .limit(1);
+    if (!acceptedRules) {
+      await sendClash1v1Rules(chatId, telegramId, true);
+      return;
+    }
+
     const suspendedUntil = await activeClash1v1Suspension(telegramId);
     if (suspendedUntil) {
       await sendMessage(chatId, `⛔ به‌دلیل جریمه ثبت‌شده، دسترسی شما به 1V1 تا <b>${html(suspendedUntil.toLocaleString("fa-IR", { timeZone: "Asia/Tehran" }))}</b> تعلیق است.`);
       return;
     }
     if (!linked.clashRoyaleId || linked.clashRoyaleStatus !== "verified") {
-      // Never leave a Telegram user at a dead-end: a step-by-step Persian
-      // guide plus Mini App + browser buttons so the user can verify the tag
-      // from inside Telegram and then return to /clash registration.
       await sendMessage(chatId, [
-        "👑 <b>Player Tag کلش رویال هنوز تأیید نشده</b>",
+        "👑 <b>Player Tag کلش رویال تأیید نشده</b>",
         "",
-        "برای ورود به صف 1V1 و گرفتن حریف، اول Player Tag خودت رو تأیید کن:",
-        "",
-        "۱) روی دکمه‌ی پایین بزن تا پروفایل باز بشه.",
-        "۲) فیلد <b>Player Tag کلش رویال</b> رو پر کن (مثل #2PP در بازی: پروفایل → بالای اسم).",
-        "۳) ذخیره کن؛ اسم بازیکن از Supercell تأیید می‌شه.",
-        "۴) برگرد اینجا و دوباره /qr رو بزن.",
-        "",
-        "بعد از تأیید، ورودی ۵۰٬۰۰۰ تومان از کیف پولت کسر می‌شه و در صف می‌گیری؛ به‌محض پیدا شدن حریف، بات QR/پیوند دوستیت رو براش می‌فرسته.",
+        "برای ثبت‌نام واقعی 1V1 باید اول تگ بازی تأیید شود:",
+        "۱) پروفایل را باز کن.",
+        "۲) Player Tag را وارد کن (مثل #2PP؛ داخل پروفایل بازی بالای نام بازیکن است).",
+        "۳) ذخیره کن تا از Supercell تأیید شود.",
+        "۴) به بات برگرد و «ثبت‌نام و پرداخت» را بزن.",
       ].join("\n"), {
         inline_keyboard: [
-          [{ text: "⚔️ ثبت و تأیید Player Tag", web_app: { url: `${APP_URL}/profile/edit` } }],
-          [{ text: "🌐 باز کردن در مرورگر", url: `${APP_URL}/profile/edit` }],
-          [{ text: "💳 شارژ کیف پول", callback_data: "menu:wallet" }],
-          [{ text: "🔁 دوباره امتحان کن", callback_data: "menu:clash_qr" }],
+          [{ text: "👑 ثبت و تأیید Player Tag", web_app: { url: `${APP_URL}/profile/edit` } }],
+          [{ text: "🌐 باز کردن پروفایل در مرورگر", url: `${APP_URL}/profile/edit` }],
+          [{ text: "⬅️ بازگشت به 1V1", callback_data: "menu:clash_qr" }],
         ],
       });
       return;

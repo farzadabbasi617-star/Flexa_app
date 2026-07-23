@@ -23,7 +23,7 @@ export function mainMenuKeyboard() {
     [{ text: "🎯 COD Arena — کاستوم‌روم کالاف", url: `${APP_URL}/cod-arena` }],
     [{ text: "💳 کیف پول", callback_data: "menu:wallet" }, { text: "🏆 تورنومنت‌های من", callback_data: "menu:my_tournaments" }],
     [{ text: "✅ چک‌این", callback_data: "menu:checkin" }, { text: "⚔️ مسابقات من", callback_data: "menu:matches" }],
-    [{ text: "⚔️ 1V1 کلش رویال (۵۰K)", callback_data: "menu:clash_qr" }, { text: "🏅 کلش چندنفره", callback_data: "menu:clash_private" }],
+    [{ text: "⚔️ 1V1 کلش رویال — ورود ۵۰K", callback_data: "clash1v1:quick_register" }, { text: "🏅 کلش چندنفره", callback_data: "menu:clash_private" }],
     [{ text: "🎯 مأموریت‌ها", callback_data: "menu:missions" }, { text: "🧠 کوییز روزانه", callback_data: "menu:quiz" }],
     [{ text: "🎁 درآمد از معرفی", callback_data: "mission:invite" }, { text: "📣 همکاری رسانه‌ای", callback_data: "menu:affiliate" }],
     [{ text: "📜 قوانین", callback_data: "menu:rules" }, { text: "🎧 پشتیبانی", callback_data: "menu:support" }],

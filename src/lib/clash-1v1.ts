@@ -51,6 +51,11 @@ async function createClash1v1Schema(client: any) {
   await client.execute(sql.raw(`ALTER TABLE clash_1v1_entries ADD COLUMN IF NOT EXISTS stake_mode varchar(16) NOT NULL DEFAULT 'paid';`));
   await client.execute(sql.raw(`ALTER TABLE clash_1v1_entries ADD COLUMN IF NOT EXISTS game_mode varchar(32) NOT NULL DEFAULT 'normal';`));
   await client.execute(sql.raw(`ALTER TABLE clash_1v1_entries ADD COLUMN IF NOT EXISTS challenge_id uuid;`));
+  // Older Neon databases may have been created from an early baseline where
+  // users.cr_status was missing.  The Telegram 1V1 path reads this field to
+  // ensure a submitted Player Tag has been verified, so repair it before any
+  // queue action rather than failing after the player presses the button.
+  await client.execute(sql.raw(`ALTER TABLE users ADD COLUMN IF NOT EXISTS cr_status verification_status DEFAULT 'unlinked';`));
   await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS clash_1v1_challenges (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     token_hash varchar(64) NOT NULL UNIQUE,
