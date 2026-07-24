@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface SiteImage {
   slug: string;
@@ -29,7 +30,9 @@ const customIcons: Record<string, string> = {
 
 export default function BottomNav() {
   const pathname = usePathname();
+  const { user } = useAuth();
   const [icons, setIcons] = useState<SiteImage[]>([]);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     // Was `cache: "no-store"`, which bypassed the server's Cache-Control
@@ -42,6 +45,26 @@ export default function BottomNav() {
       .then((data) => setIcons(Array.isArray(data) ? data : []))
       .catch(() => setIcons([]));
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadUnread() {
+      if (!user) {
+        setUnreadNotifications(0);
+        return;
+      }
+      try {
+        const response = await fetch("/api/notifications?limit=1", { cache: "no-store", credentials: "include" });
+        const data = await response.json().catch(() => ({}));
+        if (!cancelled && response.ok) setUnreadNotifications(Number(data.unreadCount || 0));
+      } catch {
+        if (!cancelled) setUnreadNotifications(0);
+      }
+    }
+    loadUnread();
+    const timer = setInterval(loadUnread, 60_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [user]);
 
   const iconMap = useMemo(() => {
     const map: Record<string, SiteImage> = {};
@@ -108,16 +131,19 @@ export default function BottomNav() {
                 isActive ? "bg-purple-500/10 text-purple-200" : "text-white/38 hover:text-white/70"
               }`}
             >
-              {finalIconUrl ? (
-                <img
-                  src={finalIconUrl}
-                  alt=""
-                  aria-hidden="true"
-                  className={`h-7 w-7 rounded-xl object-contain sm:h-8 sm:w-8 ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : "opacity-60"}`}
-                />
-              ) : (
-                <div className={`text-[24px] ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : ""}`}>{item.icon}</div>
-              )}
+              <span className="relative grid place-items-center">
+                {finalIconUrl ? (
+                  <img
+                    src={finalIconUrl}
+                    alt=""
+                    aria-hidden="true"
+                    className={`h-7 w-7 rounded-xl object-contain sm:h-8 sm:w-8 ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : "opacity-60"}`}
+                  />
+                ) : (
+                  <span className={`text-[24px] ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : ""}`}>{item.icon}</span>
+                )}
+                {item.id === "profile" && unreadNotifications > 0 && <span className="absolute -top-2 -end-2 min-w-4 h-4 rounded-full bg-red-500 px-1 text-[8px] font-black leading-4 text-white shadow-lg shadow-red-500/40">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}
+              </span>
               <span className="mt-1 max-w-[58px] truncate text-[9px] font-black leading-none">{item.label}</span>
             </Link>
           );
