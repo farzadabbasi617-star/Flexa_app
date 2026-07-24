@@ -30,10 +30,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const result = await settleCodRoom({ roomId: id, adminId: auth.user.id, ...parsed.data });
     await logAdminAction({
       adminId: auth.user.id,
-      action: "settle",
+      action: parsed.data.lobbyOverrideConfirmed ? "settle_override" : "settle",
       entityType: "cod_room",
       entityId: id,
-      metadata: { live: result.live, entryCount: result.entryCount, totalRewardRial: result.totalRewardRial, referralEventsCreated: result.referralEventsCreated },
+      metadata: {
+        live: result.live,
+        entryCount: result.entryCount,
+        totalRewardRial: result.totalRewardRial,
+        referralEventsCreated: result.referralEventsCreated,
+        lobbyOverride: Boolean(parsed.data.lobbyOverrideConfirmed),
+      },
       ipAddress: getClientIp(request.headers),
     });
     await Promise.all(result.participants.map((participant) => notifyLinkedUserOnTelegram(participant.userId, [
