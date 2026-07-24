@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { email, username, password, firstName, lastName, phoneNumber, birthDate, nationalId } = validation.data;
+    const { email, username, password, firstName, lastName, phoneNumber, birthDate, nationalId, riskAndAgeAccepted } = validation.data;
     // Public gamer identity and legal/KYC identity are deliberately separate.
     // The chosen username is public by default; first/last name stay private.
     const displayName = initialPublicDisplayName(username);
@@ -99,6 +99,13 @@ export async function POST(request: NextRequest) {
     // 4. Hash password.
     const hashedPassword = await hashPassword(password);
 
+    const registrationAcknowledgement = {
+      riskAndAgeAccepted,
+      acceptedAt: new Date().toISOString(),
+      statement: "User acknowledged tournament warnings/limitations and confirmed responsibility including 18+ declaration.",
+      version: "registration-risk-v1",
+    };
+
     // 5. Create (or reclaim an abandoned, never-verified) user + player
     // profile + empty wallet atomically. No session cookie yet — the
     // account only becomes usable after the email OTP is confirmed via
@@ -129,6 +136,7 @@ export async function POST(request: NextRequest) {
             isVerified: false,
             termsAcceptedAt: new Date(),
             termsVersion: TERMS_VERSION,
+            metadata: { registrationAcknowledgement },
           })
           .where(eq(users.id, existingByEmail.id))
           .returning();
@@ -161,6 +169,7 @@ export async function POST(request: NextRequest) {
             isVerified: false,
             termsAcceptedAt: new Date(),
             termsVersion: TERMS_VERSION,
+            metadata: { registrationAcknowledgement },
           })
           .returning();
 

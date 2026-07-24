@@ -49,7 +49,8 @@ interface AuthContextType {
     lastName: string,
     birthDate: string,
     nationalId: string,
-    termsAccepted: boolean
+    termsAccepted: boolean,
+    riskAndAgeAccepted: boolean
   ) => Promise<{ success: boolean; pendingVerification?: boolean; email?: string; error?: string }>;
   verifyEmailOtp: (email: string, code: string) => Promise<{ success: boolean; error?: string }>;
   resendEmailOtp: (email: string) => Promise<{ success: boolean; error?: string }>;
@@ -155,14 +156,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     lastName: string,
     birthDate: string,
     nationalId: string,
-    termsAccepted: boolean
+    termsAccepted: boolean,
+    riskAndAgeAccepted: boolean
   ) {
     try {
       const res = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders },
         credentials: "include",
-        body: JSON.stringify({ phoneNumber, email, username, password, firstName, lastName, birthDate, nationalId, termsAccepted }),
+        body: JSON.stringify({ phoneNumber, email, username, password, firstName, lastName, birthDate, nationalId, termsAccepted, riskAndAgeAccepted }),
       });
 
       const data = await res.json();

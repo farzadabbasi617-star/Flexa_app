@@ -1,16 +1,16 @@
 /**
  * Age-gate & light identity verification helpers.
  *
- * Product rule (Persian: «برای شرکت در تورنومنت‌های پولی و شارژ کیف پول باید
- * حداقل ۱۸ سال داشته باشید و کد ملی معتبر ثبت کرده باشید.»):
+ * Product rule:
  *
- *   1. Every real-money flow — paid tournament registration and wallet
- *      top-up — must call `assertUserCanTransact(user)` first.
- *   2. Free tournaments, login, browsing, chat, achievements, etc. are
- *      NOT gated. Under-18s can still enjoy the free side of the app.
- *   3. `birthDate` and `nationalId` are collected at signup for new users;
- *      legacy users are asked to fill them in before their first paid
- *      action (the API returns a specific error code so the UI can prompt).
+ *   1. Real-money flows require a complete identity profile (`birthDate` and
+ *      `nationalId`) so payments, refunds and fraud review have an owner.
+ *   2. The previous hard 18+ server-side block is intentionally removed.
+ *      Users acknowledge warnings and confirm 18+ responsibility during signup,
+ *      but the API no longer rejects a paid action solely because the computed
+ *      age is below 18.
+ *   3. Free tournaments, login, browsing, chat, achievements, etc. remain
+ *      accessible regardless of identity completion.
  *
  * This module is deliberately dependency-free: it takes plain values, so it
  * can be reused from route handlers, server actions and unit tests without
@@ -27,8 +27,7 @@ export type AgeGateResult =
       code:
         | "MISSING_BIRTH_DATE"
         | "MISSING_NATIONAL_ID"
-        | "INVALID_BIRTH_DATE"
-        | "UNDERAGE";
+        | "INVALID_BIRTH_DATE";
       message: string;
       ageYears?: number;
     };
@@ -115,20 +114,12 @@ export function checkAgeGate(user: {
     };
   }
   const ageYears = calculateAgeYears(parsed, now);
-  if (ageYears < MIN_ADULT_AGE) {
-    return {
-      ok: false,
-      code: "UNDERAGE",
-      message: `شرکت در تورنومنت‌های پولی و شارژ کیف پول فقط برای کاربران بالای ${MIN_ADULT_AGE} سال مجاز است.`,
-      ageYears,
-    };
-  }
   return { ok: true, ageYears };
 }
 
 /**
  * Convenience predicate for the UI (tournament card, buttons, banners).
- * Never surface financial actions when this returns false.
+ * False now means identity fields are missing/invalid, not that age is under 18.
  */
 export function isEligibleForPaidActions(user: {
   birthDate?: string | null;

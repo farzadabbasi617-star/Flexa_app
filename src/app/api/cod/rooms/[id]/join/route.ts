@@ -20,7 +20,7 @@ const errors: Record<string, { text: string; status: number }> = {
   COD_UID_ALREADY_JOINED: { text: "این UID کالاف قبلاً برای همین روم ثبت شده و امکان ورود با دو حساب وجود ندارد", status: 409 },
   COD_ROOM_FULL: { text: "ظرفیت این روم تکمیل شده است", status: 409 },
   COD_RANK_TOO_LOW: { text: "رنک COD Arena شما برای این روم کافی نیست", status: 403 },
-  COD_AGE_GATE_BLOCKED: { text: "روم پولی فقط برای حساب هویتی کامل و کاربران بالای ۱۸ سال فعال است", status: 403 },
+  COD_AGE_GATE_BLOCKED: { text: "برای روم پولی باید اطلاعات هویتی حساب کامل و معتبر باشد", status: 403 },
   COD_INSUFFICIENT_BALANCE: { text: "موجودی کیف پول برای ورود به این روم کافی نیست", status: 402 },
   COD_USER_TEMP_BANNED: { text: "حساب شما فعلاً از ورود به روم‌های COD Arena محروم است", status: 403 },
   COD_USER_PERMANENT_BANNED: { text: "حساب شما به‌صورت دائم از COD Arena محروم شده است", status: 403 },

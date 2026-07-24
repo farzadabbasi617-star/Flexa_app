@@ -3,7 +3,6 @@ import {
   calculateAgeYears,
   checkAgeGate,
   isEligibleForPaidActions,
-  MIN_ADULT_AGE,
   parseBirthDate,
 } from "./age-gate";
 
@@ -81,15 +80,11 @@ describe("checkAgeGate", () => {
     if (!r.ok) expect(r.code).toBe("INVALID_BIRTH_DATE");
   });
 
-  it("blocks under-18 users", () => {
-    // Born 2010-01-01, now 2026-07-08 → 16
+  it("allows under-18 users when identity fields are complete", () => {
+    // Born 2010-01-01, now 2026-07-08 → 16. Age is informational only.
     const r = checkAgeGate({ birthDate: "2010-01-01", nationalId: validNid }, FIXED_NOW);
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.code).toBe("UNDERAGE");
-      expect(r.ageYears).toBe(16);
-      expect(r.message).toContain(String(MIN_ADULT_AGE));
-    }
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.ageYears).toBe(16);
   });
 
   it("allows exactly-18 users", () => {
@@ -99,14 +94,11 @@ describe("checkAgeGate", () => {
     if (r.ok) expect(r.ageYears).toBe(18);
   });
 
-  it("blocks one-day-shy-of-18", () => {
+  it("allows one-day-shy-of-18 when identity fields are complete", () => {
     // Born 2008-07-09, now 2026-07-08 → 17 (birthday tomorrow)
     const r = checkAgeGate({ birthDate: "2008-07-09", nationalId: validNid }, FIXED_NOW);
-    expect(r.ok).toBe(false);
-    if (!r.ok) {
-      expect(r.code).toBe("UNDERAGE");
-      expect(r.ageYears).toBe(17);
-    }
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.ageYears).toBe(17);
   });
 
   it("allows well-over-18 users", () => {
@@ -123,7 +115,7 @@ describe("isEligibleForPaidActions", () => {
     ).toBe(true);
     expect(
       isEligibleForPaidActions({ birthDate: "2020-01-01", nationalId: "0018765412" })
-    ).toBe(false);
+    ).toBe(true);
     expect(isEligibleForPaidActions({ birthDate: null, nationalId: null })).toBe(false);
   });
 });

@@ -19,6 +19,7 @@ const validBase = {
   birthDate: "2000-05-14",
   nationalId: "0019553412", // valid Iranian NID checksum (test fixture only)
   termsAccepted: true,
+  riskAndAgeAccepted: true,
 };
 
 describe("RegisterSchema", () => {

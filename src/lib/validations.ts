@@ -56,10 +56,9 @@ const nationalIdSchema = z.preprocess(
 );
 
 // Birth date at signup: Gregorian ISO (YYYY-MM-DD). We ONLY accept a
-// well-formed past date; the age-gate itself (18+ enforcement for paid
-// flows) lives in `src/lib/age-gate.ts` — the schema deliberately allows
-// under-18 accounts to be created so those users can still use the free
-// side of the app. Financial flows do the age check separately.
+// well-formed past date. Paid flows use it as identity metadata; there is no
+// hard 18+ server-side block anymore. Users acknowledge the age/risk statement
+// separately via `riskAndAgeAccepted`.
 const registerBirthDateSchema = z.preprocess(
   (v) => (typeof v === "string" ? v.trim() : v),
   z
@@ -97,6 +96,7 @@ export const RegisterSchema = z.object({
   birthDate: registerBirthDateSchema,
   nationalId: nationalIdSchema,
   termsAccepted: z.boolean().refine((value) => value === true, "پذیرش قوانین و مقررات گیمنت الزامی است"),
+  riskAndAgeAccepted: z.boolean().refine((value) => value === true, "تأیید هشدارها، محدودیت‌ها و اعلام مسئولیت سنی الزامی است"),
 });
 
 export const EmailOtpRequestSchema = z.object({

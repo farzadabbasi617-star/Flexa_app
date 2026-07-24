@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { users } from "@/db/schema";
+import { notifications, users } from "@/db/schema";
 import { eq, sql } from "drizzle-orm";
 
 /**
@@ -24,6 +24,16 @@ export const LevelingService = {
         level: newLevel
       })
       .where(eq(users.id, userId));
+
+    if (newLevel > (user.level ?? 1)) {
+      await tx.insert(notifications).values({
+        userId,
+        type: "level_up",
+        title: "لول‌آپ شدی!",
+        message: `تبریک! سطح شما از ${user.level ?? 1} به ${newLevel} رسید. مأموریت‌ها و رقابت‌های جدید را دنبال کن.`,
+        link: "/achievements",
+      });
+    }
 
     return { xp: newXP, level: newLevel };
   },

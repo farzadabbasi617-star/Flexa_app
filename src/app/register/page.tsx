@@ -32,6 +32,7 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
     termsAccepted: false,
+    riskAndAgeAccepted: false,
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
@@ -108,6 +109,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (!form.riskAndAgeAccepted) {
+      setError("برای ثبت‌نام، مطالعه و تأیید اخطارها، محدودیت‌ها و اعلام مسئولیت سنی الزامی است.");
+      return;
+    }
+
     setLoading(true);
 
     const result = await register(
@@ -119,7 +125,8 @@ export default function RegisterPage() {
       form.lastName.trim(),
       form.birthDate.trim(),
       form.nationalId.replace(/\D/g, ""),
-      form.termsAccepted
+      form.termsAccepted,
+      form.riskAndAgeAccepted
     );
 
     if (result.success) {
@@ -381,9 +388,9 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            {/* Age gate: birth date + Iranian national ID. Required at signup
-                because paid tournament registration and wallet top-up need
-                a verified 18+ user. Free features remain accessible either way. */}
+            {/* Identity metadata: birth date + Iranian national ID. Required at
+                signup so paid actions, wallet reviews and fraud checks have a
+                verified account owner. Age is acknowledged below, not hard-blocked. */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm text-gray-400 mb-2">
@@ -397,23 +404,12 @@ export default function RegisterPage() {
                   const parsed = parseBirthDate(form.birthDate);
                   if (!parsed) return null;
                   const age = calculateAgeYears(parsed);
-                  const isAdult = age >= MIN_ADULT_AGE;
                   return (
-                    <p className={`text-[11px] mt-1.5 leading-5 ${isAdult ? "text-emerald-400" : "text-amber-400"}`}>
+                    <p className="text-[11px] mt-1.5 leading-5 text-gray-500">
                       {lang === "fa" ? (
-                        <>
-                          سن: <b>{age.toLocaleString("fa-IR")} سال</b>
-                          {isAdult
-                            ? " — امکان شرکت در تورنومنت‌های پولی و شارژ کیف پول را دارید."
-                            : ` — تا رسیدن به ${MIN_ADULT_AGE} سالگی فقط می‌توانید در تورنومنت‌های رایگان شرکت کنید.`}
-                        </>
+                        <>سن ثبت‌شده: <b>{age.toLocaleString("fa-IR")} سال</b>. محدودیت سنی خودکار برای پرداخت اعمال نمی‌شود؛ مسئولیت صحت اعلام سن با کاربر است.</>
                       ) : (
-                        <>
-                          Age: <b>{age}</b>
-                          {isAdult
-                            ? " — you can join paid tournaments and top up the wallet."
-                            : ` — until ${MIN_ADULT_AGE}, only free tournaments are available.`}
-                        </>
+                        <>Registered age: <b>{age}</b>. No automatic age block is applied; the user is responsible for the age declaration.</>
                       )}
                     </p>
                   );
@@ -481,6 +477,26 @@ export default function RegisterPage() {
               )}
             </div>
 
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs leading-7 text-amber-100">
+              <h2 className="mb-2 font-black text-amber-300">توضیحات، اخطارها و محدودیت‌های مهم</h2>
+              <ul className="list-disc space-y-1 pr-5">
+                <li>مسابقات Gament مهارتی هستند و نتیجه بر اساس عملکرد، قوانین روم و تصمیم داوری تعیین می‌شود.</li>
+                <li>پرداخت ورودی، شارژ کیف پول و دریافت جایزه باید مطابق قوانین، توضیحات هر روم و وضعیت کیف پول انجام شود.</li>
+                <li>در صورت تقلب، تیم‌آپ، ورود با اکانت غیرمجاز، نداشتن مدرک یا نقض قوانین، امکان جریمه، بن یا ابطال نتیجه وجود دارد.</li>
+                <li>مسئولیت صحت اطلاعات هویتی، UID بازی، شماره تماس، ایمیل و دسترسی به حساب با کاربر است.</li>
+                <li>با تأیید این بخش اعلام می‌کنید که حداقل {MIN_ADULT_AGE} سال دارید یا مسئولیت قانونی استفاده از سرویس را می‌پذیرید.</li>
+              </ul>
+              <label className="mt-4 flex cursor-pointer select-none items-start gap-3 rounded-xl border border-amber-400/30 bg-black/20 p-3">
+                <input
+                  type="checkbox"
+                  className="mt-1 h-5 w-5 accent-amber-500"
+                  checked={form.riskAndAgeAccepted}
+                  onChange={(e) => setForm({ ...form, riskAndAgeAccepted: e.target.checked })}
+                />
+                <span>همه اخطارها و محدودیت‌ها را خوانده‌ام و تأیید می‌کنم که بالای {MIN_ADULT_AGE} سال هستم / مسئولیت اعلام سن و استفاده از سرویس را می‌پذیرم.</span>
+              </label>
+            </div>
+
             <label className="flex items-start gap-3 bg-dark-800/70 border border-gaming-border rounded-2xl p-4 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -502,6 +518,7 @@ export default function RegisterPage() {
               disabled={
                 loading ||
                 !form.termsAccepted ||
+                !form.riskAndAgeAccepted ||
                 !isPasswordStrong(form.password) ||
                 form.password !== form.confirmPassword
               }

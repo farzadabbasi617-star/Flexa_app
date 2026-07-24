@@ -3,6 +3,7 @@ import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { honorContentLikes, honorContentViews, honorLikes, honorViews, honors, telegramSentNotifications } from "@/db/schema";
 import { fetchAIResponse, isUsableAISecret, normalizeAIEnvValue } from "@/lib/ai-provider-manager";
+import { notifyAllUsersInApp } from "@/lib/app-notifications";
 import { gamentSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import {
@@ -617,6 +618,13 @@ ${sourcesText}
     },
   }).returning();
   await markGenerated(sourceKey);
+  await notifyAllUsersInApp({
+    type: "news",
+    title: "خبر جدید گیمینگ",
+    message: title,
+    link: `/honors/${created.id}`,
+    dedupeKey: `app-news:${created.id}`,
+  }).catch((err) => logger.warn({ err, honorId: created.id }, "Failed to create app notifications for generated news"));
   logger.info({ honorId: created.id, title, game, sources: items.length }, "Generated daily game news");
   return { generated: true as const, honorId: created.id, title, game, sources: items.length, provider: ai.provider };
 }

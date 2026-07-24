@@ -18,6 +18,7 @@ import { resolveMatchResultClaims, type MatchResultClaimValue } from "@/lib/matc
 import { clashBattleMatchesExpectedMode, isClashDuelGameMode } from "@/lib/clash-duel-policy";
 import { getClashRoyaleApiConfiguration, normalizeClashRoyaleTag, verifyClashRoyaleHeadToHead } from "@/lib/clash-royale-api";
 import { processStoreOrderDeadlines } from "@/lib/store-service";
+import { notifyUsersInApp } from "@/lib/app-notifications";
 import { ensureAffiliateSchema, processAffiliateCommissions } from "@/lib/affiliate-service";
 import { ensureCodArenaSchema } from "@/lib/cod-room-service";
 import { advanceCodRoomLifecycle } from "@/lib/cod-room-lifecycle";
@@ -106,6 +107,40 @@ async function sendReminders() {
         { inline_keyboard: keyboard }
       );
       await markSent(key, "reminder", tournament.id, recipient.telegramId);
+      sent += 1;
+    }
+  }
+  return sent;
+}
+
+async function sendAppTournamentReminders() {
+  const now = Date.now();
+  const futureLimit = new Date(now + 24 * 60 * 60 * 1000 + 5 * 60 * 1000);
+  const rows = await db.select().from(tournaments).where(inArray(tournaments.status, ["registration", "in_progress"]));
+  let sent = 0;
+
+  for (const tournament of rows) {
+    if (!tournament.startDate) continue;
+    const startTime = new Date(tournament.startDate).getTime();
+    if (!Number.isFinite(startTime) || startTime < now || startTime > futureLimit.getTime()) continue;
+    const minutes = Math.round((startTime - now) / 60000);
+    const bucket = minutes <= 16 ? 15 : minutes <= 35 ? 30 : minutes <= 65 ? 60 : minutes <= 24 * 60 + 5 ? 1440 : 0;
+    if (!bucket) continue;
+
+    const recipients = await db.select({ userId: registrations.visibleUserId, checkedInAt: registrations.checkedInAt }).from(registrations).where(eq(registrations.tournamentId, tournament.id));
+    for (const recipient of recipients) {
+      const key = `app-reminder:${bucket}:${tournament.id}:${recipient.userId}`;
+      if (await hasSent(key)) continue;
+      const isPrivateClash = tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY;
+      const checkInOpen = isPrivateClash && bucket <= 30 && !recipient.checkedInAt;
+      await notifyUsersInApp({
+        userIds: [recipient.userId],
+        type: "tournament_reminder",
+        title: "یادآوری تورنمنت",
+        message: `${tournament.name} حدود ${bucket === 1440 ? "۲۴ ساعت" : `${bucket} دقیقه`} دیگر شروع می‌شود.${checkInOpen ? " چک‌این باز شده؛ حضور خود را ثبت کن." : ""}`,
+        link: `/tournaments/${tournament.id}`,
+      });
+      await markSent(key, "app_reminder", tournament.id);
       sent += 1;
     }
   }
@@ -205,6 +240,35 @@ async function sendCodRoomNotices() {
           sent += 1;
         }
       }
+    }
+  }
+  return sent;
+}
+
+async function sendAppCodRoomReminders() {
+  const now = Date.now();
+  const rooms = await db.select().from(codRooms).where(and(
+    eq(codRooms.isPublished, true),
+    inArray(codRooms.status, ["registration", "check_in", "lobby_open", "in_progress"]),
+  ));
+  let sent = 0;
+  for (const room of rooms) {
+    const minutes = Math.round((room.startsAt.getTime() - now) / 60_000);
+    const reminderBucket = minutes > 45 && minutes <= 65 ? 60 : minutes > 8 && minutes <= 18 ? 15 : 0;
+    if (!reminderBucket) continue;
+    const recipients = await db.select({ userId: codRoomEntries.userId, checkedInAt: codRoomEntries.checkedInAt }).from(codRoomEntries).where(eq(codRoomEntries.roomId, room.id));
+    for (const recipient of recipients) {
+      const key = `app-cod-room-reminder:${room.id}:${reminderBucket}:${recipient.userId}`;
+      if (await hasSent(key)) continue;
+      await notifyUsersInApp({
+        userIds: [recipient.userId],
+        type: "cod_room_reminder",
+        title: "یادآوری COD Arena",
+        message: `${room.title} حدود ${reminderBucket} دقیقه دیگر شروع می‌شود.${recipient.checkedInAt ? " حضور شما تأیید شده است." : " لطفاً Check-in را انجام بده."}`,
+        link: `/cod-arena/${room.id}`,
+      });
+      await markSent(key, "app_cod_room_reminder");
+      sent += 1;
     }
   }
   return sent;
@@ -773,6 +837,8 @@ export async function GET(request: NextRequest) {
   // pending rows from PostgreSQL without losing messages.
   const outboxBefore = await safeCronStep("outboxBefore", () => processTelegramOutbox(25));
   const reminders = await safeCronStep("reminders", sendReminders);
+  const appReminders = await safeCronStep("appReminders", sendAppTournamentReminders);
+  const appCodRoomReminders = await safeCronStep("appCodRoomReminders", sendAppCodRoomReminders);
   const capacity = await safeCronStep("capacity", sendCapacityAlerts);
   const lobby = await safeCronStep("lobby", sendLobbyNotices);
   const codRoomNotices = await safeCronStep("codRoomNotices", sendCodRoomNotices);
@@ -804,6 +870,8 @@ export async function GET(request: NextRequest) {
     outboxAfter,
     reliabilityCleanup,
     reminders,
+    appReminders,
+    appCodRoomReminders,
     capacity,
     lobby,
     codRoomNotices,

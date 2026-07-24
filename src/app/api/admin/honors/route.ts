@@ -5,6 +5,7 @@ import { validateAdmin } from "@/lib/auth";
 import { desc, eq, inArray, sql } from "drizzle-orm";
 import logger from "@/lib/logger";
 import { publishHonorToTelegramChannel } from "@/lib/telegram";
+import { notifyAllUsersInApp } from "@/lib/app-notifications";
 import { isTrustedArticleImage, isTrustedArticleUrl, type GamingNewsGame } from "@/lib/gaming-news-sources";
 
 export const dynamic = "force-dynamic";
@@ -226,6 +227,15 @@ export async function POST(request: NextRequest) {
         imageUrl: created.imageUrl,
         highlight: created.highlight,
       }).catch((err) => logger.warn({ err, honorId: created.id }, "Failed to publish honor to Telegram"));
+      if (created.type === "news") {
+        await notifyAllUsersInApp({
+          type: "news",
+          title: "خبر جدید گیمینگ",
+          message: created.title,
+          link: `/honors/${created.id}`,
+          dedupeKey: `app-news:${created.id}`,
+        }).catch((err) => logger.warn({ err, honorId: created.id }, "Failed to create app news notifications"));
+      }
     }
 
     return NextResponse.json({ success: true, honor: { ...created, image: created.imageUrl } }, { status: 201 });
@@ -274,6 +284,15 @@ export async function PATCH(request: NextRequest) {
         imageUrl: updated.imageUrl,
         highlight: updated.highlight,
       }).catch((err) => logger.warn({ err, honorId: updated.id }, "Failed to publish approved honor to Telegram"));
+      if (updated.type === "news") {
+        await notifyAllUsersInApp({
+          type: "news",
+          title: "خبر جدید گیمینگ",
+          message: updated.title,
+          link: `/honors/${updated.id}`,
+          dedupeKey: `app-news:${updated.id}`,
+        }).catch((err) => logger.warn({ err, honorId: updated.id }, "Failed to create app news notifications"));
+      }
     }
     return NextResponse.json({ success: true, honor: { ...updated, image: updated.imageUrl } });
   } catch (err) {
