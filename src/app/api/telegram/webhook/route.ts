@@ -26,6 +26,7 @@ import {
   verifyClashRoyaleHeadToHead,
 } from "@/lib/clash-royale-api";
 import { rateLimit } from "@/lib/rate-limit";
+import { addCodRoomEvidence, reportCodRoomIssue } from "@/lib/cod-room-service";
 import logger from "@/lib/logger";
 import type { SessionData, TelegramCallbackQuery, TelegramMessage, TelegramUpdate, TelegramUser } from "./types";
 import { APP_URL, CANCEL_TEXT, CHANNEL_URL, DEFAULT_RULES, GAMENT_ID_REQUIRED, PLATFORM_OPTIONS, SKIP_TEXT } from "./config";
@@ -356,6 +357,18 @@ async function handleStartPayload(chatId: number, telegramId: string, user: Tele
     // Legacy deep-link path. The system 1V1 queue is a single global product,
     // so always route to the atomic queue instead of the dead registration flow.
     await openClash1v1Queue(chatId, telegramId);
+    return true;
+  }
+
+  const codEvidencePayload = payload.match(/^codE_([0-9a-f-]{36})_(scoreboard|recording|lobby_recording|dispute)$/i);
+  if (codEvidencePayload) {
+    await startCodEvidenceUpload(chatId, telegramId, codEvidencePayload[1], codEvidencePayload[2].toLowerCase());
+    return true;
+  }
+
+  const codReportPayload = payload.match(/^codR_([0-9a-f-]{36})_([a-z_]{3,32})$/i);
+  if (codReportPayload) {
+    await startCodReportUpload(chatId, telegramId, codReportPayload[1], codReportPayload[2].toLowerCase());
     return true;
   }
 
@@ -2050,6 +2063,99 @@ async function startEvidenceUpload(chatId: number, telegramId: string, matchId: 
   await sendMessage(chatId, "📎 لطفاً اسکرین‌شات نتیجه را به‌صورت عکس ارسال کن. کپشن اختیاری است.", replyKeyboard([[CANCEL_TEXT]]));
 }
 
+const COD_REPORT_CATEGORY_LABELS: Record<string, string> = {
+  cheat: "چیت / هک",
+  teaming: "تیم‌آپ",
+  no_recording: "نداشتن رکورد",
+  banned_item: "آیتم ممنوع",
+  toxic_behavior: "رفتار/فحاشی",
+  wrong_result: "نتیجه اشتباه",
+  no_show: "No-show",
+  other: "سایر",
+};
+
+const COD_EVIDENCE_KIND_LABELS: Record<string, string> = {
+  profile: "پروفایل",
+  scoreboard: "Scoreboard",
+  recording: "رکورد بازیکن",
+  lobby_recording: "رکورد Lobby",
+  dispute: "مدرک اعتراض",
+};
+
+async function startCodEvidenceUpload(chatId: number, telegramId: string, roomId: string, kind: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) return sendMessage(chatId, "برای ارسال مدرک COD ابتدا حساب تلگرام را با /link به Gament وصل کن.", {
+    inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }], [{ text: "مشاهده روم", url: `${APP_URL}/cod-arena/${roomId}` }]],
+  });
+  await setSession(telegramId, "cod_evidence_upload", { codRoomId: roomId, codEvidenceKind: kind });
+  await sendMessage(chatId, [
+    "📎 <b>ارسال مدرک COD Arena</b>",
+    "",
+    `نوع مدرک: <b>${html(COD_EVIDENCE_KIND_LABELS[kind] || kind)}</b>`,
+    "عکس، ویدیو یا فایل مدرک را همینجا ارسال کن. فایل داخل تلگرام می‌ماند و Gament فقط شناسه فایل تلگرام را ذخیره می‌کند.",
+    "کپشن اختیاری است.",
+  ].join("\n"), replyKeyboard([[CANCEL_TEXT]]));
+}
+
+async function startCodReportUpload(chatId: number, telegramId: string, roomId: string, category: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) return sendMessage(chatId, "برای ثبت گزارش COD ابتدا حساب تلگرام را با /link به Gament وصل کن.", {
+    inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }], [{ text: "مشاهده روم", url: `${APP_URL}/cod-arena/${roomId}` }]],
+  });
+  await setSession(telegramId, "cod_report_upload", { codRoomId: roomId, codReportCategory: category });
+  await sendMessage(chatId, [
+    "🚨 <b>ثبت گزارش تخلف COD Arena</b>",
+    "",
+    `نوع گزارش: <b>${html(COD_REPORT_CATEGORY_LABELS[category] || category)}</b>`,
+    "عکس/ویدیو/فایل مدرک را ارسال کن و در کپشن حداقل ۱۰ کاراکتر توضیح بده چه اتفاقی افتاده است.",
+    "اگر مدرک نداری، فقط متن توضیح گزارش را ارسال کن.",
+  ].join("\n"), replyKeyboard([[CANCEL_TEXT]]));
+}
+
+function telegramMediaReference(message: TelegramMessage) {
+  const photos = message.photo || [];
+  const bestPhoto = photos[photos.length - 1];
+  if (bestPhoto) return {
+    fileUrl: `telegram_file:${bestPhoto.file_id}`,
+    fileType: "photo",
+    fileId: bestPhoto.file_id,
+    fileUniqueId: bestPhoto.file_unique_id,
+    fileSize: bestPhoto.file_size || null,
+  };
+  if (message.video) return {
+    fileUrl: `telegram_file:${message.video.file_id}`,
+    fileType: "video",
+    fileId: message.video.file_id,
+    fileUniqueId: message.video.file_unique_id,
+    fileSize: message.video.file_size || null,
+    fileName: message.video.file_name || null,
+    mimeType: message.video.mime_type || null,
+    duration: message.video.duration || null,
+  };
+  if (message.document) return {
+    fileUrl: `telegram_file:${message.document.file_id}`,
+    fileType: "document",
+    fileId: message.document.file_id,
+    fileUniqueId: message.document.file_unique_id,
+    fileSize: message.document.file_size || null,
+    fileName: message.document.file_name || null,
+    mimeType: message.document.mime_type || null,
+  };
+  return null;
+}
+
+async function notifyCodAdminsWithTelegramMedia(media: ReturnType<typeof telegramMediaReference>, caption: string, roomId: string) {
+  if (!media) return;
+  const keyboard = { inline_keyboard: [[{ text: "مشاهده روم در سایت", url: `${APP_URL}/cod-arena/${roomId}` }], [{ text: "پنل گزارش‌های COD", url: `${APP_URL}/admin/cod-reports` }]] };
+  await Promise.allSettled(getAdminIds().map(async (adminId) => {
+    const chatId = Number(adminId);
+    if (!Number.isFinite(chatId)) return;
+    if (media.fileType === "photo") return sendPhoto(chatId, media.fileId, caption, keyboard);
+    if (media.fileType === "video") return telegramApi("sendVideo", { chat_id: chatId, video: media.fileId, caption, parse_mode: "HTML", reply_markup: keyboard });
+    return telegramApi("sendDocument", { chat_id: chatId, document: media.fileId, caption, parse_mode: "HTML", reply_markup: keyboard });
+  }));
+}
+
 async function affiliateCommand(chatId: number, telegramId: string) {
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) return sendMessage(chatId, "برای همکاری رسانه‌ای ابتدا حساب را با /link به Gament وصل کن.", {
@@ -3416,6 +3522,104 @@ async function handleConversationMessage(message: TelegramMessage) {
         ? "حجم تصویر فیش بیشتر از ۱.۲ مگابایت است. لطفاً تصویر سبک‌تر ارسال کن."
         : "ثبت فیش انجام نشد. لطفاً دوباره عکس فیش را ارسال کن یا بعداً از سایت اقدام کن.";
       await sendMessage(chatId, messageText);
+    }
+    return;
+  }
+
+  if (session.state === "cod_evidence_upload") {
+    const linked = await getLinkedUserByTelegram(telegramId);
+    if (!linked?.userId || !data.codRoomId || !data.codEvidenceKind) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "اطلاعات ارسال مدرک COD ناقص است. از داخل صفحه روم دوباره دکمه ارسال در تلگرام را بزن.", removeKeyboard());
+      return;
+    }
+    const media = telegramMediaReference(message);
+    if (!media) {
+      await sendMessage(chatId, "لطفاً عکس، ویدیو یا فایل مدرک را همینجا ارسال کن. برای لغو، دکمه لغو را بزن.");
+      return;
+    }
+    try {
+      await addCodRoomEvidence({
+        roomId: data.codRoomId,
+        userId: linked.userId,
+        isAdmin: linked.role === "admin" || linked.role === "super_admin",
+        kind: data.codEvidenceKind,
+        fileUrl: media.fileUrl,
+        metadata: {
+          source: "telegram",
+          telegramFileId: media.fileId,
+          telegramFileUniqueId: media.fileUniqueId,
+          telegramFileType: media.fileType,
+          telegramFileSize: media.fileSize,
+          caption: message.caption || null,
+        },
+      });
+      await notifyCodAdminsWithTelegramMedia(media, [
+        "📎 <b>مدرک جدید COD Arena</b>",
+        `Room: <code>${html(data.codRoomId.slice(0, 8))}</code>`,
+        `نوع: <b>${html(COD_EVIDENCE_KIND_LABELS[data.codEvidenceKind] || data.codEvidenceKind)}</b>`,
+        `ارسال‌کننده: <code>${html(telegramId)}</code>`,
+        message.caption ? `کپشن: ${html(message.caption).slice(0, 700)}` : "",
+      ].filter(Boolean).join("\n"), data.codRoomId).catch(() => undefined);
+      await clearSession(telegramId);
+      await sendMessage(chatId, "✅ مدرک COD داخل پرونده روم ثبت شد. فایل در تلگرام نگهداری می‌شود و فقط شناسه فایل در Gament ذخیره شد.", {
+        inline_keyboard: [[{ text: "مشاهده روم", url: `${APP_URL}/cod-arena/${data.codRoomId}` }]],
+      });
+    } catch (err) {
+      const errorCode = err instanceof Error ? err.message : "";
+      const text = errorCode === "COD_ENTRY_NOT_FOUND"
+        ? "فقط شرکت‌کننده یا عوامل این روم می‌توانند مدرک ثبت کنند. اگر حساب تلگرام را به حساب درست وصل نکردی، /link را بزن."
+        : errorCode === "COD_EVIDENCE_FORBIDDEN"
+          ? "رکورد Lobby فقط توسط Roomer/Spectator/Admin قابل ثبت است."
+          : errorCode === "COD_EVIDENCE_DUPLICATE"
+            ? "این فایل قبلاً برای همین روم ثبت شده است."
+            : "ثبت مدرک COD انجام نشد. دوباره تلاش کن یا از پشتیبانی کمک بگیر.";
+      await sendMessage(chatId, text);
+    }
+    return;
+  }
+
+  if (session.state === "cod_report_upload") {
+    const linked = await getLinkedUserByTelegram(telegramId);
+    if (!linked?.userId || !data.codRoomId || !data.codReportCategory) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "اطلاعات گزارش COD ناقص است. از داخل صفحه روم دوباره دکمه ارسال در تلگرام را بزن.", removeKeyboard());
+      return;
+    }
+    const media = telegramMediaReference(message);
+    const description = (message.caption || text || "").trim();
+    if (!media && description.length < 10) {
+      await sendMessage(chatId, "لطفاً توضیح گزارش را حداقل در ۱۰ کاراکتر بنویس یا عکس/ویدیو را همراه کپشن ارسال کن.");
+      return;
+    }
+    try {
+      await reportCodRoomIssue({
+        roomId: data.codRoomId,
+        reporterId: linked.userId,
+        isAdmin: linked.role === "admin" || linked.role === "super_admin",
+        category: data.codReportCategory,
+        description: description || `گزارش ${COD_REPORT_CATEGORY_LABELS[data.codReportCategory] || data.codReportCategory} همراه با مدرک تلگرام`,
+        evidenceUrl: media?.fileUrl || null,
+      });
+      if (media) await notifyCodAdminsWithTelegramMedia(media, [
+        "🚨 <b>گزارش تخلف جدید COD Arena</b>",
+        `Room: <code>${html(data.codRoomId.slice(0, 8))}</code>`,
+        `نوع: <b>${html(COD_REPORT_CATEGORY_LABELS[data.codReportCategory] || data.codReportCategory)}</b>`,
+        `گزارش‌دهنده: <code>${html(telegramId)}</code>`,
+        `توضیح: ${html(description || "بدون توضیح").slice(0, 700)}`,
+      ].join("\n"), data.codRoomId).catch(() => undefined);
+      await clearSession(telegramId);
+      await sendMessage(chatId, "✅ گزارش تخلف ثبت شد و در صف بررسی ادمین قرار گرفت. فایل مدرک در تلگرام نگهداری می‌شود.", {
+        inline_keyboard: [[{ text: "مشاهده روم", url: `${APP_URL}/cod-arena/${data.codRoomId}` }]],
+      });
+    } catch (err) {
+      const errorCode = err instanceof Error ? err.message : "";
+      const text = errorCode === "COD_REPORT_FORBIDDEN"
+        ? "فقط شرکت‌کننده یا عوامل این روم می‌توانند گزارش ثبت کنند."
+        : errorCode === "COD_REPORT_DESCRIPTION_INVALID"
+          ? "توضیحات گزارش باید دقیق‌تر باشد. لطفاً دوباره با کپشن کامل ارسال کن."
+          : "ثبت گزارش انجام نشد. دوباره تلاش کن یا از پشتیبانی کمک بگیر.";
+      await sendMessage(chatId, text);
     }
     return;
   }

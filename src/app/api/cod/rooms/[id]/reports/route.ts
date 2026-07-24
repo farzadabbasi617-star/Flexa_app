@@ -12,7 +12,7 @@ const schema = z.object({
   description: z.string().trim().min(10).max(2000),
   accusedEntryId: z.string().uuid().optional().nullable(),
   accusedCodUsername: z.string().trim().max(100).optional().nullable(),
-  evidenceUrl: z.string().trim().min(1).max(2_000_000).optional().nullable(),
+  evidenceUrl: z.string().url().max(1500).optional().nullable(),
 });
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

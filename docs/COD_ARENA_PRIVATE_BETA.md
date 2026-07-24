@@ -68,8 +68,8 @@ The first trust/safety layer is now available:
 - admins review reports in `/admin/cod-reports`;
 - admins can resolve/reject reports and optionally apply warning, fine, temporary ban, permanent ban or result-void penalties;
 - active temporary/permanent bans block future COD Arena joins;
-- `/api/cod/upload` supports direct evidence upload for screenshots/recordings, returns SHA-256 content hashes, stores media on Cloudinary when configured and falls back to small inline images for private beta.
+- evidence/report media is routed to the Telegram bot through deep links (`codE_*` and `codR_*`); photos/videos/documents stay on Telegram and Gament stores only the `telegram_file_id` reference.
 
-For production recording uploads, configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET`. Without Cloudinary, video uploads are intentionally rejected and operators should use HTTPS evidence links.
+The web app still accepts existing HTTPS evidence links, but it intentionally does not upload COD screenshots or recordings to the site/database. This keeps heavy media traffic off the web service and Neon database.
 
-This is the foundation, not the final anti-cheat layer. Cancellation refunds are atomic, but before public money is enabled add a treasury-backed prize-budget reserve, malware-safe media processing, OCR, COD-specific dispute holds, a formal lobby-recorder workflow, device review protocol, two QA financial cycles and legal approval.
+This is the foundation, not the final anti-cheat layer. Cancellation refunds are atomic, but before public money is enabled add a treasury-backed prize-budget reserve, OCR/metadata review for Telegram media where needed, COD-specific dispute holds, a formal lobby-recorder workflow, device review protocol, two QA financial cycles and legal approval.

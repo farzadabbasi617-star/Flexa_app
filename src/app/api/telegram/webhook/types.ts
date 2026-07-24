@@ -15,7 +15,9 @@ export type BotState =
   | "clash_qr_submission"
   | "clash_1v1_qr_submission"
   | "dispute_reason"
-  | "evidence_upload";
+  | "evidence_upload"
+  | "cod_evidence_upload"
+  | "cod_report_upload";
 
 export interface TelegramUser {
   id: number;
@@ -48,6 +50,21 @@ export interface TelegramMessage {
     file_size?: number;
   }>;
   caption?: string;
+  video?: {
+    file_id: string;
+    file_unique_id: string;
+    file_name?: string;
+    mime_type?: string;
+    file_size?: number;
+    duration?: number;
+  };
+  document?: {
+    file_id: string;
+    file_unique_id: string;
+    file_name?: string;
+    mime_type?: string;
+    file_size?: number;
+  };
 }
 
 export interface TelegramCallbackQuery {
@@ -77,6 +94,9 @@ export interface SessionData {
   walletDepositTracking?: string;
   disputeMatchId?: string;
   evidenceMatchId?: string;
+  codRoomId?: string;
+  codEvidenceKind?: string;
+  codReportCategory?: string;
   qrTournamentId?: string;
   qrRegistrationId?: string;
   clash1v1EntryId?: string;

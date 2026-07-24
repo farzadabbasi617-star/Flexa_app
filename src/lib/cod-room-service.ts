@@ -871,8 +871,8 @@ function normalizeCodPenaltyType(value: unknown) {
 function normalizeEvidenceUrl(value: unknown, field: string) {
   const text = String(value || "").trim();
   if (!text) return null;
-  if (text.length > 2_000_000) throw new Error(`${field}_INVALID`);
-  if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=\r\n]+$/i.test(text)) return text;
+  if (text.length > 1500) throw new Error(`${field}_INVALID`);
+  if (/^telegram_file:[A-Za-z0-9_-]{10,300}$/.test(text)) return text;
   let parsed: URL;
   try { parsed = new URL(text); } catch { throw new Error(`${field}_INVALID`); }
   if (parsed.protocol !== "https:" || text.length > 1500) throw new Error(`${field}_INVALID`);
