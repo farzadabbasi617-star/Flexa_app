@@ -11,6 +11,7 @@ export const dynamic = "force-dynamic";
 
 const schema = z.object({
   evidenceConfirmed: z.literal(true),
+  lobbyOverrideConfirmed: z.boolean().optional().default(false),
   results: z.array(z.object({
     entryId: z.string().uuid(),
     kills: z.number().int().min(0).max(100),
@@ -54,6 +55,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       COD_SETTLEMENT_EMPTY: { text: "بازیکنی برای تسویه وجود ندارد", status: 409 },
       COD_SETTLEMENT_ENTRY_INVALID: { text: "یکی از نتیجه‌ها متعلق به این روم نیست", status: 400 },
       COD_SETTLEMENT_DUPLICATE_PLACEMENT: { text: "در روم Solo جایگاه تکراری مجاز نیست", status: 400 },
+      COD_LOBBY_FLAGGED_CONFIRMATION_REQUIRED: { text: "آخرین بررسی Lobby وضعیت مشکوک دارد؛ قبل از تسویه باید ادمین به‌صورت دستی override را تأیید کند", status: 409 },
       COD_SETTLEMENT_OVER_BUDGET: { text: "مجموع جایزه از بودجه قفل‌شده روم بیشتر است", status: 409 },
     };
     if (known[code]) return NextResponse.json({ error: known[code].text, code }, { status: known[code].status });

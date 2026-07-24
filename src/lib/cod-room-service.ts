@@ -719,6 +719,7 @@ export async function settleCodRoom(input: {
   adminId: string;
   results: CodSettlementResultInput[];
   evidenceConfirmed: boolean;
+  lobbyOverrideConfirmed?: boolean;
 }) {
   await Promise.all([ensureCodArenaSchema(), ensureWalletMoneySchema()]);
   if (!input.evidenceConfirmed) throw new Error("COD_EVIDENCE_CONFIRMATION_REQUIRED");
@@ -733,6 +734,16 @@ export async function settleCodRoom(input: {
         inArray(codRoomEvidence.kind, ["scoreboard", "recording", "lobby_recording"]),
       ));
       if (Number(evidence?.value || 0) === 0) throw new Error("COD_SETTLEMENT_EVIDENCE_REQUIRED");
+    }
+    const [latestLobbyCheck] = await tx.select({
+      id: codRoomLobbyChecks.id,
+      status: codRoomLobbyChecks.status,
+      unauthorizedCount: codRoomLobbyChecks.unauthorizedCount,
+      missingCheckedInCount: codRoomLobbyChecks.missingCheckedInCount,
+      confidence: codRoomLobbyChecks.confidence,
+    }).from(codRoomLobbyChecks).where(eq(codRoomLobbyChecks.roomId, room.id)).orderBy(desc(codRoomLobbyChecks.createdAt)).limit(1);
+    if (latestLobbyCheck?.status === "flagged" && !input.lobbyOverrideConfirmed) {
+      throw new Error("COD_LOBBY_FLAGGED_CONFIRMATION_REQUIRED");
     }
     const allEntries = await tx.select().from(codRoomEntries)
       .where(and(eq(codRoomEntries.roomId, room.id), ne(codRoomEntries.status, "refunded"), ne(codRoomEntries.status, "cancelled")))
@@ -853,7 +864,7 @@ export async function settleCodRoom(input: {
       roomId: room.id,
       actorId: input.adminId,
       eventType: "room_settled",
-      payload: { live, totalRewardRial: totalReward.toString(), entryCount: entries.length, referralEventsCreated: referralEvents.filter((row) => row.created).length },
+      payload: { live, totalRewardRial: totalReward.toString(), entryCount: entries.length, referralEventsCreated: referralEvents.filter((row) => row.created).length, lobbyOverrideConfirmed: Boolean(input.lobbyOverrideConfirmed), latestLobbyCheckId: latestLobbyCheck?.id || null }, 
     });
     return {
       live,
