@@ -47,10 +47,26 @@ import { bigIntFromText } from "@/lib/money";
 export const COD_ARENA_REFERRAL_DEFAULT_BPS = 2000;
 export const COD_ARENA_DAILY_REFERRAL_ENTRY_CAP = 3;
 
-export function codArenaLive() {
+export function codArenaFinanceState() {
   // Two independent switches prevent an accidental Render toggle from moving
   // private-beta entries or rewards. Legal/finance approval must be explicit.
-  return process.env.COD_ARENA_LIVE === "true" && process.env.COD_ARENA_FINANCE_APPROVED === "true";
+  const liveSwitch = process.env.COD_ARENA_LIVE === "true";
+  const financeApproved = process.env.COD_ARENA_FINANCE_APPROVED === "true";
+  const live = liveSwitch && financeApproved;
+  return {
+    live,
+    privateBeta: !live,
+    mode: live ? "live" : "shadow",
+    liveSwitch,
+    financeApproved,
+    entryDebitsEnabled: live,
+    prizePayoutsEnabled: live,
+    referralAccrualEnabled: live,
+  };
+}
+
+export function codArenaLive() {
+  return codArenaFinanceState().live;
 }
 
 let codSchemaPromise: Promise<void> | null = null;

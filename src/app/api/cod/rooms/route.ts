@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { listCodRooms, codArenaLive } from "@/lib/cod-room-service";
+import { listCodRooms, codArenaFinanceState } from "@/lib/cod-room-service";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -8,11 +8,11 @@ export async function GET(request: NextRequest) {
   try {
     const region = request.nextUrl.searchParams.get("region");
     const rooms = await listCodRooms({ region, limit: Number(request.nextUrl.searchParams.get("limit") || 100) });
+    const finance = codArenaFinanceState();
     return NextResponse.json({
       rooms,
       arena: {
-        live: codArenaLive(),
-        privateBeta: !codArenaLive(),
+        ...finance,
         regions: ["global", "garena"],
         modes: ["solo", "duo", "squad"],
         referralModel: "service_fee_percentage",

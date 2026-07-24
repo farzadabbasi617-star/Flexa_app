@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { requireAdminPermission } from "@/lib/admin-permissions";
-import { createCodRoom, deleteCodRoom, listCodRooms, updateCodRoom, codArenaLive } from "@/lib/cod-room-service";
+import { createCodRoom, deleteCodRoom, listCodRooms, updateCodRoom, codArenaLive, codArenaFinanceState } from "@/lib/cod-room-service";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import logger from "@/lib/logger";
 
@@ -12,7 +12,8 @@ export async function GET(request: NextRequest) {
     const auth = await requireAdminPermission(request, "tournaments");
     if (auth.error || !auth.user) return NextResponse.json({ error: auth.error }, { status: auth.status });
     const rooms = await listCodRooms({ includeUnpublished: true, limit: 300, region: request.nextUrl.searchParams.get("region") });
-    return NextResponse.json({ rooms, live: codArenaLive() }, { headers: { "Cache-Control": "no-store" } });
+    const finance = codArenaFinanceState();
+    return NextResponse.json({ rooms, live: finance.live, finance }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     logger.error({ error }, "Admin COD rooms GET failed");
     return NextResponse.json({ error: "دریافت اتاق‌های COD Arena انجام نشد" }, { status: 500 });

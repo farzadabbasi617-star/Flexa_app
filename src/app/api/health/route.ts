@@ -7,7 +7,7 @@ import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournamen
 import { ensureStoreOrderLifecycleSchema } from "@/lib/store-service";
 import { affiliateCanaryGamentIds, affiliateProgramLive, affiliateRolloutMode, ensureAffiliateSchema } from "@/lib/affiliate-service";
 import { ensurePublicIdentitySeparation } from "@/lib/public-profile";
-import { codArenaLive, ensureCodArenaSchema } from "@/lib/cod-room-service";
+import { codArenaFinanceState, ensureCodArenaSchema } from "@/lib/cod-room-service";
 
 export const dynamic = "force-dynamic";
 
@@ -70,8 +70,7 @@ export async function GET() {
         },
         codArena: {
           configured: true,
-          live: codArenaLive(),
-          privateBeta: !codArenaLive(),
+          ...codArenaFinanceState(),
           regions: ["global", "garena"],
           modes: ["solo", "duo", "squad"],
           rewards: ["kill", "placement", "participation"],

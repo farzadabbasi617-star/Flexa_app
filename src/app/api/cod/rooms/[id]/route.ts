@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { validateSession } from "@/lib/auth";
-import { getCodRoomDetail, codArenaLive } from "@/lib/cod-room-service";
+import { getCodRoomDetail, codArenaFinanceState } from "@/lib/cod-room-service";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     ) : null;
     const detail = await getCodRoomDetail(id, viewer?.id, viewer?.role === "admin" || viewer?.role === "super_admin");
     if (!detail || "forbidden" in detail) return NextResponse.json({ error: "روم پیدا نشد" }, { status: 404 });
-    return NextResponse.json({ room: detail, live: codArenaLive() }, { headers: { "Cache-Control": "no-store" } });
+    const finance = codArenaFinanceState();
+    return NextResponse.json({ room: detail, live: finance.live, finance }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     logger.error({ error, roomId: id }, "COD room detail failed");
     return NextResponse.json({ error: "دریافت اطلاعات روم انجام نشد" }, { status: 500 });

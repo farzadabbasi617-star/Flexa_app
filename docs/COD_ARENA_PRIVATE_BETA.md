@@ -6,7 +6,7 @@
 - Phase 1: Battle Royale custom rooms (Solo, Duo, Squad), 2–100 entries.
 - Rewards: operator-configurable Kill, placement and participation components.
 - Referral: a configurable percentage of Gament's service fee only; the prize budget is never reduced.
-- Financial mode: `COD_ARENA_LIVE=false` and `COD_ARENA_FINANCE_APPROVED=false` by default. Both independent switches are required; entry debit, prize payout and COD referral events are shadow-only otherwise.
+- Financial mode: `COD_ARENA_LIVE=false` and `COD_ARENA_FINANCE_APPROVED=false` by default. Both independent switches are required; entry debit, prize payout and COD referral events are shadow-only otherwise. The public COD pages and `/admin/cod-arena` now display the exact finance state so players/admins can distinguish Live wallet movement from Shadow testing.
 
 ## Secure room lifecycle
 

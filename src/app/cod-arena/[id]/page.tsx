@@ -85,6 +85,7 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
   const { user, loading: authLoading } = useAuth();
   const [room, setRoom] = useState<RoomDetail | null>(null);
   const [live, setLive] = useState(false);
+  const [finance, setFinance] = useState({ live: false, privateBeta: true, mode: "shadow", entryDebitsEnabled: false, prizePayoutsEnabled: false, liveSwitch: false, financeApproved: false });
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [rulesAccepted, setRulesAccepted] = useState(false);
@@ -100,6 +101,15 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
       if (!response.ok) throw new Error(data.error || "روم پیدا نشد");
       setRoom(data.room);
       setLive(Boolean(data.live));
+      setFinance({
+        live: Boolean(data.finance?.live ?? data.live),
+        privateBeta: Boolean(data.finance?.privateBeta ?? !data.live),
+        mode: String(data.finance?.mode || (data.live ? "live" : "shadow")),
+        entryDebitsEnabled: Boolean(data.finance?.entryDebitsEnabled),
+        prizePayoutsEnabled: Boolean(data.finance?.prizePayoutsEnabled),
+        liveSwitch: Boolean(data.finance?.liveSwitch),
+        financeApproved: Boolean(data.finance?.financeApproved),
+      });
     } catch (err) {
       setError(err instanceof Error ? err.message : "روم پیدا نشد");
     } finally {
@@ -183,6 +193,13 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
 
         {error && <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">{error}</div>}
         {message && <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300">{message}</div>}
+
+        <section className={`mt-5 rounded-[2rem] border p-5 ${finance.live ? "border-red-500/25 bg-red-950/15" : "border-emerald-500/20 bg-emerald-950/10"}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div><h2 className="font-black">{finance.live ? "⚠️ مالی واقعی فعال" : "🧪 حالت تست بدون کسر وجه"}</h2><p className="text-xs text-gray-400 leading-6 mt-2">{finance.live ? "با عضویت، ورودی از کیف پول کم می‌شود و جایزه تأییدشده واقعی واریز می‌شود." : "در این فاز، عضویت و نتیجه‌ها Shadow هستند؛ هیچ ورودی واقعی کم نمی‌شود و جایزه واقعی واریز نمی‌شود."}</p></div>
+            <div className="grid grid-cols-2 gap-2 text-[10px] text-center"><span className={`rounded-xl px-3 py-2 ${finance.entryDebitsEnabled ? "bg-red-500/15 text-red-300" : "bg-emerald-500/10 text-emerald-300"}`}>ورودی: {finance.entryDebitsEnabled ? "واقعی" : "Shadow"}</span><span className={`rounded-xl px-3 py-2 ${finance.prizePayoutsEnabled ? "bg-red-500/15 text-red-300" : "bg-emerald-500/10 text-emerald-300"}`}>جایزه: {finance.prizePayoutsEnabled ? "واقعی" : "Shadow"}</span></div>
+          </div>
+        </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_.9fr] gap-5 mt-6">
           <div className="space-y-5">
