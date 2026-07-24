@@ -101,6 +101,28 @@ export async function GET(request: NextRequest) {
       conditions.push(lte(storeListings.priceRial, String(BigInt(Math.floor(maxToman)) * BigInt(10))));
     }
 
+    // CODM account-specific filters (query the codm JSONB metadata).
+    const minLevel = Number(searchParams.get("minLevel") || "");
+    const minMythic = Number(searchParams.get("minMythic") || "");
+    const minLegendary = Number(searchParams.get("minLegendary") || "");
+    const platform = (searchParams.get("platform") || "").trim();
+    const region = (searchParams.get("region") || "").trim();
+    if (Number.isFinite(minLevel) && minLevel > 0) {
+      conditions.push(sql`((${storeListings.metadata} -> 'codm' ->> 'level')::int) >= ${minLevel}`);
+    }
+    if (Number.isFinite(minMythic) && minMythic > 0) {
+      conditions.push(sql`((${storeListings.metadata} -> 'codm' ->> 'mythicWeapons')::int) >= ${minMythic}`);
+    }
+    if (Number.isFinite(minLegendary) && minLegendary > 0) {
+      conditions.push(sql`((${storeListings.metadata} -> 'codm' ->> 'legendaryWeapons')::int) >= ${minLegendary}`);
+    }
+    if (platform) {
+      conditions.push(sql`(lower(${storeListings.metadata} -> 'codm' ->> 'platform')) LIKE ${`%${platform.toLowerCase()}%`}`);
+    }
+    if (region) {
+      conditions.push(sql`(lower(${storeListings.metadata} -> 'codm' ->> 'region')) = ${region.toLowerCase()}`);
+    }
+
     const orderBy =
       sort === "cheapest"
         ? asc(storeListings.priceRial)

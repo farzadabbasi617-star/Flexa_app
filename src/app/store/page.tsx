@@ -145,6 +145,11 @@ export default function StorePage() {
   const [sort, setSort] = useState<"newest" | "cheapest" | "expensive" | "bestselling">("newest");
   const [minToman, setMinToman] = useState("");
   const [maxToman, setMaxToman] = useState("");
+  const [minLevel, setMinLevel] = useState("");
+  const [minMythic, setMinMythic] = useState("");
+  const [minLegendary, setMinLegendary] = useState("");
+  const [codmPlatform, setCodmPlatform] = useState("");
+  const [codmRegion, setCodmRegion] = useState("");
   const [showMobileFilters, setShowMobileFilters] = useState(false);
 
   useEffect(() => {
@@ -163,6 +168,11 @@ export default function StorePage() {
     if (sort !== "newest") params.set("sort", sort);
     if (minToman) params.set("minToman", minToman);
     if (maxToman) params.set("maxToman", maxToman);
+    if (minLevel) params.set("minLevel", minLevel);
+    if (minMythic) params.set("minMythic", minMythic);
+    if (minLegendary) params.set("minLegendary", minLegendary);
+    if (codmPlatform) params.set("platform", codmPlatform);
+    if (codmRegion) params.set("region", codmRegion);
     try {
       const response = await fetch(`/api/store/listings?${params.toString()}`, { cache: "no-store" });
       if (!response.ok) throw new Error("store-load-failed");
@@ -174,14 +184,14 @@ export default function StorePage() {
     } finally {
       setLoading(false);
     }
-  }, [filter, source, debouncedSearch, sort, minToman, maxToman]);
+  }, [filter, source, debouncedSearch, sort, minToman, maxToman, minLevel, minMythic, minLegendary, codmPlatform, codmRegion]);
 
   useEffect(() => {
     load();
   }, [load]);
 
   const activeFilter = useMemo(() => FILTERS.find((item) => item.id === filter) || FILTERS[0], [filter]);
-  const hasActiveFilters = filter !== "all" || source !== "all" || Boolean(search || minToman || maxToman) || sort !== "newest";
+  const hasActiveFilters = filter !== "all" || source !== "all" || Boolean(search || minToman || maxToman || minLevel || minMythic || minLegendary || codmPlatform || codmRegion) || sort !== "newest";
 
   function resetFilters() {
     setFilter("all");
@@ -191,6 +201,11 @@ export default function StorePage() {
     setSort("newest");
     setMinToman("");
     setMaxToman("");
+    setMinLevel("");
+    setMinMythic("");
+    setMinLegendary("");
+    setCodmPlatform("");
+    setCodmRegion("");
     setShowMobileFilters(false);
   }
 
@@ -259,6 +274,75 @@ export default function StorePage() {
         </div>
         <p className="mt-2 text-[10px] text-gray-600">همه قیمت‌ها به تومان نمایش داده می‌شوند.</p>
       </div>
+
+      {(filter === "cod_mobile" || filter === "account") && (
+        <div>
+          <h3 className="mb-3 text-sm font-black text-white">فیلترهای اکانت کالاف</h3>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5 focus-within:border-orange-400/60">
+              <span className="block text-[9px] text-gray-500">حداقل لول</span>
+              <input
+                value={minLevel}
+                onChange={(e) => setMinLevel(e.target.value.replace(/[^\d]/g, ""))}
+                inputMode="numeric"
+                dir="ltr"
+                placeholder="۰"
+                aria-label="حداقل لول"
+                className="mt-1 w-full bg-transparent text-left text-xs font-bold text-white outline-none placeholder:text-gray-700"
+              />
+            </label>
+            <label className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5 focus-within:border-orange-400/60">
+              <span className="block text-[9px] text-gray-500">حداقل میثیک گان</span>
+              <input
+                value={minMythic}
+                onChange={(e) => setMinMythic(e.target.value.replace(/[^\d]/g, ""))}
+                inputMode="numeric"
+                dir="ltr"
+                placeholder="۰"
+                aria-label="حداقل میثیک گان"
+                className="mt-1 w-full bg-transparent text-left text-xs font-bold text-white outline-none placeholder:text-gray-700"
+              />
+            </label>
+            <label className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5 focus-within:border-orange-400/60">
+              <span className="block text-[9px] text-gray-500">حداقل لجندری گان</span>
+              <input
+                value={minLegendary}
+                onChange={(e) => setMinLegendary(e.target.value.replace(/[^\d]/g, ""))}
+                inputMode="numeric"
+                dir="ltr"
+                placeholder="۰"
+                aria-label="حداقل لجندری گان"
+                className="mt-1 w-full bg-transparent text-left text-xs font-bold text-white outline-none placeholder:text-gray-700"
+              />
+            </label>
+            <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5">
+              <span className="block text-[9px] text-gray-500">منطقه</span>
+              <select
+                value={codmRegion}
+                onChange={(e) => setCodmRegion(e.target.value)}
+                className="mt-1 w-full bg-transparent text-xs font-bold text-white outline-none"
+              >
+                <option value="">همه</option>
+                <option value="global">GLOBAL</option>
+                <option value="garena">GARENA</option>
+              </select>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-black/25 px-3 py-2.5 sm:col-span-2">
+              <span className="block text-[9px] text-gray-500">پلتفرم</span>
+              <select
+                value={codmPlatform}
+                onChange={(e) => setCodmPlatform(e.target.value)}
+                className="mt-1 w-full bg-transparent text-xs font-bold text-white outline-none"
+              >
+                <option value="">همه</option>
+                <option value="android">Android</option>
+                <option value="ios">iOS</option>
+                <option value="both">Both</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="overflow-hidden rounded-2xl border border-emerald-400/15 bg-emerald-500/[.07] p-4">
         <div className="flex items-start gap-3">

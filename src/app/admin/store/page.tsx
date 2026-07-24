@@ -47,10 +47,15 @@ interface ListingRow {
   source: string;
   sellerName: string | null;
   kind: string;
+  game: string | null;
   title: string;
+  description?: string | null;
   priceToman: number;
   stock: number;
   status: string;
+  images?: string[];
+  metadata?: any;
+  deliveryNotes?: string | null;
 }
 interface OrderRow {
   id: string;
@@ -208,15 +213,23 @@ export default function AdminStorePage() {
               )))}
 
               {tab === "listings" && (listings.length === 0 ? <Empty /> : listings.map((l) => (
-                <div key={l.id} className="flex flex-wrap items-center justify-between gap-3 rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-                  <div>
-                    <h3 className="font-black">{l.title}</h3>
-                    <p className="mt-1 text-xs text-gray-400">{l.kind} · {toman(l.priceToman)} · موجودی {l.stock} · فروشنده: {l.sellerName || "—"}</p>
+                <div key={l.id} className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="font-black">{l.title}</h3>
+                      <p className="mt-1 text-xs text-gray-400">{l.kind}{l.game ? ` · ${l.game}` : ""} · {toman(l.priceToman)} · موجودی {l.stock} · فروشنده: {l.sellerName || "—"}</p>
+                      {l.description && <p className="mt-2 rounded-xl bg-black/30 p-2 text-xs text-gray-300">{l.description}</p>}
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => reviewListing(l.id, "approve")} className="rounded-xl bg-green-600 px-3 py-1.5 text-xs font-black">تأیید</button>
+                      <button onClick={() => reviewListing(l.id, "reject")} className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-black">رد</button>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => reviewListing(l.id, "approve")} className="rounded-xl bg-green-600 px-3 py-1.5 text-xs font-black">تأیید</button>
-                    <button onClick={() => reviewListing(l.id, "reject")} className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-black">رد</button>
-                  </div>
+                  {l.kind === "account" && l.game === "cod_mobile" && <CodmSpecs meta={l.metadata?.codm || l.metadata} />}
+                  <ImageThumbs images={l.images} />
+                  {l.deliveryNotes && (
+                    <p className="mt-2 rounded-xl bg-black/30 p-2 text-[11px] text-amber-200">تحویل محرمانه: {l.deliveryNotes}</p>
+                  )}
                 </div>
               )))}
 
@@ -299,6 +312,82 @@ export default function AdminStorePage() {
         </div>
       </main>
     </>
+  );
+}
+
+function CodmSpecs({ meta }: { meta: any }) {
+  if (!meta) return null;
+  const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+  const txt = (v: unknown) => (v == null ? "" : String(v).trim());
+  const badges: Array<[string, boolean]> = [
+    ["دسترسی کامل", meta.fullAccess === true],
+    ["ایمیل قابل تغییر", meta.emailChangeable === true],
+    ["مالک اول", meta.firstOwner === true],
+    ["فقط Activision", meta.activisionOnly === true],
+    ["دماسکوس باز", meta.damascusUnlocked === true],
+  ];
+  const stats: Array<[string, string]> = [
+    ["لول", meta.level ? String(meta.level) : "—"],
+    ["UID", txt(meta.uid) || "—"],
+    ["منطقه", txt(meta.region).toUpperCase() || "—"],
+    ["پلتفرم", txt(meta.platform) || "—"],
+    ["روش ورود", txt(meta.loginMethod) || "—"],
+    ["CP", meta.cpBalance ? String(num(meta.cpBalance)) : "—"],
+    ["میثیک گان", String(num(meta.mythicWeapons))],
+    ["میثیک مکس", String(num(meta.maxedMythicWeapons))],
+    ["لجندری گان", String(num(meta.legendaryWeapons))],
+    ["اپیک گان", String(num(meta.epicWeapons))],
+    ["کاراکتر میثیک", String(num(meta.mythicCharacters))],
+    ["کاراکتر لجندری", String(num(meta.legendaryCharacters))],
+    ["کاراکتر اپیک", String(num(meta.epicCharacters))],
+    ["الماس کامو", String(num(meta.diamondCamos))],
+    ["رنک MP", txt(meta.rankMp) || "—"],
+    ["رنک BR", txt(meta.rankBr) || "—"],
+    ["باتل‌پس", txt(meta.battlePass) || "—"],
+  ];
+  return (
+    <div className="mt-3 rounded-2xl border border-orange-400/20 bg-orange-500/[0.06] p-3">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-black tracking-widest text-orange-300">مشخصات اکانت کالاف</span>
+        {badges.filter(([, on]) => on).map(([label]) => (
+          <span key={label} className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold text-emerald-300">✓ {label}</span>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-3 lg:grid-cols-4">
+        {stats.map(([label, value]) => (
+          <div key={label} className="rounded-xl bg-black/30 px-2 py-1.5">
+            <div className="text-[9px] text-gray-500">{label}</div>
+            <div className="text-xs font-bold text-gray-100">{value}</div>
+          </div>
+        ))}
+      </div>
+      {[
+        ["سلاح‌های شاخص", meta.notableWeapons],
+        ["کاراکترهای شاخص", meta.notableCharacters],
+        ["آیتم‌های نایاب", meta.rareItems],
+        ["تصاویر همراه", meta.screenshotsIncluded],
+      ].map(([label, v]) =>
+        txt(v) ? (
+          <p key={label} className="mt-2 text-[11px] leading-5 text-gray-300">
+            <span className="text-gray-500">{label}:</span> {txt(v)}
+          </p>
+        ) : null
+      )}
+    </div>
+  );
+}
+
+function ImageThumbs({ images }: { images?: string[] }) {
+  if (!images || !images.length) return null;
+  return (
+    <div className="mt-2 flex flex-wrap gap-2">
+      {images.slice(0, 6).map((src, i) => (
+        <a key={i} href={src} target="_blank" rel="noreferrer" className="block h-16 w-16 overflow-hidden rounded-xl border border-white/10">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={src} alt="" className="h-full w-full object-cover" loading="lazy" />
+        </a>
+      ))}
+    </div>
   );
 }
 

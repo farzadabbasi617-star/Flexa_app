@@ -30,9 +30,13 @@ export async function GET(request: NextRequest) {
       kind: storeListings.kind,
       game: storeListings.game,
       title: storeListings.title,
+      description: storeListings.description,
       priceRial: storeListings.priceRial,
       stock: storeListings.stock,
       status: storeListings.status,
+      images: storeListings.images,
+      metadata: storeListings.metadata,
+      deliveryNotes: storeListings.deliveryNotes,
       createdAt: storeListings.createdAt,
     })
     .from(storeListings)
