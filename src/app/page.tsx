@@ -332,17 +332,17 @@ export default async function LuxuryHomePage() {
                           <img
                             src={gameImage.url}
                             alt={gameImage.altText || gameImage.title}
-                            className="absolute inset-0 w-full h-full object-cover opacity-25 group-hover:scale-110 transition duration-700"
+                            className="absolute inset-0 w-full h-full object-cover opacity-55 saturate-125 brightness-110 group-hover:scale-110 group-hover:opacity-70 transition duration-700"
                             loading="lazy"
                             decoding="async"
                           />
                         )}
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-transparent" />
+                        <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.46),rgba(0,0,0,.10)_58%,rgba(0,0,0,.04)),linear-gradient(to_left,rgba(0,0,0,.34),transparent_55%)]" />
                         <div className="relative flex items-start justify-between gap-2" style={{ transform: "translateZ(30px)" }}>
                           <div
                             className={`w-16 h-16 rounded-3xl bg-gradient-to-br ${game.accent} p-0.5 shadow-2xl shrink-0`}
                           >
-                            <div className="w-full h-full rounded-[22px] bg-black/45 flex items-center justify-center">
+                            <div className="w-full h-full rounded-[22px] bg-black/25 backdrop-blur-sm flex items-center justify-center">
                               <img
                                 src={bySlug[`icon-${game.id}`]?.url || game.icon}
                                 alt={game.faName}
