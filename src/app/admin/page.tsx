@@ -232,6 +232,7 @@ export default function AdminPage() {
               { href: "/admin/users", icon: "👥", title: "مدیریت کاربران", desc: "مشاهده، افزودن، نقش‌دهی، حذف امن و تأیید کاربران" },
               { href: "/tournaments", icon: "🏆", title: "مدیریت تورنومنت‌ها", desc: "ساخت، مشاهده، وضعیت، حذف و کنترل رویدادها" },
               { href: "/admin/cod-arena", icon: "🎯", title: "مرکز عملیات COD Arena", desc: "کاستوم‌روم، Roomer، Spectator، Kill، جایزه، مدرک، رنک و تسویه" },
+              { href: "/admin/cod-profiles", icon: "✅", title: "تأیید UID کالاف", desc: "بررسی و تأیید COD UID/Username کاربران برای ثبت‌نام پولی" },
               { href: "/admin/cod-reports", icon: "🚨", title: "گزارش‌ها و جریمه‌های COD", desc: "بررسی چیت، تیم‌آپ، رکورد، اخطار، جریمه و بن بازیکن‌ها" },
               { href: "/judging", icon: "⚖️", title: "داوری مسابقات", desc: "ثبت نتیجه، داوری دستی، بررسی AI و اعتراضات" },
               { href: "/admin/images", icon: "🖼️", title: "استودیو رسانه", desc: "تصویر پس‌زمینه، هیرو، کارت بازی‌ها، آیکون‌ها و بنرها" },

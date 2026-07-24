@@ -153,6 +153,9 @@ export default function Navbar() {
                             <Link href="/admin/cod-arena" className="flex items-center gap-3 px-4 py-2.5 text-sm text-orange-300 hover:bg-orange-500/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                               <span>🎯</span> عملیات COD Arena
                             </Link>
+                            <Link href="/admin/cod-profiles" className="flex items-center gap-3 px-4 py-2.5 text-sm text-emerald-300 hover:bg-emerald-500/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                              <span>✅</span> تأیید UID کالاف
+                            </Link>
                             <Link href="/admin/cod-reports" className="flex items-center gap-3 px-4 py-2.5 text-sm text-red-300 hover:bg-red-500/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                               <span>🚨</span> گزارش‌ها و جریمه‌های COD
                             </Link>

@@ -219,7 +219,7 @@ export default function EditProfilePage() {
                 </div>
               </div>
               <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-orange-500/15 bg-orange-500/5 px-3 py-2 text-[11px] text-gray-400">
-                <span>وضعیت مالکیت: {user.codMobileStatus === "verified" ? "✅ تأییدشده" : user.codMobileStatus === "pending" ? "⏳ در انتظار بررسی" : "ثبت‌نشده"}</span>
+                <span>وضعیت مالکیت: {user.codMobileStatus === "verified" ? "✅ تأییدشده" : user.codMobileStatus === "pending" ? "⏳ در انتظار بررسی" : user.codMobileStatus === "rejected" ? "❌ رد شده؛ اطلاعات را اصلاح کن" : "ثبت‌نشده"}</span>
                 <Link href="/cod-arena" className="font-black text-orange-300">ورود به COD Arena ←</Link>
               </div>
             </div>
