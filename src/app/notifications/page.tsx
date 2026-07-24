@@ -23,6 +23,8 @@ const TYPE_ICONS: Record<string, string> = {
   tournament_update: "🏆",
   tournament_reminder: "⏰",
   cod_room_reminder: "🎯",
+  cod_room_joined: "✅",
+  cod_room_result: "🏁",
   achievement: "🏅",
   level_up: "⚡",
   news: "📰",

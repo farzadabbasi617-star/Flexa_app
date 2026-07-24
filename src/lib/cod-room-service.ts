@@ -15,6 +15,7 @@ import {
   codRoomSettlements,
   codRoomStaff,
   mediaPartners,
+  notifications,
   players,
   transactions,
   users,
@@ -504,6 +505,16 @@ export async function joinCodRoom(input: { roomId: string; userId: string; rules
       eventType: "entry_joined",
       payload: { entryId: entry.id, paymentMode: entry.paymentMode, ip: input.ip || null },
     });
+    const entryFeeToman = entryFee > BigInt(0) ? (entryFee / BigInt(10)).toLocaleString("fa-IR") : "۰";
+    await tx.insert(notifications).values({
+      userId: account.id,
+      type: "cod_room_joined",
+      title: "عضویت COD Arena ثبت شد",
+      message: entryFee > BigInt(0)
+        ? `عضویت شما در ${room.title} ثبت شد و ورودی ${entryFeeToman} تومان از کیف پول کسر شد.`
+        : `عضویت شما در ${room.title} ثبت شد.`,
+      link: `/cod-arena/${room.id}`,
+    });
     return { entry, roomTitle: room.title, live };
   });
 }
@@ -876,6 +887,14 @@ export async function settleCodRoom(input: {
           wins: row.reward.placement === 1 ? 1 : 0,
         });
       }
+      const rewardToman = (row.reward.totalRewardRial / BigInt(10)).toLocaleString("fa-IR");
+      await tx.insert(notifications).values({
+        userId: row.entry.userId,
+        type: "cod_room_result",
+        title: "نتیجه COD Arena تأیید شد",
+        message: `نتیجه شما در ${room.title}: ${row.reward.kills} Kill${row.reward.placement ? `، جایگاه ${row.reward.placement}` : ""}، جایزه ${rewardToman} تومان.`,
+        link: `/cod-arena/${room.id}`,
+      });
       if (bigIntFromText(row.entry.entryFeeRial) > BigInt(0)) {
         referralEvents.push(await createCodReferralShadow(tx, {
           roomId: room.id,
