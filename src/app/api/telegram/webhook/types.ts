@@ -17,7 +17,8 @@ export type BotState =
   | "dispute_reason"
   | "evidence_upload"
   | "cod_evidence_upload"
-  | "cod_report_upload";
+  | "cod_report_upload"
+  | "cod_lobby_check";
 
 export interface TelegramUser {
   id: number;

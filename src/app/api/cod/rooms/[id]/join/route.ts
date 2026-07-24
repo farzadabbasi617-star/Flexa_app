@@ -17,6 +17,7 @@ const errors: Record<string, { text: string; status: number }> = {
   COD_PROFILE_NOT_VERIFIED: { text: "پروفایل کالاف هنوز توسط Gament تأیید نشده است", status: 409 },
   COD_REGION_MISMATCH: { text: "ریجن پروفایل کالاف با ریجن این روم یکسان نیست", status: 409 },
   COD_ALREADY_JOINED: { text: "قبلاً عضو این روم شده‌ای", status: 409 },
+  COD_UID_ALREADY_JOINED: { text: "این UID کالاف قبلاً برای همین روم ثبت شده و امکان ورود با دو حساب وجود ندارد", status: 409 },
   COD_ROOM_FULL: { text: "ظرفیت این روم تکمیل شده است", status: 409 },
   COD_RANK_TOO_LOW: { text: "رنک COD Arena شما برای این روم کافی نیست", status: 403 },
   COD_AGE_GATE_BLOCKED: { text: "روم پولی فقط برای حساب هویتی کامل و کاربران بالای ۱۸ سال فعال است", status: 403 },

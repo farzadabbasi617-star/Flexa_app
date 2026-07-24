@@ -36,6 +36,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | `0025_repair_wallet_money_types.sql` | Converts legacy text wallet/transaction money columns to `numeric(20,0)` without losing valid balances. |
 | `0036_add_cod_mobile_room_engine.sql` | Adds the COD Mobile custom-room engine: rooms, entries, evidence, settlements, ranks and audit trail. |
 | `0037_add_cod_room_reports_penalties.sql` | Adds COD room trust/safety reports, admin resolutions, warnings, fines and temporary/permanent bans. |
+| `0038_add_cod_lobby_verification.sql` | Adds Telegram-based AI lobby verification records for COD custom rooms. |
 
 > **Email verification (required before deploying the email-OTP auth flow):**
 > Run `0019_add_email_verification.sql` and set `RESEND_API_KEY` (and

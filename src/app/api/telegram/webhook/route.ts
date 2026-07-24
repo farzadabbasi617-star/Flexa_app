@@ -26,7 +26,7 @@ import {
   verifyClashRoyaleHeadToHead,
 } from "@/lib/clash-royale-api";
 import { rateLimit } from "@/lib/rate-limit";
-import { addCodRoomEvidence, reportCodRoomIssue } from "@/lib/cod-room-service";
+import { addCodRoomEvidence, reportCodRoomIssue, verifyCodLobbyFromImage } from "@/lib/cod-room-service";
 import logger from "@/lib/logger";
 import type { SessionData, TelegramCallbackQuery, TelegramMessage, TelegramUpdate, TelegramUser } from "./types";
 import { APP_URL, CANCEL_TEXT, CHANNEL_URL, DEFAULT_RULES, GAMENT_ID_REQUIRED, PLATFORM_OPTIONS, SKIP_TEXT } from "./config";
@@ -357,6 +357,12 @@ async function handleStartPayload(chatId: number, telegramId: string, user: Tele
     // Legacy deep-link path. The system 1V1 queue is a single global product,
     // so always route to the atomic queue instead of the dead registration flow.
     await openClash1v1Queue(chatId, telegramId);
+    return true;
+  }
+
+  const codLobbyPayload = payload.match(/^codL_([0-9a-f-]{36})$/i);
+  if (codLobbyPayload) {
+    await startCodLobbyCheck(chatId, telegramId, codLobbyPayload[1]);
     return true;
   }
 
@@ -2112,6 +2118,23 @@ async function startCodReportUpload(chatId: number, telegramId: string, roomId: 
   ].join("\n"), replyKeyboard([[CANCEL_TEXT]]));
 }
 
+async function startCodLobbyCheck(chatId: number, telegramId: string, roomId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) return sendMessage(chatId, "برای بررسی لابی COD ابتدا حساب تلگرام را با /link به Gament وصل کن.", {
+    inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }], [{ text: "مشاهده روم", url: `${APP_URL}/cod-arena/${roomId}` }]],
+  });
+  await setSession(telegramId, "cod_lobby_check", { codRoomId: roomId });
+  await sendMessage(chatId, [
+    "🤖 <b>بررسی هوشمند Lobby COD Arena</b>",
+    "",
+    "Roomer/Spectator باید اسکرین‌شات واضح از لیست بازیکنان داخل لابی کالاف را به صورت <b>عکس</b> ارسال کند.",
+    "AI نام‌های داخل لابی را استخراج و با لیست کاربران ثبت‌نام/پرداخت‌شده Gament مقایسه می‌کند.",
+    "اگر اسم غیرمجاز یا اکانت تکراری دیده شود، به ادمین هشدار داده می‌شود.",
+    "",
+    "اگر عکس واضح نداری، می‌توانی لیست نام‌ها را خط‌به‌خط به صورت متن ارسال کنی تا بررسی دستی/نیمه‌خودکار انجام شود.",
+  ].join("\n"), replyKeyboard([[CANCEL_TEXT]]));
+}
+
 function telegramMediaReference(message: TelegramMessage) {
   const photos = message.photo || [];
   const bestPhoto = photos[photos.length - 1];
@@ -3522,6 +3545,66 @@ async function handleConversationMessage(message: TelegramMessage) {
         ? "حجم تصویر فیش بیشتر از ۱.۲ مگابایت است. لطفاً تصویر سبک‌تر ارسال کن."
         : "ثبت فیش انجام نشد. لطفاً دوباره عکس فیش را ارسال کن یا بعداً از سایت اقدام کن.";
       await sendMessage(chatId, messageText);
+    }
+    return;
+  }
+
+  if (session.state === "cod_lobby_check") {
+    const linked = await getLinkedUserByTelegram(telegramId);
+    if (!linked?.userId || !data.codRoomId) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "اطلاعات بررسی لابی ناقص است. از داخل صفحه روم دوباره دکمه بررسی لابی را بزن.", removeKeyboard());
+      return;
+    }
+    const bestPhoto = message.photo?.[message.photo.length - 1];
+    let imageDataUrl: string | null = null;
+    let media = telegramMediaReference(message);
+    if (bestPhoto) {
+      try {
+        const photo = await downloadTelegramPhotoAsDataUrl(bestPhoto.file_id);
+        imageDataUrl = photo.dataUrl;
+      } catch {
+        await sendMessage(chatId, "عکس لابی خیلی بزرگ یا نامعتبر است. لطفاً اسکرین‌شات فشرده‌تر/واضح‌تر بفرست یا نام‌ها را خط‌به‌خط ارسال کن.");
+        return;
+      }
+    }
+    const operatorNote = message.caption || text || "";
+    if (!imageDataUrl && operatorNote.trim().length < 3) {
+      await sendMessage(chatId, "لطفاً اسکرین‌شات لابی را به صورت عکس ارسال کن یا نام‌های داخل لابی را خط‌به‌خط بنویس.");
+      return;
+    }
+    try {
+      const check = await verifyCodLobbyFromImage({
+        roomId: data.codRoomId,
+        userId: linked.userId,
+        isAdmin: linked.role === "admin" || linked.role === "super_admin",
+        telegramFileId: media?.fileId || null,
+        telegramFileUniqueId: media?.fileUniqueId || null,
+        sourceKind: media ? `telegram_${media.fileType}` : "telegram_text",
+        imageDataUrl,
+        operatorNote,
+      });
+      const unauthorized = Array.isArray(check.unauthorizedUsernames) ? check.unauthorizedUsernames as string[] : [];
+      const missing = Array.isArray(check.missingCheckedInUsernames) ? check.missingCheckedInUsernames as string[] : [];
+      const textResult = [
+        check.status === "verified" ? "✅ <b>لابی تأیید شد</b>" : check.status === "flagged" ? "🚨 <b>لابی مشکوک/دارای نفر غیرمجاز است</b>" : "⚠️ <b>لابی نیازمند بررسی دستی است</b>",
+        "",
+        `Matched: <b>${check.matchedCount}</b>` ,
+        `Unauthorized: <b>${check.unauthorizedCount}</b>` ,
+        `Missing checked-in: <b>${check.missingCheckedInCount}</b>` ,
+        `Confidence: <b>${check.confidence}%</b>`,
+        unauthorized.length ? `\nغیرمجازها:\n${unauthorized.slice(0, 20).map((x) => `• ${html(x)}`).join("\n")}` : "",
+        missing.length ? `\nChecked-in ولی در عکس دیده نشد:\n${missing.slice(0, 20).map((x) => `• ${html(x)}`).join("\n")}` : "",
+      ].filter(Boolean).join("\n");
+      await clearSession(telegramId);
+      await sendMessage(chatId, textResult, { inline_keyboard: [[{ text: "مشاهده روم", url: `${APP_URL}/cod-arena/${data.codRoomId}` }]] });
+      await Promise.allSettled(getAdminIds().map((adminId) => sendMessage(Number(adminId), `🤖 <b>نتیجه بررسی Lobby COD</b>\nRoom: <code>${html(data.codRoomId!.slice(0, 8))}</code>\n${textResult}`, { inline_keyboard: [[{ text: "مشاهده روم", url: `${APP_URL}/cod-arena/${data.codRoomId}` }]] }).catch(() => undefined)));
+    } catch (err) {
+      const code = err instanceof Error ? err.message : "";
+      const msg = code === "COD_LOBBY_CHECK_FORBIDDEN"
+        ? "فقط Roomer/Spectator/Judge/Admin این روم می‌تواند بررسی هوشمند لابی را انجام دهد."
+        : "بررسی لابی انجام نشد. مطمئن شو حساب تلگرام به اکانت ادمین/رومر وصل است و دوباره تلاش کن.";
+      await sendMessage(chatId, msg);
     }
     return;
   }

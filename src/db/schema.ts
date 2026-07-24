@@ -1257,6 +1257,33 @@ export const codRoomPenalties = pgTable("cod_room_penalties", {
   reportIdx: index("cod_room_penalties_report_idx").on(table.reportId),
 }));
 
+export const codRoomLobbyChecks = pgTable("cod_room_lobby_checks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  roomId: uuid("room_id").notNull().references(() => codRooms.id),
+  uploadedById: uuid("uploaded_by_id").notNull().references(() => users.id),
+  telegramFileId: text("telegram_file_id"),
+  telegramFileUniqueId: text("telegram_file_unique_id"),
+  sourceKind: varchar("source_kind", { length: 24 }).notNull().default("telegram_photo"),
+  status: varchar("status", { length: 24 }).notNull().default("manual_review"),
+  extractedUsernames: jsonb("extracted_usernames").notNull().default('[]'),
+  matchedUsernames: jsonb("matched_usernames").notNull().default('[]'),
+  unauthorizedUsernames: jsonb("unauthorized_usernames").notNull().default('[]'),
+  missingCheckedInUsernames: jsonb("missing_checked_in_usernames").notNull().default('[]'),
+  matchedCount: integer("matched_count").notNull().default(0),
+  unauthorizedCount: integer("unauthorized_count").notNull().default(0),
+  missingCheckedInCount: integer("missing_checked_in_count").notNull().default(0),
+  confidence: integer("confidence").notNull().default(0),
+  aiProvider: varchar("ai_provider", { length: 30 }),
+  aiModel: varchar("ai_model", { length: 120 }),
+  rawAiResponse: text("raw_ai_response"),
+  operatorNote: text("operator_note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  roomCreatedIdx: index("cod_room_lobby_checks_room_created_idx").on(table.roomId, table.createdAt),
+  statusIdx: index("cod_room_lobby_checks_status_idx").on(table.status, table.createdAt),
+}));
+
 // Support Tickets
 export const tickets = pgTable("tickets", {
   id: uuid("id").defaultRandom().primaryKey(),

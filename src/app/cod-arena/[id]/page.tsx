@@ -49,6 +49,16 @@ interface RoomDetail {
   credentialsVisible: boolean;
   checkInAvailable: boolean;
   registeredCount: number;
+  latestLobbyCheck: null | {
+    status: string;
+    matchedCount: number;
+    unauthorizedCount: number;
+    missingCheckedInCount: number;
+    confidence: number;
+    unauthorizedUsernames?: string[];
+    missingCheckedInUsernames?: string[];
+    createdAt: string;
+  };
   myEntry: RoomEntry | null;
   staffRole: string | null;
   evidenceCount: number;
@@ -193,6 +203,16 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
               <div className="mt-4 whitespace-pre-line text-xs text-gray-300 leading-7">{room.rules || "استفاده از چیت، تبانی، جعل نتیجه و ورود با UID غیر از پروفایل ممنوع است. تمام بازیکنان باید از شروع Lobby تا نمایش Scoreboard رکورد قابل بررسی داشته باشند."}</div>
               <div className="mt-4 flex flex-wrap gap-2 text-[9px]"><span className="rounded-full bg-white/5 px-3 py-1">نسخه قوانین: {room.rulesVersion}</span><span className="rounded-full bg-white/5 px-3 py-1">رکورد: {room.requiresRecording ? "الزامی" : "اختیاری"}</span><span className="rounded-full bg-white/5 px-3 py-1">حداقل RP: {room.minRankPoints.toLocaleString("fa-IR")}</span></div>
             </section>
+
+            {canOperate && <section className="rounded-[2rem] border border-cyan-500/20 bg-cyan-950/10 p-5 sm:p-6">
+              <h2 className="text-lg font-black">🤖 بررسی هوشمند Lobby</h2>
+              <p className="text-[10px] text-gray-500 mt-2 leading-5">Roomer/Spectator قبل از استارت، اسکرین‌شات لیست بازیکنان لابی را در تلگرام می‌فرستد. AI نام‌ها را با کاربران ثبت‌نام/پرداخت‌شده و Check-in شده مقایسه می‌کند تا کد لو رفته یا اکانت اضافی شناسایی شود.</p>
+              <div className="mt-4 flex flex-wrap gap-2 items-center">
+                <a href={telegramStartUrl(`codL_${room.id}`)} target="_blank" rel="noopener noreferrer" className="rounded-xl bg-cyan-500 text-black px-5 py-3 text-xs font-black">ارسال اسکرین‌شات لابی در تلگرام</a>
+                {room.latestLobbyCheck && <span className={`rounded-xl px-4 py-3 text-xs font-black ${room.latestLobbyCheck.status === "verified" ? "bg-emerald-500/10 text-emerald-300" : room.latestLobbyCheck.status === "flagged" ? "bg-red-500/10 text-red-300" : "bg-amber-500/10 text-amber-300"}`}>آخرین بررسی: {room.latestLobbyCheck.status} • Match {room.latestLobbyCheck.matchedCount} • غیرمجاز {room.latestLobbyCheck.unauthorizedCount}</span>}
+              </div>
+              {room.latestLobbyCheck?.unauthorizedUsernames?.length ? <div className="mt-3 rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-200">غیرمجازها: {room.latestLobbyCheck.unauthorizedUsernames.slice(0, 8).join("، ")}</div> : null}
+            </section>}
 
             {(room.myEntry || canOperate) && <section className="rounded-[2rem] border border-purple-500/20 bg-purple-950/10 p-5 sm:p-6">
               <h2 className="text-lg font-black">📎 ثبت مدرک</h2>

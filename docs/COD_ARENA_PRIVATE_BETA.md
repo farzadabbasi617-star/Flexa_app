@@ -68,8 +68,10 @@ The first trust/safety layer is now available:
 - admins review reports in `/admin/cod-reports`;
 - admins can resolve/reject reports and optionally apply warning, fine, temporary ban, permanent ban or result-void penalties;
 - active temporary/permanent bans block future COD Arena joins;
-- evidence/report media is routed to the Telegram bot through deep links (`codE_*` and `codR_*`); photos/videos/documents stay on Telegram and Gament stores only the `telegram_file_id` reference.
+- evidence/report media is routed to the Telegram bot through deep links (`codE_*` and `codR_*`); photos/videos/documents stay on Telegram and Gament stores only the `telegram_file_id` reference;
+- lobby verification is routed to Telegram through `codL_{roomId}`: Roomer/Spectator sends a lobby screenshot, AI extracts visible usernames and compares them with registered/paid/check-in COD usernames;
+- duplicate COD UID registration inside the same room is blocked before join.
 
-The web app still accepts existing HTTPS evidence links, but it intentionally does not upload COD screenshots or recordings to the site/database. This keeps heavy media traffic off the web service and Neon database.
+The web app still accepts existing HTTPS evidence links, but it intentionally does not upload COD screenshots or recordings to the site/database. This keeps heavy media traffic off the web service and Neon database. Lobby screenshot processing is transient: the screenshot is pulled from Telegram for AI/OCR analysis and the binary is not persisted by Gament.
 
 This is the foundation, not the final anti-cheat layer. Cancellation refunds are atomic, but before public money is enabled add a treasury-backed prize-budget reserve, OCR/metadata review for Telegram media where needed, COD-specific dispute holds, a formal lobby-recorder workflow, device review protocol, two QA financial cycles and legal approval.

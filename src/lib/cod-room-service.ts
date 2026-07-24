@@ -8,6 +8,7 @@ import {
   codRoomAuditEvents,
   codRoomEntries,
   codRoomEvidence,
+  codRoomLobbyChecks,
   codRoomPenalties,
   codRoomReports,
   codRooms,
@@ -37,6 +38,8 @@ import {
   type CodRoomStatus,
 } from "@/lib/cod-room-policy";
 import { checkAgeGate } from "@/lib/age-gate";
+import { fetchAIResponse } from "@/lib/ai-provider-manager";
+import { safeParseAIJson } from "@/lib/ai-utils";
 import { affiliateAccrualLiveForUsers, ensureAffiliateSchema, AFFILIATE_HOLD_HOURS } from "@/lib/affiliate-service";
 import { ensureWalletMoneySchema, updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
 import { bigIntFromText } from "@/lib/money";
@@ -163,6 +166,20 @@ async function createCodArenaSchema(client: any) {
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_penalties_user_active_idx ON cod_room_penalties(user_id,status,starts_at DESC)`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_penalties_room_idx ON cod_room_penalties(room_id,created_at DESC) WHERE room_id IS NOT NULL`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_penalties_report_idx ON cod_room_penalties(report_id) WHERE report_id IS NOT NULL`));
+  await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS cod_room_lobby_checks (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(), room_id uuid NOT NULL REFERENCES cod_rooms(id),
+    uploaded_by_id uuid NOT NULL REFERENCES users(id), telegram_file_id text, telegram_file_unique_id text,
+    source_kind varchar(24) NOT NULL DEFAULT 'telegram_photo', status varchar(24) NOT NULL DEFAULT 'manual_review',
+    extracted_usernames jsonb NOT NULL DEFAULT '[]'::jsonb, matched_usernames jsonb NOT NULL DEFAULT '[]'::jsonb,
+    unauthorized_usernames jsonb NOT NULL DEFAULT '[]'::jsonb, missing_checked_in_usernames jsonb NOT NULL DEFAULT '[]'::jsonb,
+    matched_count integer NOT NULL DEFAULT 0, unauthorized_count integer NOT NULL DEFAULT 0, missing_checked_in_count integer NOT NULL DEFAULT 0,
+    confidence integer NOT NULL DEFAULT 0, ai_provider varchar(30), ai_model varchar(120), raw_ai_response text,
+    operator_note text, created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now()
+  )`));
+  await client.execute(sql.raw(`DO $$ BEGIN ALTER TABLE cod_room_lobby_checks ADD CONSTRAINT cod_room_lobby_checks_status_check CHECK (status IN ('verified','flagged','manual_review','failed')); EXCEPTION WHEN duplicate_object THEN NULL; END $$`));
+  await client.execute(sql.raw(`DO $$ BEGIN ALTER TABLE cod_room_lobby_checks ADD CONSTRAINT cod_room_lobby_checks_counts_check CHECK (matched_count >= 0 AND unauthorized_count >= 0 AND missing_checked_in_count >= 0 AND confidence BETWEEN 0 AND 100); EXCEPTION WHEN duplicate_object THEN NULL; END $$`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_lobby_checks_room_created_idx ON cod_room_lobby_checks(room_id,created_at DESC)`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_lobby_checks_status_idx ON cod_room_lobby_checks(status,created_at DESC)`));
   await client.execute(sql.raw(`ALTER TABLE affiliate_commission_events ALTER COLUMN match_id DROP NOT NULL`));
   await client.execute(sql.raw(`ALTER TABLE affiliate_commission_events ADD COLUMN IF NOT EXISTS source_type varchar(30) NOT NULL DEFAULT 'clash_match'`));
   await client.execute(sql.raw(`ALTER TABLE affiliate_commission_events ADD COLUMN IF NOT EXISTS source_id varchar(100)`));
@@ -342,6 +359,17 @@ export async function getCodRoomDetail(roomId: string, viewerId?: string | null,
     status: room.status as CodRoomStatus,
   });
   const [evidenceRow] = privileged ? await db.select({ value: count() }).from(codRoomEvidence).where(eq(codRoomEvidence.roomId, roomId)) : [{ value: 0 }];
+  const [latestLobbyCheck] = privileged ? await db.select({
+    id: codRoomLobbyChecks.id,
+    status: codRoomLobbyChecks.status,
+    matchedCount: codRoomLobbyChecks.matchedCount,
+    unauthorizedCount: codRoomLobbyChecks.unauthorizedCount,
+    missingCheckedInCount: codRoomLobbyChecks.missingCheckedInCount,
+    confidence: codRoomLobbyChecks.confidence,
+    unauthorizedUsernames: codRoomLobbyChecks.unauthorizedUsernames,
+    missingCheckedInUsernames: codRoomLobbyChecks.missingCheckedInUsernames,
+    createdAt: codRoomLobbyChecks.createdAt,
+  }).from(codRoomLobbyChecks).where(eq(codRoomLobbyChecks.roomId, roomId)).orderBy(desc(codRoomLobbyChecks.createdAt)).limit(1) : [null as any];
   return {
     ...room,
     roomCode: reveal ? room.roomCode : null,
@@ -355,6 +383,7 @@ export async function getCodRoomDetail(roomId: string, viewerId?: string | null,
     myEntry: myEntry ? { ...myEntry, userId: undefined } : null,
     staffRole: staff?.role || null,
     evidenceCount: Number(evidenceRow?.value || 0),
+    latestLobbyCheck: latestLobbyCheck || null,
     entries: (privileged || myEntry ? entries : []).map((entry) => ({
       id: privileged ? entry.id : undefined,
       displayName: entry.displayName,
@@ -396,6 +425,12 @@ export async function joinCodRoom(input: { roomId: string; userId: string; rules
     const [existing] = await tx.select({ id: codRoomEntries.id }).from(codRoomEntries)
       .where(and(eq(codRoomEntries.roomId, room.id), eq(codRoomEntries.userId, account.id))).limit(1);
     if (existing) throw new Error("COD_ALREADY_JOINED");
+    const [sameCodUid] = await tx.select({ id: codRoomEntries.id }).from(codRoomEntries).where(and(
+      eq(codRoomEntries.roomId, room.id),
+      eq(codRoomEntries.codUidSnapshot, account.codMobileId),
+      sql`${codRoomEntries.status} NOT IN ('cancelled','refunded')`,
+    )).limit(1);
+    if (sameCodUid) throw new Error("COD_UID_ALREADY_JOINED");
     const [{ value: registered }] = await tx.select({ value: count() }).from(codRoomEntries).where(eq(codRoomEntries.roomId, room.id));
     if (Number(registered || 0) >= room.capacity) throw new Error("COD_ROOM_FULL");
     const [rank] = await tx.select().from(codPlayerRanks)
@@ -1025,4 +1060,150 @@ export async function resolveCodRoomReport(input: {
     });
     return { report: updated, penalty };
   });
+}
+
+function normalizeCodLobbyName(value: unknown) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[\u200c\u200d\u200e\u200f]/g, "")
+    .replace(/[\s._\-•丨|:：'"`´،,؛;()[\]{}<>]/g, "")
+    .trim();
+}
+
+function parseLobbyNamesFromText(text: string) {
+  return [...new Set(String(text || "")
+    .split(/[\n،,;؛]+/)
+    .map((line) => line.replace(/^[-*#\d.\s]+/, "").trim())
+    .filter((line) => line.length >= 2 && line.length <= 100)
+    .slice(0, 120))];
+}
+
+interface LobbyAiJson {
+  usernames?: string[];
+  confidence?: number;
+  notes?: string;
+}
+
+export async function verifyCodLobbyFromImage(input: {
+  roomId: string;
+  userId: string;
+  isAdmin?: boolean;
+  telegramFileId?: string | null;
+  telegramFileUniqueId?: string | null;
+  sourceKind?: string | null;
+  imageDataUrl?: string | null;
+  operatorNote?: string | null;
+}) {
+  await ensureCodArenaSchema();
+  const [room] = await db.select().from(codRooms).where(eq(codRooms.id, input.roomId)).limit(1);
+  if (!room) throw new Error("COD_ROOM_NOT_FOUND");
+  const [staff] = await db.select({ role: codRoomStaff.role }).from(codRoomStaff)
+    .where(and(eq(codRoomStaff.roomId, input.roomId), eq(codRoomStaff.userId, input.userId))).limit(1);
+  const privileged = Boolean(input.isAdmin || staff);
+  if (!privileged) throw new Error("COD_LOBBY_CHECK_FORBIDDEN");
+
+  const entries = await db.select({
+    id: codRoomEntries.id,
+    userId: codRoomEntries.userId,
+    status: codRoomEntries.status,
+    checkedInAt: codRoomEntries.checkedInAt,
+    codUsername: codRoomEntries.codUsernameSnapshot,
+    codUid: codRoomEntries.codUidSnapshot,
+    paymentMode: codRoomEntries.paymentMode,
+    entryFeeRial: codRoomEntries.entryFeeRial,
+  }).from(codRoomEntries).where(and(
+    eq(codRoomEntries.roomId, input.roomId),
+    sql`${codRoomEntries.status} NOT IN ('cancelled','refunded')`,
+  ));
+
+  const authorized = entries.map((entry) => ({
+    username: entry.codUsername,
+    normalized: normalizeCodLobbyName(entry.codUsername),
+    checkedIn: Boolean(entry.checkedInAt),
+    status: entry.status,
+  })).filter((entry) => entry.normalized);
+  const checkedIn = authorized.filter((entry) => entry.checkedIn);
+  const authorizedNames = authorized.map((entry) => entry.username);
+
+  let extracted: string[] = [];
+  let confidence = 0;
+  let aiProvider: string | null = null;
+  let aiModel: string | null = null;
+  let rawAiResponse: string | null = null;
+
+  if (input.imageDataUrl) {
+    const prompt = [
+      "Extract every visible Call of Duty Mobile custom room lobby player username from this screenshot.",
+      "Return ONLY valid JSON with this shape:",
+      "{\"usernames\":[\"exact visible username\"],\"confidence\":0-100,\"notes\":\"short Persian note\"}",
+      "Do not invent names. Keep symbols and mixed Persian/Latin text as visible. Ignore UI labels, buttons, rank labels and map names.",
+      "Registered/paid reference list for comparison only, not extraction:",
+      JSON.stringify(authorizedNames.slice(0, 120)),
+    ].join("\n");
+    const systemPrompt = "You are Gament COD Arena lobby OCR. You only extract visible player usernames from COD Mobile lobby screenshots and respond in strict JSON.";
+    const ai = await fetchAIResponse(prompt, systemPrompt, input.imageDataUrl).catch(() => null);
+    if (ai?.content) {
+      rawAiResponse = ai.content.slice(0, 4000);
+      aiProvider = ai.provider;
+      aiModel = ai.model || null;
+      const parsed = safeParseAIJson<LobbyAiJson>(ai.content);
+      extracted = Array.isArray(parsed?.usernames) ? parsed!.usernames.map(String).map((x) => x.trim()).filter(Boolean) : [];
+      confidence = Math.max(0, Math.min(100, Number(parsed?.confidence || 0)));
+    }
+  }
+
+  if (!extracted.length && input.operatorNote) extracted = parseLobbyNamesFromText(input.operatorNote);
+  extracted = [...new Set(extracted.map((name) => name.trim()).filter((name) => name.length >= 2 && name.length <= 100))].slice(0, 120);
+
+  const authorizedByNorm = new Map(authorized.map((entry) => [entry.normalized, entry.username]));
+  const checkedInByNorm = new Map(checkedIn.map((entry) => [entry.normalized, entry.username]));
+  const matched: string[] = [];
+  const unauthorized: string[] = [];
+  for (const name of extracted) {
+    const normalized = normalizeCodLobbyName(name);
+    if (!normalized) continue;
+    const exact = authorizedByNorm.get(normalized);
+    if (exact) matched.push(name);
+    else unauthorized.push(name);
+  }
+  const extractedNorms = new Set(extracted.map(normalizeCodLobbyName));
+  const missingCheckedIn = [...checkedInByNorm.entries()]
+    .filter(([normalized]) => !extractedNorms.has(normalized))
+    .map(([, username]) => username);
+
+  const status = extracted.length === 0
+    ? "manual_review"
+    : unauthorized.length > 0
+      ? "flagged"
+      : confidence >= 55
+        ? "verified"
+        : "manual_review";
+
+  const [created] = await db.insert(codRoomLobbyChecks).values({
+    roomId: input.roomId,
+    uploadedById: input.userId,
+    telegramFileId: input.telegramFileId || null,
+    telegramFileUniqueId: input.telegramFileUniqueId || null,
+    sourceKind: String(input.sourceKind || "telegram_photo").slice(0, 24),
+    status,
+    extractedUsernames: extracted,
+    matchedUsernames: matched,
+    unauthorizedUsernames: unauthorized,
+    missingCheckedInUsernames: missingCheckedIn,
+    matchedCount: matched.length,
+    unauthorizedCount: unauthorized.length,
+    missingCheckedInCount: missingCheckedIn.length,
+    confidence,
+    aiProvider,
+    aiModel,
+    rawAiResponse,
+    operatorNote: input.operatorNote ? String(input.operatorNote).slice(0, 2000) : null,
+  }).returning();
+  await db.insert(codRoomAuditEvents).values({
+    roomId: input.roomId,
+    actorId: input.userId,
+    eventType: "lobby_ai_checked",
+    payload: { lobbyCheckId: created.id, status, matched: matched.length, unauthorized: unauthorized.length, missingCheckedIn: missingCheckedIn.length, confidence },
+  });
+  return created;
 }
