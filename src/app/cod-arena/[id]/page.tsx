@@ -155,6 +155,14 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
   const full = room.registeredCount >= room.capacity;
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const canOperate = isAdmin || Boolean(room.staffRole);
+  let paidRoom = false;
+  try { paidRoom = BigInt(room.entryFeeRial || "0") > BigInt(0); } catch { paidRoom = false; }
+  const codProfileBlocked = Boolean(user && live && paidRoom && user.codMobileId && user.codMobileUsername && user.codMobileStatus !== "verified");
+  const codProfileStatusText = user?.codMobileStatus === "pending"
+    ? "پروفایل کالاف شما در انتظار تأیید ادمین است. بعد از تأیید، پرداخت و عضویت در روم پولی فعال می‌شود."
+    : user?.codMobileStatus === "rejected"
+      ? "پروفایل کالاف شما رد شده است. UID و نام داخل بازی را اصلاح کن تا دوباره برای ادمین ارسال شود."
+      : "برای روم پولی، مالکیت UID کالاف باید توسط ادمین تأیید شود.";
 
   return (
     <div className="min-h-screen bg-[#060606] text-white">
@@ -249,8 +257,10 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
               {!user ? <><p className="text-xs text-gray-400 leading-6 mt-3">برای ثبت UID، پذیرش قوانین و عضویت باید وارد حساب Gament شوی.</p><Link href={`/login?next=/cod-arena/${room.id}`} className="block text-center rounded-2xl bg-orange-500 text-black py-3.5 font-black text-sm mt-5">ورود به حساب</Link></> : <>
                 {(!user.codMobileId || !user.codMobileUsername) && <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-300 mt-4">UID و نام داخل بازی کالاف ناقص است. <Link href="/profile/edit" className="underline font-black">تکمیل پروفایل</Link></div>}
                 {user.codMobileRegion !== room.region && <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-300 mt-4">ریجن پروفایل شما {user.codMobileRegion?.toUpperCase()} است ولی این روم {room.region.toUpperCase()} است.</div>}
+                {codProfileBlocked && <div className={`rounded-xl border p-3 text-xs mt-4 ${user.codMobileStatus === "rejected" ? "bg-red-500/10 border-red-500/20 text-red-300" : "bg-amber-500/10 border-amber-500/20 text-amber-300"}`}>{codProfileStatusText} <Link href="/profile/edit" className="underline font-black">ویرایش پروفایل کالاف</Link></div>}
+                {user.codMobileStatus === "verified" && paidRoom && <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-300 mt-4">مالکیت UID کالاف شما تأیید شده است و می‌توانید در روم پولی عضو شوید.</div>}
                 <label className="flex gap-3 items-start mt-5 text-xs leading-6 text-gray-300"><input type="checkbox" checked={rulesAccepted} onChange={(e) => setRulesAccepted(e.target.checked)} className="mt-1 accent-orange-500" /><span>قوانین نسخه {room.rulesVersion}، سیاست No-show، ضبط مدرک و داوری Gament را می‌پذیرم.</span></label>
-                <button onClick={() => action("join", { rulesAccepted })} disabled={busy || full || !rulesAccepted || !user.codMobileId || !user.codMobileUsername || user.codMobileRegion !== room.region} className="w-full rounded-2xl bg-gradient-to-l from-orange-500 to-red-600 text-black py-3.5 font-black text-sm mt-5 disabled:opacity-40">{busy ? "در حال ثبت..." : full ? "ظرفیت تکمیل است" : "پرداخت و عضویت"}</button>
+                <button onClick={() => action("join", { rulesAccepted })} disabled={busy || full || !rulesAccepted || !user.codMobileId || !user.codMobileUsername || user.codMobileRegion !== room.region || codProfileBlocked} className="w-full rounded-2xl bg-gradient-to-l from-orange-500 to-red-600 text-black py-3.5 font-black text-sm mt-5 disabled:opacity-40">{busy ? "در حال ثبت..." : full ? "ظرفیت تکمیل است" : codProfileBlocked ? "در انتظار تأیید UID کالاف" : "پرداخت و عضویت"}</button>
               </>}
             </section> : <section className="rounded-[2rem] border border-emerald-500/20 bg-emerald-950/10 p-5 sm:p-6 sticky top-4">
               <div className="flex items-center justify-between"><h2 className="text-xl font-black">عضویت ثبت شده ✅</h2><span className="text-[9px] rounded-full bg-emerald-500/10 px-3 py-1 text-emerald-300">{room.myEntry.status}</span></div>
