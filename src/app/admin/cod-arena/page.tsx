@@ -57,14 +57,18 @@ function OperationalChecklist({room,results}:{room:DetailRoom;results:Record<str
 }
 function safeRial(value: unknown){try{return BigInt(String(value||0));}catch{return BigInt(0);}}
 function formatToman(value: bigint){return (value/BigInt(10)).toLocaleString("fa-IR");}
-function entryReward(room: DetailRoom, row?: {kills:string;placement:string}){
+function entryRewardBreakdown(room: DetailRoom, row?: {kills:string;placement:string}){
   const config=room.rewardConfig||{};
-  const kills=Math.max(0,Math.min(Number(config.maxKillsPerEntry||100),Number(row?.kills||0)));
+  const maxKills=Number(config.maxKillsPerEntry||100);
+  const kills=Math.max(0,Math.min(maxKills,Number(row?.kills||0)));
   const placement=row?.placement?Number(row.placement):null;
   const perKill=safeRial(config.perKillRial);
   const participation=safeRial(config.participationRial);
   const placementRule=placement==null?undefined:(config.placementRules||[]).find((rule)=>placement>=rule.from&&placement<=rule.to);
-  return perKill*BigInt(kills)+participation+safeRial(placementRule?.amountRial);
+  const killReward=perKill*BigInt(kills);
+  const placementReward=safeRial(placementRule?.amountRial);
+  const total=killReward+placementReward+participation;
+  return {kills,placement,perKill,killReward,placementReward,participation,total};
 }
 function settlementPreview(room: DetailRoom, results: Record<string,{kills:string;placement:string}>){
   const activeEntries=room.entries.filter((entry)=>entry.status!=="cancelled"&&entry.status!=="refunded");
@@ -74,8 +78,8 @@ function settlementPreview(room: DetailRoom, results: Record<string,{kills:strin
   const prizeBudget=safeRial(room.prizeBudgetRial);
   const grossEntry=entryFee*BigInt(activeEntries.length);
   const grossService=serviceFee*BigInt(activeEntries.length);
-  const rewards=checkedIn.map((entry)=>({entry,reward:entryReward(room,entry.id?results[entry.id]:undefined)}));
-  const totalReward=rewards.reduce((sum,row)=>sum+row.reward,BigInt(0));
+  const rewards=checkedIn.map((entry)=>({entry,breakdown:entryRewardBreakdown(room,entry.id?results[entry.id]:undefined)}));
+  const totalReward=rewards.reduce((sum,row)=>sum+row.breakdown.total,BigInt(0));
   const remaining=prizeBudget-totalReward;
   const netAfterPrize=grossEntry-totalReward;
   return {activeEntries,checkedIn,rewards,entryFee,serviceFee,prizeBudget,grossEntry,grossService,totalReward,remaining,netAfterPrize,overBudget:totalReward>prizeBudget};
@@ -83,7 +87,7 @@ function settlementPreview(room: DetailRoom, results: Record<string,{kills:strin
 function SettlementFinancePreview({room,results}:{room:DetailRoom;results:Record<string,{kills:string;placement:string}>}){
   const preview=settlementPreview(room,results);
   const box=(label:string,value:bigint,tone="text-white")=><div className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="text-[10px] text-gray-500">{label}</div><div className={`mt-1 text-sm font-black ${tone}`}>{formatToman(value)} تومان</div></div>;
-  return <section className={`mt-5 rounded-[2rem] border p-4 ${preview.overBudget?"border-red-500/30 bg-red-500/10":"border-cyan-500/20 bg-cyan-950/10"}`}><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><h3 className="font-black">پیش‌نمایش مالی تسویه</h3><p className="mt-1 text-[10px] text-gray-500">قبل از پرداخت جایزه، اعداد مالی بر اساس نتایج واردشده محاسبه می‌شود.</p></div><span className={`rounded-xl px-3 py-2 text-[10px] font-black ${preview.overBudget?"bg-red-500 text-black":"bg-cyan-500/15 text-cyan-200"}`}>{preview.checkedIn.length.toLocaleString("fa-IR")} بازیکن قابل تسویه</span></div><div className="mt-4 grid grid-cols-2 lg:grid-cols-5 gap-2">{box("کل ورودی ثبت‌نام",preview.grossEntry)}{box("کارمزد سرویس",preview.grossService,"text-orange-300")}{box("بودجه جایزه",preview.prizeBudget,"text-purple-200")}{box("مجموع جایزه محاسبه‌شده",preview.totalReward,preview.overBudget?"text-red-300":"text-emerald-300")}{box("باقی‌مانده بودجه",preview.remaining,preview.remaining<0?"text-red-300":"text-emerald-300")}</div>{preview.overBudget&&<div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-200">مجموع جایزه از بودجه قفل‌شده بیشتر است؛ تسویه در Backend هم رد می‌شود. نتایج، جایزه هر Kill یا بودجه جایزه را اصلاح کن.</div>}</section>;
+  return <section className={`mt-5 rounded-[2rem] border p-4 ${preview.overBudget?"border-red-500/30 bg-red-500/10":"border-cyan-500/20 bg-cyan-950/10"}`}><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3"><div><h3 className="font-black">پیش‌نمایش مالی تسویه</h3><p className="mt-1 text-[10px] text-gray-500">قبل از پرداخت جایزه، اعداد مالی بر اساس نتایج واردشده محاسبه می‌شود.</p></div><span className={`rounded-xl px-3 py-2 text-[10px] font-black ${preview.overBudget?"bg-red-500 text-black":"bg-cyan-500/15 text-cyan-200"}`}>{preview.checkedIn.length.toLocaleString("fa-IR")} بازیکن قابل تسویه</span></div><div className="mt-4 grid grid-cols-2 lg:grid-cols-5 gap-2">{box("کل ورودی ثبت‌نام",preview.grossEntry)}{box("کارمزد سرویس",preview.grossService,"text-orange-300")}{box("بودجه جایزه",preview.prizeBudget,"text-purple-200")}{box("مجموع جایزه محاسبه‌شده",preview.totalReward,preview.overBudget?"text-red-300":"text-emerald-300")}{box("باقی‌مانده بودجه",preview.remaining,preview.remaining<0?"text-red-300":"text-emerald-300")}</div><div className="mt-5 overflow-x-auto rounded-2xl border border-white/10"><table className="w-full min-w-[760px] text-xs"><thead className="bg-black/30 text-gray-500"><tr><th className="p-3 text-right">بازیکن</th><th className="p-3">Kill</th><th className="p-3">جایگاه</th><th className="p-3">جایزه Kill</th><th className="p-3">جایزه جایگاه</th><th className="p-3">جایزه حضور</th><th className="p-3">جمع</th></tr></thead><tbody>{preview.rewards.length===0?<tr><td colSpan={7} className="p-5 text-center text-gray-500">هنوز بازیکن Check-in شده‌ای برای محاسبه وجود ندارد.</td></tr>:preview.rewards.map(({entry,breakdown})=><tr key={entry.id} className="border-t border-white/5"><td className="p-3 text-right"><b>{entry.displayName}</b><div className="text-[10px] text-gray-600" dir="ltr">{entry.codUsername}</div></td><td className="p-3 text-center">{breakdown.kills.toLocaleString("fa-IR")}</td><td className="p-3 text-center">{breakdown.placement?breakdown.placement.toLocaleString("fa-IR"):"—"}</td><td className="p-3 text-center text-orange-200">{formatToman(breakdown.killReward)}</td><td className="p-3 text-center text-purple-200">{formatToman(breakdown.placementReward)}</td><td className="p-3 text-center text-cyan-200">{formatToman(breakdown.participation)}</td><td className="p-3 text-center font-black text-emerald-300">{formatToman(breakdown.total)}</td></tr>)}</tbody></table></div>{preview.overBudget&&<div className="mt-3 rounded-xl border border-red-500/30 bg-red-500/10 p-3 text-xs text-red-200">مجموع جایزه از بودجه قفل‌شده بیشتر است؛ تسویه در Backend هم رد می‌شود. نتایج، جایزه هر Kill یا بودجه جایزه را اصلاح کن.</div>}</section>;
 }
 
 const initialForm = {
