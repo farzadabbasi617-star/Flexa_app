@@ -76,8 +76,10 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
   const [rulesAccepted, setRulesAccepted] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [evidence, setEvidence] = useState({ kind: "scoreboard", fileUrl: "" });
+  const [evidence, setEvidence] = useState({ kind: "scoreboard", fileUrl: "", contentHash: "" });
   const [report, setReport] = useState({ category: "cheat", accusedCodUsername: "", evidenceUrl: "", description: "" });
+  const [uploadingEvidence, setUploadingEvidence] = useState(false);
+  const [uploadingReport, setUploadingReport] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -106,10 +108,36 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "عملیات انجام نشد");
       setMessage(path === "join" ? "عضویت در روم ثبت شد." : path === "check-in" ? "حضور شما تأیید شد." : "مدرک با موفقیت ثبت شد.");
-      if (path === "evidence") setEvidence((current) => ({ ...current, fileUrl: "" }));
+      if (path === "evidence") setEvidence((current) => ({ ...current, fileUrl: "", contentHash: "" }));
       await load();
     } catch (err) { setError(err instanceof Error ? err.message : "عملیات انجام نشد"); }
     finally { setBusy(false); }
+  }
+
+  async function uploadCodFile(file: File | undefined, target: "evidence" | "report") {
+    if (!file) return;
+    const setUploading = target === "evidence" ? setUploadingEvidence : setUploadingReport;
+    setUploading(true); setError(""); setMessage("");
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("purpose", target);
+      formData.append("roomId", id);
+      const response = await fetch("/api/cod/upload", {
+        method: "POST",
+        credentials: "include",
+        body: formData,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "آپلود انجام نشد");
+      if (target === "evidence") {
+        setEvidence((current) => ({ ...current, fileUrl: data.url || "", contentHash: data.contentHash || "" }));
+      } else {
+        setReport((current) => ({ ...current, evidenceUrl: data.url || "" }));
+      }
+      setMessage(`فایل مدرک آپلود شد (${data.provider === "cloudinary" ? "Cloudinary" : "Direct"}).`);
+    } catch (err) { setError(err instanceof Error ? err.message : "آپلود انجام نشد"); }
+    finally { setUploading(false); }
   }
 
   async function submitReport() {
@@ -192,12 +220,17 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
 
             {(room.myEntry || canOperate) && <section className="rounded-[2rem] border border-purple-500/20 bg-purple-950/10 p-5 sm:p-6">
               <h2 className="text-lg font-black">📎 ثبت مدرک</h2>
-              <p className="text-[10px] text-gray-500 mt-2 leading-5">در Private Beta لینک امن Cloudinary/Drive رکورد یا Scoreboard را وارد کن. آپلود مستقیم در فاز بعد فعال می‌شود.</p>
+              <p className="text-[10px] text-gray-500 mt-2 leading-5">اسکرین‌شات Scoreboard یا رکورد را مستقیم آپلود کن؛ اگر Cloudinary تنظیم نشده باشد فقط تصویر سبک پشتیبانی می‌شود و برای ویدیو می‌توانی لینک HTTPS بدهی.</p>
               <div className="grid grid-cols-1 sm:grid-cols-[160px_1fr_auto] gap-2 mt-4">
                 <select value={evidence.kind} onChange={(e) => setEvidence({ ...evidence, kind: e.target.value })} className="rounded-xl bg-black/40 border border-white/10 px-3 py-3 text-xs"><option value="scoreboard">Scoreboard</option><option value="recording">رکورد بازیکن</option>{canOperate && <option value="lobby_recording">رکورد Lobby</option>}<option value="dispute">مدرک اعتراض</option></select>
-                <input value={evidence.fileUrl} onChange={(e) => setEvidence({ ...evidence, fileUrl: e.target.value })} dir="ltr" placeholder="https://..." className="rounded-xl bg-black/40 border border-white/10 px-3 py-3 text-xs outline-none focus:border-purple-400" />
-                <button onClick={() => action("evidence", evidence)} disabled={busy || !evidence.fileUrl.startsWith("https://")} className="rounded-xl bg-purple-600 px-4 py-3 text-xs font-black disabled:opacity-40">ثبت مدرک</button>
+                <label className="rounded-xl border border-dashed border-purple-400/30 bg-black/30 px-3 py-3 text-center text-xs font-black text-purple-200 cursor-pointer hover:border-purple-300/60">
+                  {uploadingEvidence ? "در حال آپلود..." : evidence.fileUrl ? "✅ فایل انتخاب شد / تغییر فایل" : "آپلود تصویر یا ویدیو"}
+                  <input type="file" accept="image/*,video/mp4,video/webm,video/quicktime" className="hidden" disabled={uploadingEvidence} onChange={(e) => uploadCodFile(e.target.files?.[0], "evidence").finally(() => { e.currentTarget.value = ""; })} />
+                </label>
+                <button onClick={() => action("evidence", { ...evidence, contentHash: evidence.contentHash || undefined })} disabled={busy || !(evidence.fileUrl.startsWith("https://") || evidence.fileUrl.startsWith("data:image/"))} className="rounded-xl bg-purple-600 px-4 py-3 text-xs font-black disabled:opacity-40">ثبت مدرک</button>
+                <input value={evidence.fileUrl.startsWith("data:image/") ? "فایل تصویر مستقیم آپلود شده است" : evidence.fileUrl} onChange={(e) => setEvidence({ ...evidence, fileUrl: e.target.value, contentHash: "" })} dir="ltr" placeholder="یا لینک HTTPS مدرک را دستی وارد کن" className="sm:col-span-3 rounded-xl bg-black/40 border border-white/10 px-3 py-3 text-xs outline-none focus:border-purple-400" />
               </div>
+              {evidence.contentHash && <div className="mt-2 text-[10px] text-purple-300" dir="ltr">SHA-256: {evidence.contentHash.slice(0, 18)}...</div>}
               {canOperate && <div className="text-[10px] text-purple-300 mt-3">مدارک ثبت‌شده روم: {room.evidenceCount.toLocaleString("fa-IR")}</div>}
             </section>}
 
@@ -209,10 +242,14 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
                   <option value="cheat">چیت / هک</option><option value="teaming">تیم‌آپ</option><option value="no_recording">نداشتن رکورد</option><option value="banned_item">آیتم ممنوع</option><option value="toxic_behavior">رفتار/فحاشی</option><option value="wrong_result">نتیجه اشتباه</option><option value="no_show">No-show</option><option value="other">سایر</option>
                 </select>
                 <input value={report.accusedCodUsername} onChange={(e) => setReport({ ...report, accusedCodUsername: e.target.value })} dir="ltr" placeholder="نام داخل بازی متخلف / اختیاری" className="rounded-xl bg-black/40 border border-white/10 px-3 py-3 text-xs outline-none focus:border-red-400" />
-                <input value={report.evidenceUrl} onChange={(e) => setReport({ ...report, evidenceUrl: e.target.value })} dir="ltr" placeholder="https:// لینک مدرک / اختیاری" className="sm:col-span-2 rounded-xl bg-black/40 border border-white/10 px-3 py-3 text-xs outline-none focus:border-red-400" />
+                <label className="rounded-xl border border-dashed border-red-400/30 bg-black/30 px-3 py-3 text-center text-xs font-black text-red-200 cursor-pointer hover:border-red-300/60">
+                  {uploadingReport ? "در حال آپلود..." : report.evidenceUrl ? "✅ مدرک انتخاب شد / تغییر" : "آپلود مدرک گزارش"}
+                  <input type="file" accept="image/*,video/mp4,video/webm,video/quicktime" className="hidden" disabled={uploadingReport} onChange={(e) => uploadCodFile(e.target.files?.[0], "report").finally(() => { e.currentTarget.value = ""; })} />
+                </label>
+                <input value={report.evidenceUrl.startsWith("data:image/") ? "فایل تصویر مستقیم آپلود شده است" : report.evidenceUrl} onChange={(e) => setReport({ ...report, evidenceUrl: e.target.value })} dir="ltr" placeholder="یا لینک HTTPS مدرک / اختیاری" className="rounded-xl bg-black/40 border border-white/10 px-3 py-3 text-xs outline-none focus:border-red-400" />
                 <textarea value={report.description} onChange={(e) => setReport({ ...report, description: e.target.value })} rows={4} placeholder="توضیح دقیق اتفاق، زمان تقریبی و مدرک را بنویس..." className="sm:col-span-2 rounded-xl bg-black/40 border border-white/10 px-3 py-3 text-xs outline-none focus:border-red-400" />
               </div>
-              <button onClick={submitReport} disabled={busy || report.description.trim().length < 10 || Boolean(report.evidenceUrl && !report.evidenceUrl.startsWith("https://"))} className="mt-4 rounded-xl bg-red-500 text-black px-5 py-3 text-xs font-black disabled:opacity-40">ثبت گزارش برای بررسی</button>
+              <button onClick={submitReport} disabled={busy || report.description.trim().length < 10 || Boolean(report.evidenceUrl && !(report.evidenceUrl.startsWith("https://") || report.evidenceUrl.startsWith("data:image/")))} className="mt-4 rounded-xl bg-red-500 text-black px-5 py-3 text-xs font-black disabled:opacity-40">ثبت گزارش برای بررسی</button>
             </section>}
           </div>
 

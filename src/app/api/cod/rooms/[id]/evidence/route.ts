@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const bodySchema = z.object({
   kind: z.enum(["profile", "scoreboard", "recording", "lobby_recording", "dispute"]),
-  fileUrl: z.string().url().max(1500),
+  fileUrl: z.string().trim().min(1).max(2_000_000),
   contentHash: z.string().regex(/^[a-fA-F0-9]{64}$/).optional().nullable(),
   metadata: z.record(z.string(), z.unknown()).optional(),
 });

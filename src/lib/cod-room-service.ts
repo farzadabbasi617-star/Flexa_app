@@ -492,9 +492,8 @@ export async function addCodRoomEvidence(input: {
   await ensureCodArenaSchema();
   const kind = String(input.kind || "");
   if (!EVIDENCE_KINDS.includes(kind)) throw new Error("COD_EVIDENCE_KIND_INVALID");
-  let parsed: URL;
-  try { parsed = new URL(input.fileUrl); } catch { throw new Error("COD_EVIDENCE_URL_INVALID"); }
-  if (parsed.protocol !== "https:" || input.fileUrl.length > 1500) throw new Error("COD_EVIDENCE_URL_INVALID");
+  const fileUrl = normalizeEvidenceUrl(input.fileUrl, "COD_EVIDENCE_URL");
+  if (!fileUrl) throw new Error("COD_EVIDENCE_URL_INVALID");
   const hash = input.contentHash ? input.contentHash.toLowerCase() : null;
   if (hash && !/^[a-f0-9]{64}$/.test(hash)) throw new Error("COD_EVIDENCE_HASH_INVALID");
   const [entry] = await db.select().from(codRoomEntries)
@@ -510,7 +509,7 @@ export async function addCodRoomEvidence(input: {
       entryId: entry?.id || null,
       uploadedById: input.userId,
       kind,
-      fileUrl: input.fileUrl,
+      fileUrl,
       contentHash: hash,
       metadata: input.metadata || {},
     }).returning();
@@ -869,9 +868,11 @@ function normalizeCodPenaltyType(value: unknown) {
   return type;
 }
 
-function normalizeHttpsUrl(value: unknown, field: string) {
+function normalizeEvidenceUrl(value: unknown, field: string) {
   const text = String(value || "").trim();
   if (!text) return null;
+  if (text.length > 2_000_000) throw new Error(`${field}_INVALID`);
+  if (/^data:image\/(png|jpe?g|webp|gif);base64,[a-z0-9+/=\r\n]+$/i.test(text)) return text;
   let parsed: URL;
   try { parsed = new URL(text); } catch { throw new Error(`${field}_INVALID`); }
   if (parsed.protocol !== "https:" || text.length > 1500) throw new Error(`${field}_INVALID`);
@@ -892,7 +893,7 @@ export async function reportCodRoomIssue(input: {
   const category = normalizeCodReportCategory(input.category);
   const description = String(input.description || "").trim();
   if (description.length < 10 || description.length > 2000) throw new Error("COD_REPORT_DESCRIPTION_INVALID");
-  const evidenceUrl = normalizeHttpsUrl(input.evidenceUrl, "COD_REPORT_EVIDENCE_URL");
+  const evidenceUrl = normalizeEvidenceUrl(input.evidenceUrl, "COD_REPORT_EVIDENCE_URL");
   const [room] = await db.select({ id: codRooms.id, status: codRooms.status }).from(codRooms).where(eq(codRooms.id, input.roomId)).limit(1);
   if (!room) throw new Error("COD_ROOM_NOT_FOUND");
   const [reporterEntry] = await db.select().from(codRoomEntries)
