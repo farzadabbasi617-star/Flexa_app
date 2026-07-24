@@ -92,6 +92,8 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
   const [message, setMessage] = useState("");
   const [evidence, setEvidence] = useState({ kind: "scoreboard", fileUrl: "" });
   const [report, setReport] = useState({ category: "cheat", accusedCodUsername: "", evidenceUrl: "", description: "" });
+  const [wallet, setWallet] = useState<{ usableRial: string; usableToman: number } | null>(null);
+  const [walletLoading, setWalletLoading] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -108,6 +110,28 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
     }
   }, [id]);
   useEffect(() => { load(); }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadWallet() {
+      if (!user || !room || !live) { setWallet(null); return; }
+      let paid = false;
+      try { paid = BigInt(room.entryFeeRial || "0") > BigInt(0); } catch { paid = false; }
+      if (!paid) { setWallet(null); return; }
+      setWalletLoading(true);
+      try {
+        const response = await fetch("/api/wallet/balance", { cache: "no-store", credentials: "include" });
+        const data = await response.json();
+        if (!cancelled && response.ok) setWallet({ usableRial: String(data.usableRial || "0"), usableToman: Number(data.usableToman || 0) });
+      } catch {
+        if (!cancelled) setWallet(null);
+      } finally {
+        if (!cancelled) setWalletLoading(false);
+      }
+    }
+    loadWallet();
+    return () => { cancelled = true; };
+  }, [user, room, live]);
 
   async function action(path: string, body?: Record<string, unknown>) {
     setBusy(true); setError(""); setMessage("");
@@ -158,6 +182,9 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
   let paidRoom = false;
   try { paidRoom = BigInt(room.entryFeeRial || "0") > BigInt(0); } catch { paidRoom = false; }
   const codProfileBlocked = Boolean(user && live && paidRoom && user.codMobileId && user.codMobileUsername && user.codMobileStatus !== "verified");
+  const identityBlocked = Boolean(user && live && paidRoom && (!user.birthDate || !user.nationalId));
+  let walletInsufficient = false;
+  try { walletInsufficient = Boolean(user && live && paidRoom && wallet && BigInt(wallet.usableRial || "0") < BigInt(room.entryFeeRial || "0")); } catch { walletInsufficient = false; }
   const codProfileStatusText = user?.codMobileStatus === "pending"
     ? "پروفایل کالاف شما در انتظار تأیید ادمین است. بعد از تأیید، پرداخت و عضویت در روم پولی فعال می‌شود."
     : user?.codMobileStatus === "rejected"
@@ -258,9 +285,11 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
                 {(!user.codMobileId || !user.codMobileUsername) && <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-300 mt-4">UID و نام داخل بازی کالاف ناقص است. <Link href="/profile/edit" className="underline font-black">تکمیل پروفایل</Link></div>}
                 {user.codMobileRegion !== room.region && <div className="rounded-xl bg-red-500/10 border border-red-500/20 p-3 text-xs text-red-300 mt-4">ریجن پروفایل شما {user.codMobileRegion?.toUpperCase()} است ولی این روم {room.region.toUpperCase()} است.</div>}
                 {codProfileBlocked && <div className={`rounded-xl border p-3 text-xs mt-4 ${user.codMobileStatus === "rejected" ? "bg-red-500/10 border-red-500/20 text-red-300" : "bg-amber-500/10 border-amber-500/20 text-amber-300"}`}>{codProfileStatusText} <Link href="/profile/edit" className="underline font-black">ویرایش پروفایل کالاف</Link></div>}
-                {user.codMobileStatus === "verified" && paidRoom && <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-300 mt-4">مالکیت UID کالاف شما تأیید شده است و می‌توانید در روم پولی عضو شوید.</div>}
+                {identityBlocked && <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-300 mt-4">برای پرداخت و شرکت در روم پولی، تاریخ تولد و کد ملی باید در پروفایل کامل باشد. <Link href="/profile/edit" className="underline font-black">تکمیل اطلاعات هویتی</Link></div>}
+                {paidRoom && live && user.codMobileStatus === "verified" && !identityBlocked && <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-300 mt-4">مالکیت UID کالاف شما تأیید شده است و می‌توانید در روم پولی عضو شوید.</div>}
+                {paidRoom && live && <div className={`rounded-xl border p-3 text-xs mt-4 ${walletInsufficient ? "bg-red-500/10 border-red-500/20 text-red-300" : "bg-black/25 border-white/10 text-gray-300"}`}><div>موجودی قابل استفاده کیف پول: <b>{walletLoading ? "در حال بررسی..." : `${(wallet?.usableToman || 0).toLocaleString("fa-IR")} تومان`}</b></div>{walletInsufficient && <div className="mt-2">موجودی برای پرداخت ورودی کافی نیست. <Link href="/wallet" className="underline font-black">شارژ کیف پول</Link></div>}</div>}
                 <label className="flex gap-3 items-start mt-5 text-xs leading-6 text-gray-300"><input type="checkbox" checked={rulesAccepted} onChange={(e) => setRulesAccepted(e.target.checked)} className="mt-1 accent-orange-500" /><span>قوانین نسخه {room.rulesVersion}، سیاست No-show، ضبط مدرک و داوری Gament را می‌پذیرم.</span></label>
-                <button onClick={() => action("join", { rulesAccepted })} disabled={busy || full || !rulesAccepted || !user.codMobileId || !user.codMobileUsername || user.codMobileRegion !== room.region || codProfileBlocked} className="w-full rounded-2xl bg-gradient-to-l from-orange-500 to-red-600 text-black py-3.5 font-black text-sm mt-5 disabled:opacity-40">{busy ? "در حال ثبت..." : full ? "ظرفیت تکمیل است" : codProfileBlocked ? "در انتظار تأیید UID کالاف" : "پرداخت و عضویت"}</button>
+                <button onClick={() => action("join", { rulesAccepted })} disabled={busy || full || !rulesAccepted || !user.codMobileId || !user.codMobileUsername || user.codMobileRegion !== room.region || codProfileBlocked || identityBlocked || walletLoading || walletInsufficient} className="w-full rounded-2xl bg-gradient-to-l from-orange-500 to-red-600 text-black py-3.5 font-black text-sm mt-5 disabled:opacity-40">{busy ? "در حال ثبت..." : full ? "ظرفیت تکمیل است" : codProfileBlocked ? "در انتظار تأیید UID کالاف" : identityBlocked ? "تکمیل اطلاعات هویتی لازم است" : walletInsufficient ? "موجودی کیف پول کافی نیست" : "پرداخت و عضویت"}</button>
               </>}
             </section> : <section className="rounded-[2rem] border border-emerald-500/20 bg-emerald-950/10 p-5 sm:p-6 sticky top-4">
               <div className="flex items-center justify-between"><h2 className="text-xl font-black">عضویت ثبت شده ✅</h2><span className="text-[9px] rounded-full bg-emerald-500/10 px-3 py-1 text-emerald-300">{room.myEntry.status}</span></div>
