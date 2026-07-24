@@ -424,3 +424,183 @@ button, a {
     radial-gradient(circle at 50% 108%, rgba(255, 255, 255, 0.10), transparent 34%),
     linear-gradient(135deg, #14101d 0%, #0b0b12 45%, #1c0630 100%);
 }
+
+/* ============================================
+   GAMENT ARENA GLOBAL SKIN — inspired by COD Arena
+   ============================================ */
+:root {
+  --arena-bg: #050509;
+  --arena-panel: rgba(12, 12, 18, 0.72);
+  --arena-panel-strong: rgba(16, 15, 24, 0.88);
+  --arena-border: rgba(255, 255, 255, 0.10);
+  --arena-border-hot: rgba(249, 115, 22, 0.34);
+  --arena-orange: #ff6a00;
+  --arena-red: #ff1e1e;
+  --arena-purple: #a855f7;
+  --arena-gold: #ffd84d;
+  --bg-main: var(--arena-bg);
+  --card-bg: var(--arena-panel);
+  --color-dark-950: #050509;
+  --color-dark-900: #07070d;
+  --color-dark-800: #0d0d14;
+  --color-dark-700: #151522;
+  --color-gaming-card: #101018;
+  --color-gaming-border: rgba(255,255,255,.11);
+}
+
+html,
+body {
+  background:
+    radial-gradient(circle at 82% -8%, rgba(168, 85, 247, .34), transparent 34%),
+    radial-gradient(circle at 12% 16%, rgba(255, 106, 0, .16), transparent 28%),
+    radial-gradient(circle at 72% 44%, rgba(255, 106, 0, .10), transparent 30%),
+    linear-gradient(180deg, #050509 0%, #090912 50%, #050509 100%) !important;
+  color: #fff;
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  opacity: .42;
+  background-image:
+    linear-gradient(rgba(255,255,255,.085) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.085) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(circle at 50% 22%, black 0%, rgba(0,0,0,.85) 42%, transparent 100%);
+}
+
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  opacity: .75;
+  background:
+    radial-gradient(circle at 86% 28%, rgba(255, 106, 0, .12), transparent 23%),
+    radial-gradient(circle at 7% 80%, rgba(168, 85, 247, .20), transparent 23%),
+    linear-gradient(90deg, rgba(255,255,255,.02), transparent 35%, rgba(255,106,0,.04));
+}
+
+/* Let the global arena background show through old page wrappers. */
+.bg-dark-900,
+.bg-dark-950,
+.bg-\[\#060606\],
+.bg-\[\#070707\],
+.bg-\[\#06060f\],
+.bg-\[\#07080d\],
+.bg-\[\#070711\] {
+  background-color: transparent !important;
+}
+
+nav.sticky {
+  background: rgba(5, 5, 9, 0.82) !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09) !important;
+  backdrop-filter: blur(24px) saturate(1.25) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(1.25) !important;
+  box-shadow: 0 18px 50px rgba(0,0,0,.35), inset 0 -1px 0 rgba(249,115,22,.10);
+}
+
+.gaming-card,
+.glass-panel,
+.fx-card {
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.055), rgba(255,255,255,.018)),
+    radial-gradient(circle at 82% 0%, rgba(249,115,22,.10), transparent 38%),
+    rgba(8, 8, 14, .78) !important;
+  border: 1px solid rgba(255,255,255,.10) !important;
+  border-top-color: rgba(255,255,255,.18) !important;
+  border-radius: 28px !important;
+  box-shadow:
+    0 24px 80px rgba(0,0,0,.36),
+    inset 0 1px 0 rgba(255,255,255,.08),
+    inset 0 -1px 0 rgba(249,115,22,.045) !important;
+  backdrop-filter: blur(22px) saturate(1.12) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(1.12) !important;
+}
+
+.gaming-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  background:
+    linear-gradient(120deg, rgba(255,255,255,.10), transparent 18%, transparent 78%, rgba(249,115,22,.08)),
+    radial-gradient(circle at 15% 0%, rgba(168,85,247,.12), transparent 28%);
+  opacity: .85;
+}
+
+.gaming-card:hover {
+  border-color: rgba(249, 115, 22, .42) !important;
+  box-shadow:
+    0 30px 95px rgba(0,0,0,.46),
+    0 0 34px rgba(249,115,22,.13),
+    inset 0 1px 0 rgba(255,255,255,.10) !important;
+}
+
+.gaming-btn {
+  background: linear-gradient(135deg, #ff2020 0%, #ff6a00 48%, #ff9f1c 100%) !important;
+  border-radius: 18px !important;
+  border: 1px solid rgba(255,255,255,.16) !important;
+  border-top-color: rgba(255,255,255,.34) !important;
+  box-shadow:
+    0 14px 34px rgba(255, 80, 0, .30),
+    inset 0 1px 1px rgba(255,255,255,.26) !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+
+.gaming-btn:hover {
+  box-shadow:
+    0 18px 48px rgba(255, 80, 0, .42),
+    0 0 24px rgba(168,85,247,.16),
+    inset 0 1px 1px rgba(255,255,255,.32) !important;
+}
+
+.gaming-input,
+.gaming-select,
+input.gaming-input,
+textarea.gaming-input,
+select.gaming-input {
+  background: rgba(0,0,0,.36) !important;
+  border: 1px solid rgba(255,255,255,.11) !important;
+  border-radius: 18px !important;
+  color: #fff !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+}
+
+.gaming-input:focus,
+.gaming-select:focus {
+  border-color: rgba(249,115,22,.58) !important;
+  background: rgba(0,0,0,.48) !important;
+  box-shadow: 0 0 0 4px rgba(249,115,22,.10), inset 0 1px 0 rgba(255,255,255,.07) !important;
+}
+
+.neon-text-purple {
+  color: #c084fc;
+  text-shadow: 0 0 12px rgba(168,85,247,.55), 0 0 22px rgba(255,106,0,.18);
+}
+
+.glass-bottom {
+  background:
+    linear-gradient(145deg, rgba(255,255,255,.075), rgba(255,255,255,.025)),
+    rgba(9, 9, 16, 0.92) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  box-shadow: 0 -18px 55px rgba(0,0,0,.72), inset 0 1px 0 rgba(255,255,255,.10) !important;
+}
+
+/* Upgrade common utility-looking panels without touching Tailwind internals. */
+[class*="rounded-[2rem]"],
+[class*="rounded-[2.5rem]"],
+[class*="rounded-3xl"] {
+  --tw-shadow-color: rgba(0,0,0,.38);
+}
+
+@media (max-width: 640px) {
+  .gaming-card { border-radius: 24px !important; }
+  .gaming-btn { border-radius: 16px !important; }
+}
