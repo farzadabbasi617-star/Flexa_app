@@ -6,11 +6,14 @@ import TiltCard from "@/components/fx/TiltCard";
 import Reveal from "@/components/fx/Reveal";
 import MagneticButton from "@/components/fx/MagneticButton";
 import { SITE_URL } from "@/lib/seo";
+import { db } from "@/db";
+import { siteImages, tournaments, registrations } from "@/db/schema";
+import { asc, desc, eq, count } from "drizzle-orm";
+import { ttlCache } from "@/lib/server-cache";
 
-interface SiteImage {
+interface SiteImageMeta {
   slug: string;
   title: string;
-  url: string;
   category: string;
   altText?: string | null;
 }
@@ -41,6 +44,7 @@ interface HonorPreview {
 const GAMES = [
   {
     id: "cod_mobile",
+    bannerSlug: "bg-codm",
     name: "COD MOBILE",
     faName: "کالاف موبایل",
     icon: "/icons/icon-cod_mobile.png",
@@ -51,6 +55,7 @@ const GAMES = [
   },
   {
     id: "fortnite",
+    bannerSlug: "bg-fortnite",
     name: "FORTNITE",
     faName: "فورتنایت",
     icon: "/icons/icon-fortnite.png",
@@ -61,6 +66,7 @@ const GAMES = [
   },
   {
     id: "clash_royale",
+    bannerSlug: "bg-clash",
     name: "CLASH ROYALE",
     faName: "کلش رویال",
     icon: "/icons/icon-clash_royale.png",
@@ -70,6 +76,10 @@ const GAMES = [
     bg: "radial-gradient(circle at 74% 32%, rgba(0,210,255,.34), transparent 20%), radial-gradient(circle at 24% 68%, rgba(255,230,0,.12), transparent 22%), linear-gradient(135deg, #080a12 0%, #101827 52%, #09283a 100%)",
   },
 ];
+
+// Render live so the hero, game banners and tournaments always reflect the
+// current database; the per-query ttlCache calls keep this cheap.
+export const dynamic = "force-dynamic";
 
 function gameLabel(game?: string | null) {
   if (game === "cod_mobile") return "کالاف موبایل";
@@ -85,12 +95,25 @@ function formatDate(value?: string | null) {
   return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-async function getImages(): Promise<SiteImage[]> {
+function assetUrl(slug: string) {
+  return `/api/public/images/asset?slug=${encodeURIComponent(slug)}`;
+}
+
+// Fetch only image metadata (no heavy base64 payload) and let the browser
+// load the actual bytes through /api/public/images/asset, which caches them.
+async function getSiteImageMeta(): Promise<SiteImageMeta[]> {
   try {
-    const res = await fetch(`${SITE_URL}/api/public/images`, { next: { revalidate: 300 } });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : [];
+    const rows = await db
+      .select({
+        slug: siteImages.slug,
+        title: siteImages.title,
+        category: siteImages.category,
+        altText: siteImages.altText,
+      })
+      .from(siteImages)
+      .where(eq(siteImages.isActive, true))
+      .orderBy(asc(siteImages.sortOrder));
+    return rows;
   } catch {
     return [];
   }
@@ -98,10 +121,37 @@ async function getImages(): Promise<SiteImage[]> {
 
 async function getTournaments(): Promise<TournamentPreview[]> {
   try {
-    const res = await fetch(`${SITE_URL}/api/tournaments?limit=6`, { next: { revalidate: 60 } });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
+    return await ttlCache("home:tournaments:6", 30_000, async () => {
+      const rows = await db
+        .select({
+          id: tournaments.id,
+          name: tournaments.name,
+          game: tournaments.game,
+          maxPlayers: tournaments.maxPlayers,
+          entryFee: tournaments.entryFee,
+          prizePool: tournaments.prizePool,
+          startDate: tournaments.startDate,
+          bannerUrl: tournaments.bannerUrl,
+          registeredCount: count(registrations.id),
+        })
+        .from(tournaments)
+        .leftJoin(registrations, eq(tournaments.id, registrations.tournamentId))
+        .groupBy(tournaments.id)
+        .orderBy(desc(tournaments.createdAt))
+        .limit(6);
+
+      return rows.map((r) => ({
+        id: r.id,
+        name: r.name,
+        game: r.game,
+        maxPlayers: r.maxPlayers,
+        entryFee: r.entryFee,
+        prizePool: r.prizePool,
+        startDate: r.startDate ? new Date(r.startDate).toISOString() : null,
+        bannerUrl: r.bannerUrl,
+        registeredCount: Number(r.registeredCount || 0),
+      }));
+    });
   } catch {
     return [];
   }
@@ -109,10 +159,15 @@ async function getTournaments(): Promise<TournamentPreview[]> {
 
 async function getHonors(): Promise<HonorPreview[]> {
   try {
-    const res = await fetch(`${SITE_URL}/api/honors`, { next: { revalidate: 300 } });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return Array.isArray(data) ? data.filter((item: HonorPreview) => item).slice(0, 3) : [];
+    return await ttlCache("home:honors:3", 60_000, async () => {
+      const res = await fetch(`${SITE_URL}/api/honors`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(4000),
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data.filter((item: HonorPreview) => item).slice(0, 3) : [];
+    });
   } catch {
     return [];
   }
@@ -120,13 +175,13 @@ async function getHonors(): Promise<HonorPreview[]> {
 
 export default async function LuxuryHomePage() {
   const [images, tournaments, honors] = await Promise.all([
-    getImages(),
+    getSiteImageMeta(),
     getTournaments(),
     getHonors(),
   ]);
 
-  const bySlug: Record<string, SiteImage> = {};
-  const byCategory: Record<string, SiteImage> = {};
+  const bySlug: Record<string, SiteImageMeta> = {};
+  const byCategory: Record<string, SiteImageMeta> = {};
   for (const image of images) {
     bySlug[image.slug] = image;
     if (!byCategory[image.category]) byCategory[image.category] = image;
@@ -181,7 +236,7 @@ export default async function LuxuryHomePage() {
 
         <section className="grid grid-cols-1 lg:grid-cols-[1.15fr_.85fr] gap-5 sm:gap-6 mb-10 sm:mb-14">
           <HeroScene
-            heroImage={heroImage?.url}
+            heroImage={heroImage ? assetUrl(heroImage.slug) : null}
             heroAlt={heroImage?.altText || heroImage?.title}
             className="rounded-[34px] sm:rounded-[44px] border border-purple-300/20 min-h-[430px] sm:min-h-[510px] bg-[#0d0b16] shadow-[0_0_70px_rgba(124,58,237,.18)]"
           >
@@ -313,7 +368,10 @@ export default async function LuxuryHomePage() {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-5">
             {GAMES.map((game, i) => {
-              const gameImage = bySlug[`game-card-${game.id}`] || byCategory[game.id];
+              const gameImage =
+                bySlug[game.bannerSlug] ||
+                bySlug[`game-card-${game.id}`] ||
+                byCategory[game.id];
               return (
                 <Reveal key={game.id} delay={i * 0.08} from="up" distance={22}>
                   <TiltCard maxTilt={9} liftZ={16} className="rounded-[30px]">
@@ -330,7 +388,7 @@ export default async function LuxuryHomePage() {
                       >
                         {gameImage && (
                           <img
-                            src={gameImage.url}
+                            src={assetUrl(gameImage.slug)}
                             alt={gameImage.altText || gameImage.title}
                             className="absolute inset-0 w-full h-full object-cover opacity-55 saturate-125 brightness-110 group-hover:scale-110 group-hover:opacity-70 transition duration-700"
                             loading="lazy"
@@ -344,7 +402,7 @@ export default async function LuxuryHomePage() {
                           >
                             <div className="w-full h-full rounded-[22px] bg-black/25 backdrop-blur-sm flex items-center justify-center">
                               <img
-                                src={bySlug[`icon-${game.id}`]?.url || game.icon}
+                                src={game.icon}
                                 alt={game.faName}
                                 className="w-11 h-11 object-contain"
                                 loading="lazy"
