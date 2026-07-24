@@ -158,6 +158,7 @@ export default function AdminPage() {
         { key: "disputes", icon: "🚨", label: "اعتراضات", value: data.stats.disputes, color: "text-neon-pink" },
         { key: "messages", icon: "💬", label: "پیام‌ها", value: data.stats.messages, color: "text-gray-300" },
         { key: "telegram", icon: "⚡", label: "پیش‌ثبت‌نام تلگرام", value: data.stats.telegramPreRegistrations, color: "text-neon-orange" },
+        { key: "codProfiles", icon: "✅", label: "UID کالاف در انتظار", value: data.stats.codPendingProfiles || 0, color: "text-emerald-300", href: "/admin/cod-profiles" },
       ]
     : [];
 
@@ -187,6 +188,7 @@ export default function AdminPage() {
               <Link href="/admin/images" className="gaming-btn text-xs">+ تصویر</Link>
               <button onClick={() => setActiveTab("telegram")} className="gaming-btn text-xs">پیش‌ثبت‌نام تلگرام</button>
               <Link href="/admin/wallets" className="gaming-btn text-xs">کیف پول</Link>
+              <Link href="/admin/cod-profiles" className="gaming-btn text-xs">تأیید UID کالاف</Link>
             </div>
           </div>
         </section>
@@ -197,7 +199,7 @@ export default function AdminPage() {
           {busy
             ? Array.from({ length: 8 }).map((_, i) => <div key={i} className="gaming-card p-5 animate-pulse"><div className="h-14 bg-dark-600 rounded-xl" /></div>)
             : statCards.map((s) => (
-                <button key={s.key} onClick={() => setActiveTab(s.key === "completedMatches" ? "matches" : (s.key as TabKey))} className="gaming-card p-4 text-right hover:border-neon-purple/40 transition-all group">
+                <button key={s.key} onClick={() => ("href" in s && s.href) ? router.push(s.href) : setActiveTab(s.key === "completedMatches" ? "matches" : (s.key as TabKey))} className="gaming-card p-4 text-right hover:border-neon-purple/40 transition-all group">
                   <div className="flex items-center gap-3">
                     <span className="text-3xl group-hover:scale-125 transition-transform">{s.icon}</span>
                     <div>

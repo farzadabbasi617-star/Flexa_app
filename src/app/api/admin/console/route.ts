@@ -12,7 +12,7 @@ import {
   tournaments,
   users,
 } from "@/db/schema";
-import { count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import logger from "@/lib/logger";
@@ -43,6 +43,14 @@ export async function GET(request: NextRequest) {
       .select({ v: count() })
       .from(telegramPreRegistrations)
       .where(eq(telegramPreRegistrations.status, "new"));
+    const [codPendingProfileCount] = await db
+      .select({ v: count() })
+      .from(users)
+      .where(and(
+        eq(users.codMobileStatus, "pending"),
+        isNotNull(users.codMobileId),
+        isNotNull(users.codMobileUsername),
+      ));
 
     const userRows = await db
       .select({
@@ -199,6 +207,7 @@ export async function GET(request: NextRequest) {
         images: imgCount.v,
         telegramPreRegistrations: telegramPreRegCount.v,
         telegramNewPreRegistrations: telegramNewCount.v,
+        codPendingProfiles: codPendingProfileCount.v,
       },
       users: userRows,
       tournaments: tournamentRows,
