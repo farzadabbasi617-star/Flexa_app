@@ -6,6 +6,7 @@ import { validateSession } from "@/lib/auth";
 import { ClashRoyaleApiError, createClashRoyaleApiClient, normalizeClashRoyaleTag } from "@/lib/clash-royale-api";
 import logger from "@/lib/logger";
 import { rateLimit } from "@/lib/rate-limit";
+import { notifyTelegramAdmins } from "@/lib/telegram";
 
 export const dynamic = "force-dynamic";
 
@@ -18,6 +19,18 @@ const ALLOWED_AVATARS = [
   "/icons/profile_icon.png",
   "/icons/gament-icon-192.png",
 ];
+
+function html(value: unknown) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/\"/g, "&quot;");
+}
+
+function appUrl() {
+  return (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || "https://www.gament1.ir").replace(/\/$/, "");
+}
 
 export async function PATCH(request: NextRequest) {
   try {
@@ -140,6 +153,22 @@ export async function PATCH(request: NextRequest) {
 
       return nextUser;
     });
+
+    if (codIdentityChanged && updated.codMobileStatus === "pending" && updated.codMobileId && updated.codMobileUsername) {
+      await notifyTelegramAdmins([
+        "🎯 <b>درخواست جدید تأیید UID کالاف</b>",
+        "",
+        `کاربر: <b>${html(updated.displayName)}</b>`,
+        `Gament ID: <code>${html(updated.gamentId)}</code>`,
+        `COD UID: <code>${html(updated.codMobileId)}</code>`,
+        `COD Username: <code>${html(updated.codMobileUsername)}</code>`,
+        `Region: <b>${html(updated.codMobileRegion?.toUpperCase())}</b>`,
+        "",
+        "برای تأیید، وارد پنل ادمین شو.",
+      ].join("\n"), {
+        inline_keyboard: [[{ text: "✅ بررسی UID کالاف", url: `${appUrl()}/admin/cod-profiles` }]],
+      }).catch((err) => logger.warn({ err, userId: updated.id }, "Failed to notify admins for pending COD profile"));
+    }
 
     return NextResponse.json({
       user: {

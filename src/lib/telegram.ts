@@ -142,6 +142,23 @@ export async function publishTournamentToTelegramChannel(tournament: TelegramTou
 }
 
 
+export function getTelegramAdminIds() {
+  return (process.env.TELEGRAM_ADMIN_IDS || "")
+    .split(/[\s,;]+/)
+    .map((value) => value.trim())
+    .filter((value) => /^\d+$/.test(value));
+}
+
+export async function notifyTelegramAdmins(text: string, replyMarkup?: Record<string, unknown>) {
+  const adminIds = getTelegramAdminIds();
+  const results = await Promise.allSettled(adminIds.map((id) => sendTelegramMessage(Number(id), text, replyMarkup)));
+  return {
+    ok: results.some((result) => result.status === "fulfilled" && Boolean((result.value as { ok?: boolean })?.ok)),
+    total: adminIds.length,
+    sent: results.filter((result) => result.status === "fulfilled" && Boolean((result.value as { ok?: boolean })?.ok)).length,
+  };
+}
+
 export async function notifyLinkedUserOnTelegram(userId: string, text: string, replyMarkup?: Record<string, unknown>) {
   try {
     const [account] = await db
