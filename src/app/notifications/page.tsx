@@ -19,8 +19,15 @@ interface Notification {
 
 const TYPE_ICONS: Record<string, string> = {
   match_start: "⚔️",
+  match_result: "🏁",
   tournament_update: "🏆",
+  tournament_reminder: "⏰",
+  cod_room_reminder: "🎯",
   achievement: "🏅",
+  level_up: "⚡",
+  news: "📰",
+  wallet: "💳",
+  support: "🎧",
   system: "📢",
 };
 

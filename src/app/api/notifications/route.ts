@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
-import { eq, desc, count } from "drizzle-orm";
+import { and, eq, desc, count } from "drizzle-orm";
 import { validateSession, requireRole } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +31,11 @@ export async function GET(request: NextRequest) {
       .from(notifications)
       .where(eq(notifications.userId, user.id));
 
+    const [unreadResult] = await db
+      .select({ value: count() })
+      .from(notifications)
+      .where(and(eq(notifications.userId, user.id), eq(notifications.isRead, false)));
+
     const userNotifications = await db
       .select()
       .from(notifications)
@@ -41,6 +46,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       data: userNotifications,
+      unreadCount: unreadResult.value,
       pagination: {
         total: totalResult.value,
         page,

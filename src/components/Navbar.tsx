@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -12,8 +12,26 @@ export default function Navbar() {
   const { lang, setLang, t } = useLanguage();
   const { user, loading, logout } = useAuth();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadUnread() {
+      if (!user) { setUnreadNotifications(0); return; }
+      try {
+        const response = await fetch("/api/notifications?limit=1", { cache: "no-store", credentials: "include" });
+        const data = await response.json().catch(() => ({}));
+        if (!cancelled && response.ok) setUnreadNotifications(Number(data.unreadCount || 0));
+      } catch {
+        if (!cancelled) setUnreadNotifications(0);
+      }
+    }
+    loadUnread();
+    const timer = setInterval(loadUnread, 60_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, [user]);
 
   const navItems = [
     { href: "/", label: t.nav.home, icon: "🏠" },
@@ -102,6 +120,7 @@ export default function Navbar() {
                     </div>
                     <span className="text-sm font-bold hidden xl:block">{user.displayName}</span>
                     <span className="text-gray-500 text-[10px]">▼</span>
+                    {unreadNotifications > 0 && <span className="absolute -top-1 -end-1 min-w-5 h-5 rounded-full bg-red-500 px-1.5 text-[10px] font-black text-white grid place-items-center">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}
                   </button>
 
                   {showUserMenu && (
@@ -117,8 +136,9 @@ export default function Navbar() {
                         <Link href="/profile/edit" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                           <span>🎮</span> {t.auth.gameIds}
                         </Link>
-                        <Link href="/notifications" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
-                          <span>🔔</span> {t.notif.title}
+                        <Link href="/notifications" className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => { setShowUserMenu(false); setUnreadNotifications(0); }}>
+                          <span className="flex items-center gap-3"><span>🔔</span> {t.notif.title}</span>
+                          {unreadNotifications > 0 && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}
                         </Link>
                         <Link href="/support" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                           <span>🎧</span> پشتیبانی
