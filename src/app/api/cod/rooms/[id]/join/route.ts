@@ -21,6 +21,8 @@ const errors: Record<string, { text: string; status: number }> = {
   COD_RANK_TOO_LOW: { text: "رنک COD Arena شما برای این روم کافی نیست", status: 403 },
   COD_AGE_GATE_BLOCKED: { text: "روم پولی فقط برای حساب هویتی کامل و کاربران بالای ۱۸ سال فعال است", status: 403 },
   COD_INSUFFICIENT_BALANCE: { text: "موجودی کیف پول برای ورود به این روم کافی نیست", status: 402 },
+  COD_USER_TEMP_BANNED: { text: "حساب شما فعلاً از ورود به روم‌های COD Arena محروم است", status: 403 },
+  COD_USER_PERMANENT_BANNED: { text: "حساب شما به‌صورت دائم از COD Arena محروم شده است", status: 403 },
 };
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

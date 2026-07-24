@@ -8,6 +8,8 @@ import {
   codRoomAuditEvents,
   codRoomEntries,
   codRoomEvidence,
+  codRoomPenalties,
+  codRoomReports,
   codRooms,
   codRoomSettlements,
   codRoomStaff,
@@ -135,6 +137,32 @@ async function createCodArenaSchema(client: any) {
     payload jsonb NOT NULL DEFAULT '{}'::jsonb, created_at timestamp NOT NULL DEFAULT now()
   )`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_audit_room_created_idx ON cod_room_audit_events(room_id,created_at)`));
+  await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS cod_room_reports (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(), room_id uuid NOT NULL REFERENCES cod_rooms(id),
+    reporter_id uuid NOT NULL REFERENCES users(id), accused_entry_id uuid REFERENCES cod_room_entries(id),
+    accused_user_id uuid REFERENCES users(id), accused_cod_username varchar(100), category varchar(32) NOT NULL,
+    description text NOT NULL, evidence_url text, status varchar(24) NOT NULL DEFAULT 'pending',
+    resolution varchar(40), admin_note text, reviewed_by_id uuid REFERENCES users(id), reviewed_at timestamp,
+    created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now()
+  )`));
+  await client.execute(sql.raw(`DO $$ BEGIN ALTER TABLE cod_room_reports ADD CONSTRAINT cod_room_reports_category_check CHECK (category IN ('cheat','teaming','no_recording','banned_item','toxic_behavior','wrong_result','no_show','other')); EXCEPTION WHEN duplicate_object THEN NULL; END $$`));
+  await client.execute(sql.raw(`DO $$ BEGIN ALTER TABLE cod_room_reports ADD CONSTRAINT cod_room_reports_status_check CHECK (status IN ('pending','in_review','resolved','rejected')); EXCEPTION WHEN duplicate_object THEN NULL; END $$`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_reports_room_status_idx ON cod_room_reports(room_id,status,created_at DESC)`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_reports_reporter_idx ON cod_room_reports(reporter_id,created_at DESC)`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_reports_accused_user_idx ON cod_room_reports(accused_user_id,created_at DESC) WHERE accused_user_id IS NOT NULL`));
+  await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS cod_room_penalties (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(), room_id uuid REFERENCES cod_rooms(id), report_id uuid REFERENCES cod_room_reports(id),
+    entry_id uuid REFERENCES cod_room_entries(id), user_id uuid NOT NULL REFERENCES users(id), type varchar(24) NOT NULL,
+    reason text NOT NULL, fine_rial numeric(20,0) NOT NULL DEFAULT 0, status varchar(20) NOT NULL DEFAULT 'active',
+    starts_at timestamp NOT NULL DEFAULT now(), ends_at timestamp, created_by_id uuid REFERENCES users(id),
+    created_at timestamp NOT NULL DEFAULT now(), updated_at timestamp NOT NULL DEFAULT now(), metadata jsonb NOT NULL DEFAULT '{}'::jsonb
+  )`));
+  await client.execute(sql.raw(`DO $$ BEGIN ALTER TABLE cod_room_penalties ADD CONSTRAINT cod_room_penalties_type_check CHECK (type IN ('warning','fine','temp_ban','permanent_ban','result_void')); EXCEPTION WHEN duplicate_object THEN NULL; END $$`));
+  await client.execute(sql.raw(`DO $$ BEGIN ALTER TABLE cod_room_penalties ADD CONSTRAINT cod_room_penalties_status_check CHECK (status IN ('active','paid','reversed','expired')); EXCEPTION WHEN duplicate_object THEN NULL; END $$`));
+  await client.execute(sql.raw(`DO $$ BEGIN ALTER TABLE cod_room_penalties ADD CONSTRAINT cod_room_penalties_fine_check CHECK (fine_rial >= 0); EXCEPTION WHEN duplicate_object THEN NULL; END $$`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_penalties_user_active_idx ON cod_room_penalties(user_id,status,starts_at DESC)`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_penalties_room_idx ON cod_room_penalties(room_id,created_at DESC) WHERE room_id IS NOT NULL`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_room_penalties_report_idx ON cod_room_penalties(report_id) WHERE report_id IS NOT NULL`));
   await client.execute(sql.raw(`ALTER TABLE affiliate_commission_events ALTER COLUMN match_id DROP NOT NULL`));
   await client.execute(sql.raw(`ALTER TABLE affiliate_commission_events ADD COLUMN IF NOT EXISTS source_type varchar(30) NOT NULL DEFAULT 'clash_match'`));
   await client.execute(sql.raw(`ALTER TABLE affiliate_commission_events ADD COLUMN IF NOT EXISTS source_id varchar(100)`));
@@ -351,6 +379,13 @@ export async function joinCodRoom(input: { roomId: string; userId: string; rules
     if (room.startsAt <= new Date()) throw new Error("COD_REGISTRATION_CLOSED");
     const [account] = await tx.select().from(users).where(eq(users.id, input.userId)).limit(1);
     if (!account) throw new Error("COD_USER_NOT_FOUND");
+    const [activeBan] = await tx.select({ id: codRoomPenalties.id, type: codRoomPenalties.type, endsAt: codRoomPenalties.endsAt }).from(codRoomPenalties).where(and(
+      eq(codRoomPenalties.userId, account.id),
+      eq(codRoomPenalties.status, "active"),
+      inArray(codRoomPenalties.type, ["temp_ban", "permanent_ban"]),
+      sql`(${codRoomPenalties.endsAt} IS NULL OR ${codRoomPenalties.endsAt} > now())`,
+    )).limit(1);
+    if (activeBan) throw new Error(activeBan.type === "permanent_ban" ? "COD_USER_PERMANENT_BANNED" : "COD_USER_TEMP_BANNED");
     if (!room.isPublished && account.role !== "admin" && account.role !== "super_admin") {
       const [betaStaff] = await tx.select({ id: codRoomStaff.id }).from(codRoomStaff)
         .where(and(eq(codRoomStaff.roomId, room.id), eq(codRoomStaff.userId, account.id))).limit(1);
@@ -799,5 +834,194 @@ export async function settleCodRoom(input: {
         rewardRial: row.reward.totalRewardRial.toString(),
       })),
     };
+  });
+}
+
+export const COD_ROOM_REPORT_CATEGORIES = [
+  "cheat",
+  "teaming",
+  "no_recording",
+  "banned_item",
+  "toxic_behavior",
+  "wrong_result",
+  "no_show",
+  "other",
+] as const;
+
+export const COD_ROOM_REPORT_STATUSES = ["pending", "in_review", "resolved", "rejected"] as const;
+export const COD_ROOM_PENALTY_TYPES = ["warning", "fine", "temp_ban", "permanent_ban", "result_void"] as const;
+
+function normalizeCodReportCategory(value: unknown) {
+  const category = String(value || "other").trim();
+  if (!(COD_ROOM_REPORT_CATEGORIES as readonly string[]).includes(category)) throw new Error("COD_REPORT_CATEGORY_INVALID");
+  return category;
+}
+
+function normalizeCodReportStatus(value: unknown) {
+  const status = String(value || "pending").trim();
+  if (!(COD_ROOM_REPORT_STATUSES as readonly string[]).includes(status)) throw new Error("COD_REPORT_STATUS_INVALID");
+  return status;
+}
+
+function normalizeCodPenaltyType(value: unknown) {
+  const type = String(value || "warning").trim();
+  if (!(COD_ROOM_PENALTY_TYPES as readonly string[]).includes(type)) throw new Error("COD_PENALTY_TYPE_INVALID");
+  return type;
+}
+
+function normalizeHttpsUrl(value: unknown, field: string) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  let parsed: URL;
+  try { parsed = new URL(text); } catch { throw new Error(`${field}_INVALID`); }
+  if (parsed.protocol !== "https:" || text.length > 1500) throw new Error(`${field}_INVALID`);
+  return text;
+}
+
+export async function reportCodRoomIssue(input: {
+  roomId: string;
+  reporterId: string;
+  isAdmin?: boolean;
+  category: string;
+  description: string;
+  accusedEntryId?: string | null;
+  accusedCodUsername?: string | null;
+  evidenceUrl?: string | null;
+}) {
+  await ensureCodArenaSchema();
+  const category = normalizeCodReportCategory(input.category);
+  const description = String(input.description || "").trim();
+  if (description.length < 10 || description.length > 2000) throw new Error("COD_REPORT_DESCRIPTION_INVALID");
+  const evidenceUrl = normalizeHttpsUrl(input.evidenceUrl, "COD_REPORT_EVIDENCE_URL");
+  const [room] = await db.select({ id: codRooms.id, status: codRooms.status }).from(codRooms).where(eq(codRooms.id, input.roomId)).limit(1);
+  if (!room) throw new Error("COD_ROOM_NOT_FOUND");
+  const [reporterEntry] = await db.select().from(codRoomEntries)
+    .where(and(eq(codRoomEntries.roomId, input.roomId), eq(codRoomEntries.userId, input.reporterId))).limit(1);
+  const [staff] = await db.select({ id: codRoomStaff.id }).from(codRoomStaff)
+    .where(and(eq(codRoomStaff.roomId, input.roomId), eq(codRoomStaff.userId, input.reporterId))).limit(1);
+  const privileged = Boolean(input.isAdmin || staff);
+  if (!reporterEntry && !privileged) throw new Error("COD_REPORT_FORBIDDEN");
+
+  let accusedEntry = null as null | typeof reporterEntry;
+  if (input.accusedEntryId) {
+    [accusedEntry] = await db.select().from(codRoomEntries)
+      .where(and(eq(codRoomEntries.roomId, input.roomId), eq(codRoomEntries.id, input.accusedEntryId))).limit(1);
+    if (!accusedEntry) throw new Error("COD_REPORT_ACCUSED_INVALID");
+  }
+  const usernameText = String(input.accusedCodUsername || "").trim().slice(0, 100);
+  if (!accusedEntry && usernameText) {
+    const entries = await db.select().from(codRoomEntries).where(eq(codRoomEntries.roomId, input.roomId));
+    accusedEntry = entries.find((entry) => entry.codUsernameSnapshot.toLowerCase() === usernameText.toLowerCase()) || null;
+  }
+
+  const [created] = await db.insert(codRoomReports).values({
+    roomId: input.roomId,
+    reporterId: input.reporterId,
+    accusedEntryId: accusedEntry?.id || null,
+    accusedUserId: accusedEntry?.userId || null,
+    accusedCodUsername: accusedEntry?.codUsernameSnapshot || usernameText || null,
+    category,
+    description,
+    evidenceUrl,
+  }).returning();
+  await db.insert(codRoomAuditEvents).values({
+    roomId: input.roomId,
+    actorId: input.reporterId,
+    eventType: "report_created",
+    payload: { reportId: created.id, category, accusedEntryId: accusedEntry?.id || null },
+  });
+  return created;
+}
+
+export async function listCodRoomReports(input: { status?: string | null; roomId?: string | null; limit?: number } = {}) {
+  await ensureCodArenaSchema();
+  const limit = Math.min(Math.max(Number(input.limit || 100), 1), 300);
+  const status = input.status ? normalizeCodReportStatus(input.status) : null;
+  const rows = await db.execute(sql`
+    SELECT
+      r.id, r.room_id AS "roomId", r.category, r.description, r.evidence_url AS "evidenceUrl",
+      r.status, r.resolution, r.admin_note AS "adminNote", r.accused_cod_username AS "accusedCodUsername",
+      r.created_at AS "createdAt", r.updated_at AS "updatedAt", r.reviewed_at AS "reviewedAt",
+      room.title AS "roomTitle", room.status AS "roomStatus",
+      reporter.display_name AS "reporterName", reporter.gament_id AS "reporterGamentId",
+      accused.display_name AS "accusedName", accused.gament_id AS "accusedGamentId",
+      reviewer.display_name AS "reviewerName"
+    FROM cod_room_reports r
+    INNER JOIN cod_rooms room ON room.id = r.room_id
+    INNER JOIN users reporter ON reporter.id = r.reporter_id
+    LEFT JOIN users accused ON accused.id = r.accused_user_id
+    LEFT JOIN users reviewer ON reviewer.id = r.reviewed_by_id
+    WHERE (${status}::text IS NULL OR r.status = ${status})
+      AND (${input.roomId || null}::uuid IS NULL OR r.room_id = ${input.roomId || null}::uuid)
+    ORDER BY r.created_at DESC
+    LIMIT ${limit}
+  `);
+  return (rows as unknown as { rows?: unknown[] }).rows || rows;
+}
+
+export async function resolveCodRoomReport(input: {
+  reportId: string;
+  adminId: string;
+  status: string;
+  resolution?: string | null;
+  adminNote?: string | null;
+  penalty?: {
+    type: string;
+    reason?: string | null;
+    fineRial?: string | null;
+    durationHours?: number | null;
+  } | null;
+}) {
+  await ensureCodArenaSchema();
+  const status = normalizeCodReportStatus(input.status);
+  if (!["in_review", "resolved", "rejected"].includes(status)) throw new Error("COD_REPORT_STATUS_INVALID");
+  return db.transaction(async (tx) => {
+    const [report] = await tx.select().from(codRoomReports).where(eq(codRoomReports.id, input.reportId)).for("update").limit(1);
+    if (!report) throw new Error("COD_REPORT_NOT_FOUND");
+    const now = new Date();
+    const [updated] = await tx.update(codRoomReports).set({
+      status,
+      resolution: input.resolution ? String(input.resolution).trim().slice(0, 40) : null,
+      adminNote: input.adminNote ? String(input.adminNote).trim().slice(0, 2000) : null,
+      reviewedById: input.adminId,
+      reviewedAt: now,
+      updatedAt: now,
+    }).where(eq(codRoomReports.id, report.id)).returning();
+
+    let penalty: any = null;
+    if (input.penalty && status === "resolved") {
+      if (!report.accusedUserId) throw new Error("COD_REPORT_ACCUSED_REQUIRED_FOR_PENALTY");
+      const type = normalizeCodPenaltyType(input.penalty.type);
+      const fineRial = moneyString(input.penalty.fineRial || "0", "جریمه");
+      if (type !== "fine" && BigInt(fineRial) > BigInt(0)) throw new Error("COD_PENALTY_FINE_ONLY_FOR_FINE");
+      const durationHours = Number(input.penalty.durationHours || 0);
+      const endsAt = type === "temp_ban"
+        ? new Date(now.getTime() + Math.max(1, Math.min(24 * 30, durationHours || 72)) * 60 * 60_000)
+        : null;
+      const reason = String(input.penalty.reason || input.adminNote || report.description).trim().slice(0, 2000);
+      if (reason.length < 3) throw new Error("COD_PENALTY_REASON_INVALID");
+      [penalty] = await tx.insert(codRoomPenalties).values({
+        roomId: report.roomId,
+        reportId: report.id,
+        entryId: report.accusedEntryId || null,
+        userId: report.accusedUserId,
+        type,
+        reason,
+        fineRial,
+        status: "active",
+        startsAt: now,
+        endsAt,
+        createdById: input.adminId,
+        metadata: { category: report.category, accusedCodUsername: report.accusedCodUsername },
+      }).returning();
+    }
+
+    await tx.insert(codRoomAuditEvents).values({
+      roomId: report.roomId,
+      actorId: input.adminId,
+      eventType: "report_resolved",
+      payload: { reportId: report.id, status, penaltyId: penalty?.id || null },
+    });
+    return { report: updated, penalty };
   });
 }

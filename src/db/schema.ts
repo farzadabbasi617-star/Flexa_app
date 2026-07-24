@@ -1212,6 +1212,51 @@ export const codRoomAuditEvents = pgTable("cod_room_audit_events", {
   roomCreatedIdx: index("cod_room_audit_room_created_idx").on(table.roomId, table.createdAt),
 }));
 
+export const codRoomReports = pgTable("cod_room_reports", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  roomId: uuid("room_id").notNull().references(() => codRooms.id),
+  reporterId: uuid("reporter_id").notNull().references(() => users.id),
+  accusedEntryId: uuid("accused_entry_id").references(() => codRoomEntries.id),
+  accusedUserId: uuid("accused_user_id").references(() => users.id),
+  accusedCodUsername: varchar("accused_cod_username", { length: 100 }),
+  category: varchar("category", { length: 32 }).notNull(),
+  description: text("description").notNull(),
+  evidenceUrl: text("evidence_url"),
+  status: varchar("status", { length: 24 }).notNull().default("pending"),
+  resolution: varchar("resolution", { length: 40 }),
+  adminNote: text("admin_note"),
+  reviewedById: uuid("reviewed_by_id").references(() => users.id),
+  reviewedAt: timestamp("reviewed_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  roomStatusIdx: index("cod_room_reports_room_status_idx").on(table.roomId, table.status, table.createdAt),
+  reporterIdx: index("cod_room_reports_reporter_idx").on(table.reporterId, table.createdAt),
+  accusedUserIdx: index("cod_room_reports_accused_user_idx").on(table.accusedUserId, table.createdAt),
+}));
+
+export const codRoomPenalties = pgTable("cod_room_penalties", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  roomId: uuid("room_id").references(() => codRooms.id),
+  reportId: uuid("report_id").references(() => codRoomReports.id),
+  entryId: uuid("entry_id").references(() => codRoomEntries.id),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  type: varchar("type", { length: 24 }).notNull(),
+  reason: text("reason").notNull(),
+  fineRial: numeric("fine_rial", { precision: 20, scale: 0 }).notNull().default("0"),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  startsAt: timestamp("starts_at").defaultNow().notNull(),
+  endsAt: timestamp("ends_at"),
+  createdById: uuid("created_by_id").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  metadata: jsonb("metadata").notNull().default('{}'),
+}, (table) => ({
+  userActiveIdx: index("cod_room_penalties_user_active_idx").on(table.userId, table.status, table.startsAt),
+  roomIdx: index("cod_room_penalties_room_idx").on(table.roomId, table.createdAt),
+  reportIdx: index("cod_room_penalties_report_idx").on(table.reportId),
+}));
+
 // Support Tickets
 export const tickets = pgTable("tickets", {
   id: uuid("id").defaultRandom().primaryKey(),

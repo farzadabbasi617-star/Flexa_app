@@ -77,6 +77,7 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [evidence, setEvidence] = useState({ kind: "scoreboard", fileUrl: "" });
+  const [report, setReport] = useState({ category: "cheat", accusedCodUsername: "", evidenceUrl: "", description: "" });
 
   const load = useCallback(async () => {
     try {
@@ -108,6 +109,28 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
       if (path === "evidence") setEvidence((current) => ({ ...current, fileUrl: "" }));
       await load();
     } catch (err) { setError(err instanceof Error ? err.message : "عملیات انجام نشد"); }
+    finally { setBusy(false); }
+  }
+
+  async function submitReport() {
+    setBusy(true); setError(""); setMessage("");
+    try {
+      const response = await fetch(`/api/cod/rooms/${id}/reports`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        body: JSON.stringify({
+          category: report.category,
+          accusedCodUsername: report.accusedCodUsername || null,
+          evidenceUrl: report.evidenceUrl || null,
+          description: report.description,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "ثبت گزارش انجام نشد");
+      setMessage("گزارش تخلف ثبت شد و در صف بررسی ادمین قرار گرفت.");
+      setReport({ category: "cheat", accusedCodUsername: "", evidenceUrl: "", description: "" });
+    } catch (err) { setError(err instanceof Error ? err.message : "ثبت گزارش انجام نشد"); }
     finally { setBusy(false); }
   }
 
@@ -176,6 +199,20 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
                 <button onClick={() => action("evidence", evidence)} disabled={busy || !evidence.fileUrl.startsWith("https://")} className="rounded-xl bg-purple-600 px-4 py-3 text-xs font-black disabled:opacity-40">ثبت مدرک</button>
               </div>
               {canOperate && <div className="text-[10px] text-purple-300 mt-3">مدارک ثبت‌شده روم: {room.evidenceCount.toLocaleString("fa-IR")}</div>}
+            </section>}
+
+            {(room.myEntry || canOperate) && <section className="rounded-[2rem] border border-red-500/20 bg-red-950/10 p-5 sm:p-6">
+              <h2 className="text-lg font-black">🚨 گزارش تخلف روم</h2>
+              <p className="text-[10px] text-gray-500 mt-2 leading-5">برای چیت، تیم‌آپ، نداشتن رکورد، آیتم ممنوع یا نتیجه اشتباه گزارش ثبت کن. گزارش‌ها در پنل ادمین بررسی و در صورت نیاز اخطار/جریمه/بن اعمال می‌شود.</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
+                <select value={report.category} onChange={(e) => setReport({ ...report, category: e.target.value })} className="rounded-xl bg-black/40 border border-white/10 px-3 py-3 text-xs">
+                  <option value="cheat">چیت / هک</option><option value="teaming">تیم‌آپ</option><option value="no_recording">نداشتن رکورد</option><option value="banned_item">آیتم ممنوع</option><option value="toxic_behavior">رفتار/فحاشی</option><option value="wrong_result">نتیجه اشتباه</option><option value="no_show">No-show</option><option value="other">سایر</option>
+                </select>
+                <input value={report.accusedCodUsername} onChange={(e) => setReport({ ...report, accusedCodUsername: e.target.value })} dir="ltr" placeholder="نام داخل بازی متخلف / اختیاری" className="rounded-xl bg-black/40 border border-white/10 px-3 py-3 text-xs outline-none focus:border-red-400" />
+                <input value={report.evidenceUrl} onChange={(e) => setReport({ ...report, evidenceUrl: e.target.value })} dir="ltr" placeholder="https:// لینک مدرک / اختیاری" className="sm:col-span-2 rounded-xl bg-black/40 border border-white/10 px-3 py-3 text-xs outline-none focus:border-red-400" />
+                <textarea value={report.description} onChange={(e) => setReport({ ...report, description: e.target.value })} rows={4} placeholder="توضیح دقیق اتفاق، زمان تقریبی و مدرک را بنویس..." className="sm:col-span-2 rounded-xl bg-black/40 border border-white/10 px-3 py-3 text-xs outline-none focus:border-red-400" />
+              </div>
+              <button onClick={submitReport} disabled={busy || report.description.trim().length < 10 || Boolean(report.evidenceUrl && !report.evidenceUrl.startsWith("https://"))} className="mt-4 rounded-xl bg-red-500 text-black px-5 py-3 text-xs font-black disabled:opacity-40">ثبت گزارش برای بررسی</button>
             </section>}
           </div>
 

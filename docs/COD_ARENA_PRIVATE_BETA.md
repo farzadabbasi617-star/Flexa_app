@@ -62,4 +62,11 @@ commission = service_fee × referral_rate_bps / 10,000
 
 Evidence supports profile, scoreboard, player recording, lobby recording and dispute records. Optional SHA-256 content hashes prevent reuse inside a room. Rooms marked `requires_recording` cannot be settled without at least one scoreboard/recording/lobby-recording record.
 
+The first trust/safety layer is now available:
+
+- players/staff can file room reports for cheat, teaming, no recording, banned item, toxic behavior, wrong result, no-show or other;
+- admins review reports in `/admin/cod-reports`;
+- admins can resolve/reject reports and optionally apply warning, fine, temporary ban, permanent ban or result-void penalties;
+- active temporary/permanent bans block future COD Arena joins.
+
 This is the foundation, not the final anti-cheat layer. Cancellation refunds are atomic, but before public money is enabled add a treasury-backed prize-budget reserve, direct upload, malware-safe media processing, OCR, COD-specific dispute holds, a formal lobby-recorder workflow, device review protocol, two QA financial cycles and legal approval.

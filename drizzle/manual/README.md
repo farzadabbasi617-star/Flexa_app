@@ -34,6 +34,8 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | `0023_add_clash_1v1_entries.sql` | Adds a standalone paid Clash Royale 1V1 queue table for repeatable Telegram matchmaking entries. |
 | `0024_add_telegram_reliability.sql` | Adds incoming webhook idempotency leases and the PostgreSQL-backed outgoing Telegram message queue. |
 | `0025_repair_wallet_money_types.sql` | Converts legacy text wallet/transaction money columns to `numeric(20,0)` without losing valid balances. |
+| `0036_add_cod_mobile_room_engine.sql` | Adds the COD Mobile custom-room engine: rooms, entries, evidence, settlements, ranks and audit trail. |
+| `0037_add_cod_room_reports_penalties.sql` | Adds COD room trust/safety reports, admin resolutions, warnings, fines and temporary/permanent bans. |
 
 > **Email verification (required before deploying the email-OTP auth flow):**
 > Run `0019_add_email_verification.sql` and set `RESEND_API_KEY` (and
