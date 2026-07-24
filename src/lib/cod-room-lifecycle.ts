@@ -1,6 +1,6 @@
-import { and, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { codRoomAuditEvents, codRoomEntries, codRooms } from "@/db/schema";
+import { codRoomAuditEvents, codRoomEntries, codRoomLobbyChecks, codRooms } from "@/db/schema";
 import { ensureCodArenaSchema } from "@/lib/cod-room-service";
 
 /**
@@ -23,7 +23,15 @@ export async function advanceCodRoomLifecycle(now = new Date()) {
       let next = room.status;
       if (room.status === "registration" && room.checkInOpensAt && room.checkInOpensAt <= now) next = "check_in";
       if (["registration", "check_in"].includes(room.status) && room.credentialsRevealAt && room.credentialsRevealAt <= now) next = "lobby_open";
-      if (["registration", "check_in", "lobby_open"].includes(room.status) && room.startsAt <= now) next = "in_progress";
+      if (["registration", "check_in", "lobby_open"].includes(room.status) && room.startsAt <= now) {
+        const [latestLobbyCheck] = await tx.select({ id: codRoomLobbyChecks.id, status: codRoomLobbyChecks.status })
+          .from(codRoomLobbyChecks)
+          .where(eq(codRoomLobbyChecks.roomId, room.id))
+          .orderBy(desc(codRoomLobbyChecks.createdAt))
+          .limit(1);
+        if (latestLobbyCheck?.status === "verified") next = "in_progress";
+        else if (["registration", "check_in"].includes(room.status)) next = "lobby_open";
+      }
       let marked = 0;
       if (room.checkInClosesAt && room.checkInClosesAt <= now) {
         const absent = await tx.update(codRoomEntries).set({ status: "no_show", resultStatus: "no_show", updatedAt: now })

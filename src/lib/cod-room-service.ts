@@ -620,9 +620,20 @@ export async function updateCodRoom(roomId: string, raw: Record<string, unknown>
         }).where(eq(codRoomEntries.id, entry.id));
       }
     }
+    let latestLobbyCheck: { id: string; status: string } | null = null;
+    if (before.status !== "in_progress" && values.status === "in_progress") {
+      [latestLobbyCheck] = await tx.select({ id: codRoomLobbyChecks.id, status: codRoomLobbyChecks.status })
+        .from(codRoomLobbyChecks)
+        .where(eq(codRoomLobbyChecks.roomId, roomId))
+        .orderBy(desc(codRoomLobbyChecks.createdAt))
+        .limit(1);
+      if (latestLobbyCheck?.status !== "verified" && !Boolean(raw.lobbyOverrideConfirmed)) {
+        throw new Error("COD_LOBBY_START_CONFIRMATION_REQUIRED");
+      }
+    }
     const { maximumLiabilityRial, ...databaseValues } = values;
     const [updated] = await tx.update(codRooms).set({ ...databaseValues, updatedAt: new Date() }).where(eq(codRooms.id, roomId)).returning();
-    await tx.insert(codRoomAuditEvents).values({ roomId, actorId: adminId, eventType: "room_updated", payload: { fromStatus: before.status, toStatus: updated.status, maximumLiabilityRial, refunds } });
+    await tx.insert(codRoomAuditEvents).values({ roomId, actorId: adminId, eventType: "room_updated", payload: { fromStatus: before.status, toStatus: updated.status, maximumLiabilityRial, refunds, lobbyOverrideConfirmed: Boolean(raw.lobbyOverrideConfirmed), latestLobbyCheckId: latestLobbyCheck?.id || null } });
     return { ...updated, maximumLiabilityRial };
   });
 }

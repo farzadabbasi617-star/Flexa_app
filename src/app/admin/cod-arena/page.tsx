@@ -38,7 +38,7 @@ export default function AdminCodArenaPage(){
   const {user,loading:authLoading}=useAuth(); const router=useRouter();
   const [rooms,setRooms]=useState<RoomRow[]>([]); const [loading,setLoading]=useState(true); const [live,setLive]=useState(false); const [form,setForm]=useState(initialForm); const [showForm,setShowForm]=useState(false);
   const [saving,setSaving]=useState(false); const [error,setError]=useState(""); const [message,setMessage]=useState(""); const [selected,setSelected]=useState<DetailRoom|null>(null);
-  const [results,setResults]=useState<Record<string,{kills:string;placement:string}>>({}); const [evidenceConfirmed,setEvidenceConfirmed]=useState(false); const [lobbyOverrideConfirmed,setLobbyOverrideConfirmed]=useState(false); const [staff,setStaff]=useState({identifier:"",role:"roomer"});
+  const [results,setResults]=useState<Record<string,{kills:string;placement:string}>>({}); const [evidenceConfirmed,setEvidenceConfirmed]=useState(false); const [lobbyOverrideConfirmed,setLobbyOverrideConfirmed]=useState(false); const [lobbyStartOverrideConfirmed,setLobbyStartOverrideConfirmed]=useState(false); const [staff,setStaff]=useState({identifier:"",role:"roomer"});
   const isAdmin=user?.role==="admin"||user?.role==="super_admin";
 
   useEffect(()=>{if(!authLoading&&(!user||!isAdmin))router.push("/");},[authLoading,user,isAdmin,router]);
@@ -47,14 +47,15 @@ export default function AdminCodArenaPage(){
 
   const payload=useMemo(()=>({
     ...form,
+    lobbyOverrideConfirmed:lobbyStartOverrideConfirmed,
     entryFeeRial:tomanToRial(form.entryFeeToman),serviceFeeRial:tomanToRial(form.serviceFeeToman),prizeBudgetRial:tomanToRial(form.prizeBudgetToman),referralRateBps:Math.round(Number(normalizeDigits(String(form.referralPercent||0)).replace("٫","."))*100),
     rewardConfig:{perKillRial:tomanToRial(form.perKillToman),participationRial:tomanToRial(form.participationToman),maxKillsPerEntry:Number(form.maxKillsPerEntry),placementRules:[
       ...(Number(form.firstToman)>0?[{from:1,to:1,amountRial:tomanToRial(form.firstToman)}]:[]),...(Number(form.secondToman)>0?[{from:2,to:2,amountRial:tomanToRial(form.secondToman)}]:[]),...(Number(form.thirdToman)>0?[{from:3,to:3,amountRial:tomanToRial(form.thirdToman)}]:[]),
     ]},
     startsAt:iso(form.startsAt),endsAt:iso(form.endsAt),checkInOpensAt:iso(form.checkInOpensAt),checkInClosesAt:iso(form.checkInClosesAt),credentialsRevealAt:iso(form.credentialsRevealAt),
-  }),[form]);
+  }),[form,lobbyStartOverrideConfirmed]);
 
-  function begin(){setForm({...initialForm,startsAt:localDate(new Date(Date.now()+24*60*60_000).toISOString())});setShowForm(true);setSelected(null);setError("");}
+  function begin(){setForm({...initialForm,startsAt:localDate(new Date(Date.now()+24*60*60_000).toISOString())});setLobbyStartOverrideConfirmed(false);setShowForm(true);setSelected(null);setError("");}
   async function edit(room:RoomRow){
     setError("");
     try {
@@ -63,7 +64,7 @@ export default function AdminCodArenaPage(){
       if(!response.ok)throw new Error(data.error||"اطلاعات روم دریافت نشد");
       const full=data.room as DetailRoom;
       setForm({...initialForm,id:full.id,title:full.title,description:full.description||"",region:full.region,map:full.map,teamMode:full.teamMode,perspective:full.perspective,status:full.status,isPublished:full.isPublished,capacity:full.capacity,entryFeeToman:rialToToman(full.entryFeeRial),serviceFeeToman:rialToToman(full.serviceFeeRial),prizeBudgetToman:rialToToman(full.prizeBudgetRial),referralPercent:String(Number(full.referralRateBps||0)/100),perKillToman:rialToToman(full.rewardConfig?.perKillRial),participationToman:rialToToman(full.rewardConfig?.participationRial),maxKillsPerEntry:Number(full.rewardConfig?.maxKillsPerEntry||40),firstToman:rialToToman(full.rewardConfig?.placementRules?.find(x=>x.from===1)?.amountRial),secondToman:rialToToman(full.rewardConfig?.placementRules?.find(x=>x.from===2)?.amountRial),thirdToman:rialToToman(full.rewardConfig?.placementRules?.find(x=>x.from===3)?.amountRial),minRankPoints:full.minRankPoints,requiresRecording:full.requiresRecording,rulesVersion:full.rulesVersion||"cod-beta-1",rules:full.rules||"",roomCode:full.roomCode||"",roomPassword:full.roomPassword||"",officialJoinUrl:full.officialJoinUrl||"",startsAt:localDate(full.startsAt),endsAt:localDate(full.endsAt),checkInOpensAt:localDate(full.checkInOpensAt),checkInClosesAt:localDate(full.checkInClosesAt),credentialsRevealAt:localDate(full.credentialsRevealAt)});
-      setShowForm(true);setSelected(null);scrollTo({top:0,behavior:"smooth"});
+      setLobbyStartOverrideConfirmed(false);setShowForm(true);setSelected(null);scrollTo({top:0,behavior:"smooth"});
     } catch(e){setError(e instanceof Error?e.message:"اطلاعات روم دریافت نشد");}
   }
   async function save(e:FormEvent){e.preventDefault();setSaving(true);setError("");setMessage("");try{const r=await fetch("/api/admin/cod/rooms",{method:form.id?"PATCH":"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||"ذخیره نشد");setMessage(form.id?"روم به‌روزرسانی شد":"روم Private Beta ساخته شد");setShowForm(false);setForm(initialForm);await load();}catch(e){setError(e instanceof Error?e.message:"ذخیره نشد");}finally{setSaving(false);}}
@@ -88,6 +89,7 @@ export default function AdminCodArenaPage(){
       <div><h3 className="font-black text-orange-300 mb-3">اطلاعات محرمانه Lobby</h3><div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><label className="text-xs text-gray-400">Room Code<input value={form.roomCode} onChange={e=>setForm({...form,roomCode:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label><label className="text-xs text-gray-400">Password<input value={form.roomPassword} onChange={e=>setForm({...form,roomPassword:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label><label className="text-xs text-gray-400">لینک رسمی COD<input value={form.officialJoinUrl} onChange={e=>setForm({...form,officialJoinUrl:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label></div></div>
       <label className="block text-xs text-gray-400">قوانین<textarea value={form.rules} onChange={e=>setForm({...form,rules:e.target.value})} rows={6} className={`${input} mt-1`}/></label>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><label className="text-xs text-gray-400">وضعیت<select value={form.status} onChange={e=>setForm({...form,status:e.target.value})} className={`${input} mt-1`}>{(statusNext[form.status]||[form.status]).map(x=><option key={x} value={x}>{statusFa[x]||x}</option>)}</select></label><label className="flex items-center gap-2 text-xs mt-7"><input type="checkbox" checked={form.requiresRecording} onChange={e=>setForm({...form,requiresRecording:e.target.checked})}/> رکورد بازیکنان الزامی</label><label className="flex items-center gap-2 text-xs mt-7"><input type="checkbox" checked={form.isPublished} onChange={e=>setForm({...form,isPublished:e.target.checked})}/> نمایش در COD Arena</label></div>
+      {form.status==="in_progress"&&<label className="flex gap-3 items-start rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs leading-6 text-amber-200"><input type="checkbox" checked={lobbyStartOverrideConfirmed} onChange={e=>setLobbyStartOverrideConfirmed(e.target.checked)} className="mt-1"/><span>اگر آخرین بررسی Lobby هنوز verified نیست، با مسئولیت ادمین اجازه شروع/درج وضعیت در اجرا را صادر می‌کنم.</span></label>}
       <button disabled={saving} className="rounded-2xl bg-orange-500 text-black px-8 py-3.5 text-sm font-black disabled:opacity-50">{saving?"در حال ذخیره...":"ذخیره امن روم"}</button>
     </form>}
 

@@ -63,6 +63,7 @@ export async function PATCH(request: NextRequest) {
       COD_STATUS_TRANSITION_INVALID: { text: "تغییر وضعیت روم خارج از چرخه امن است", status: 409 },
       COD_LOCKED_AFTER_REGISTRATION: { text: "پس از اولین ثبت‌نام، ریجن، مود، قوانین و تمام شرایط مالی/جایزه قفل می‌شوند", status: 409 },
       COD_CAPACITY_BELOW_REGISTRATIONS: { text: "ظرفیت نمی‌تواند کمتر از تعداد ثبت‌نام فعلی باشد", status: 409 },
+      COD_LOBBY_START_CONFIRMATION_REQUIRED: { text: "برای شروع روم، آخرین بررسی Lobby باید verified باشد؛ در غیر این صورت override دستی ادمین لازم است", status: 409 },
     };
     if (known[code]) return NextResponse.json({ error: known[code].text, code }, { status: known[code].status });
     return NextResponse.json({ error: code === "UNKNOWN" ? "ویرایش روم انجام نشد" : code }, { status: 400 });
