@@ -27,6 +27,7 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         soldCount: storeListings.soldCount,
         warrantyDays: storeListings.warrantyDays,
         images: storeListings.images,
+        metadata: storeListings.metadata,
         status: storeListings.status,
         createdAt: storeListings.createdAt,
         sellerId: storeListings.sellerId,

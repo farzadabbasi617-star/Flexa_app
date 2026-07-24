@@ -201,6 +201,7 @@ export const StoreListingCreateSchema = z
     images: z.array(imageRefSchema).max(8, "حداکثر ۸ تصویر").default([]),
     deliveryNotes: z.string().trim().max(5000).optional(),
     warrantyDays: z.coerce.number().int().min(0).max(365).optional(),
+    metadata: z.record(z.string(), z.unknown()).optional(),
   })
   .refine(
     (d) => d.kind !== "currency" || (d.currencyKind && d.currencyAmount),

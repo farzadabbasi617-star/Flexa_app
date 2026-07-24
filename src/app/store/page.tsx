@@ -34,6 +34,7 @@ interface Listing {
   soldCount: number;
   warrantyDays?: number;
   images: string[];
+  metadata?: any;
   sellerName: string | null;
 }
 
@@ -99,6 +100,21 @@ const GAME_LABELS: Record<string, string> = {
 
 function toman(value: number) {
   return `${Math.round(value).toLocaleString("fa-IR")} تومان`;
+}
+function codmMeta(listing: Listing) {
+  return listing.kind === "account" && listing.game === "cod_mobile" ? listing.metadata?.codm || null : null;
+}
+function codmChips(listing: Listing) {
+  const meta = codmMeta(listing);
+  if (!meta) return [];
+  return [
+    meta.level ? `Lvl ${meta.level}` : "",
+    meta.mythicWeapons ? `${meta.mythicWeapons} Mythic` : "",
+    meta.legendaryWeapons ? `${meta.legendaryWeapons} Legendary` : "",
+    meta.epicWeapons ? `${meta.epicWeapons} Epic Gun` : "",
+    meta.cpBalance ? `${meta.cpBalance} CP` : "",
+    meta.region ? String(meta.region).toUpperCase() : "",
+  ].filter(Boolean).slice(0, 5);
 }
 
 function ProductFallback({ listing }: { listing: Listing }) {
@@ -568,6 +584,7 @@ export default function StorePage() {
                               {listing.currencyAmount ? listing.currencyAmount.toLocaleString("fa-IR") : ""} {CURRENCY_LABELS[listing.currencyKind || "other"]}
                             </span>
                           )}
+                          {codmChips(listing).map((chip) => <span key={chip} className="rounded-md bg-orange-500/10 px-1.5 py-1 text-orange-300">{chip}</span>)}
                         </div>
 
                         <Link href={`/store/${listing.id}`} className="line-clamp-2 min-h-12 text-[12px] font-black leading-6 text-gray-100 transition hover:text-violet-200 sm:text-[13px]">

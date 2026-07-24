@@ -12,6 +12,54 @@ import { safePagination } from "@/lib/pagination";
 
 export const dynamic = "force-dynamic";
 
+function cleanText(value: unknown, max = 500) {
+  return String(value || "").trim().slice(0, max);
+}
+function cleanInt(value: unknown, min = 0, max = 1_000_000) {
+  const parsed = Number(value || 0);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.min(max, Math.max(min, Math.floor(parsed)));
+}
+function cleanBool(value: unknown) {
+  return value === true || value === "true" || value === "yes" || value === "1";
+}
+function normalizeListingMetadata(kind: string, game: string | null | undefined, raw: unknown) {
+  const input = raw && typeof raw === "object" && !Array.isArray(raw) ? raw as Record<string, unknown> : {};
+  if (kind !== "account") return input;
+  if (game !== "cod_mobile") return input;
+  const codm = input.codm && typeof input.codm === "object" && !Array.isArray(input.codm) ? input.codm as Record<string, unknown> : input;
+  const normalized = {
+    schema: "codm-account-v1",
+    level: cleanInt(codm.level, 1, 1000),
+    uid: cleanText(codm.uid, 100),
+    region: ["global", "garena"].includes(String(codm.region)) ? String(codm.region) : "global",
+    platform: cleanText(codm.platform, 80),
+    loginMethod: cleanText(codm.loginMethod, 120),
+    activisionOnly: cleanBool(codm.activisionOnly),
+    fullAccess: cleanBool(codm.fullAccess),
+    emailChangeable: cleanBool(codm.emailChangeable),
+    firstOwner: cleanBool(codm.firstOwner),
+    cpBalance: cleanInt(codm.cpBalance, 0, 100_000_000),
+    mythicWeapons: cleanInt(codm.mythicWeapons, 0, 1000),
+    maxedMythicWeapons: cleanInt(codm.maxedMythicWeapons, 0, 1000),
+    legendaryWeapons: cleanInt(codm.legendaryWeapons, 0, 5000),
+    epicWeapons: cleanInt(codm.epicWeapons, 0, 10000),
+    mythicCharacters: cleanInt(codm.mythicCharacters, 0, 1000),
+    legendaryCharacters: cleanInt(codm.legendaryCharacters, 0, 5000),
+    epicCharacters: cleanInt(codm.epicCharacters, 0, 10000),
+    diamondCamos: cleanInt(codm.diamondCamos, 0, 10000),
+    damascusUnlocked: cleanBool(codm.damascusUnlocked),
+    battlePass: cleanText(codm.battlePass, 200),
+    rankMp: cleanText(codm.rankMp, 80),
+    rankBr: cleanText(codm.rankBr, 80),
+    notableWeapons: cleanText(codm.notableWeapons, 1200),
+    notableCharacters: cleanText(codm.notableCharacters, 1200),
+    rareItems: cleanText(codm.rareItems, 1200),
+    screenshotsIncluded: cleanText(codm.screenshotsIncluded, 500),
+  };
+  return { ...input, codm: normalized };
+}
+
 // GET: public catalogue of active listings, with optional filters.
 export async function GET(request: NextRequest) {
   try {
@@ -77,6 +125,7 @@ export async function GET(request: NextRequest) {
         soldCount: storeListings.soldCount,
         warrantyDays: storeListings.warrantyDays,
         images: storeListings.images,
+        metadata: storeListings.metadata,
         createdAt: storeListings.createdAt,
         sellerId: storeListings.sellerId,
         sellerName: users.displayName,
@@ -126,6 +175,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: parsed.error.issues[0]?.message || "اطلاعات نامعتبر" }, { status: 400 });
     }
     const d = parsed.data;
+    const normalizedMetadata = normalizeListingMetadata(d.kind, d.game, d.metadata);
+    const codmMeta = normalizedMetadata && typeof normalizedMetadata === "object" && "codm" in normalizedMetadata ? (normalizedMetadata as { codm?: Record<string, unknown> }).codm : null;
+    if (d.kind === "account" && d.game === "cod_mobile") {
+      if (!codmMeta || Number(codmMeta.level || 0) < 1) return NextResponse.json({ error: "برای اکانت کالاف، لول اکانت الزامی است" }, { status: 400 });
+      if (!String(codmMeta.loginMethod || "").trim()) return NextResponse.json({ error: "برای اکانت کالاف، روش ورود/اتصال اکانت را مشخص کنید" }, { status: 400 });
+      if (!String(codmMeta.platform || "").trim()) return NextResponse.json({ error: "برای اکانت کالاف، پلتفرم قابل تحویل را مشخص کنید" }, { status: 400 });
+      if ((d.images || []).length < 3) return NextResponse.json({ error: "برای اکانت کالاف حداقل ۳ تصویر لازم است: پروفایل/لول، گان‌ها، کاراکترها یا لینک‌شده‌ها" }, { status: 400 });
+      if (!String(d.deliveryNotes || "").trim() || String(d.deliveryNotes || "").trim().length < 20) {
+        return NextResponse.json({ error: "برای اکانت کالاف، اطلاعات تحویل محرمانه را کامل‌تر وارد کنید" }, { status: 400 });
+      }
+    }
     const priceRial = parseTomanToRial(String(d.priceToman));
     if (priceRial <= BigInt(0)) {
       return NextResponse.json({ error: "قیمت نامعتبر است" }, { status: 400 });
@@ -147,6 +207,7 @@ export async function POST(request: NextRequest) {
         images: d.images,
         deliveryNotes: d.deliveryNotes ?? null,
         warrantyDays: d.warrantyDays ?? 0,
+        metadata: normalizedMetadata,
         status: "pending_review",
       })
       .returning({ id: storeListings.id, status: storeListings.status });

@@ -20,6 +20,7 @@ interface Listing {
   soldCount: number;
   warrantyDays?: number;
   images: string[];
+  metadata?: any;
   sellerId: string | null;
   sellerName: string | null;
   sellerVerified: boolean | null;
@@ -59,6 +60,14 @@ const CURRENCY_ICONS: Record<string, string> = {
 };
 
 function toman(n: number) { return `${Math.round(n).toLocaleString("fa-IR")} تومان`; }
+function codmMeta(listing: Listing | null) {
+  return listing?.kind === "account" && listing.game === "cod_mobile" ? listing.metadata?.codm || null : null;
+}
+function metaValue(value: unknown) {
+  if (value === true) return "دارد";
+  if (value === false || value === null || value === undefined || value === "") return "—";
+  return String(value);
+}
 
 function roundNice(n: number, dir: "down" | "up" | "near" = "near"): number {
   if (n <= 0) return 0;
@@ -262,6 +271,7 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             fortnite: "/icons/icon-fortnite.png",
           } as Record<string, string>)[listing.game]
         : undefined;
+  const codm = codmMeta(listing);
 
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden bg-[#07080d] pb-28 text-white" dir="rtl">
@@ -377,6 +387,9 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
                 {listing.kind === "currency" ? CURRENCY_LABELS[listing.currencyKind || "other"] : KIND_LABELS[listing.kind] || listing.kind}
               </span>
               {listing.game && <span className="rounded-lg border border-white/[.07] bg-white/[.04] px-2.5 py-1.5 text-gray-300">{GAME_LABELS[listing.game] || listing.game}</span>}
+              {codm?.level && <span className="rounded-lg bg-orange-500/10 px-2.5 py-1.5 text-orange-300">Level {codm.level}</span>}
+              {codm?.mythicWeapons ? <span className="rounded-lg bg-fuchsia-500/10 px-2.5 py-1.5 text-fuchsia-300">{codm.mythicWeapons} Mythic</span> : null}
+              {codm?.legendaryWeapons ? <span className="rounded-lg bg-amber-500/10 px-2.5 py-1.5 text-amber-300">{codm.legendaryWeapons} Legendary</span> : null}
               {listing.stock > 0 && <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/10 px-2.5 py-1.5 text-emerald-300"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> موجود</span>}
             </div>
 
@@ -510,6 +523,13 @@ export default function ListingDetailPage({ params }: { params: Promise<{ id: st
             )}
           </section>
         </div>
+
+        {codm && <section className="mt-10 rounded-[28px] border border-orange-500/20 bg-orange-950/10 p-5 sm:p-6"><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-orange-500/10 text-orange-300">🎯</span><h2 className="text-lg font-black">مشخصات اکانت کالاف دیوتی موبایل</h2></div><div className="mt-5 grid grid-cols-2 gap-2 md:grid-cols-4">{[
+          ["لول", codm.level], ["ریجن", String(codm.region || "").toUpperCase()], ["پلتفرم", codm.platform], ["روش ورود", codm.loginMethod],
+          ["CP", codm.cpBalance], ["Mythic Gun", codm.mythicWeapons], ["Mythic Max", codm.maxedMythicWeapons], ["Legendary Gun", codm.legendaryWeapons],
+          ["Epic Gun", codm.epicWeapons], ["Mythic Character", codm.mythicCharacters], ["Legendary Character", codm.legendaryCharacters], ["Epic Character", codm.epicCharacters],
+          ["Diamond Camo", codm.diamondCamos], ["Damascus", metaValue(codm.damascusUnlocked)], ["Full Access", metaValue(codm.fullAccess)], ["Email Changeable", metaValue(codm.emailChangeable)],
+        ].map(([label,value])=><div key={String(label)} className="rounded-2xl border border-white/10 bg-black/25 p-3"><div className="text-[10px] text-gray-500">{label}</div><div className="mt-1 text-xs font-black text-gray-100" dir="auto">{metaValue(value)}</div></div>)}</div>{codm.notableWeapons&&<div className="mt-4 rounded-2xl bg-black/25 p-4 text-xs leading-7"><b className="text-orange-300">گان‌های شاخص:</b><p className="mt-1 whitespace-pre-wrap text-gray-300">{codm.notableWeapons}</p></div>}{codm.notableCharacters&&<div className="mt-3 rounded-2xl bg-black/25 p-4 text-xs leading-7"><b className="text-purple-300">کاراکترهای شاخص:</b><p className="mt-1 whitespace-pre-wrap text-gray-300">{codm.notableCharacters}</p></div>}{codm.rareItems&&<div className="mt-3 rounded-2xl bg-black/25 p-4 text-xs leading-7"><b className="text-cyan-300">آیتم‌ها و نکات کمیاب:</b><p className="mt-1 whitespace-pre-wrap text-gray-300">{codm.rareItems}</p></div>}</section>}
 
         <section className="mt-10 grid gap-5 lg:grid-cols-[1fr_340px]">
           <div className="rounded-[28px] border border-white/[.08] bg-white/[.025] p-5 sm:p-6">
