@@ -70,6 +70,18 @@ const nextConfig: NextConfig = {
     formats: ["image/avif", "image/webp"],
     minimumCacheTTL: 86400,
     deviceSizes: [390, 768, 1024, 1280, 1920],
+    // Hosts that actually appear in the database today: first-party artwork
+    // attached to auto-generated news, and the image host used by the admin
+    // media panel. next/image refuses unknown remote hosts by default, so a
+    // missing entry here renders a broken image rather than a warning.
+    remotePatterns: [
+      { protocol: "https", hostname: "**.supercell.com" },
+      { protocol: "https", hostname: "cms-assets.unrealengine.com" },
+      { protocol: "https", hostname: "**.callofduty.com" },
+      { protocol: "https", hostname: "**.fortnite.com" },
+      { protocol: "https", hostname: "i.postimg.cc" },
+      { protocol: "https", hostname: "res.cloudinary.com" },
+    ],
   },
 
   async headers() {

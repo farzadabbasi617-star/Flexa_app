@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AppImage from "@/components/AppImage";
 import BottomNav from "@/components/BottomNav";
 import DailyQuests from "@/components/DailyQuests";
 import HeroScene from "@/components/fx/HeroScene";
@@ -205,9 +206,13 @@ export default async function LuxuryHomePage() {
       >
         <header className="flex items-center justify-between gap-4 mb-7 sm:mb-10">
           <Link href="/" className="flex items-center gap-3 min-w-0">
-            <img
+            <AppImage
               src="/icons/gament-icon-192.png"
               alt="Gament Logo"
+              width={56}
+              height={56}
+              // First thing painted on the busiest page.
+              priority
               className="w-12 h-12 sm:w-14 sm:h-14 object-contain drop-shadow-[0_0_18px_rgba(188,0,255,.55)] shrink-0"
             />
             <div className="min-w-0">
@@ -229,7 +234,7 @@ export default async function LuxuryHomePage() {
               href="/wallet"
               className="grid place-items-center w-12 h-12 rounded-2xl bg-purple-500/12 border border-purple-300/20 active:scale-95"
             >
-              <img src="/icons/wallet_icon.png" alt="کیف پول" className="w-8 h-8 object-contain" loading="lazy" decoding="async" />
+              <AppImage src="/icons/wallet_icon.png" alt="کیف پول" width={32} height={32} className="w-8 h-8 object-contain" />
             </Link>
           </div>
         </header>
@@ -326,12 +331,12 @@ export default async function LuxuryHomePage() {
                 className="relative overflow-hidden rounded-[30px] border border-purple-300/15 bg-gradient-to-br from-purple-950/35 to-[#0d0b16] min-h-[205px] group active:scale-[.99] transition flex items-end"
               >
                 {featuredHonor?.image && (
-                  <img
+                  <AppImage
                     src={featuredHonor.image}
                     alt={featuredHonor.title}
+                    fill
+                    sizes="(max-width: 1024px) 100vw, 45vw"
                     className="absolute inset-0 w-full h-full object-cover opacity-45 group-hover:scale-105 transition duration-700"
-                    loading="lazy"
-                    decoding="async"
                   />
                 )}
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent" />
@@ -387,12 +392,12 @@ export default async function LuxuryHomePage() {
                         }}
                       >
                         {gameImage && (
-                          <img
+                          <AppImage
                             src={assetUrl(gameImage.slug)}
                             alt={gameImage.altText || gameImage.title}
+                            fill
+                            sizes="(max-width: 768px) 100vw, 33vw"
                             className="absolute inset-0 w-full h-full object-cover opacity-55 saturate-125 brightness-110 group-hover:scale-110 group-hover:opacity-70 transition duration-700"
-                            loading="lazy"
-                            decoding="async"
                           />
                         )}
                         <div className="absolute inset-0 bg-[linear-gradient(to_top,rgba(0,0,0,.46),rgba(0,0,0,.10)_58%,rgba(0,0,0,.04)),linear-gradient(to_left,rgba(0,0,0,.34),transparent_55%)]" />
@@ -401,12 +406,12 @@ export default async function LuxuryHomePage() {
                             className={`w-16 h-16 rounded-3xl bg-gradient-to-br ${game.accent} p-0.5 shadow-2xl shrink-0`}
                           >
                             <div className="w-full h-full rounded-[22px] bg-black/25 backdrop-blur-sm flex items-center justify-center">
-                              <img
+                              <AppImage
                                 src={game.icon}
                                 alt={game.faName}
+                                width={44}
+                                height={44}
                                 className="w-11 h-11 object-contain"
-                                loading="lazy"
-                                decoding="async"
                               />
                             </div>
                           </div>

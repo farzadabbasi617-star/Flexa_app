@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import AppImage from "@/components/AppImage";
 
 interface SiteImage {
   slug: string;
@@ -100,10 +101,11 @@ export default function BottomNav() {
                   }`}
                 >
                   {finalIconUrl ? (
-                    <img
+                    <AppImage
                       src={finalIconUrl}
                       alt=""
-                      aria-hidden="true"
+                      width={36}
+                      height={36}
                       className="h-9 w-9 rounded-xl object-contain drop-shadow-[0_0_10px_rgba(255,255,255,0.45)]"
                     />
                   ) : (
@@ -133,10 +135,11 @@ export default function BottomNav() {
             >
               <span className="relative grid place-items-center">
                 {finalIconUrl ? (
-                  <img
+                  <AppImage
                     src={finalIconUrl}
                     alt=""
-                    aria-hidden="true"
+                    width={32}
+                    height={32}
                     className={`h-7 w-7 rounded-xl object-contain sm:h-8 sm:w-8 ${isActive ? "drop-shadow-[0_0_12px_#bc00ff]" : "opacity-60"}`}
                   />
                 ) : (

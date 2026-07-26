@@ -1,6 +1,6 @@
 "use client";
 
-import { PropsWithChildren } from "react";
+import { PropsWithChildren, useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -19,6 +19,19 @@ import { AnimatePresence, motion } from "framer-motion";
  */
 export default function PageTransition({ children }: PropsWithChildren) {
   const pathname = usePathname();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  // Server render (and the first client paint) emits the children as plain
+  // markup. Wrapping them in AnimatePresence/motion on that first pass made
+  // Next bail out to client-side rendering for this subtree, so the browser
+  // received the page inside `<div hidden>` and showed nothing but the footer
+  // until hydration — a 0.66 layout shift once the real content appeared.
+  //
+  // The fade only matters when navigating between routes, which by definition
+  // happens after mount, so nothing is lost visually.
+  if (!mounted) return <>{children}</>;
 
   return (
     <AnimatePresence mode="wait" initial={false}>

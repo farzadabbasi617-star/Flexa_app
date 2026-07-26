@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import AppImage from "@/components/AppImage";
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -61,9 +62,13 @@ export default function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2.5 group">
             <div className="w-11 h-11 rounded-2xl overflow-hidden border border-neon-purple/30 bg-dark-900 shadow-lg shadow-neon-purple/25 group-hover:scale-110 transition-transform">
-              <img
+              <AppImage
                 src="/icons/gament-icon-192.png"
                 alt="Gament logo"
+                width={44}
+                height={44}
+                // Above the fold on every page — eager so it does not delay LCP.
+                priority
                 className="w-full h-full object-cover"
               />
             </div>
@@ -260,10 +265,12 @@ export default function Navbar() {
                   title={item.label}
                 >
                   {finalIconUrl ? (
-                    <img 
-                      src={finalIconUrl} 
-                      alt={item.label} 
-                      className={`w-6 h-6 object-contain ${isActive ? "drop-shadow-[0_0_8px_#bc00ff]" : "opacity-60"}`} 
+                    <AppImage
+                      src={finalIconUrl}
+                      alt={item.label}
+                      width={24}
+                      height={24}
+                      className={`w-6 h-6 object-contain ${isActive ? "drop-shadow-[0_0_8px_#bc00ff]" : "opacity-60"}`}
                     />
                   ) : (
                     <span className="text-lg">{item.icon}</span>
