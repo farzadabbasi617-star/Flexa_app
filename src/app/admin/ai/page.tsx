@@ -7,8 +7,10 @@ import { useAuth } from "@/contexts/AuthContext";
 
 interface AIStatus {
   configured: { openrouter: boolean; groq: boolean };
-  connected: boolean;
-  provider: string;
+  /** `null` when the live probe was skipped to avoid burning AI credits. */
+  connected: boolean | null;
+  probeSkipped?: boolean;
+  provider: string | null;
   cachedProvider: string | null;
   model: string | null;
   sample: string | null;
@@ -61,6 +63,14 @@ interface DailyReport {
 
 function ProviderBadge({ status }: { status: AIStatus | null }) {
   if (!status) return <span className="text-xs text-gray-500">در حال بررسی...</span>;
+  if (status.connected === null) {
+    // Throttled, not broken — saying "disconnected" here would be a lie.
+    return (
+      <span className="inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs font-black text-amber-300">
+        ● تست زنده موقتاً محدود شد؛ کمی بعد دوباره بررسی کنید
+      </span>
+    );
+  }
   if (status.connected) {
     return (
       <span className="inline-flex items-center gap-2 rounded-full border border-green-500/30 bg-green-500/10 px-3 py-1 text-xs font-black text-green-300">
@@ -185,8 +195,20 @@ export default function AIAdminPage() {
   const systems = [
     { title: "OpenRouter", icon: "🌐", active: Boolean(status?.configured.openrouter), detail: "کلید OPENROUTER_API_KEY" },
     { title: "Groq", icon: "⚡", active: Boolean(status?.configured.groq), detail: "کلید GROQ_API_KEY" },
-    { title: "اتصال واقعی", icon: "🔌", active: Boolean(status?.connected), detail: status?.model || "در انتظار تست" },
-    { title: "Fallback لوکال", icon: "🧠", active: !status?.connected, detail: "فقط وقتی providerها قطع باشند" },
+    {
+      title: "اتصال واقعی",
+      icon: "🔌",
+      active: status?.connected === true,
+      detail: status?.connected === null ? "تست زنده محدود شد" : status?.model || "در انتظار تست",
+    },
+    {
+      // Only claim the local fallback is in use when the probe actually ran
+      // and failed; a skipped probe says nothing about provider health.
+      title: "Fallback لوکال",
+      icon: "🧠",
+      active: status?.connected === false,
+      detail: "فقط وقتی providerها قطع باشند",
+    },
   ];
 
   return (

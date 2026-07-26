@@ -33,20 +33,19 @@ export async function GET(request: NextRequest) {
     const result = await generateDailyGamingNews({ force });
     return NextResponse.json({ ok: true, ...result });
   } catch (err: any) {
-    logger.error({ 
-      err: err?.message || err, 
+    // Full diagnostics stay server-side. The response deliberately carries no
+    // exception text, PostgreSQL error code, constraint detail or table name:
+    // those describe the schema and belong in logs, not in a payload. The
+    // caller is a cron job, so a stable generic failure is all it needs.
+    logger.error({
+      err: err?.message || err,
       stack: err?.stack,
       code: err?.code,
       detail: err?.detail,
-      table: err?.table
+      table: err?.table,
     }, "Auto honors news endpoint failed");
-    
-    return NextResponse.json({ 
-      error: "Auto news generation failed", 
-      details: err?.message || "Unknown error",
-      dbCode: err?.code,
-      dbDetail: err?.detail
-    }, { status: 500 });
+
+    return NextResponse.json({ error: "Auto news generation failed" }, { status: 500 });
   }
 }
 

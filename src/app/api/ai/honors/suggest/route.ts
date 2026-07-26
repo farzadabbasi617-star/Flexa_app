@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { honors } from "@/db/schema";
 import { normalizeAIEnvValue } from "@/lib/ai-provider-manager";
+import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,19 @@ function isAuthorized(request: NextRequest) {
 export async function POST(request: NextRequest) {
   if (!isAuthorized(request)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Every accepted call writes a pending row that a human then has to review.
+  // A stuck or misconfigured automation loop would otherwise flood the admin
+  // queue and the honors table unbounded. Generous enough for legitimate
+  // batch runs, low enough to stop a runaway.
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const limit = await rateLimit(`ai-honor-suggest:${ip}`, 30, 60 * 1000);
+  if (!limit.success) {
+    return NextResponse.json(
+      { error: "Too many honor suggestions. Try again shortly." },
+      { status: 429, headers: { "Retry-After": "60" } }
+    );
   }
 
   try {
