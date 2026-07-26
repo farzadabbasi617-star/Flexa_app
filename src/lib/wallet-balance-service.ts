@@ -1,5 +1,6 @@
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
+import { runtimeSchemaDdlEnabled } from "@/lib/runtime-schema-guard";
 
 let moneySchemaPromise: Promise<void> | null = null;
 
@@ -46,6 +47,12 @@ async function repairMoneySchema(client: any) {
 
 export async function ensureWalletMoneySchema(client: any = db) {
   if (client !== db) return repairMoneySchema(client);
+
+  // This is a one-off repair for early databases whose money columns were
+  // text. It ships as migration 0025 and must not run ALTER TABLE from inside
+  // a live wallet transaction. See runtime-schema-guard.ts.
+  if (!runtimeSchemaDdlEnabled()) return;
+
   if (!moneySchemaPromise) {
     moneySchemaPromise = repairMoneySchema(client).catch((error) => {
       moneySchemaPromise = null;

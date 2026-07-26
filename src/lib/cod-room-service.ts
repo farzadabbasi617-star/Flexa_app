@@ -43,6 +43,7 @@ import { fetchAIResponse } from "@/lib/ai-provider-manager";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import { affiliateAccrualLiveForUsers, ensureAffiliateSchema, AFFILIATE_HOLD_HOURS } from "@/lib/affiliate-service";
 import { ensureWalletMoneySchema, updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
+import { runtimeSchemaDdlEnabled } from "@/lib/runtime-schema-guard";
 import { bigIntFromText } from "@/lib/money";
 
 export const COD_ARENA_REFERRAL_DEFAULT_BPS = 2000;
@@ -206,6 +207,13 @@ async function createCodArenaSchema(client: any) {
 
 export function ensureCodArenaSchema(client: any = db) {
   if (client !== db) return createCodArenaSchema(client);
+
+  // The COD engine schema ships as reviewed migrations (0036/0037/0038).
+  // Running the same DDL from a request handler would take ACCESS EXCLUSIVE
+  // locks on the paid join/settlement path, so it is off in production.
+  // See runtime-schema-guard.ts.
+  if (!runtimeSchemaDdlEnabled()) return Promise.resolve();
+
   if (!codSchemaPromise) {
     codSchemaPromise = createCodArenaSchema(client).catch((error) => {
       codSchemaPromise = null;
