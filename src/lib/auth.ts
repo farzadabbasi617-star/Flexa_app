@@ -6,6 +6,7 @@ import logger from "@/lib/logger";
 import { NextRequest } from "next/server";
 import { hashPassword as argonHash, comparePassword as argonCompare } from "@/lib/auth-utils";
 import { hashSessionToken } from "@/lib/session-token";
+import { isSameDevice, serializeFingerprint } from "@/lib/session-fingerprint";
 
 export function generateToken(): string {
   return crypto.randomBytes(48).toString("hex");
@@ -165,10 +166,33 @@ export async function validateSession(token: string, currentIp: string, currentU
       return null;
     }
 
-    if (session.userAgent !== currentUserAgent) {
-      logger.warn({ userId: session.userId, oldUA: session.userAgent, newUA: currentUserAgent }, 'Session User-Agent mismatch - Possible Hijacking!');
+    // Bind the session to the device that created it, but compare a *stable*
+    // fingerprint (browser + OS + form factor) rather than the raw header.
+    // Browsers rewrite their User-Agent on every self-update, so an exact
+    // match would log honest users out mid-tournament. See
+    // `session-fingerprint.ts` for the exact trade-off.
+    if (!isSameDevice(session.userAgent, currentUserAgent)) {
+      logger.warn(
+        {
+          userId: session.userId,
+          oldDevice: serializeFingerprint(session.userAgent),
+          newDevice: serializeFingerprint(currentUserAgent),
+        },
+        'Session device mismatch - possible hijacking'
+      );
       await deleteSession(token);
       return null;
+    }
+
+    // Same device, but the browser updated itself since this session was
+    // created. Refresh the stored header so the "my devices" list shows the
+    // current browser version instead of a stale one. Best-effort: a failure
+    // here must never block an otherwise valid request.
+    if (currentUserAgent && session.userAgent !== currentUserAgent) {
+      db.update(sessions)
+        .set({ userAgent: currentUserAgent })
+        .where(eq(sessions.id, session.id))
+        .catch((error) => logger.warn({ error }, 'Failed to refresh session User-Agent'));
     }
 
     // Do not rotate the session token here: route handlers that call
