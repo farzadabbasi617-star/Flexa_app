@@ -621,7 +621,30 @@ ${sourcesText}
     }
   }
   if (!qualityValid(parsed)) {
-    return { generated: false as const, game, reason: structurallyValid(parsed) ? "persian_quality_rejected" : "source_translation_rejected" };
+    // "rejected" on its own gave no way to tell an AI refusal from unparseable
+    // JSON from a game-tag mismatch, which made this failure mode opaque in
+    // the cron output. Report which specific check failed.
+    const rejectionDetail = !parsed
+      ? "unparseable_json"
+      : parsed.reject
+        ? "ai_declared_insufficient_source"
+        : !parsed.title
+          ? "missing_title"
+          : !parsed.description
+            ? "missing_description"
+            : parsed.game !== game
+              ? `game_mismatch:${String(parsed.game).slice(0, 24)}`
+              : "persian_quality";
+    logger.warn(
+      { game, rejectionDetail, provider: ai.provider, preview: String(ai.content || "").slice(0, 240) },
+      "Source translation rejected"
+    );
+    return {
+      generated: false as const,
+      game,
+      reason: structurallyValid(parsed) ? "persian_quality_rejected" : "source_translation_rejected",
+      rejectionDetail,
+    };
   }
   const news = parsed!;
   const title = shortText(String(news.title), 100);
