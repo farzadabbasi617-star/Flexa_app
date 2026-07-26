@@ -82,27 +82,33 @@ TELEGRAM_CHANNEL_URL="https://t.me/Gament_games"
 TELEGRAM_CHANNEL_ID="@Gament_games"
 ```
 
-Migrationهای لازم:
+Migrationهای لازم — همه با یک دستور:
 
 ```bash
-psql "$DATABASE_URL" -f drizzle/manual/0002_add_telegram_pre_registrations.sql
-psql "$DATABASE_URL" -f drizzle/manual/0003_add_telegram_bot_sessions.sql
-psql "$DATABASE_URL" -f drizzle/manual/0004_add_telegram_account_linking.sql
-psql "$DATABASE_URL" -f drizzle/manual/0005_add_telegram_growth_and_notifications.sql
-psql "$DATABASE_URL" -f drizzle/manual/0006_add_telegram_marketing_and_waitlist.sql
-psql "$DATABASE_URL" -f drizzle/manual/0009_sync_core_schema.sql
-psql "$DATABASE_URL" -f drizzle/manual/0010_harden_registration_integrity.sql
-psql "$DATABASE_URL" -f drizzle/manual/0024_add_telegram_reliability.sql
-psql "$DATABASE_URL" -f drizzle/manual/0025_repair_wallet_money_types.sql
-psql "$DATABASE_URL" -f drizzle/manual/0026_repair_telegram_sent_notifications.sql
-psql "$DATABASE_URL" -f drizzle/manual/0027_add_match_result_claims.sql
-psql "$DATABASE_URL" -f drizzle/manual/0028_add_private_tournament_leaderboards.sql
-psql "$DATABASE_URL" -f drizzle/manual/0029_add_private_tournament_attendance.sql
-psql "$DATABASE_URL" -f drizzle/manual/0030_add_clash_ready_and_tournament_end.sql
-psql "$DATABASE_URL" -f drizzle/manual/0031_add_store_order_deadlines.sql
+DATABASE_URL="postgresql://..." ./scripts/apply-migrations.sh
 ```
 
-یا محتوای فایل‌ها را داخل SQL Editor دیتابیس/Neon اجرا کنید.
+اسکریپت تمام فایل‌های `drizzle/manual/*.sql` را به ترتیب اجرا می‌کند. همه
+فایل‌ها **idempotent** هستند (`IF NOT EXISTS` / `DO $$ ... EXCEPTION`)، پس
+اجرای دوباره روی دیتابیس موجود کاملاً بی‌خطر است و مایگریشن‌های اعمال‌شده
+به‌سادگی رد می‌شوند.
+
+قبل از اجرا می‌توانید فهرست را ببینید:
+
+```bash
+./scripts/apply-migrations.sh --dry-run
+```
+
+یا فقط از یک شماره به بعد اجرا کنید:
+
+```bash
+DATABASE_URL="postgresql://..." ./scripts/apply-migrations.sh --from 0036
+```
+
+یا محتوای فایل‌ها را به همان ترتیب داخل SQL Editor دیتابیس/Neon اجرا کنید.
+
+> **چرا اسکریپت به‌جای فهرست دستی؟** فهرست دستی قبلی فقط ۱۶ مایگریشن از ۴۰
+> مایگریشن موجود را پوشش می‌داد؛ هر نصب تازه دیتابیس ناقص می‌ساخت.
 
 بعد از Deploy، webhook تلگرام را ست کنید:
 

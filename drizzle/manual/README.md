@@ -7,11 +7,35 @@ safe on an existing database.
 
 ## How to apply
 
+Apply everything, in order, with the runner:
+
+```bash
+DATABASE_URL="postgresql://..." ./scripts/apply-migrations.sh
+```
+
+Preview without touching the database:
+
+```bash
+./scripts/apply-migrations.sh --dry-run
+```
+
+Resume from a specific migration:
+
+```bash
+DATABASE_URL="postgresql://..." ./scripts/apply-migrations.sh --from 0036
+```
+
+A single file can still be applied by hand:
+
 ```bash
 psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 ```
 
 …or paste the file contents into the Neon SQL editor.
+
+> Files are applied in lexical order. Where two share a numeric prefix
+> (`0023_add_clash_1v1_entries` then `0023_harden_clash_1v1_queue`), the
+> alphabetical tie-break already matches the dependency order.
 
 ## Files
 
@@ -27,16 +51,36 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | `0008_add_honors.sql` | Adds the persistent `honors` table for the Hall of Fame public page, admin approval flow and AI honor suggestions. |
 | `0009_sync_core_schema.sql` | Adds missing core tables/columns for databases created from the early partial migration. |
 | `0010_harden_registration_integrity.sql` | Adds unique indexes that prevent duplicate tournament registrations per player/user under concurrent requests. |
+| `0011_add_honor_engagement.sql` | Adds `honor_views` / `honor_likes` for per-visitor engagement tracking on Hall of Fame entries. |
+| `0012_add_static_honor_engagement.sql` | Adds `honor_content_views` / `honor_content_likes` so statically-defined honor content gets the same engagement tracking. |
+| `0013_add_performance_indexes.sql` | Performance-only indexes for high-traffic public pages, wallet/admin panels, Telegram automation and support. Does not modify data. |
+| `0014_add_store_marketplace.sql` | Adds the Store/Marketplace: KYC profiles, official + P2P listings, and escrow-based orders. |
+| `0015_add_price_estimator.sql` | Adds admin-configurable per-game/per-field unit prices for the account price estimator. |
+| `0016_add_store_trust_safety.sql` | Adds store trust & safety: listing warranty window, seller reviews and abuse reports. |
+| `0017_add_price_memory.sql` | Adds `price_memory`, a learning cache of account valuations and confirmed real sales. |
+| `0018_add_store_offers.sql` | Adds buyer→seller price-negotiation offers on user listings; acceptance creates an escrow order. |
 | `0019_add_email_verification.sql` | Adds `users.email_verified_at`, backfilled for existing rows. Required for the email-OTP registration/login flow (see below). |
 | `0020_add_first_last_name.sql` | Adds `users.first_name` and `users.last_name`, backfilled by splitting the existing `display_name`. Required for the "first name + last name" registration fields. |
 | `0021_add_age_gate_fields.sql` | Adds age-gate identity fields for paid tournament eligibility. |
 | `0022_add_registration_game_invites.sql` | Adds per-registration game invite fields for Clash Royale QR/Share Link matchmaking in the Telegram bot. |
 | `0023_add_clash_1v1_entries.sql` | Adds a standalone paid Clash Royale 1V1 queue table for repeatable Telegram matchmaking entries. |
+| `0023_harden_clash_1v1_queue.sql` | Hardens that queue: adds `qr_file_id`, a partial queue-artifact index, and separates legacy hand-made rooms from automated matchmaking. Runs after `0023_add_clash_1v1_entries`. |
 | `0024_add_telegram_reliability.sql` | Adds incoming webhook idempotency leases and the PostgreSQL-backed outgoing Telegram message queue. |
 | `0025_repair_wallet_money_types.sql` | Converts legacy text wallet/transaction money columns to `numeric(20,0)` without losing valid balances. |
+| `0026_repair_telegram_sent_notifications.sql` | Repairs notification de-duplication for databases that skipped the optional Telegram growth migration. |
+| `0027_add_match_result_claims.sql` | Adds independent per-player result claims so Clash Royale 1V1 settles only on agreement. |
+| `0028_add_private_tournament_leaderboards.sql` | Adds Clash Royale private-tournament leaderboard OCR results and confirmed standings. |
+| `0029_add_private_tournament_attendance.sql` | Adds the attendance / no-show policy tables for paid multiplayer tournaments. |
+| `0030_add_clash_ready_and_tournament_end.sql` | Adds the 1V1 ready gate and an end time for scheduled private tournaments. |
+| `0031_add_store_order_deadlines.sql` | Adds escrow delivery deadlines and auto-release timers to store orders. |
+| `0032_add_clash_duel_modes_and_friend_challenges.sql` | Adds Clash 1V1 duel modes: random/friend opponents, free/paid stakes and negotiated matches. |
+| `0033_add_media_affiliate_program.sql` | Adds the audited media-partner affiliate program: 30-day attribution, versioned OTP contracts and one 7,000-Toman commission pool per paid match. |
+| `0034_add_personal_referral_program.sql` | Extends that affiliate ledger to ordinary user referrers, sharing the same per-match commission pool. |
+| `0035_separate_public_and_legal_names.sql` | One-time privacy migration separating public display names from legal names. Mirrors `ensurePublicIdentitySeparation()` at runtime. |
 | `0036_add_cod_mobile_room_engine.sql` | Adds the COD Mobile custom-room engine: rooms, entries, evidence, settlements, ranks and audit trail. |
 | `0037_add_cod_room_reports_penalties.sql` | Adds COD room trust/safety reports, admin resolutions, warnings, fines and temporary/permanent bans. |
 | `0038_add_cod_lobby_verification.sql` | Adds Telegram-based AI lobby verification records for COD custom rooms. |
+| `0039_add_session_and_hot_table_indexes.sql` | Performance-only indexes for previously unindexed hot tables: `sessions` (user_id, expires_at), plus teams, judges, ai_proposals and classified_scrape_logs. |
 
 > **Email verification (required before deploying the email-OTP auth flow):**
 > Run `0019_add_email_verification.sql` and set `RESEND_API_KEY` (and
