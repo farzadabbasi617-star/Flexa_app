@@ -593,6 +593,53 @@ select.gaming-input {
   box-shadow: 0 -18px 55px rgba(0,0,0,.72), inset 0 1px 0 rgba(255,255,255,.10) !important;
 }
 
+/* ============================================
+   BOTTOM NAV — layout safety
+   ============================================
+
+   The bar is `position: fixed` and capped at max-width 520px so it looks like
+   a phone dock. On a phone the viewport is narrower than that cap, so the bar
+   spans the full width and sits flush against the bottom edge — correct.
+
+   On desktop the same cap left it centred with ~700px of empty space on each
+   side, floating in the middle of the layout. Worse, nothing reserved space
+   for it, so it painted straight over real content (the game cards on the
+   home page, player rows on the leaderboard, news cards in the hall of fame).
+
+   Two fixes, both desktop-only so the mobile/PWA layout is untouched:
+     1. widen the bar and pin it to the bottom edge,
+     2. reserve its height at the end of the page so the last row of content
+        can always be scrolled clear of it.
+*/
+
+/* `--bottom-nav-space` (96px + safe area) is defined in :root near the top of
+   this file, alongside `.mobile-safe-page` / `.mb-bottom-nav`. That machinery
+   already existed but no page ever opted in, so nothing actually reserved the
+   space. Apply it automatically instead of asking ~30 pages to remember. */
+
+body:has(.site-bottom-nav) {
+  padding-bottom: var(--bottom-nav-space);
+}
+
+/* Belt and braces for engines without :has(): the bar contributes its own
+   spacer at the end of the document flow. */
+@supports not selector(:has(*)) {
+  .site-bottom-nav::after {
+    content: "";
+    display: block;
+    height: var(--bottom-nav-space);
+  }
+}
+
+@media (min-width: 640px) {
+  /* Desktop/tablet: stop pretending to be a phone dock. The 520px cap left the
+     bar marooned in the middle of a 1920px viewport; span a comfortable width
+     instead while staying anchored to the bottom edge. */
+  .site-bottom-nav {
+    max-width: min(760px, calc(100% - 48px));
+  }
+}
+
 /* Upgrade common utility-looking panels without touching Tailwind internals. */
 [class*="rounded-[2rem]"],
 [class*="rounded-[2.5rem]"],

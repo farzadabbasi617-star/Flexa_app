@@ -74,9 +74,9 @@ export default function BottomNav() {
 
   return (
     <nav
-      className="fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[520px] px-3 sm:px-6 pointer-events-none"
+      className="site-bottom-nav fixed inset-x-0 bottom-0 z-50 mx-auto w-full max-w-[520px] px-3 sm:px-6 pointer-events-none"
       style={{ paddingBottom: "max(10px, env(safe-area-inset-bottom))" }}
-      aria-label="ناوبری اصلی موبایل"
+      aria-label="ناوبری اصلی"
     >
       {/* Extra top padding so the raised center (Arena) button can overflow above the bar. */}
       <div className="glass-bottom pointer-events-auto relative flex items-end justify-around rounded-[24px] border border-white/10 px-1.5 pt-2.5 pb-2.5 shadow-[0_-12px_35px_rgba(0,0,0,0.7)]">
