@@ -85,10 +85,13 @@ for (const viewport of WIDTHS) {
                 if (nav.contains(el)) return false;
                 if (!interesting.includes(el.tagName)) return false;
                 if (!(el.textContent || "").trim()) return false;
-                // Ignore elements whose own box stops above the bar; only a
-                // genuine intersection is an overlap.
+
+                // The only thing that matters: does this element's own box
+                // actually intersect the bar? elementsFromPoint also reports
+                // ancestors that merely span the probe point, and those are
+                // not overlaps — their visible content sits far above.
                 const box = el.getBoundingClientRect();
-                return box.bottom > rect.top + 4 && box.height > 0;
+                return box.height > 0 && box.bottom > rect.top + 4;
               });
             if (hit) return `${hit.tagName}: ${(hit.textContent || "").trim().slice(0, 40)}`;
           }

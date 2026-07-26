@@ -195,7 +195,28 @@ async function fetchDiscordNewsItems(): Promise<NewsItem[]> {
   return allMessages;
 }
 
-export function isRecentNewsItem(item: NewsItem, maxAgeHours = 96) {
+/**
+ * How old an official post may be and still count as "news".
+ *
+ * This was hard-coded to 96 hours (4 days), which quietly starved the Hall of
+ * Fame: first-party studios do not publish daily. Measured against the live
+ * Supercell index, the six most recent Clash Royale posts were 293h, 486h,
+ * 487h, 601h, 1323h and 1325h old — so every single candidate was discarded
+ * and the cron reported success while publishing nothing.
+ *
+ * 14 days keeps posts genuinely current while surviving a normal quiet week.
+ * Override with GAMING_NEWS_MAX_AGE_HOURS.
+ */
+export const DEFAULT_NEWS_MAX_AGE_HOURS = 336;
+
+export function newsMaxAgeHours() {
+  const raw = Number(process.env.GAMING_NEWS_MAX_AGE_HOURS);
+  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_NEWS_MAX_AGE_HOURS;
+  // Clamp so a stray value cannot resurface year-old posts.
+  return Math.min(Math.max(Math.floor(raw), 24), 2160);
+}
+
+export function isRecentNewsItem(item: NewsItem, maxAgeHours = newsMaxAgeHours()) {
   if (!item.pubDate) return false;
   const published = new Date(item.pubDate).getTime();
   return Number.isFinite(published) && published <= Date.now() + 60 * 60 * 1000 && published >= Date.now() - maxAgeHours * 60 * 60 * 1000;
@@ -279,31 +300,47 @@ async function fetchOfficialIndexItems(index: (typeof OFFICIAL_NEWS_INDEXES)[num
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 12_000);
   try {
-    const response = await fetch(index.url, {
-      signal: controller.signal,
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
-        Accept: "text/html,application/xhtml+xml",
-        "Accept-Language": "en-US,en;q=0.9",
-      },
-      cache: "no-store",
-    });
-    let indexBody = response.ok ? (await response.text()).slice(0, 1_500_000) : "";
-    let indexBaseUrl = response.url || index.url;
+    let indexBody = "";
+    let indexBaseUrl = index.url;
     let transport = "direct";
-    if (!indexBody && index.game === "fortnite") {
+    let directStatus: number | string = "error";
+
+    // Publishers increasingly block datacentre IPs. Call of Duty hangs until
+    // the timeout and Fortnite answers 403, so a direct failure is expected
+    // rather than exceptional — fall through to the reader proxy for *any*
+    // index, not just Fortnite (which was the only one handled before).
+    try {
+      const response = await fetch(index.url, {
+        signal: controller.signal,
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124 Safari/537.36",
+          Accept: "text/html,application/xhtml+xml",
+          "Accept-Language": "en-US,en;q=0.9",
+        },
+        cache: "no-store",
+      });
+      directStatus = response.status;
+      if (response.ok) {
+        indexBody = (await response.text()).slice(0, 1_500_000);
+        indexBaseUrl = response.url || index.url;
+      }
+    } catch (error) {
+      directStatus = error instanceof Error && error.name === "TimeoutError" ? "timeout" : "fetch_failed";
+    }
+
+    if (!indexBody) {
       const reader = await fetch(`https://r.jina.ai/${index.url}`, {
         headers: { Accept: "text/plain", "User-Agent": "GamentNewsReader/2.0" },
         cache: "no-store",
-        signal: AbortSignal.timeout(15_000),
-      });
-      if (reader.ok) {
+        signal: AbortSignal.timeout(20_000),
+      }).catch(() => null);
+      if (reader?.ok) {
         indexBody = (await reader.text()).slice(0, 500_000);
         indexBaseUrl = index.url;
         transport = "reader";
       }
     }
-    if (!indexBody) return { items: [] as NewsItem[], discovered: 0, error: `index_http_${response.status}`, transport };
+    if (!indexBody) return { items: [] as NewsItem[], discovered: 0, error: `index_http_${directStatus}`, transport };
     const links = extractOfficialArticleLinks(indexBody, indexBaseUrl, index.game).slice(0, 6);
     const items = await Promise.all(links.map((link) => fetchTrustedArticleDetails({
       title: link.split("/").filter(Boolean).pop()?.replace(/-/g, " ") || index.source,
@@ -389,7 +426,17 @@ async function collectGamingNewsItems() {
   const officialItems = officialGroups.flatMap((group) => group.items);
   const rawItems = [...officialItems, ...discordResults, ...telegramResults, ...googleGroups.flat()];
   const uniqueItems = [...new Map(rawItems.map((item) => [item.link, item])).values()].slice(0, 50);
-  const recentItems = uniqueItems.filter((item) => isRecentNewsItem(item));
+  const maxAgeHours = newsMaxAgeHours();
+  const recentItems = uniqueItems.filter((item) => isRecentNewsItem(item, maxAgeHours));
+
+  // When discovery works but the freshness window rejects everything, the run
+  // looks like a success that published nothing. Report how stale the best
+  // candidate actually was so the cause is visible in the cron output instead
+  // of having to reproduce it by hand.
+  const ages = uniqueItems
+    .map((item) => (item.pubDate ? (Date.now() - new Date(item.pubDate).getTime()) / 3_600_000 : null))
+    .filter((value): value is number => Number.isFinite(value as number) && (value as number) >= 0)
+    .sort((a, b) => a - b);
   const enriched = await Promise.all(recentItems.map(async (item) => {
     const enoughExistingText = isConfiguredFeed(item)
       ? stripHtml(item.content || "").length >= 120
@@ -413,13 +460,16 @@ async function collectGamingNewsItems() {
       officialIndexes: officialGroups.map((group, index) => ({
         game: OFFICIAL_NEWS_INDEXES[index].game,
         discovered: group.discovered,
-        accepted: group.items.filter((item) => isRecentNewsItem(item)).length,
+        accepted: group.items.filter((item) => isRecentNewsItem(item, maxAgeHours)).length,
         transport: group.transport,
         error: group.error,
       })),
       discovered: uniqueItems.length,
       recent: recentItems.length,
       accepted: accepted.length,
+      maxAgeHours,
+      newestSourceAgeHours: ages.length ? Math.round(ages[0]) : null,
+      itemsWithoutDate: uniqueItems.filter((item) => !item.pubDate).length,
       discord: discordResults.length,
       telegram: telegramResults.length,
       googleFallback: googleGroups.flat().length,

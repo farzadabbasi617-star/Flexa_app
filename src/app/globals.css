@@ -654,7 +654,10 @@ select.gaming-input {
    space. Apply it automatically instead of asking ~30 pages to remember. */
 
 body:has(.site-bottom-nav) {
-  padding-bottom: var(--bottom-nav-space);
+  /* The bar measures ~88px, and the raised centre (Arena) button overflows
+     above it, so reserve a little more than --bottom-nav-space rather than
+     exactly matching it. */
+  padding-bottom: calc(var(--bottom-nav-space) + 24px);
 }
 
 /* Belt and braces for engines without :has(): the bar contributes its own

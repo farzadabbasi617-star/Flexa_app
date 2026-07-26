@@ -3,6 +3,7 @@ import { and, count, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { honors } from "@/db/schema";
 import { isUsableAISecret, normalizeAIEnvValue } from "@/lib/ai-provider-manager";
+import { newsMaxAgeHours } from "@/lib/gaming-news-generator";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -34,7 +35,7 @@ export async function GET() {
     return NextResponse.json({
       ok: true,
       sourcePolicy: "official_source_text_and_first_party_image",
-      sourceMaxAgeHours: 96,
+      sourceMaxAgeHours: newsMaxAgeHours(),
       retentionDays: 7,
       configuredProviders,
       aiConfigured: configuredProviders.length > 0,
