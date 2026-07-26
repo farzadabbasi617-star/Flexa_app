@@ -185,7 +185,13 @@ export const sessions = pgTable("sessions", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
   ipAddress: varchar("ip_address", { length: 45 }),
   userAgent: varchar("user_agent", { length: 500 }),
-});
+}, (table) => ({
+  // `token` is already indexed by its UNIQUE constraint (the hot
+  // validateSession lookup). These cover the remaining access patterns:
+  // listing a user's devices, revoking all sessions, and expiry sweeps.
+  userIdIdx: index("sessions_user_id_idx").on(table.userId),
+  expiresAtIdx: index("sessions_expires_at_idx").on(table.expiresAt),
+}));
 
 // Notifications
 export const notifications = pgTable("notifications", {
@@ -210,7 +216,10 @@ export const teams = pgTable("teams", {
   ownerId: uuid("owner_id").notNull().references(() => users.id),
   description: text("description"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  ownerIdIdx: index("teams_owner_id_idx").on(table.ownerId),
+  createdAtIdx: index("teams_created_at_idx").on(table.createdAt),
+}));
 
 // Team members
 export const teamMembers = pgTable("team_members", {
@@ -958,7 +967,10 @@ export const judges = pgTable("judges", {
   role: varchar("role", { length: 50 }).notNull().default("judge"),
   isActive: boolean("is_active").notNull().default(true),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  activeCreatedAtIdx: index("judges_is_active_created_at_idx").on(table.isActive, table.createdAt),
+  userIdIdx: index("judges_user_id_idx").on(table.visibleUserId),
+}));
 
 // Judgments
 export const judgments = pgTable("judgments", {
@@ -1012,7 +1024,10 @@ export const aiProposals = pgTable("ai_proposals", {
   reasoning: text("reasoning"),
   status: varchar("status", { length: 20 }).default("pending"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  statusCreatedAtIdx: index("ai_proposals_status_created_at_idx").on(table.status, table.createdAt),
+  targetIdIdx: index("ai_proposals_target_id_idx").on(table.targetId),
+}));
 
 // Granular admin permissions
 export const adminPermissions = pgTable("admin_permissions", {
@@ -1347,7 +1362,9 @@ export const classifiedScrapeLogs = pgTable("classified_scrape_logs", {
   itemsNew: integer("items_new").default(0).notNull(),
   errorMessage: text("error_message"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => ({
+  createdAtIdx: index("classified_scrape_logs_created_at_idx").on(table.createdAt),
+}));
 
 // =========================================================================
 // STORE / MARKETPLACE
