@@ -269,6 +269,17 @@ export default function HonorsPage() {
         </div>
       </section>
 
+      {/* Placeholder while the archive loads. The spotlight below only renders
+          once data arrives, and inserting it pushed the archive section down —
+          the single real layout shift on this page (199px, ~0.136 CLS).
+          Reserving a matching box on the default (unfiltered) view removes it. */}
+      {loading && activeFilter === "all" && activeGame === "all" && !query.trim() && (
+        <section aria-hidden className="mx-auto mt-6 max-w-7xl px-4 sm:mt-8 sm:px-6">
+          <div className="mb-4 h-[52px]" />
+          <div className="h-[390px] animate-pulse rounded-[32px] border border-white/[.07] bg-white/[.03] sm:h-[460px]" />
+        </section>
+      )}
+
       {activeFilter === "all" && activeGame === "all" && !query.trim() && activeFeatured && (
         <section className="mx-auto mt-6 max-w-7xl px-4 sm:mt-8 sm:px-6" aria-labelledby="featured-title">
           <div className="mb-4 flex items-end justify-between gap-4">

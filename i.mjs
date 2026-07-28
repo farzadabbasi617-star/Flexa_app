@@ -1,0 +1,13 @@
+import { chromium } from '@playwright/test';
+const b = await chromium.launch();
+const p = await b.newPage({ viewport:{width:390,height:844} });
+const failed=[];
+p.on('response', r => { if (r.request().resourceType()==='image' && r.status()>=400) failed.push(`${r.status()} ${r.url()}`); });
+p.on('requestfailed', r => { if (r.request?.().resourceType?.()==='image') failed.push(`FAIL ${r.url()}`); });
+await p.goto('https://www.gament1.ir/honors',{waitUntil:'load',timeout:90000});
+await p.waitForTimeout(8000);
+const stuck = await p.evaluate(()=>[...document.images].filter(i=>!i.complete||i.naturalWidth===0).map(i=>({src:i.currentSrc||i.src, w:i.naturalWidth, loading:i.loading})));
+console.log('HTTP-failed images:', failed.length ? failed : '(none)');
+console.log('\nImages never completing:');
+for (const s of stuck) console.log('  ', JSON.stringify(s).slice(0,150));
+await b.close();
