@@ -341,8 +341,13 @@ export default function HonorsPage() {
           <div className="mt-5 grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_290px]">
             <div className="min-w-0">
               {loading ? (
+                // Two placeholders, not four. The archive usually holds a
+                // couple of entries, so a four-card skeleton collapsed to one
+                // row once the data arrived and shifted everything below it.
+                // Under-guessing shrinks nothing: the grid only grows, which
+                // does not move content that is already above it.
                 <div className="grid gap-4 sm:grid-cols-2">
-                  {Array.from({ length: 4 }).map((_, index) => <div key={index} className="h-[390px] animate-pulse rounded-[28px] border border-white/[.07] bg-white/[.035]" />)}
+                  {Array.from({ length: 2 }).map((_, index) => <div key={index} className="h-[390px] animate-pulse rounded-[28px] border border-white/[.07] bg-white/[.035]" />)}
                 </div>
               ) : loadError ? (
                 <div className="rounded-[28px] border border-red-300/15 bg-red-500/[.045] py-16 text-center">
