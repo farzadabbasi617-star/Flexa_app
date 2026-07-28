@@ -70,7 +70,9 @@ export async function POST(request: NextRequest) {
           nationalId: data.nationalId,
           birthDate: data.birthDate ?? null,
           idCardImageUrl: data.idCardImageUrl,
-          selfieImageUrl: data.selfieImageUrl,
+          // Selfie is no longer collected; clear any value from an older
+          // submission so a resubmit does not silently keep stale face data.
+          selfieImageUrl: null,
           status: "pending",
           rejectionReason: null,
           reviewedBy: null,
@@ -91,7 +93,6 @@ export async function POST(request: NextRequest) {
         nationalId: data.nationalId,
         birthDate: data.birthDate ?? null,
         idCardImageUrl: data.idCardImageUrl,
-        selfieImageUrl: data.selfieImageUrl,
         status: "pending",
       })
       .returning({ id: kycProfiles.id, status: kycProfiles.status });

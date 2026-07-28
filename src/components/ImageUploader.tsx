@@ -100,6 +100,13 @@ export default function ImageUploader({
         const res = await fetch("/api/store/upload", {
           method: "POST",
           credentials: "include",
+          // validateSession() rejects every mutating request without this
+          // header as a CSRF attempt, so omitting it made authenticated
+          // uploads fail with "Unauthorized" — which is what the seller
+          // verification form hit when attaching a national ID card.
+          // Do NOT set Content-Type: the browser must add the multipart
+          // boundary for FormData itself.
+          headers: { "X-Requested-With": "XMLHttpRequest" },
           body: fd,
         });
         const data = await res.json();

@@ -1378,7 +1378,9 @@ export const kycProfiles = pgTable("kyc_profiles", {
   nationalId: varchar("national_id", { length: 10 }).notNull(),
   birthDate: varchar("birth_date", { length: 10 }), // YYYY-MM-DD (Jalali or Gregorian as entered)
   idCardImageUrl: varchar("id_card_image_url", { length: 500 }).notNull(),
-  selfieImageUrl: varchar("selfie_image_url", { length: 500 }).notNull(),
+  // Legacy: seller verification no longer collects a selfie. Kept nullable so
+  // historical submissions stay readable in the admin panel (migration 0040).
+  selfieImageUrl: varchar("selfie_image_url", { length: 500 }),
   status: kycStatusEnum("status").notNull().default("pending"),
   rejectionReason: text("rejection_reason"),
   reviewedBy: uuid("reviewed_by").references(() => users.id),

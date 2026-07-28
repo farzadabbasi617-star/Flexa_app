@@ -169,7 +169,9 @@ export const KycSubmitSchema = z.object({
     .optional()
     .or(z.literal("").transform(() => undefined)),
   idCardImageUrl: imageRefSchema,
-  selfieImageUrl: imageRefSchema,
+  // Selfies are no longer requested. Still accepted (and ignored) so an older
+  // cached client bundle posting one does not fail validation.
+  selfieImageUrl: imageRefSchema.optional(),
 });
 
 export const KycReviewSchema = z.object({

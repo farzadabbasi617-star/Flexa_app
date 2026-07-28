@@ -81,6 +81,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | `0037_add_cod_room_reports_penalties.sql` | Adds COD room trust/safety reports, admin resolutions, warnings, fines and temporary/permanent bans. |
 | `0038_add_cod_lobby_verification.sql` | Adds Telegram-based AI lobby verification records for COD custom rooms. |
 | `0039_add_session_and_hot_table_indexes.sql` | Performance-only indexes for previously unindexed hot tables: `sessions` (user_id, expires_at), plus teams, judges, ai_proposals and classified_scrape_logs. |
+| `0040_drop_kyc_selfie_requirement.sql` | Makes `kyc_profiles.selfie_image_url` nullable. Seller verification no longer collects a selfie; the column is kept so historical submissions stay readable. |
 
 > **Email verification (required before deploying the email-OTP auth flow):**
 > Run `0019_add_email_verification.sql` and set `RESEND_API_KEY` (and

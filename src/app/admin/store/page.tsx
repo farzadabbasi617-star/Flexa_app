@@ -36,7 +36,7 @@ interface KycRow {
   nationalId: string;
   birthDate: string | null;
   idCardImageUrl: string;
-  selfieImageUrl: string;
+  selfieImageUrl: string | null;
   status: string;
   displayName: string | null;
   phoneNumber: string | null;
@@ -109,7 +109,7 @@ export default function AdminStorePage() {
     const adminNote = window.prompt("یادداشت (اختیاری):") || undefined;
     const r = await fetch("/api/admin/store/reports", {
       method: "PATCH", credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({ id, status, adminNote }),
     });
     setMsg(r.ok ? "انجام شد" : "خطا"); load();
@@ -123,7 +123,7 @@ export default function AdminStorePage() {
       for (const f of rateFields) rates[f.key] = f.unitToman;
       const r = await fetch("/api/admin/store/estimator-rates", {
         method: "PUT", credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
         body: JSON.stringify({ game: rateGame, rates }),
       });
       setMsg(r.ok ? "نرخ‌ها ذخیره شد" : "خطا در ذخیره");
@@ -141,7 +141,7 @@ export default function AdminStorePage() {
     if (decision === "rejected" && !rejectionReason) return;
     const r = await fetch("/api/admin/store/kyc", {
       method: "PATCH", credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({ id, decision, rejectionReason }),
     });
     setMsg(r.ok ? "انجام شد" : "خطا"); load();
@@ -151,7 +151,7 @@ export default function AdminStorePage() {
     if (decision === "reject" && !rejectionReason) return;
     const r = await fetch("/api/admin/store/listings", {
       method: "PATCH", credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({ id, decision, rejectionReason }),
     });
     setMsg(r.ok ? "انجام شد" : "خطا"); load();
@@ -160,7 +160,7 @@ export default function AdminStorePage() {
     const reason = window.prompt("یادداشت (اختیاری):") || undefined;
     const r = await fetch("/api/admin/store/orders", {
       method: "PATCH", credentials: "include",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
       body: JSON.stringify({ id, resolution, reason }),
     });
     setMsg(r.ok ? "انجام شد" : "خطا"); load();
@@ -201,7 +201,10 @@ export default function AdminStorePage() {
                       <p className="mt-1 text-xs text-gray-400">کد ملی: {k.nationalId} · {k.phoneNumber} · {k.gamentId}</p>
                       <div className="mt-2 flex gap-2 text-xs">
                         <a href={k.idCardImageUrl} target="_blank" rel="noreferrer" className="text-cyan-300 underline">کارت ملی</a>
-                        <a href={k.selfieImageUrl} target="_blank" rel="noreferrer" className="text-cyan-300 underline">سلفی</a>
+                        {/* Selfies are no longer collected; older submissions may still have one. */}
+                        {k.selfieImageUrl && (
+                          <a href={k.selfieImageUrl} target="_blank" rel="noreferrer" className="text-cyan-300 underline">سلفی (بایگانی)</a>
+                        )}
                       </div>
                     </div>
                     <div className="flex gap-2">

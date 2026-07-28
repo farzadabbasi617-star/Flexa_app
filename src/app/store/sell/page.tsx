@@ -89,7 +89,7 @@ function KycGate({
   onMessage: (m: { type: "ok" | "err"; text: string }) => void;
   onUpdated: (k: KycState) => void;
 }) {
-  const [form, setForm] = useState({ fullName: "", nationalId: "", birthDate: "", idCardImageUrl: "", selfieImageUrl: "" });
+  const [form, setForm] = useState({ fullName: "", nationalId: "", birthDate: "", idCardImageUrl: "" });
   const [submitting, setSubmitting] = useState(false);
 
   if (kyc?.status === "pending") {
@@ -107,6 +107,13 @@ function KycGate({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting) return;
+    // The image is uploaded separately, so a plain `required` on the form
+    // cannot cover it. Without this the server answers with a generic
+    // validation error that does not say which field is missing.
+    if (!form.idCardImageUrl) {
+      onMessage({ type: "err", text: "لطفاً تصویر کارت ملی را بارگذاری کنید." });
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await fetch("/api/kyc", {
@@ -158,15 +165,6 @@ function KycGate({
         value={form.idCardImageUrl ? [form.idCardImageUrl] : []}
         onChange={(urls) => setForm({ ...form, idCardImageUrl: urls[0] || "" })}
       />
-      <ImageUploader
-        purpose="kyc"
-        max={1}
-        label="سلفی با کارت ملی"
-        hint="عکس از چهره خود در حالی که کارت ملی را در دست دارید"
-        value={form.selfieImageUrl ? [form.selfieImageUrl] : []}
-        onChange={(urls) => setForm({ ...form, selfieImageUrl: urls[0] || "" })}
-      />
-
       <button disabled={submitting} className="w-full rounded-2xl bg-purple-600 py-3 text-sm font-black transition active:scale-95 hover:bg-purple-500 disabled:opacity-40">
         {submitting ? "در حال ارسال..." : "ارسال برای احراز هویت"}
       </button>
