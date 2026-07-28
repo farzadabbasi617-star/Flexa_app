@@ -166,7 +166,7 @@ export default function MediaPartnersPage() {
     });
   }
 
-  if (loading) return <main className="grid min-h-[70dvh] place-items-center bg-[#07080d] text-white">در حال بارگذاری همکاری رسانه‌ای...</main>;
+  if (loading) return <main className="grid min-h-[100dvh] place-items-center bg-[#07080d] text-white">در حال بارگذاری همکاری رسانه‌ای...</main>;
 
   const partner = data?.partner;
   const canApply = !partner || ["draft", "rejected"].includes(partner.status);

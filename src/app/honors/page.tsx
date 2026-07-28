@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import AppImage from "@/components/AppImage";
 import ParticleField from "@/components/fx/ParticleField";
 import Reveal from "@/components/fx/Reveal";
 import HonorsIcon, { type HonorsIconName } from "@/components/honors/HonorsIcon";
@@ -88,8 +89,7 @@ function HonorCard({ honor, index = 0 }: { honor: Honor; index?: number }) {
       >
         <div className="relative z-0 h-52 overflow-hidden bg-[#11121a]">
           {honor.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={honor.image} alt={honor.imageAlt || honor.title} className={`${styles.imageZoom} h-full w-full object-cover`} loading="lazy" decoding="async" />
+            <AppImage src={honor.image} alt={honor.imageAlt || honor.title} fill sizes="(max-width: 640px) 100vw, 33vw" className={`${styles.imageZoom} h-full w-full object-cover`} />
           ) : (
             <div className="grid h-full w-full place-items-center bg-[radial-gradient(circle_at_50%_20%,rgba(245,158,11,.2),transparent_35%),linear-gradient(145deg,#231b12,#12101b_55%,#07141b)]">
               <HonorsIcon name={typeIcon(honor.type)} className="h-20 w-20 text-amber-200/45" />
@@ -104,8 +104,7 @@ function HonorCard({ honor, index = 0 }: { honor: Honor; index?: number }) {
             {honor.game && (
               <span className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-black/55 px-2.5 py-1.5 text-[9px] font-black backdrop-blur-xl">
                 {gameImage(honor.game) && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={gameImage(honor.game)!} alt="" className="h-3.5 w-3.5 object-contain" />
+                  <AppImage src={gameImage(honor.game)!} alt="" width={14} height={14} className="h-3.5 w-3.5 object-contain" />
                 )}
                 {gameLabel(honor.game)}
               </span>
@@ -201,8 +200,7 @@ export default function HonorsPage() {
       <header className="relative z-40 border-b border-white/[.07] bg-[#08090e]/80 backdrop-blur-2xl">
         <div className="mx-auto flex h-18 max-w-7xl items-center gap-3 px-4 sm:px-6">
           <Link href="/" className="flex items-center gap-2.5">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/icons/gament-icon-192.png" alt="گیمنت" className="h-11 w-11 object-contain drop-shadow-[0_0_16px_rgba(245,158,11,.25)]" />
+            <AppImage src="/icons/gament-icon-192.png" alt="گیمنت" width={44} height={44} priority className="h-11 w-11 object-contain drop-shadow-[0_0_16px_rgba(245,158,11,.25)]" />
             <div>
               <div className="text-[8px] font-black tracking-[.26em] text-amber-300">GAMENT ARCHIVES</div>
               <div className="text-sm font-black sm:text-base">تالار افتخارات</div>
@@ -260,8 +258,7 @@ export default function HonorsPage() {
                 <span className={`${styles.rune} right-[3%] top-[20%]`}><HonorsIcon name="crown" className="h-5 w-5" /></span>
                 <span className={`${styles.rune} bottom-[9%] right-[26%]`}><HonorsIcon name="sparkles" className="h-5 w-5" /></span>
                 <span className={`${styles.rune} left-[2%] top-[43%]`}><HonorsIcon name="trophy" className="h-5 w-5" /></span>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/icons/honors_icon.png" alt="نشان تالار افتخارات گیمنت" className={styles.medallionIcon} />
+                <AppImage src="/icons/honors_icon.png" alt="نشان تالار افتخارات گیمنت" width={330} height={330} priority className={styles.medallionIcon} />
               </div>
               <div className="absolute -bottom-8 left-1/2 w-64 -translate-x-1/2 rounded-2xl border border-white/[.08] bg-black/30 px-4 py-3 text-center backdrop-blur-xl">
                 <span className="text-[8px] font-black tracking-[.22em] text-amber-300">GAMENT HALL OF FAME</span>
@@ -290,8 +287,7 @@ export default function HonorsPage() {
 
           <Link href={`/honors/${activeFeatured.id}`} className={`${styles.cardTexture} group relative block min-h-[390px] overflow-hidden rounded-[32px] border border-white/[.09] bg-[#101117] shadow-[0_24px_70px_rgba(0,0,0,.3)] sm:min-h-[460px]`}>
             {activeFeatured.image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img key={activeFeatured.image} src={activeFeatured.image} alt={activeFeatured.imageAlt || activeFeatured.title} className={`${styles.imageZoom} absolute inset-0 h-full w-full object-cover`} />
+              <AppImage key={activeFeatured.image} src={activeFeatured.image} alt={activeFeatured.imageAlt || activeFeatured.title} fill priority sizes="(max-width: 1024px) 100vw, 66vw" className={`${styles.imageZoom} absolute inset-0 h-full w-full object-cover`} />
             ) : (
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_20%,rgba(251,191,36,.18),transparent_30%),linear-gradient(135deg,#23180d,#12101c_55%,#07141b)]" />
             )}
@@ -335,8 +331,7 @@ export default function HonorsPage() {
             {GAME_FILTERS.map((game) => (
               <button key={game.id} onClick={() => setActiveGame(game.id)} className={`inline-flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2.5 text-[10px] font-black transition ${activeGame === game.id ? "border-violet-300/25 bg-violet-500/10 text-violet-200" : "border-white/[.07] bg-white/[.025] text-gray-500 hover:border-white/15 hover:text-gray-300"}`}>
                 {game.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img src={game.image} alt="" className="h-4 w-4 object-contain" />
+                  <AppImage src={game.image} alt="" width={16} height={16} className="h-4 w-4 object-contain" />
                 ) : <HonorsIcon name="layers" className="h-4 w-4" />}
                 {game.label}
               </button>

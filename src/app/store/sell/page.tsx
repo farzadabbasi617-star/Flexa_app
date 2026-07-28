@@ -53,7 +53,10 @@ export default function SellPage() {
   }, []);
 
   if (loadingKyc) {
-    return <main className="grid min-h-[60dvh] place-items-center bg-[#06060f] text-white">در حال بارگذاری...</main>;
+    // Must reserve the same height as the loaded state below (100dvh).
+    // A shorter skeleton let the document grow once the KYC check resolved,
+    // shoving the footer down and costing ~0.16 CLS on this page.
+    return <main className="grid min-h-[100dvh] place-items-center bg-[#06060f] text-white">در حال بارگذاری...</main>;
   }
 
   return (
