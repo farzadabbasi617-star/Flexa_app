@@ -32,17 +32,32 @@ export function calculateDynamicTournamentPrizePool({
   registeredCount = 0,
   maxPlayers = 16,
   staticPrizePool,
+  isDuel = false,
 }: {
   entryFee?: string | null;
   registeredCount?: number;
   maxPlayers?: number;
   staticPrizePool?: string | null;
+  /**
+   * Head-to-head match rather than a bracket: exactly two players, one winner,
+   * no tiered ladder.
+   *
+   * Clash Royale 1V1 is a matchmaking *queue*, so its `maxPlayers` is 1000 —
+   * the queue capacity, not the size of a single match. Feeding that into the
+   * pooled formula advertised 1000 x 50,000 = 50,000,000 collected and a
+   * 40,000,000 prize pool, then split it across a 10-place ladder. The real
+   * economics are two players x 50,000 = 100,000, minus the 20% fee, so the
+   * winner takes 80,000.
+   */
+  isDuel?: boolean;
 }): DynamicPrizePoolResult {
   const entryFeeRial = parseTomanToRial(entryFee);
   const entryFeeToman = rialToTomanNumber(entryFeeRial);
   const isPaid = entryFeeToman > 0;
-  const count = Math.max(0, registeredCount || 0);
-  const maxCount = Math.max(1, maxPlayers || 16);
+  // A duel is always two seats regardless of the queue capacity stored on the
+  // tournament row.
+  const maxCount = isDuel ? 2 : Math.max(1, maxPlayers || 16);
+  const count = Math.min(Math.max(0, registeredCount || 0), isDuel ? 2 : Number.MAX_SAFE_INTEGER);
 
   let totalCollectedToman = 0;
   let siteCommissionToman = 0;
@@ -66,7 +81,12 @@ export function calculateDynamicTournamentPrizePool({
     maxSiteCommissionToman = Math.floor(maxTotalCollectedToman * 0.2);
     maxNetPrizePoolToman = maxTotalCollectedToman - maxSiteCommissionToman;
 
-    if (count > 0) {
+    if (isDuel) {
+      // The payout for a duel is fixed and known before anyone joins, so show
+      // the real number instead of "۰ تومان (طبق ثبت‌نام)".
+      displayPrizePool = `${maxNetPrizePoolToman.toLocaleString("fa-IR")} تومان`;
+      subtitle = `۲ بازیکن × ${entryFeeToman.toLocaleString("fa-IR")} تومان ورودی، پس از کسر ۲۰٪ کارمزد سایت — کل مبلغ به برنده می‌رسد`;
+    } else if (count > 0) {
       displayPrizePool = `${netPrizePoolToman.toLocaleString("fa-IR")} تومان`;
       subtitle = `از مجموع ${count.toLocaleString("fa-IR")} شرکت‌کننده (۲۰٪ کارمزد سایت کسر شده)`;
     } else {
@@ -88,7 +108,11 @@ export function calculateDynamicTournamentPrizePool({
     }
   }
 
-  const ladderWeights = [
+  // Winner-takes-all: a duel has no runner-up prize, so the whole net pool
+  // goes to first place instead of being split ten ways.
+  const ladderWeights = isDuel ? [
+    { rank: 1, label: "برنده مسابقه 🥇", weight: 1 },
+  ] : [
     { rank: 1, label: "نفر اول (قهرمان 🥇)", weight: 0.35 },
     { rank: 2, label: "نفر دوم (نایب قهرمان 🥈)", weight: 0.20 },
     { rank: 3, label: "نفر سوم 🥉", weight: 0.12 },

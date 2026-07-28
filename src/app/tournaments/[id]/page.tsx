@@ -10,7 +10,7 @@ import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { calculateDynamicTournamentPrizePool } from "@/lib/tournament-finance";
 import { useCountdown } from "@/hooks/useCountdown";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
-import { CLASH_1V1_CONFIG } from "@/lib/clash-1v1-config";
+import { CLASH_1V1_CONFIG, isClash1v1QueueTournament } from "@/lib/clash-1v1-config";
 
 interface Player {
   id: string;
@@ -316,11 +316,15 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const completedMatches = tournament.matches.filter((m) => m.status === "completed").length;
   const awaitingJudgmentCount = tournament.matches.filter((m) => m.status === "awaiting_judgment" || m.status === "disputed").length;
 
+  const isClash1v1Queue = isClash1v1QueueTournament(tournament);
+
   const prizeData = calculateDynamicTournamentPrizePool({
     entryFee: tournament.entryFee,
     registeredCount: tournament.registrations.length,
     maxPlayers: tournament.maxPlayers,
     staticPrizePool: tournament.prizePool,
+    // 1V1 is a matchmaking queue: maxPlayers is the queue size, not the match.
+    isDuel: isClash1v1Queue,
   });
 
   const roundsMap = new Map<number, Match[]>();
@@ -330,7 +334,6 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   });
   const rounds = Array.from(roundsMap.entries()).sort(([a], [b]) => a - b);
   const isPrivateClashDraft = tournament.categoryLabel === CLASH_PRIVATE_DRAFT_CATEGORY;
-  const isClash1v1Queue = tournament.game === "clash_royale" && tournament.categoryLabel === CLASH_1V1_CONFIG.categoryLabel;
 
   const tabs = [
     { key: "overview", label: t.tournamentDetail.overview, icon: "📋" },
@@ -610,9 +613,11 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     🏆 سیستم داینامیک محاسبه و توزیع جوایز
                   </h3>
                   <p className="text-xs text-gray-400 mt-1 leading-6">
-                    {prizeData.isPaid
-                      ? `جایزه مسابقات بر اساس تعداد شرکت‌کنندگان محاسبه شده و پس از کسر ۲۰٪ کارمزد سایت، ۸۰٪ مابقی به‌صورت پلکانی بین نفر اول تا دهم تقسیم می‌شود.`
-                      : `این تورنومنت بدون ورودی (رایگان) بوده و جوایز طبق اعلام مدیریت/اسپانسر به‌صورت پلکانی بین نفرات برتر توزیع می‌گردد.`}
+                    {!prizeData.isPaid
+                      ? `این تورنومنت بدون ورودی (رایگان) بوده و جوایز طبق اعلام مدیریت/اسپانسر به‌صورت پلکانی بین نفرات برتر توزیع می‌گردد.`
+                      : isClash1v1Queue
+                        ? `این یک مسابقه دو نفره است: هر بازیکن ${prizeData.entryFeeToman.toLocaleString("fa-IR")} تومان ورودی می‌پردازد و پس از کسر ۲۰٪ کارمزد سایت، کل مبلغ باقی‌مانده به برنده مسابقه پرداخت می‌شود.`
+                        : `جایزه مسابقات بر اساس تعداد شرکت‌کنندگان محاسبه شده و پس از کسر ۲۰٪ کارمزد سایت، ۸۰٪ مابقی به‌صورت پلکانی بین نفر اول تا دهم تقسیم می‌شود.`}
                   </p>
                 </div>
                 <div className="bg-yellow-500/10 border border-yellow-500/30 px-4 py-2.5 rounded-2xl text-right shrink-0">
@@ -624,28 +629,36 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
               {prizeData.isPaid && (
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
                   <div className="bg-white/5 border border-white/10 rounded-2xl p-4 text-center">
-                    <div className="text-xs text-gray-400 mb-1">مجموع مبالغ ورودی جمع‌شده</div>
+                    <div className="text-xs text-gray-400 mb-1">
+                      {isClash1v1Queue ? "مجموع ورودی دو بازیکن" : "مجموع مبالغ ورودی جمع‌شده"}
+                    </div>
                     <div className="text-base sm:text-lg font-black text-white">
-                      {prizeData.totalCollectedToman.toLocaleString("fa-IR")} تومان
+                      {(isClash1v1Queue ? prizeData.maxTotalCollectedToman : prizeData.totalCollectedToman).toLocaleString("fa-IR")} تومان
                     </div>
                     <div className="text-[10px] text-gray-500 mt-1">
-                      {tournament.registrations.length.toLocaleString("fa-IR")} نفر × {prizeData.entryFeeToman.toLocaleString("fa-IR")} تومان
+                      {isClash1v1Queue
+                        ? `۲ نفر × ${prizeData.entryFeeToman.toLocaleString("fa-IR")} تومان`
+                        : `${tournament.registrations.length.toLocaleString("fa-IR")} نفر × ${prizeData.entryFeeToman.toLocaleString("fa-IR")} تومان`}
                     </div>
                   </div>
                   <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-center">
                     <div className="text-xs text-red-300 mb-1">کارمزد سایت (۲۰٪)</div>
                     <div className="text-base sm:text-lg font-black text-red-400">
-                      {prizeData.siteCommissionToman.toLocaleString("fa-IR")} تومان
+                      {(isClash1v1Queue ? prizeData.maxSiteCommissionToman : prizeData.siteCommissionToman).toLocaleString("fa-IR")} تومان
                     </div>
                     <div className="text-[10px] text-red-400/70 mt-1">هزینه‌های برگزاری و داوری AI</div>
                   </div>
                   <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 text-center">
-                    <div className="text-xs text-emerald-300 mb-1">مجموع جوایز بازیکنان (۸۰٪)</div>
+                    <div className="text-xs text-emerald-300 mb-1">
+                      {isClash1v1Queue ? "جایزه برنده (۸۰٪)" : "مجموع جوایز بازیکنان (۸۰٪)"}
+                    </div>
                     <div className="text-base sm:text-lg font-black text-emerald-400">
-                      {prizeData.netPrizePoolToman.toLocaleString("fa-IR")} تومان
+                      {(isClash1v1Queue ? prizeData.maxNetPrizePoolToman : prizeData.netPrizePoolToman).toLocaleString("fa-IR")} تومان
                     </div>
                     <div className="text-[10px] text-emerald-400/70 mt-1">
-                      ظرفیت کامل: {prizeData.maxNetPrizePoolToman.toLocaleString("fa-IR")} تومان
+                      {isClash1v1Queue
+                        ? "کل مبلغ به برنده مسابقه می‌رسد"
+                        : `ظرفیت کامل: ${prizeData.maxNetPrizePoolToman.toLocaleString("fa-IR")} تومان`}
                     </div>
                   </div>
                 </div>

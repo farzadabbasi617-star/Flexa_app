@@ -4,6 +4,7 @@ import React, { memo, useMemo } from "react";
 import Link from "next/link";
 import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { calculateDynamicTournamentPrizePool } from "@/lib/tournament-finance";
+import { isClash1v1QueueTournament } from "@/lib/clash-1v1-config";
 import { checkAgeGate, MIN_ADULT_AGE } from "@/lib/age-gate";
 import { useAuth } from "@/contexts/AuthContext";
 import TiltCard from "@/components/fx/TiltCard";
@@ -13,6 +14,7 @@ interface Tournament {
   id: string;
   name: string;
   game: string;
+  categoryLabel?: string | null;
   maxPlayers: number;
   registeredCount: number;
   prizePool: string | null;
@@ -88,8 +90,11 @@ const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false
       registeredCount: t.registeredCount,
       maxPlayers: t.maxPlayers,
       staticPrizePool: t.prizePool,
+      // 1V1 is a matchmaking queue whose maxPlayers is the queue capacity
+      // (1000), not the two seats in an actual match.
+      isDuel: isClash1v1QueueTournament(t),
     });
-  }, [t.entryFee, t.registeredCount, t.maxPlayers, t.prizePool]);
+  }, [t]);
 
   const insufficientWallet = Boolean(
     isLoggedIn && !t.isRegistered && entryFeeInfo.isPaid && walletBalanceToman !== null && walletBalanceToman < entryFeeInfo.toman

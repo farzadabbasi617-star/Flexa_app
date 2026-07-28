@@ -238,6 +238,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     const [{ value: registeredCount }] = await db.select({ value: sql<number>`count(*)` })
       .from(registrations).where(eq(registrations.tournamentId, id));
+    // Pooled ladder is correct here: this route is gated to
+    // CLASH_PRIVATE_DRAFT_CATEGORY above, so it never handles the 1V1 queue
+    // (which is a two-player, winner-takes-all duel — see `isDuel`).
     const finance = calculateDynamicTournamentPrizePool({
       entryFee: tournament.entryFee,
       registeredCount: Number(registeredCount || 0),
