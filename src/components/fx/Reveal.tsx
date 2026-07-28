@@ -18,12 +18,38 @@ interface RevealProps {
   as?: "div" | "section" | "article" | "li";
 }
 
+// Animate through `transform` explicitly rather than framer's x/y shorthand.
+//
+// The shorthand let Chrome attribute the movement to layout, so every reveal
+// counted as Cumulative Layout Shift even though nothing actually reflowed:
+// the shift entries reported identical geometry (y:94->94 h:550->550). On
+// /honors that inflated CLS from 0.136 to 0.368 — measured by re-running the
+// same page under prefers-reduced-motion, which disables these animations and
+// removed exactly that 0.23.
+//
+// translate3d keeps the motion on the compositor, where it is invisible to
+// layout, so the effect looks identical but no longer scores against us.
 const directions: Record<string, (d: number) => Variants> = {
-  up: (d) => ({ hidden: { opacity: 0, y: d }, visible: { opacity: 1, y: 0 } }),
-  down: (d) => ({ hidden: { opacity: 0, y: -d }, visible: { opacity: 1, y: 0 } }),
-  left: (d) => ({ hidden: { opacity: 0, x: d }, visible: { opacity: 1, x: 0 } }),
-  right: (d) => ({ hidden: { opacity: 0, x: -d }, visible: { opacity: 1, x: 0 } }),
-  scale: () => ({ hidden: { opacity: 0, scale: 0.88 }, visible: { opacity: 1, scale: 1 } }),
+  up: (d) => ({
+    hidden: { opacity: 0, transform: `translate3d(0, ${d}px, 0)` },
+    visible: { opacity: 1, transform: "translate3d(0, 0, 0)" },
+  }),
+  down: (d) => ({
+    hidden: { opacity: 0, transform: `translate3d(0, ${-d}px, 0)` },
+    visible: { opacity: 1, transform: "translate3d(0, 0, 0)" },
+  }),
+  left: (d) => ({
+    hidden: { opacity: 0, transform: `translate3d(${d}px, 0, 0)` },
+    visible: { opacity: 1, transform: "translate3d(0, 0, 0)" },
+  }),
+  right: (d) => ({
+    hidden: { opacity: 0, transform: `translate3d(${-d}px, 0, 0)` },
+    visible: { opacity: 1, transform: "translate3d(0, 0, 0)" },
+  }),
+  scale: () => ({
+    hidden: { opacity: 0, transform: "scale3d(0.88, 0.88, 1)" },
+    visible: { opacity: 1, transform: "scale3d(1, 1, 1)" },
+  }),
 };
 
 /**
