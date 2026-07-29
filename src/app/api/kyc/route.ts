@@ -99,7 +99,26 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ kyc: created }, { status: 201 });
   } catch (err) {
-    logger.error({ err }, "KYC submit error");
+    // Log enough to identify a schema/constraint problem without putting any
+    // of it in the response. The previous generic 500 hid a
+    // "value too long for type character varying(500)" for months: with
+    // Cloudinary unconfigured the uploader returns a base64 data URL, which
+    // overflowed the old column width on every real photo.
+    const code = (err as { code?: string })?.code;
+    logger.error(
+      { err, code, constraint: (err as { constraint?: string })?.constraint },
+      "KYC submit error"
+    );
+
+    // 22001 = string_data_right_truncation. Tell the user something they can
+    // act on instead of a dead end.
+    if (code === "22001") {
+      return NextResponse.json(
+        { error: "حجم تصویر بارگذاری‌شده زیاد است. لطفاً تصویر کوچک‌تری انتخاب کنید." },
+        { status: 400 }
+      );
+    }
+
     return NextResponse.json({ error: "خطا در ثبت درخواست احراز هویت" }, { status: 500 });
   }
 }

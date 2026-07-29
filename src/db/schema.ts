@@ -1377,10 +1377,13 @@ export const kycProfiles = pgTable("kyc_profiles", {
   fullName: varchar("full_name", { length: 150 }).notNull(),
   nationalId: varchar("national_id", { length: 10 }).notNull(),
   birthDate: varchar("birth_date", { length: 10 }), // YYYY-MM-DD (Jalali or Gregorian as entered)
-  idCardImageUrl: varchar("id_card_image_url", { length: 500 }).notNull(),
+  // `text`, not varchar(500): with Cloudinary unconfigured the uploader returns
+  // an inline base64 data URL, which overflowed the old cap and made every real
+  // submission fail (migration 0041).
+  idCardImageUrl: text("id_card_image_url").notNull(),
   // Legacy: seller verification no longer collects a selfie. Kept nullable so
   // historical submissions stay readable in the admin panel (migration 0040).
-  selfieImageUrl: varchar("selfie_image_url", { length: 500 }),
+  selfieImageUrl: text("selfie_image_url"),
   status: kycStatusEnum("status").notNull().default("pending"),
   rejectionReason: text("rejection_reason"),
   reviewedBy: uuid("reviewed_by").references(() => users.id),
