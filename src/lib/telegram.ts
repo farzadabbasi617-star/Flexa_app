@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { registrations, telegramAccounts } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { telegramApi } from "@/lib/telegram-api";
+import { channelHandle, channelUrl } from "@/lib/telegram-channel";
 
 export { telegramApi } from "@/lib/telegram-api";
 
@@ -29,7 +30,7 @@ function appUrl() {
 }
 
 export function getTelegramChannelUrl() {
-  return (process.env.TELEGRAM_CHANNEL_URL || process.env.CHANNEL_URL || "https://t.me/Gament_games").trim();
+  return (process.env.TELEGRAM_CHANNEL_URL || process.env.CHANNEL_URL || channelUrl()).trim();
 }
 
 export function normalizeTelegramChannelChatId(value: string | null | undefined) {
@@ -45,7 +46,7 @@ export function normalizeTelegramChannelChatId(value: string | null | undefined)
 export function getTelegramChannelChatId() {
   const explicit = normalizeTelegramChannelChatId(process.env.TELEGRAM_CHANNEL_ID);
   if (explicit) return explicit;
-  return normalizeTelegramChannelChatId(getTelegramChannelUrl()) || "@Gament_games";
+  return normalizeTelegramChannelChatId(getTelegramChannelUrl()) || channelHandle();
 }
 
 function html(value: unknown) {

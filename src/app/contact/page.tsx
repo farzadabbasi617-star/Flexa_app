@@ -1,6 +1,7 @@
 "use client";
 
 import Navbar from "@/components/Navbar";
+import { channelHandle, channelUrl } from "@/lib/telegram-channel";
 import BottomNav from "@/components/BottomNav";
 
 export default function ContactPage() {
@@ -35,8 +36,8 @@ export default function ContactPage() {
               <span className="text-2xl mt-0.5">📱</span>
               <div>
                 <div className="font-bold mb-1">تلگرام</div>
-                <a href="https://t.me/Gament_games" target="_blank" className="text-purple-400 hover:underline">
-                  @Gament_games
+                <a href={channelUrl(process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_URL)} target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:underline">
+                  {channelHandle(process.env.NEXT_PUBLIC_TELEGRAM_CHANNEL_URL)}
                 </a>
               </div>
             </div>

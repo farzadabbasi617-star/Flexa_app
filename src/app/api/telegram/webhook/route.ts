@@ -4,7 +4,7 @@ import { and, count, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { classifiedAds, classifiedScrapeLogs, clash1v1Entries, couponRedemptions, coupons, disputes, matchEvidence, matchResultClaims, matches, players, registrations, telegramAccounts, telegramCampaignEvents, telegramLinkCodes, telegramPreRegistrations, telegramReferrals, telegramSentNotifications, tickets, ticketMessages, tournamentWaitlist, tournaments, transactions, users, wallets, honors, honorLikes, honorViews } from "@/db/schema";
 import { normalizeDigits, normalizePhoneNumber } from "@/lib/phone";
-import { notifyLinkedUserOnTelegram, publishHonorToTelegramChannel, publishTournamentToTelegramChannel, telegramApi } from "@/lib/telegram";
+import { getTelegramChannelChatId, notifyLinkedUserOnTelegram, publishHonorToTelegramChannel, publishTournamentToTelegramChannel, telegramApi } from "@/lib/telegram";
 import { getGameIdGuide, gameGuideKeyboard } from "./guide";
 import { bigIntFromText, formatTomanFromRial, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
@@ -2930,7 +2930,7 @@ async function pollCommand(chatId: number, telegramId: string, question: string)
   if (!hasAdminAccess(telegramId)) return sendMessage(chatId, "شما دسترسی ادمین ندارید.");
   const q = question.trim() || "تورنومنت بعدی کدام بازی باشد؟";
   await telegramApi("sendPoll", {
-    chat_id: process.env.TELEGRAM_CHANNEL_ID || "@Gament_games",
+    chat_id: getTelegramChannelChatId(),
     question: q,
     options: ["COD Mobile", "Clash Royale", "Fortnite"],
     is_anonymous: false,

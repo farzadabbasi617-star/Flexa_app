@@ -1,5 +1,6 @@
+import { channelUrl } from "@/lib/telegram-channel";
 export const APP_URL = (process.env.APP_URL || "https://www.gament1.ir").replace(/\/$/, "");
-export const CHANNEL_URL = (process.env.TELEGRAM_CHANNEL_URL || process.env.CHANNEL_URL || "https://t.me/Gament_games").trim();
+export const CHANNEL_URL = (process.env.TELEGRAM_CHANNEL_URL || process.env.CHANNEL_URL || channelUrl()).trim();
 export const SKIP_TEXT = "رد کردن";
 export const CANCEL_TEXT = "لغو";
 export const GAMENT_ID_REQUIRED = process.env.GAMENT_ID_REQUIRED === "true" || process.env.TELEGRAM_GAMENT_ID_REQUIRED === "true";

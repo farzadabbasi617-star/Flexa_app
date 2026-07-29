@@ -4,6 +4,7 @@ import { isActiveTelegramChannelMember, type TelegramChatMemberLike } from "@/li
 import { CHANNEL_URL } from "./config";
 import { getTelegramSetting } from "./settings";
 import { sendMessage } from "./transport";
+import { channelUrl } from "@/lib/telegram-channel";
 
 export type ChannelMembershipCheck = {
   member: boolean;
@@ -74,7 +75,7 @@ export async function promptChannelMembership(chatId: number, verificationUnavai
       : "ابتدا عضو کانال رسمی شو؛ سپس به Flexa برگرد و روی «عضو شدم» بزن تا عضویتت بررسی شود.",
   ].join("\n"), {
     inline_keyboard: [
-      [{ text: "📣 عضویت در کانال", url: CHANNEL_URL || "https://t.me/Gament_games" }],
+      [{ text: "📣 عضویت در کانال", url: CHANNEL_URL || channelUrl() }],
       [{ text: "✅ عضو شدم؛ بررسی کن", callback_data: "membership:check" }],
     ],
   });
