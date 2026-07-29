@@ -3,6 +3,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import ImageUploader from "@/components/ImageUploader";
+import JalaliDatePicker from "@/components/JalaliDatePicker";
+import { gregorianISOToJalaliString, jalaliStringToGregorianISO } from "@/lib/jalali";
 import BottomNav from "@/components/BottomNav";
 
 type KycStatus = "none" | "pending" | "verified" | "rejected";
@@ -158,7 +160,17 @@ function KycGate({
       </div>
       <div>
         <label className="mb-1 block text-xs font-bold text-gray-400">تاریخ تولد (اختیاری)</label>
-        <input className={inputCls} value={form.birthDate} onChange={(e) => setForm({ ...form, birthDate: e.target.value })} placeholder="مثال: 1375/03/21" />
+        {/* JalaliDatePicker speaks Gregorian ISO, but KYC stores the Jalali
+            string, so convert on the way in and out. */}
+        <JalaliDatePicker
+          value={jalaliStringToGregorianISO(form.birthDate) || ""}
+          onChange={(iso) =>
+            setForm({
+              ...form,
+              birthDate: iso ? gregorianISOToJalaliString(iso, { digits: "latin" }) : "",
+            })
+          }
+        />
       </div>
       <ImageUploader
         purpose="kyc"

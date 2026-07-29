@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
+import KycReviewCard, { type KycReviewRow } from "@/components/admin/KycReviewCard";
 
 type Tab = "kyc" | "listings" | "orders" | "reports" | "rates";
 
@@ -29,19 +30,7 @@ const EST_GAMES: Array<{ id: EstGame; label: string }> = [
   { id: "fortnite", label: "فورتنایت" },
 ];
 
-interface KycRow {
-  id: string;
-  userId: string;
-  fullName: string;
-  nationalId: string;
-  birthDate: string | null;
-  idCardImageUrl: string;
-  selfieImageUrl: string | null;
-  status: string;
-  displayName: string | null;
-  phoneNumber: string | null;
-  gamentId: string | null;
-}
+type KycRow = KycReviewRow;
 interface ListingRow {
   id: string;
   source: string;
@@ -194,25 +183,7 @@ export default function AdminStorePage() {
           ) : (
             <div className="mt-6 space-y-3">
               {tab === "kyc" && (kyc.length === 0 ? <Empty /> : kyc.map((k) => (
-                <div key={k.id} className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
-                  <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                      <h3 className="font-black">{k.fullName} <span className="text-xs text-gray-500">({k.displayName})</span></h3>
-                      <p className="mt-1 text-xs text-gray-400">کد ملی: {k.nationalId} · {k.phoneNumber} · {k.gamentId}</p>
-                      <div className="mt-2 flex gap-2 text-xs">
-                        <a href={k.idCardImageUrl} target="_blank" rel="noreferrer" className="text-cyan-300 underline">کارت ملی</a>
-                        {/* Selfies are no longer collected; older submissions may still have one. */}
-                        {k.selfieImageUrl && (
-                          <a href={k.selfieImageUrl} target="_blank" rel="noreferrer" className="text-cyan-300 underline">سلفی (بایگانی)</a>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-2">
-                      <button onClick={() => reviewKyc(k.id, "verified")} className="rounded-xl bg-green-600 px-3 py-1.5 text-xs font-black">تأیید</button>
-                      <button onClick={() => reviewKyc(k.id, "rejected")} className="rounded-xl bg-red-600 px-3 py-1.5 text-xs font-black">رد</button>
-                    </div>
-                  </div>
-                </div>
+                <KycReviewCard key={k.id} row={k} onReview={reviewKyc} />
               )))}
 
               {tab === "listings" && (listings.length === 0 ? <Empty /> : listings.map((l) => (

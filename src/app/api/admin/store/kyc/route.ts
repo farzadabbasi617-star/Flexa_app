@@ -34,9 +34,15 @@ export async function GET(request: NextRequest) {
       status: kycProfiles.status,
       rejectionReason: kycProfiles.rejectionReason,
       submittedAt: kycProfiles.submittedAt,
+      reviewedAt: kycProfiles.reviewedAt,
       displayName: users.displayName,
       phoneNumber: users.phoneNumber,
       gamentId: users.gamentId,
+      // Reviewers need a way to contact the applicant and to see how
+      // established the account is before approving a seller.
+      email: users.email,
+      username: users.username,
+      userCreatedAt: users.createdAt,
     })
     .from(kycProfiles)
     .leftJoin(users, eq(users.id, kycProfiles.userId))
