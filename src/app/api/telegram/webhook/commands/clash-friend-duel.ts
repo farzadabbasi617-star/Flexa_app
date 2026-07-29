@@ -36,6 +36,7 @@ import {
   sendClash1v1Rules,
 } from "./clash-1v1";
 import { isSupportedClashInvite } from "./clash-1v1-policy";
+import { serverBotUsername } from "@/lib/telegram-bot-username";
 
 const CHALLENGE_TTL_MS = 15 * 60 * 1000;
 const RECENT_INVITE_REUSE_MS = 24 * 60 * 60 * 1000;
@@ -45,7 +46,7 @@ function challengeTokenHash(token: string) {
 }
 
 function botStartLink(token: string) {
-  const username = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
+  const username = serverBotUsername();
   return `https://t.me/${username}?start=duel_${encodeURIComponent(token)}`;
 }
 

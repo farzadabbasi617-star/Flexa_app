@@ -13,6 +13,7 @@ import { z } from "zod";
 import { CLASH_1V1_CONFIG } from "@/lib/clash-1v1";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
+import { serverBotUsername } from "@/lib/telegram-bot-username";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,7 @@ function isPgUniqueViolation(error: unknown) {
 }
 
 function telegramBotStartLink(payload: string) {
-  const username = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
+  const username = serverBotUsername();
   return `https://t.me/${username}?start=${encodeURIComponent(payload)}`;
 }
 

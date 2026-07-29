@@ -11,6 +11,7 @@ import { calculateDynamicTournamentPrizePool } from "@/lib/tournament-finance";
 import { useCountdown } from "@/hooks/useCountdown";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 import { CLASH_1V1_CONFIG, isClash1v1QueueTournament } from "@/lib/clash-1v1-config";
+import { botDeepLink } from "@/lib/telegram-bot-username";
 
 interface Player {
   id: string;
@@ -499,7 +500,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     بعد از پرداخت ورودی از کیف پول، QR یا پیوند دوستی کلشت را به بات بفرست تا بات خودکار حریفت را پیدا کند و شما را به هم وصل کند.
                   </div>
                   <a
-                    href={`https://t.me/${process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "FlexaTournamentBot"}?start=clash`}
+                    href={botDeepLink("clash", process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME)}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="gaming-btn w-full text-sm text-center"

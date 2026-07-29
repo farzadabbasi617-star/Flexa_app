@@ -5,6 +5,7 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
+import { botDeepLink } from "@/lib/telegram-bot-username";
 
 interface RoomEntry {
   id?: string;
@@ -76,8 +77,7 @@ function rankLabel(value: string) {
   return ({ rookie: "تازه‌وارد", bronze: "Bronze", silver: "Silver", gold: "Gold", pro: "Pro", ultra: "Ultra", legend: "Legend" } as Record<string,string>)[value] || value;
 }
 function telegramStartUrl(payload: string) {
-  const bot = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
-  return `https://t.me/${bot}?start=${encodeURIComponent(payload)}`;
+  return botDeepLink(payload, process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME);
 }
 
 export default function CodRoomDetailPage({ params }: { params: Promise<{ id: string }> }) {

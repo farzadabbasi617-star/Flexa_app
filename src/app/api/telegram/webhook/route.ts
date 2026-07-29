@@ -81,6 +81,7 @@ import {
   type TelegramUpdateClaim,
 } from "@/lib/telegram-reliability";
 import { shouldRetryTelegramUpdate } from "@/lib/telegram-reliability-policy";
+import { serverBotUsername } from "@/lib/telegram-bot-username";
 import {
   affiliatePartnerForTelegramChat,
   affiliatePublicLink,
@@ -412,7 +413,7 @@ async function handleStartPayload(chatId: number, telegramId: string, user: Tele
 }
 
 function telegramStartLink(payload: string) {
-  const username = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
+  const username = serverBotUsername();
   return `https://t.me/${username}?start=${encodeURIComponent(payload)}`;
 }
 
@@ -4143,7 +4144,7 @@ async function handleGroupUpdate(update: TelegramUpdate) {
   const privateClashUrl = connectedMedia
     ? affiliatePublicLink(connectedMedia.referralCode, "GROUP")
     : telegramStartLink("clash");
-  const botUsername = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
+  const botUsername = serverBotUsername();
   const keyboard = {
     inline_keyboard: [
       [{ text: "⚔️ اجرای 1V1 در چت خصوصی", url: privateClashUrl }],

@@ -21,6 +21,7 @@ import {
   wallets,
 } from "@/db/schema";
 import { updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
+import { serverBotUsername } from "@/lib/telegram-bot-username";
 
 export const AFFILIATE_ATTRIBUTION_DAYS = 30;
 export const AFFILIATE_COMMISSION_TOMAN = 7_000;
@@ -750,7 +751,7 @@ export async function affiliateAdminOverview() {
 }
 
 export function affiliatePublicLink(referralCode: string, campaignCode?: string) {
-  const bot = process.env.TELEGRAM_BOT_USERNAME || "FlexaTournamentBot";
+  const bot = serverBotUsername();
   const suffix = campaignCode ? `_${normalizeAffiliateCode(campaignCode)}` : "";
   return `https://t.me/${bot}?start=aff_${normalizeAffiliateCode(referralCode)}${suffix}`;
 }
