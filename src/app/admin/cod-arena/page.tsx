@@ -15,6 +15,8 @@ interface RoomRow {
   rewardConfig: { perKillRial?: string; participationRial?: string; maxKillsPerEntry?: number; maxTotalKills?: number; placementPayout?: "per_team"|"per_entry"; killLadder?: { firstKillRial:string; divisor:number; minKillRial:string }|null; placementRules?: Array<{ from:number;to:number;amountRial:string }> };
   bannerImageUrl?: string|null; category?: string|null; originalEntryFeeRial?: string|null; minCodLevel?: number;
   prizeScaling?: { mode?: "scaled"|"fixed"; fullPayoutAtBps?: number; minimumViableBps?: number }|null;
+  matchSettings?: { revive?: string|null; limitedAmmo?: boolean|null; zoneSpeed?: string|null; doubleGroundLoot?: boolean|null; vehiclesEnabled?: boolean|null }|null;
+  faq?: Array<{ question:string; answer:string }>|null;
   referralRateBps?: number; minRankPoints: number; requiresRecording: boolean; startsAt: string; endsAt: string|null; checkInOpensAt: string|null; checkInClosesAt: string|null; credentialsRevealAt: string|null;
 }
 interface DetailEntry { id?: string; displayName: string; codUsername: string; status: string; checkedIn: boolean; kills?: number|null; placement?: number|null; resultStatus?: string; }
@@ -199,6 +201,17 @@ function AuditFeed(){
 }
 
 interface PlacementRow { from:string; to:string; amountToman:string }
+interface FaqRow { question:string; answer:string }
+
+/** The questions every published Call of Duty room answers, in the usual order. */
+const FAQ_TEMPLATE: FaqRow[] = [
+  { question:"جایزه به چه کسانی واریز میشود؟", answer:"" },
+  { question:"تنظیمات بازی به چه صورتی است ؟", answer:"" },
+  { question:"قوانین بازی چگونه است؟", answer:"" },
+  { question:"اگه کسی جامو گرفته بود چیکار کنم؟", answer:"در صورتی که کسی در جایگاه شما بود باید برین تو جایگاه تماشاگر ( اسپکت ) بشینید و به ادمین روم داخل چت گیم تایپ کنید شماره جایگاهتون رو تا چک کنه" },
+  { question:"از کجا باید وارد بازی شیم؟", answer:"راس ساعت مشخص شده تو اپلیکیشن گیمنت آنلاین باشین، لینک و کد روم بهتون ارسال میشه. فراموش نکنید که ارسال لینک و کد به دوستانتون تخلف محسوب میشه." },
+  { question:"چجوری جایزه رو دریافت کنیم؟", answer:"چند دقیقه پس از اتمام روم در صورت برنده بودن حساب کیف پولتون شارژ میشه، نگران نباشین." },
+];
 
 const initialForm = {
   id:"",title:"",description:"",region:"global" as "global"|"garena",map:"isolated",teamMode:"solo" as "solo"|"duo"|"squad",perspective:"tpp",status:"draft",isPublished:false,
@@ -206,6 +219,8 @@ const initialForm = {
   maxTotalKills:"0",placementPayout:"per_team" as "per_team"|"per_entry",
   bannerImageUrl:"",category:"",originalEntryFeeToman:"",minCodLevel:0,
   prizeScalingMode:"scaled" as "scaled"|"fixed",fullPayoutAtPercent:100,minimumViablePercent:25,
+  revive:"" as ""|"disabled"|"enabled"|"auto",limitedAmmo:"" as ""|"on"|"off",zoneSpeed:"" as ""|"slow"|"normal"|"fast",
+  doubleGroundLoot:"" as ""|"on"|"off",vehiclesEnabled:"" as ""|"on"|"off",
   killLadderEnabled:false,ladderFirstKillToman:"0",ladderDivisor:2,ladderMinKillToman:"0",
   minRankPoints:0,requiresRecording:true,rulesVersion:"cod-beta-1",rules:"",
   roomCode:"",roomPassword:"",officialJoinUrl:"",checkInOpensAt:"",checkInClosesAt:"",credentialsRevealAt:"",startsAt:"",endsAt:"",
@@ -236,6 +251,7 @@ export default function AdminCodArenaPage(){
   const [saving,setSaving]=useState(false); const [error,setError]=useState(""); const [message,setMessage]=useState(""); const [selected,setSelected]=useState<DetailRoom|null>(null); const [view,setView]=useState<"rooms"|"audit">("rooms");
   const [results,setResults]=useState<Record<string,{kills:string;placement:string}>>({}); const [evidenceConfirmed,setEvidenceConfirmed]=useState(false); const [lobbyOverrideConfirmed,setLobbyOverrideConfirmed]=useState(false); const [lobbyStartOverrideConfirmed,setLobbyStartOverrideConfirmed]=useState(false); const [staff,setStaff]=useState({identifier:"",role:"roomer"});
   const [placements,setPlacements]=useState<PlacementRow[]>(()=>DEFAULT_PLACEMENTS.map((row)=>({...row})));
+  const [faq,setFaq]=useState<FaqRow[]>([]);
   const isAdmin=user?.role==="admin"||user?.role==="super_admin";
 
   useEffect(()=>{if(!authLoading&&(!user||!isAdmin))router.push("/");},[authLoading,user,isAdmin,router]);
@@ -247,6 +263,14 @@ export default function AdminCodArenaPage(){
     lobbyOverrideConfirmed:lobbyStartOverrideConfirmed,
     entryFeeRial:tomanToRial(form.entryFeeToman),serviceFeeRial:tomanToRial(form.serviceFeeToman),prizeBudgetRial:tomanToRial(form.prizeBudgetToman),
     bannerImageUrl:form.bannerImageUrl||null,category:form.category||null,minCodLevel:Number(form.minCodLevel)||0,
+    matchSettings:{
+      ...(form.revive?{revive:form.revive}:{}),
+      ...(form.limitedAmmo?{limitedAmmo:form.limitedAmmo==="on"}:{}),
+      ...(form.zoneSpeed?{zoneSpeed:form.zoneSpeed}:{}),
+      ...(form.doubleGroundLoot?{doubleGroundLoot:form.doubleGroundLoot==="on"}:{}),
+      ...(form.vehiclesEnabled?{vehiclesEnabled:form.vehiclesEnabled==="on"}:{}),
+    },
+    faq:faq.filter((row)=>row.question.trim()&&row.answer.trim()),
     prizeScaling:{mode:form.prizeScalingMode,fullPayoutAtBps:Math.round(Number(form.fullPayoutAtPercent||100)*100),minimumViableBps:Math.round(Number(form.minimumViablePercent||0)*100)},
     originalEntryFeeRial:String(form.originalEntryFeeToman||"").trim()?tomanToRial(form.originalEntryFeeToman):null,referralRateBps:Math.round(Number(normalizeDigits(String(form.referralPercent||0)).replace("٫","."))*100),
     rewardConfig:{
@@ -265,9 +289,9 @@ export default function AdminCodArenaPage(){
         .map((row)=>({from:Number(row.from),to:Number(row.to||row.from),amountRial:tomanToRial(row.amountToman)})),
     },
     startsAt:iso(form.startsAt),endsAt:iso(form.endsAt),checkInOpensAt:iso(form.checkInOpensAt),checkInClosesAt:iso(form.checkInClosesAt),credentialsRevealAt:iso(form.credentialsRevealAt),
-  }),[form,lobbyStartOverrideConfirmed,placements]);
+  }),[form,lobbyStartOverrideConfirmed,placements,faq]);
 
-  function begin(){setForm({...initialForm,startsAt:localDate(new Date(Date.now()+24*60*60_000).toISOString())});setPlacements(DEFAULT_PLACEMENTS.map((row)=>({...row})));setLobbyStartOverrideConfirmed(false);setShowForm(true);setSelected(null);setError("");}
+  function begin(){setForm({...initialForm,startsAt:localDate(new Date(Date.now()+24*60*60_000).toISOString())});setPlacements(DEFAULT_PLACEMENTS.map((row)=>({...row})));setFaq(FAQ_TEMPLATE.map((row)=>({...row})));setLobbyStartOverrideConfirmed(false);setShowForm(true);setSelected(null);setError("");}
   async function edit(room:RoomRow){
     setError("");
     try {
@@ -275,12 +299,18 @@ export default function AdminCodArenaPage(){
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||"اطلاعات روم دریافت نشد");
       const full=data.room as DetailRoom;
-      setForm({...initialForm,id:full.id,title:full.title,description:full.description||"",region:full.region,map:full.map,teamMode:full.teamMode,perspective:full.perspective,status:full.status,isPublished:full.isPublished,capacity:full.capacity,entryFeeToman:rialToToman(full.entryFeeRial),serviceFeeToman:rialToToman(full.serviceFeeRial),prizeBudgetToman:rialToToman(full.prizeBudgetRial),referralPercent:String(Number(full.referralRateBps||0)/100),perKillToman:rialToToman(full.rewardConfig?.perKillRial),participationToman:rialToToman(full.rewardConfig?.participationRial),maxKillsPerEntry:Number(full.rewardConfig?.maxKillsPerEntry||40),maxTotalKills:String(full.rewardConfig?.maxTotalKills||0),bannerImageUrl:full.bannerImageUrl||"",prizeScalingMode:(full.prizeScaling?.mode==="fixed"?"fixed":"scaled"),fullPayoutAtPercent:Math.round(Number(full.prizeScaling?.fullPayoutAtBps??10000)/100),minimumViablePercent:Math.round(Number(full.prizeScaling?.minimumViableBps??2500)/100),category:full.category||"",originalEntryFeeToman:full.originalEntryFeeRial?rialToToman(full.originalEntryFeeRial):"",minCodLevel:Number(full.minCodLevel||0),placementPayout:(full.rewardConfig?.placementPayout==="per_entry"?"per_entry":"per_team"),killLadderEnabled:Boolean(full.rewardConfig?.killLadder),ladderFirstKillToman:rialToToman(full.rewardConfig?.killLadder?.firstKillRial),ladderDivisor:Number(full.rewardConfig?.killLadder?.divisor||2),ladderMinKillToman:rialToToman(full.rewardConfig?.killLadder?.minKillRial),minRankPoints:full.minRankPoints,requiresRecording:full.requiresRecording,rulesVersion:full.rulesVersion||"cod-beta-1",rules:full.rules||"",roomCode:full.roomCode||"",roomPassword:full.roomPassword||"",officialJoinUrl:full.officialJoinUrl||"",startsAt:localDate(full.startsAt),endsAt:localDate(full.endsAt),checkInOpensAt:localDate(full.checkInOpensAt),checkInClosesAt:localDate(full.checkInClosesAt),credentialsRevealAt:localDate(full.credentialsRevealAt)});
+      setForm({...initialForm,id:full.id,title:full.title,description:full.description||"",region:full.region,map:full.map,teamMode:full.teamMode,perspective:full.perspective,status:full.status,isPublished:full.isPublished,capacity:full.capacity,entryFeeToman:rialToToman(full.entryFeeRial),serviceFeeToman:rialToToman(full.serviceFeeRial),prizeBudgetToman:rialToToman(full.prizeBudgetRial),referralPercent:String(Number(full.referralRateBps||0)/100),perKillToman:rialToToman(full.rewardConfig?.perKillRial),participationToman:rialToToman(full.rewardConfig?.participationRial),maxKillsPerEntry:Number(full.rewardConfig?.maxKillsPerEntry||40),maxTotalKills:String(full.rewardConfig?.maxTotalKills||0),bannerImageUrl:full.bannerImageUrl||"",prizeScalingMode:(full.prizeScaling?.mode==="fixed"?"fixed":"scaled"),
+        revive:(full.matchSettings?.revive??"") as ""|"disabled"|"enabled"|"auto",
+        limitedAmmo:(typeof full.matchSettings?.limitedAmmo==="boolean"?(full.matchSettings.limitedAmmo?"on":"off"):"") as ""|"on"|"off",
+        zoneSpeed:(full.matchSettings?.zoneSpeed??"") as ""|"slow"|"normal"|"fast",
+        doubleGroundLoot:(typeof full.matchSettings?.doubleGroundLoot==="boolean"?(full.matchSettings.doubleGroundLoot?"on":"off"):"") as ""|"on"|"off",
+        vehiclesEnabled:(typeof full.matchSettings?.vehiclesEnabled==="boolean"?(full.matchSettings.vehiclesEnabled?"on":"off"):"") as ""|"on"|"off",fullPayoutAtPercent:Math.round(Number(full.prizeScaling?.fullPayoutAtBps??10000)/100),minimumViablePercent:Math.round(Number(full.prizeScaling?.minimumViableBps??2500)/100),category:full.category||"",originalEntryFeeToman:full.originalEntryFeeRial?rialToToman(full.originalEntryFeeRial):"",minCodLevel:Number(full.minCodLevel||0),placementPayout:(full.rewardConfig?.placementPayout==="per_entry"?"per_entry":"per_team"),killLadderEnabled:Boolean(full.rewardConfig?.killLadder),ladderFirstKillToman:rialToToman(full.rewardConfig?.killLadder?.firstKillRial),ladderDivisor:Number(full.rewardConfig?.killLadder?.divisor||2),ladderMinKillToman:rialToToman(full.rewardConfig?.killLadder?.minKillRial),minRankPoints:full.minRankPoints,requiresRecording:full.requiresRecording,rulesVersion:full.rulesVersion||"cod-beta-1",rules:full.rules||"",roomCode:full.roomCode||"",roomPassword:full.roomPassword||"",officialJoinUrl:full.officialJoinUrl||"",startsAt:localDate(full.startsAt),endsAt:localDate(full.endsAt),checkInOpensAt:localDate(full.checkInOpensAt),checkInClosesAt:localDate(full.checkInClosesAt),credentialsRevealAt:localDate(full.credentialsRevealAt)});
       setPlacements(placementRowsFromConfig(full.rewardConfig?.placementRules));
+      setFaq(Array.isArray(full.faq)?full.faq.map((row)=>({question:String(row.question||""),answer:String(row.answer||"")})):[]);
       setLobbyStartOverrideConfirmed(false);setShowForm(true);setSelected(null);scrollTo({top:0,behavior:"smooth"});
     } catch(e){setError(e instanceof Error?e.message:"اطلاعات روم دریافت نشد");}
   }
-  async function save(e:FormEvent){e.preventDefault();setSaving(true);setError("");setMessage("");try{const r=await fetch("/api/admin/cod/rooms",{method:form.id?"PATCH":"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||"ذخیره نشد");setMessage(form.id?"روم به‌روزرسانی شد":"روم COD ساخته شد");setShowForm(false);setForm(initialForm);setPlacements(DEFAULT_PLACEMENTS.map((row)=>({...row})));await load();}catch(e){setError(e instanceof Error?e.message:"ذخیره نشد");}finally{setSaving(false);}}
+  async function save(e:FormEvent){e.preventDefault();setSaving(true);setError("");setMessage("");try{const r=await fetch("/api/admin/cod/rooms",{method:form.id?"PATCH":"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||"ذخیره نشد");setMessage(form.id?"روم به‌روزرسانی شد":"روم COD ساخته شد");setShowForm(false);setForm(initialForm);setPlacements(DEFAULT_PLACEMENTS.map((row)=>({...row})));setFaq([]);await load();}catch(e){setError(e instanceof Error?e.message:"ذخیره نشد");}finally{setSaving(false);}}
   async function remove(id:string){if(!confirm("فقط Draft خالی قابل حذف است. حذف شود؟"))return;const r=await fetch("/api/admin/cod/rooms",{method:"DELETE",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify({id})});const d=await r.json();if(!r.ok){setError(d.error||"حذف نشد");return;}load();}
   async function openOps(id:string){setError("");const r=await fetch(`/api/cod/rooms/${id}`,{cache:"no-store"});const d=await r.json();if(!r.ok){setError(d.error||"دریافت نشد");return;}setSelected(d.room);const next:Record<string,{kills:string;placement:string}>={};for(const e of d.room.entries||[])if(e.id)next[e.id]={kills:String(e.kills||0),placement:e.placement?String(e.placement):""};setResults(next);setEvidenceConfirmed(false);setLobbyOverrideConfirmed(false);setShowForm(false);}
   async function settle(){if(!selected||!confirm("نتایج نهایی و روم تسویه شود؟"))return;setSaving(true);setError("");try{const eligibleIds=new Set(selected.entries.filter(entry=>entry.id&&entry.checkedIn).map(entry=>entry.id));const body={evidenceConfirmed,lobbyOverrideConfirmed,results:Object.entries(results).filter(([entryId])=>eligibleIds.has(entryId)).map(([entryId,v])=>({entryId,kills:Number(v.kills||0),placement:v.placement?Number(v.placement):null}))};const r=await fetch(`/api/admin/cod/rooms/${selected.id}/settle`,{method:"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.error||"تسویه نشد");setMessage(`تسویه ${d.settlement.entryCount} بازیکن با موفقیت ثبت شد.`);setSelected(null);await load();}catch(e){setError(e instanceof Error?e.message:"تسویه نشد");}finally{setSaving(false);}}
@@ -379,6 +409,53 @@ export default function AdminCodArenaPage(){
       </div>
       <div><h3 className="font-black text-orange-300 mb-3">زمان‌بندی</h3><div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><label className="text-xs text-gray-400">شروع روم<input required type="datetime-local" value={form.startsAt} onChange={e=>setForm({...form,startsAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">شروع Check-in<input type="datetime-local" value={form.checkInOpensAt} onChange={e=>setForm({...form,checkInOpensAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">پایان Check-in<input type="datetime-local" value={form.checkInClosesAt} onChange={e=>setForm({...form,checkInClosesAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">نمایش کد و لینک<input type="datetime-local" value={form.credentialsRevealAt} onChange={e=>setForm({...form,credentialsRevealAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">پایان تقریبی<input type="datetime-local" value={form.endsAt} onChange={e=>setForm({...form,endsAt:e.target.value})} className={`${input} mt-1`}/></label></div></div>
       <div><h3 className="font-black text-orange-300 mb-3">اطلاعات محرمانه Lobby</h3><div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><label className="text-xs text-gray-400">Room Code<input value={form.roomCode} onChange={e=>setForm({...form,roomCode:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label><label className="text-xs text-gray-400">Password<input value={form.roomPassword} onChange={e=>setForm({...form,roomPassword:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label><label className="text-xs text-gray-400">لینک رسمی COD<input value={form.officialJoinUrl} onChange={e=>setForm({...form,officialJoinUrl:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label></div></div>
+      <div><h3 className="font-black text-orange-300 mb-3">تنظیمات بازی</h3>
+        <p className="text-[10px] leading-5 text-gray-500 mb-3">این موارد به‌صورت برچسب روی صفحه روم نمایش داده می‌شوند. هر کدام را خالی بگذاری، اصلاً نشان داده نمی‌شود.</p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <label className="text-xs text-gray-400">ریوایو
+            <select value={form.revive} onChange={e=>setForm({...form,revive:e.target.value as typeof form.revive})} className={`${input} mt-1`}>
+              <option value="">— اعلام نشده —</option><option value="enabled">فعال</option><option value="disabled">غیرفعال</option><option value="auto">اتو ریوایو</option>
+            </select>
+          </label>
+          <label className="text-xs text-gray-400">لیمیتد امو
+            <select value={form.limitedAmmo} onChange={e=>setForm({...form,limitedAmmo:e.target.value as typeof form.limitedAmmo})} className={`${input} mt-1`}>
+              <option value="">— اعلام نشده —</option><option value="off">خاموش (تیر بی‌نهایت)</option><option value="on">روشن</option>
+            </select>
+          </label>
+          <label className="text-xs text-gray-400">سرعت زون
+            <select value={form.zoneSpeed} onChange={e=>setForm({...form,zoneSpeed:e.target.value as typeof form.zoneSpeed})} className={`${input} mt-1`}>
+              <option value="">— اعلام نشده —</option><option value="slow">کند</option><option value="normal">نرمال</option><option value="fast">فست</option>
+            </select>
+          </label>
+          <label className="text-xs text-gray-400">گان‌های روی زمین
+            <select value={form.doubleGroundLoot} onChange={e=>setForm({...form,doubleGroundLoot:e.target.value as typeof form.doubleGroundLoot})} className={`${input} mt-1`}>
+              <option value="">— اعلام نشده —</option><option value="on">دوبل</option><option value="off">معمولی</option>
+            </select>
+          </label>
+          <label className="text-xs text-gray-400">وسائل نقلیه
+            <select value={form.vehiclesEnabled} onChange={e=>setForm({...form,vehiclesEnabled:e.target.value as typeof form.vehiclesEnabled})} className={`${input} mt-1`}>
+              <option value="">— اعلام نشده —</option><option value="on">فعال</option><option value="off">غیرفعال</option>
+            </select>
+          </label>
+        </div>
+      </div>
+
+      <div><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
+        <div><h3 className="font-black text-orange-300">سوالات پرتکرار روم</h3><p className="mt-1 text-[10px] text-gray-500">به‌صورت آکاردئون در تب «توضیحات» صفحه روم نمایش داده می‌شود.</p></div>
+        {faq.length===0&&<button type="button" onClick={()=>setFaq(FAQ_TEMPLATE.map((row)=>({...row})))} className="rounded-xl border border-white/10 px-4 py-2 text-xs font-black">افزودن قالب پیش‌فرض</button>}
+      </div>
+        <div className="space-y-3">{faq.map((row,index)=><div key={index} className="rounded-2xl border border-white/10 bg-black/20 p-3">
+          <div className="flex gap-2 items-center">
+            <span className="shrink-0 text-[10px] text-gray-600">{(index+1).toLocaleString("fa-IR")}</span>
+            <input value={row.question} onChange={e=>setFaq(faq.map((r,i)=>i===index?{...r,question:e.target.value}:r))} placeholder="سوال" className={input}/>
+            <button type="button" onClick={()=>setFaq(faq.filter((_,i)=>i!==index))} className="shrink-0 rounded-xl border border-red-500/25 px-3 py-3 text-xs text-red-300">حذف</button>
+          </div>
+          <textarea value={row.answer} onChange={e=>setFaq(faq.map((r,i)=>i===index?{...r,answer:e.target.value}:r))} rows={3} placeholder="پاسخ" className={`${input} mt-2`}/>
+        </div>)}</div>
+        <button type="button" onClick={()=>setFaq([...faq,{question:"",answer:""}])} className="mt-3 rounded-xl border border-white/10 px-4 py-2 text-xs font-black">+ سوال جدید</button>
+        <p className="mt-2 text-[10px] text-gray-500">سوال‌های بدون پاسخ ذخیره نمی‌شوند. حداکثر ۲۰ سوال.</p>
+      </div>
+
       <label className="block text-xs text-gray-400">قوانین<textarea value={form.rules} onChange={e=>setForm({...form,rules:e.target.value})} rows={6} className={`${input} mt-1`}/></label>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><label className="text-xs text-gray-400">وضعیت<select value={form.status} onChange={e=>setForm({...form,status:e.target.value})} className={`${input} mt-1`}>{(statusNext[form.status]||[form.status]).map(x=><option key={x} value={x}>{statusFa[x]||x}</option>)}</select></label><label className="flex items-center gap-2 text-xs mt-7"><input type="checkbox" checked={form.requiresRecording} onChange={e=>setForm({...form,requiresRecording:e.target.checked})}/> رکورد بازیکنان الزامی</label><label className="flex items-center gap-2 text-xs mt-7"><input type="checkbox" checked={form.isPublished} onChange={e=>setForm({...form,isPublished:e.target.checked})}/> نمایش در COD Arena</label></div>
       {form.status==="in_progress"&&<label className="flex gap-3 items-start rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs leading-6 text-amber-200"><input type="checkbox" checked={lobbyStartOverrideConfirmed} onChange={e=>setLobbyStartOverrideConfirmed(e.target.checked)} className="mt-1"/><span>اگر آخرین بررسی Lobby هنوز verified نیست، با مسئولیت ادمین اجازه شروع/درج وضعیت در اجرا را صادر می‌کنم.</span></label>}

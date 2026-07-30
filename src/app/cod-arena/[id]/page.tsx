@@ -6,6 +6,8 @@ import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import { useAuth } from "@/contexts/AuthContext";
 import { botDeepLink } from "@/lib/telegram-bot-username";
+import RoomFaqAccordion from "@/components/cod/RoomFaqAccordion";
+import { codMatchSettingChips } from "@/lib/cod-match-settings-display";
 
 interface RoomEntry {
   id?: string;
@@ -53,6 +55,11 @@ interface RoomDetail {
   } | null;
   rewardConfig: { perKillRial?: string; participationRial?: string; maxKillsPerEntry?: number; maxTotalKills?: number; placementPayout?: "per_team"|"per_entry"; killLadder?: { firstKillRial: string; divisor: number; minKillRial: string } | null; placementRules?: Array<{ from: number; to: number; amountRial: string }> };
   minRankPoints: number;
+  minCodLevel?: number;
+  bannerImageUrl?: string | null;
+  category?: string | null;
+  matchSettings?: Record<string, unknown> | null;
+  faq?: Array<{ question: string; answer: string }> | null;
   rules: string | null;
   rulesVersion: string;
   requiresRecording: boolean;
@@ -111,6 +118,7 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
   const [report, setReport] = useState({ category: "cheat", accusedCodUsername: "", evidenceUrl: "", description: "" });
   const [wallet, setWallet] = useState<{ usableRial: string; usableToman: number } | null>(null);
   const [walletLoading, setWalletLoading] = useState(false);
+  const [tab, setTab] = useState<"about" | "room">("about");
 
   const load = useCallback(async () => {
     try {
@@ -195,6 +203,8 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
 
   const full = room.registeredCount >= room.capacity;
   const proj = room.prizeProjection || null;
+  const settingChips = codMatchSettingChips(room.matchSettings);
+  const faqEntries = Array.isArray(room.faq) ? room.faq : [];
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const canOperate = isAdmin || Boolean(room.staffRole);
   let paidRoom = false;
@@ -212,9 +222,19 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
   return (
     <div className="min-h-screen bg-[#060606] text-white">
       <Navbar />
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-7 sm:py-10" style={{ paddingBottom: "var(--bottom-nav-space)" }} dir="rtl">
+      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-7 sm:py-10 pb-24 lg:pb-10" dir="rtl">
         <Link href="/cod-arena" className="text-xs text-gray-500 hover:text-white">← بازگشت به COD Arena</Link>
         <section className="relative overflow-hidden rounded-[2.5rem] border border-orange-500/20 bg-gradient-to-br from-[#24160d] via-[#0d0d0d] to-black p-6 sm:p-9 mt-5">
+          {room.bannerImageUrl && (
+            <>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={room.bannerImageUrl} alt="" width={1280} height={543} className="pointer-events-none absolute inset-0 h-full w-full object-cover" />
+              {/* Text sits directly on the art, so hold a consistent floor of
+                  contrast rather than letting a bright banner wash it out. */}
+              <div className="pointer-events-none absolute inset-0 bg-[#0d0d0d]/72" />
+              <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#0d0d0d] via-transparent to-[#0d0d0d]/60" />
+            </>
+          )}
           <div className="absolute -top-32 -left-24 w-80 h-80 bg-orange-500/15 rounded-full blur-3xl" />
           <div className="relative flex flex-col md:flex-row items-start justify-between gap-7">
             <div className="max-w-2xl">
@@ -238,8 +258,28 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
         {error && <div className="mt-5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-sm text-red-300">{error}</div>}
         {message && <div className="mt-5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-sm text-emerald-300">{message}</div>}
 
+        {/* Two views over one room: "room" is everything you act on, "about" is
+            everything you read before deciding to join. */}
+        <div role="tablist" aria-label="بخش‌های روم" className="mt-6 flex gap-1 border-b border-white/10">
+          {([["room", "روم"], ["about", "توضیحات"]] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              role="tab"
+              id={`cod-tab-${key}`}
+              aria-selected={tab === key}
+              aria-controls={`cod-panel-${key}`}
+              onClick={() => setTab(key)}
+              className={`relative px-6 py-3 text-sm font-black transition-colors ${tab === key ? "text-white" : "text-gray-500 hover:text-gray-300"}`}
+            >
+              {label}
+              <span className={`absolute inset-x-2 -bottom-px h-0.5 rounded-full transition-opacity ${tab === key ? "bg-yellow-400 opacity-100" : "opacity-0"}`} />
+            </button>
+          ))}
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_.9fr] gap-5 mt-6">
-          <div className="space-y-5">
+          <div className="space-y-5" role="tabpanel" id="cod-panel-about" aria-labelledby="cod-tab-about" hidden={tab !== "about"}>
             <section className="rounded-[2rem] border border-white/10 bg-white/[.025] p-5 sm:p-6">
               <h2 className="text-lg font-black">💰 فرمول جایزه و اقتصاد روم</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-5 text-center">
@@ -290,11 +330,73 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
               <p className="text-[10px] text-gray-600 leading-5 mt-4">کمیسیون معرفی فقط درصدی از کارمزد خدمات Gament است؛ بودجه جایزه بازیکنان دست‌نخورده می‌ماند.</p>
             </section>
 
+            {settingChips.length > 0 && <section className="rounded-[2rem] border border-white/10 bg-white/[.025] p-5 sm:p-6">
+              <h2 className="text-lg font-black">⚙️ تنظیمات بازی</h2>
+              <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {settingChips.map((chip) => (
+                  <div key={chip.key} className={`rounded-2xl border p-3 ${chip.emphasis ? "border-orange-400/25 bg-orange-500/[.07]" : "border-white/10 bg-black/25"}`}>
+                    <div className="text-[9px] text-gray-500">{chip.label}</div>
+                    <div className={`mt-1 text-xs font-black ${chip.emphasis ? "text-orange-200" : "text-white"}`}>{chip.value}</div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2 text-[9px]">
+                <span className="rounded-full bg-white/5 px-3 py-1">مپ: {room.map}</span>
+                <span className="rounded-full bg-white/5 px-3 py-1">{room.perspective.toUpperCase()}</span>
+                {room.minCodLevel ? <span className="rounded-full bg-amber-500/10 px-3 py-1 text-amber-200">حداقل لول اکانت کالاف: {room.minCodLevel.toLocaleString("fa-IR")}</span> : null}
+              </div>
+            </section>}
+
             <section className="rounded-[2rem] border border-white/10 bg-white/[.025] p-5 sm:p-6">
               <h2 className="text-lg font-black">🛡️ قوانین و مدرک ضدچیت</h2>
               <div className="mt-4 whitespace-pre-line text-xs text-gray-300 leading-7">{room.rules || "استفاده از چیت، تبانی، جعل نتیجه و ورود با UID غیر از پروفایل ممنوع است. تمام بازیکنان باید از شروع Lobby تا نمایش Scoreboard رکورد قابل بررسی داشته باشند."}</div>
               <div className="mt-4 flex flex-wrap gap-2 text-[9px]"><span className="rounded-full bg-white/5 px-3 py-1">نسخه قوانین: {room.rulesVersion}</span><span className="rounded-full bg-white/5 px-3 py-1">رکورد: {room.requiresRecording ? "الزامی" : "اختیاری"}</span><span className="rounded-full bg-white/5 px-3 py-1">حداقل RP: {room.minRankPoints.toLocaleString("fa-IR")}</span></div>
             </section>
+
+            {faqEntries.length > 0 && <section className="rounded-[2rem] border border-white/10 bg-white/[.025] p-5 sm:p-6">
+              <h2 className="text-lg font-black mb-4">❓ سوالات پرتکرار</h2>
+              <RoomFaqAccordion entries={faqEntries} />
+            </section>}
+          </div>
+
+          <div className="space-y-5" role="tabpanel" id="cod-panel-room" aria-labelledby="cod-tab-room" hidden={tab !== "room"}>
+            <section className="rounded-[2rem] border border-white/10 bg-white/[.025] p-5 sm:p-6">
+              <h2 className="text-lg font-black">🗓️ زمان‌بندی روم</h2>
+              <div className="mt-4 space-y-3">
+                {([
+                  ["باز شدن Check-in", room.checkInOpensAt, "از این ساعت باید حضورت را تأیید کنی"],
+                  ["نمایش کد و پسورد روم", room.credentialsRevealAt, "فقط برای کسانی که Check-in کرده‌اند"],
+                  ["بسته شدن Check-in", room.checkInClosesAt, "بعد از این ساعت جایگاهت آزاد می‌شود"],
+                  ["شروع بازی", room.startsAt, "راس این ساعت داخل بازی باش"],
+                ] as const).map(([label, value, hint]) => (
+                  <div key={label} className="flex items-start gap-3 rounded-2xl bg-black/25 p-3">
+                    <span aria-hidden="true" className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-orange-400" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-xs font-black">{label}</div>
+                      <div className="mt-0.5 text-[10px] text-gray-400">{faDate(value)}</div>
+                      <div className="mt-1 text-[10px] text-gray-600">{hint}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2 text-[9px]">
+                <span className="rounded-full bg-white/5 px-3 py-1">وضعیت: {room.status}</span>
+                <span className="rounded-full bg-white/5 px-3 py-1">{room.registeredCount.toLocaleString("fa-IR")} از {room.capacity.toLocaleString("fa-IR")} نفر</span>
+                <span className="rounded-full bg-white/5 px-3 py-1">رکورد: {room.requiresRecording ? "الزامی" : "اختیاری"}</span>
+              </div>
+            </section>
+
+            {!room.myEntry && !canOperate && (
+              <section className="rounded-[2rem] border border-white/10 bg-white/[.02] p-5 sm:p-6">
+                <h2 className="text-sm font-black">بعد از عضویت اینجا فعال می‌شود</h2>
+                <ul className="mt-3 space-y-2 text-[11px] leading-6 text-gray-400">
+                  <li>• دکمه Check-in برای تأیید حضور</li>
+                  <li>• کد و پسورد روم در زمان اعلام‌شده</li>
+                  <li>• ثبت مدرک (Scoreboard و رکورد بازی)</li>
+                  <li>• گزارش تخلف در صورت مشاهده چیت یا تبانی</li>
+                </ul>
+              </section>
+            )}
 
             {canOperate && <section className="rounded-[2rem] border border-cyan-500/20 bg-cyan-950/10 p-5 sm:p-6">
               <h2 className="text-lg font-black">🤖 بررسی هوشمند Lobby</h2>
@@ -335,7 +437,7 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
           </div>
 
           <div className="space-y-5">
-            {!room.myEntry ? <section className="rounded-[2rem] border border-orange-500/20 bg-orange-950/10 p-5 sm:p-6 sticky top-4">
+            {!room.myEntry ? <section id="cod-join-card" className="rounded-[2rem] border border-orange-500/20 bg-orange-950/10 p-5 sm:p-6 sticky top-4 scroll-mt-24">
               <h2 className="text-xl font-black">عضویت در روم</h2>
               {!user ? <><p className="text-xs text-gray-400 leading-6 mt-3">برای ثبت UID، پذیرش قوانین و عضویت باید وارد حساب Gament شوی.</p><Link href={`/login?next=/cod-arena/${room.id}`} className="block text-center rounded-2xl bg-orange-500 text-black py-3.5 font-black text-sm mt-5">ورود به حساب</Link></> : <>
                 {(!user.codMobileId || !user.codMobileUsername) && <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 p-3 text-xs text-amber-300 mt-4">UID و نام داخل بازی کالاف ناقص است. <Link href="/profile/edit" className="underline font-black">تکمیل پروفایل</Link></div>}
@@ -365,6 +467,27 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
           </div>
         </div>
       </main>
+      {/* On mobile the join card sits below a long description, so mirror the
+          primary action in a docked bar the way the reference apps do. It sits
+          above BottomNav and is hidden once the player has already joined. */}
+      {!room.myEntry && (
+        <div
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-white/10 bg-[#060606]/95 px-4 pt-3 backdrop-blur-sm lg:hidden"
+          style={{ paddingBottom: "calc(var(--bottom-nav-space) + 12px)" }}
+        >
+          <button
+            type="button"
+            onClick={() => {
+              document.getElementById("cod-join-card")?.scrollIntoView({ behavior: "smooth", block: "center" });
+            }}
+            disabled={full}
+            className="mx-auto flex w-full max-w-md items-center justify-center gap-2 rounded-2xl bg-yellow-400 py-4 text-sm font-black text-black disabled:bg-white/10 disabled:text-gray-500"
+          >
+            <span aria-hidden="true">‹</span>
+            {full ? "ظرفیت تکمیل است" : "شرکت کنید"}
+          </button>
+        </div>
+      )}
       <BottomNav />
     </div>
   );
