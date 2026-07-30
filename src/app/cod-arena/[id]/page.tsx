@@ -42,6 +42,7 @@ interface RoomDetail {
     capacity: number;
     isFullPayout: boolean;
     meetsMinimum: boolean;
+    showHeadlineAmounts: boolean;
     minimumPlayers: number;
     perKillCurrentRial: string;
     perKillFullRial: string;
@@ -243,33 +244,36 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
               <h2 className="text-lg font-black">💰 فرمول جایزه و اقتصاد روم</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-5 text-center">
                 <div className="rounded-2xl bg-black/30 p-3"><div className="text-[9px] text-gray-500">ورودی</div><div className="font-black text-sm mt-1">{BigInt(room.entryFeeRial) === BigInt(0) ? "رایگان" : `${toman(room.entryFeeRial)} ت`}</div></div>
-                <div className="rounded-2xl bg-black/30 p-3"><div className="text-[9px] text-gray-500">{room.rewardConfig.killLadder ? "اولین Kill" : "هر Kill"}</div><div className="font-black text-sm mt-1 text-orange-300">{toman(proj ? (proj.killLadderCurrent ? proj.killLadderCurrent.firstKillRial : proj.perKillCurrentRial) : (room.rewardConfig.killLadder ? room.rewardConfig.killLadder.firstKillRial : room.rewardConfig.perKillRial))} ت</div></div>
+                <div className="rounded-2xl bg-black/30 p-3"><div className="text-[9px] text-gray-500">{room.rewardConfig.killLadder ? "اولین Kill" : "هر Kill"}</div><div className="font-black text-sm mt-1 text-orange-300">{toman(proj && !proj.showHeadlineAmounts ? (proj.killLadderCurrent ? proj.killLadderCurrent.firstKillRial : proj.perKillCurrentRial) : (room.rewardConfig.killLadder ? room.rewardConfig.killLadder.firstKillRial : room.rewardConfig.perKillRial))} ت</div></div>
                 <div className="rounded-2xl bg-black/30 p-3"><div className="text-[9px] text-gray-500">جایزه حضور</div><div className="font-black text-sm mt-1">{toman(room.rewardConfig.participationRial)} ت</div></div>
                 <div className="rounded-2xl bg-black/30 p-3"><div className="text-[9px] text-gray-500">سقف بودجه مصوب</div><div className="font-black text-sm mt-1">{toman(room.prizeBudgetRial)} ت</div></div>
               </div>
               {proj && proj.rows.length > 0 && <div className="mt-5">
                 {proj.mode === "scaled" && <div className={`rounded-2xl border p-4 mb-3 ${proj.isFullPayout ? "border-emerald-500/25 bg-emerald-500/10" : "border-amber-500/25 bg-amber-500/10"}`}>
                   <div className="flex items-center justify-between gap-3">
-                    <b className="text-xs">{proj.isFullPayout ? "ظرفیت تکمیل است — جایزه کامل پرداخت می‌شود" : "جایزه متناسب با تعداد شرکت‌کننده"}</b>
-                    <span className="shrink-0 rounded-full bg-black/40 px-3 py-1 text-[10px] font-black">{proj.scalePercent.toLocaleString("fa-IR")}٪</span>
+                    <b className="text-xs">{proj.isFullPayout ? "ظرفیت تکمیل است — جایزه کامل پرداخت می‌شود" : "جایزه مشروط به تکمیل ظرفیت"}</b>
+                    {!proj.showHeadlineAmounts && <span className="shrink-0 rounded-full bg-black/40 px-3 py-1 text-[10px] font-black">{proj.scalePercent.toLocaleString("fa-IR")}٪</span>}
                   </div>
                   <p className="mt-2 text-[10px] leading-5 text-gray-300">
-                    مبالغ زیر برای ظرفیت کامل ({proj.capacity.toLocaleString("fa-IR")} نفر) اعلام شده‌اند. در حال حاضر {proj.registeredCount.toLocaleString("fa-IR")} نفر ثبت‌نام کرده‌اند، بنابراین جایزه‌ی فعلی {proj.scalePercent.toLocaleString("fa-IR")}٪ مبلغ اعلام‌شده است. با پر شدن روم، جایزه‌ها تا سقف کامل بالا می‌روند.
+                    {proj.showHeadlineAmounts
+                      ? `مبالغ زیر برای ظرفیت کامل (${proj.capacity.toLocaleString("fa-IR")} نفر) است. جایزه‌ی نهایی متناسب با تعداد شرکت‌کننده محاسبه می‌شود و با پر شدن روم به این سقف می‌رسد.`
+                      : `مبالغ کامل برای ${proj.capacity.toLocaleString("fa-IR")} نفر اعلام شده‌اند. الان ${proj.registeredCount.toLocaleString("fa-IR")} نفر ثبت‌نام کرده‌اند، پس جایزه‌ی فعلی ${proj.scalePercent.toLocaleString("fa-IR")}٪ مبلغ اعلام‌شده است و با پر شدن روم بالا می‌رود.`}
                   </p>
                   <div className="mt-3 h-1.5 rounded-full bg-black/40 overflow-hidden"><div className="h-full bg-gradient-to-l from-amber-400 to-emerald-400 transition-all" style={{ width: `${Math.min(100, proj.fillPercent)}%` }} /></div>
-                  {!proj.meetsMinimum && <p className="mt-2 text-[10px] font-black text-amber-200">حداقل {proj.minimumPlayers.toLocaleString("fa-IR")} نفر برای برگزاری روم لازم است؛ در غیر این صورت روم لغو و ورودی‌ها بازگردانده می‌شود.</p>}
+                  <div className="mt-1.5 flex justify-between text-[9px] text-gray-400"><span>{proj.registeredCount.toLocaleString("fa-IR")} از {proj.capacity.toLocaleString("fa-IR")} نفر</span><span>{proj.fillPercent.toLocaleString("fa-IR")}٪ تکمیل</span></div>
+                  {!proj.meetsMinimum && <p className="mt-2 text-[10px] font-black text-amber-200">حداقل {proj.minimumPlayers.toLocaleString("fa-IR")} نفر برای برگزاری روم لازم است؛ در غیر این صورت روم لغو و کل ورودی به کیف پول شما بازگردانده می‌شود.</p>}
                 </div>}
                 <div className="space-y-2">{proj.rows.map((row) => <div key={`${row.from}-${row.to}`} className="flex items-center justify-between gap-3 rounded-xl bg-black/25 px-4 py-3 text-xs">
                   <span>جایگاه {row.from === row.to ? row.from.toLocaleString("fa-IR") : `${row.from.toLocaleString("fa-IR")} تا ${row.to.toLocaleString("fa-IR")}`}</span>
                   <span className="text-left">
-                    {!proj.isFullPayout && <span className="text-[10px] text-gray-600 line-through block">{toman(row.fullAmountRial)}</span>}
-                    <b>{toman(row.currentAmountRial)} تومان {room.rewardConfig.placementPayout === "per_entry" ? "برای هر بازیکن" : room.teamMode === "solo" ? "" : "برای کل تیم"}</b>
-                    {room.teamMode !== "solo" && room.rewardConfig.placementPayout !== "per_entry" && <span className="block text-[10px] text-gray-500">هر نفر {toman(row.perPlayerRial)} تومان</span>}
+                    {!proj.isFullPayout && !proj.showHeadlineAmounts && <span className="text-[10px] text-gray-600 line-through block">{toman(row.fullAmountRial)}</span>}
+                    <b>{toman(proj.showHeadlineAmounts ? row.fullAmountRial : row.currentAmountRial)} تومان {room.rewardConfig.placementPayout === "per_entry" ? "برای هر بازیکن" : room.teamMode === "solo" ? "" : "برای کل تیم"}</b>
+                    {room.teamMode !== "solo" && room.rewardConfig.placementPayout !== "per_entry" && <span className="block text-[10px] text-gray-500">هر نفر {toman(proj.showHeadlineAmounts ? (BigInt(row.fullAmountRial) / BigInt(4)).toString() : row.perPlayerRial)} تومان</span>}
                   </span>
                 </div>)}</div>
                 <div className="mt-3 flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-xs">
-                  <span className="text-gray-400">مجموع جایزه در این لحظه</span>
-                  <b className="text-emerald-300">{toman(proj.totalCurrentRial)} تومان{!proj.isFullPayout && <span className="text-gray-500 font-normal"> از {toman(proj.totalFullRial)}</span>}</b>
+                  <span className="text-gray-400">{proj.showHeadlineAmounts ? "مجموع جایزه با تکمیل ظرفیت" : "مجموع جایزه در این لحظه"}</span>
+                  <b className="text-emerald-300">{toman(proj.showHeadlineAmounts ? proj.totalFullRial : proj.totalCurrentRial)} تومان{!proj.isFullPayout && !proj.showHeadlineAmounts && <span className="text-gray-500 font-normal"> از {toman(proj.totalFullRial)}</span>}</b>
                 </div>
               </div>}
               {room.rewardConfig.killLadder && <div className="mt-5 rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">

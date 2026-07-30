@@ -227,3 +227,42 @@ describe("settleCodRoom's reward computation", () => {
     for (const row of rewards) expect(asToman(row.reward.totalRewardRial)).toBe(100_000);
   });
 });
+
+describe("what an empty room advertises", () => {
+  it("leads with the headline amounts rather than a table of zeroes", () => {
+    const table = projectCodPrizeTable({
+      rewardConfig: brIso870, scaling: {}, registeredCount: 0, capacity: 100, teamMode: "squad",
+    });
+    // Scaling to zero is correct arithmetic but a terrible advert, so the room
+    // page is told to show the full amounts captioned as conditional.
+    expect(table.scaleBps).toBe(0);
+    expect(table.showHeadlineAmounts).toBe(true);
+    expect(asToman(table.totalFullRial)).toBe(1_590_000);
+  });
+
+  it("keeps showing headline amounts until the room is viable", () => {
+    for (const players of [1, 10, 24]) {
+      const table = projectCodPrizeTable({
+        rewardConfig: brIso870, scaling: {}, registeredCount: players, capacity: 100, teamMode: "squad",
+      });
+      expect(table.showHeadlineAmounts).toBe(true);
+    }
+  });
+
+  it("switches to live amounts once the room can actually run", () => {
+    const table = projectCodPrizeTable({
+      rewardConfig: brIso870, scaling: {}, registeredCount: 25, capacity: 100, teamMode: "squad",
+    });
+    expect(table.meetsMinimum).toBe(true);
+    expect(table.showHeadlineAmounts).toBe(false);
+    expect(asToman(table.totalCurrentRial)).toBe(397_500);
+  });
+
+  it("still settles at the scaled amount even while headlines are displayed", () => {
+    // Display and payout are separate decisions: a room that somehow settled
+    // below its minimum must not pay the headline.
+    const scaleBps = codPrizeScaleBps(normalizeCodPrizeScaling({}), 10, 100);
+    const reward = calculateCodEntryReward(brIso870, 0, 1, { placementSharers: 4, scaleBps });
+    expect(asToman(reward.placementRewardRial)).toBe(10_000);
+  });
+});

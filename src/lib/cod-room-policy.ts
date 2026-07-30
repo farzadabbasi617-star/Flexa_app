@@ -397,6 +397,8 @@ export function projectCodPrizeTable(input: {
   const seats = Math.max(1, Math.floor(input.capacity) || 1);
   const filled = Math.max(0, Math.min(seats, Math.floor(input.registeredCount) || 0));
 
+  const meetsMinimum = Math.floor((filled * 10_000) / seats) >= scaling.minimumViableBps;
+
   const rows = config.placementRules.map((rule) => {
     const fullRial = BigInt(rule.amountRial);
     const currentRial = scaleRial(rule.amountRial, scaleBps);
@@ -422,12 +424,18 @@ export function projectCodPrizeTable(input: {
   return {
     mode: scaling.mode,
     scaleBps,
+    /**
+     * An empty room scales to zero, and a prize table reading "0 toman" is a
+     * worse advert than the truth. Until the room is viable the headline
+     * amounts are what we lead with, captioned as conditional on filling.
+     */
+    showHeadlineAmounts: !meetsMinimum,
     scalePercent: Math.round(scaleBps / 100),
     fillPercent: Math.round((filled / seats) * 100),
     registeredCount: filled,
     capacity: seats,
     isFullPayout: scaleBps >= 10_000,
-    meetsMinimum: Math.floor((filled * 10_000) / seats) >= scaling.minimumViableBps,
+    meetsMinimum,
     minimumPlayers: Math.ceil((scaling.minimumViableBps * seats) / 10_000),
     perKillCurrentRial: scaleRial(config.perKillRial, scaleBps).toString(),
     perKillFullRial: config.perKillRial,
