@@ -137,6 +137,11 @@ export function codKillLadderTotalRial(ladder: CodKillLadderConfig, kills: numbe
   return total;
 }
 
+function scaleRial(amountRial: string, scaleBps: number) {
+  if (scaleBps >= 10_000) return BigInt(amountRial);
+  return (BigInt(amountRial) * BigInt(scaleBps)) / BigInt(10_000);
+}
+
 function killRewardRial(config: CodRewardConfig, kills: number) {
   if (config.killLadder) return codKillLadderTotalRial(config.killLadder, kills);
   return BigInt(config.perKillRial) * BigInt(kills);
@@ -146,24 +151,40 @@ export function calculateCodEntryReward(
   configInput: unknown,
   killsInput: number,
   placementInput?: number | null,
-  options: { placementSharers?: number } = {},
+  options: { placementSharers?: number; scaleBps?: number } = {},
 ) {
   const config = normalizeCodRewardConfig(configInput);
   const kills = boundedInteger(killsInput, 0, config.maxKillsPerEntry, "تعداد Kill");
   const placement = placementInput == null ? null : boundedInteger(placementInput, 1, 100, "جایگاه");
-  const killRewardTotal = killRewardRial(config, kills);
+  // A partially filled room pays a proportionally smaller version of the same
+  // prize table. 10000 bps (a full room, or a `fixed` room) is a no-op.
+  const scaleBps = options.scaleBps == null
+    ? 10_000
+    : boundedInteger(options.scaleBps, 0, 10_000, "ضریب مقیاس جایزه");
+  const scaledConfig: CodRewardConfig = scaleBps >= 10_000 ? config : {
+    ...config,
+    perKillRial: scaleRial(config.perKillRial, scaleBps).toString(),
+    participationRial: scaleRial(config.participationRial, scaleBps).toString(),
+    killLadder: config.killLadder ? {
+      ...config.killLadder,
+      firstKillRial: scaleRial(config.killLadder.firstKillRial, scaleBps).toString(),
+      minKillRial: scaleRial(config.killLadder.minKillRial, scaleBps).toString(),
+    } : null,
+  };
+  const killRewardTotal = killRewardRial(scaledConfig, kills);
   const placementRule = placement == null
     ? undefined
     : config.placementRules.find((rule) => placement >= rule.from && placement <= rule.to);
-  const nominalPlacementRial = BigInt(placementRule?.amountRial || "0");
+  const nominalPlacementRial = scaleRial(placementRule?.amountRial || "0", scaleBps);
   const sharers = config.placementPayout === "per_team"
     ? BigInt(Math.max(1, Math.floor(Number(options.placementSharers) || 1)))
     : BigInt(1);
   const placementRewardRial = nominalPlacementRial / sharers;
-  const participationRewardRial = BigInt(config.participationRial);
+  const participationRewardRial = BigInt(scaledConfig.participationRial);
   return {
     kills,
     placement,
+    scaleBps,
     killRewardRial: killRewardTotal,
     placementRewardRial,
     participationRewardRial,
@@ -291,6 +312,134 @@ export function normalizeCodBannerUrl(value: unknown): string | null {
     if (error instanceof Error && error.message.includes("HTTPS")) throw error;
     throw new Error("آدرس بنر روم معتبر نیست");
   }
+}
+
+/**
+ * How a room's advertised prize table behaves when the lobby does not fill.
+ *
+ * `fixed` honours the published amounts no matter how many players show up,
+ * which is what a sponsored room wants but loses money on a quiet night: a
+ * 100-seat room advertising 1,590,000 toman of prizes at a 23,000 toman entry
+ * needs ~70 players just to break even.
+ *
+ * `scaled` keeps the same shape of prize table but scales every amount by how
+ * full the room actually got, so the operator's margin is the same at 20
+ * players as at 100. This is the default.
+ */
+export const COD_PRIZE_SCALING_MODES = ["scaled", "fixed"] as const;
+export type CodPrizeScalingMode = (typeof COD_PRIZE_SCALING_MODES)[number];
+
+export interface CodPrizeScalingConfig {
+  mode: CodPrizeScalingMode;
+  /**
+   * Fill ratio, in basis points, at or above which the full advertised table is
+   * paid. 10000 means "only a completely full room pays the headline amounts".
+   */
+  fullPayoutAtBps: number;
+  /** Fill ratio below which the room is considered non-viable and is cancelled/refunded. */
+  minimumViableBps: number;
+}
+
+export const DEFAULT_COD_PRIZE_SCALING: CodPrizeScalingConfig = {
+  mode: "scaled",
+  fullPayoutAtBps: 10_000,
+  minimumViableBps: 2_500,
+};
+
+export function normalizeCodPrizeScaling(input: unknown): CodPrizeScalingConfig {
+  const raw = input && typeof input === "object" ? input as Record<string, unknown> : {};
+  const mode = String(raw.mode ?? "scaled");
+  if (!(COD_PRIZE_SCALING_MODES as readonly string[]).includes(mode)) {
+    throw new Error("حالت مقیاس جایزه معتبر نیست");
+  }
+  const fullPayoutAtBps = boundedInteger(raw.fullPayoutAtBps ?? 10_000, 1_000, 10_000, "درصد تکمیل برای جایزه کامل");
+  const minimumViableBps = boundedInteger(raw.minimumViableBps ?? 2_500, 0, 10_000, "حداقل درصد تکمیل");
+  if (minimumViableBps > fullPayoutAtBps) {
+    throw new Error("حداقل درصد تکمیل نمی‌تواند از درصد جایزه کامل بیشتر باشد");
+  }
+  return { mode: mode as CodPrizeScalingMode, fullPayoutAtBps, minimumViableBps };
+}
+
+/**
+ * Fraction of the advertised prize table that a room with `registeredCount` of
+ * `capacity` seats actually pays, expressed in basis points.
+ */
+export function codPrizeScaleBps(
+  scaling: CodPrizeScalingConfig,
+  registeredCount: number,
+  capacity: number,
+) {
+  if (scaling.mode === "fixed") return 10_000;
+  const seats = Math.max(1, Math.floor(capacity) || 1);
+  const filled = Math.max(0, Math.min(seats, Math.floor(registeredCount) || 0));
+  const fillBps = Math.floor((filled * 10_000) / seats);
+  if (fillBps >= scaling.fullPayoutAtBps) return 10_000;
+  // Scale linearly against the threshold, so hitting `fullPayoutAtBps` pays 100%.
+  return Math.floor((fillBps * 10_000) / scaling.fullPayoutAtBps);
+}
+
+/**
+ * The prize table as it stands right now, given how many players have joined.
+ * This is what the room page shows so a player always sees the amount they
+ * would actually be paid, not an aspirational headline.
+ */
+export function projectCodPrizeTable(input: {
+  rewardConfig: unknown;
+  scaling?: unknown;
+  registeredCount: number;
+  capacity: number;
+  teamMode: CodBrTeamMode;
+}) {
+  const config = normalizeCodRewardConfig(input.rewardConfig);
+  const scaling = normalizeCodPrizeScaling(input.scaling);
+  const scaleBps = codPrizeScaleBps(scaling, input.registeredCount, input.capacity);
+  const members = input.teamMode === "duo" ? 2 : input.teamMode === "squad" ? 4 : 1;
+  const seats = Math.max(1, Math.floor(input.capacity) || 1);
+  const filled = Math.max(0, Math.min(seats, Math.floor(input.registeredCount) || 0));
+
+  const rows = config.placementRules.map((rule) => {
+    const fullRial = BigInt(rule.amountRial);
+    const currentRial = scaleRial(rule.amountRial, scaleBps);
+    return {
+      from: rule.from,
+      to: rule.to,
+      fullAmountRial: fullRial.toString(),
+      currentAmountRial: currentRial.toString(),
+      perPlayerRial: (config.placementPayout === "per_team" ? currentRial / BigInt(members) : currentRial).toString(),
+    };
+  });
+
+  const totalCurrent = config.placementRules.reduce((sum, rule) => {
+    const squads = rule.to - rule.from + 1;
+    const perSquad = scaleRial(rule.amountRial, scaleBps);
+    return sum + perSquad * BigInt(config.placementPayout === "per_team" ? squads : squads * members);
+  }, BigInt(0));
+  const totalFull = config.placementRules.reduce((sum, rule) => {
+    const squads = rule.to - rule.from + 1;
+    return sum + BigInt(rule.amountRial) * BigInt(config.placementPayout === "per_team" ? squads : squads * members);
+  }, BigInt(0));
+
+  return {
+    mode: scaling.mode,
+    scaleBps,
+    scalePercent: Math.round(scaleBps / 100),
+    fillPercent: Math.round((filled / seats) * 100),
+    registeredCount: filled,
+    capacity: seats,
+    isFullPayout: scaleBps >= 10_000,
+    meetsMinimum: Math.floor((filled * 10_000) / seats) >= scaling.minimumViableBps,
+    minimumPlayers: Math.ceil((scaling.minimumViableBps * seats) / 10_000),
+    perKillCurrentRial: scaleRial(config.perKillRial, scaleBps).toString(),
+    perKillFullRial: config.perKillRial,
+    killLadderCurrent: config.killLadder ? {
+      firstKillRial: scaleRial(config.killLadder.firstKillRial, scaleBps).toString(),
+      divisor: config.killLadder.divisor,
+      minKillRial: scaleRial(config.killLadder.minKillRial, scaleBps).toString(),
+    } : null,
+    rows,
+    totalCurrentRial: totalCurrent.toString(),
+    totalFullRial: totalFull.toString(),
+  };
 }
 
 export function codReferralCommissionRial(serviceFeeRialInput: bigint, referralRateBpsInput: number) {

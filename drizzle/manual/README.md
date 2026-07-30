@@ -84,6 +84,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | `0040_drop_kyc_selfie_requirement.sql` | Makes `kyc_profiles.selfie_image_url` nullable. Seller verification no longer collects a selfie; the column is kept so historical submissions stay readable. |
 | `0041_widen_kyc_image_columns.sql` | Converts `kyc_profiles` image columns from `varchar(500)` to `text`. With Cloudinary unconfigured the uploader returns base64 data URLs, which overflowed the old cap and made every real KYC submission fail. |
 | `0042_add_cod_room_presentation.sql` | Adds presentation columns to `cod_rooms`: `banner_image_url` (key art), `category` (home-page shelf), `original_entry_fee_rial` (struck-through price), `min_cod_level` (in-game level gate, distinct from Gament rank points), `match_settings` and `faq` (structured JSON instead of free text). Adds a partial index on `(category, starts_at)` for published rooms. |
+| `0043_add_cod_prize_scaling.sql` | Adds `cod_rooms.prize_scaling`. A room advertises its prize table for a full lobby; paying those amounts to a half-empty room is a guaranteed loss. `scaled` (the default) pays the same table scaled by occupancy so the margin holds at any turnout, `fixed` keeps the old behaviour for sponsored rooms. Also carries the minimum fill below which a room should be cancelled and refunded. |
 
 > **Email verification (required before deploying the email-OTP auth flow):**
 > Run `0019_add_email_verification.sql` and set `RESEND_API_KEY` (and

@@ -38,6 +38,7 @@ interface CodRoomListItem {
   };
   minRankPoints: number;
   minCodLevel?: number;
+  prizeScaling?: { mode?: "scaled" | "fixed"; fullPayoutAtBps?: number; minimumViableBps?: number } | null;
   bannerImageUrl?: string | null;
   category?: string | null;
   originalEntryFeeRial?: string | null;
@@ -75,6 +76,12 @@ function relativeStart(value: string) {
 function CodRoomCard({ room }: { room: CodRoomListItem }) {
                 const full = room.registeredCount >= room.capacity;
   const remaining = Math.max(0, room.capacity - room.registeredCount);
+  const scaledPrizes = room.prizeScaling?.mode !== "fixed";
+  const fullPayoutAtBps = Number(room.prizeScaling?.fullPayoutAtBps ?? 10_000);
+  const fillBps = Math.floor((Math.min(room.registeredCount, room.capacity) * 10_000) / Math.max(1, room.capacity));
+  const prizePercent = !scaledPrizes || fillBps >= fullPayoutAtBps
+    ? 100
+    : Math.round(fillBps / fullPayoutAtBps * 100);
   let discounted = false;
   try { discounted = Boolean(room.originalEntryFeeRial) && BigInt(room.originalEntryFeeRial!) > BigInt(room.entryFeeRial); } catch { discounted = false; }
   const ladder = room.rewardConfig?.killLadder;
@@ -110,7 +117,7 @@ function CodRoomCard({ room }: { room: CodRoomListItem }) {
         </div>
         <div className="mt-5 h-1.5 rounded-full bg-white/5 overflow-hidden"><div className="h-full bg-gradient-to-l from-yellow-400 to-orange-600" style={{ width: `${Math.min(100, (room.registeredCount / room.capacity) * 100)}%` }} /></div>
         <div className="flex items-center justify-between mt-5">
-          <div className="text-[10px] text-gray-400"><span className="text-orange-300 font-black">⏱ {relativeStart(room.startsAt)}</span><br /><span>{room.map}</span></div>
+          <div className="text-[10px] text-gray-400"><span className="text-orange-300 font-black">⏱ {relativeStart(room.startsAt)}</span><br /><span>{room.map}</span>{scaledPrizes && prizePercent < 100 && <span className="mt-1 block text-amber-300 font-black">جایزه فعلی {prizePercent.toLocaleString("fa-IR")}٪ — با تکمیل ظرفیت ۱۰۰٪</span>}</div>
           <Link href={`/cod-arena/${room.id}`} className={`rounded-2xl px-5 py-3 text-xs font-black ${full ? "bg-white/5 text-gray-500" : "bg-orange-500 text-black"}`}>{full ? "ظرفیت تکمیل" : "جزئیات و عضویت"}</Link>
         </div>
       </div>

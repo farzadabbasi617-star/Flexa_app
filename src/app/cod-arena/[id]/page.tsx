@@ -34,6 +34,22 @@ interface RoomDetail {
   serviceFeeRial: string;
   prizeBudgetRial: string;
   referralRateBps: number;
+  prizeProjection?: {
+    mode: "scaled" | "fixed";
+    scalePercent: number;
+    fillPercent: number;
+    registeredCount: number;
+    capacity: number;
+    isFullPayout: boolean;
+    meetsMinimum: boolean;
+    minimumPlayers: number;
+    perKillCurrentRial: string;
+    perKillFullRial: string;
+    killLadderCurrent: { firstKillRial: string; divisor: number; minKillRial: string } | null;
+    rows: Array<{ from: number; to: number; fullAmountRial: string; currentAmountRial: string; perPlayerRial: string }>;
+    totalCurrentRial: string;
+    totalFullRial: string;
+  } | null;
   rewardConfig: { perKillRial?: string; participationRial?: string; maxKillsPerEntry?: number; maxTotalKills?: number; placementPayout?: "per_team"|"per_entry"; killLadder?: { firstKillRial: string; divisor: number; minKillRial: string } | null; placementRules?: Array<{ from: number; to: number; amountRial: string }> };
   minRankPoints: number;
   rules: string | null;
@@ -177,6 +193,7 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
   if (!room) return <div className="min-h-screen bg-[#060606] text-white grid place-items-center px-5"><div className="text-center"><div className="text-6xl mb-4">🔒</div><p>{error || "روم پیدا نشد"}</p><Link href="/cod-arena" className="inline-block mt-5 text-orange-300">بازگشت به COD Arena</Link></div></div>;
 
   const full = room.registeredCount >= room.capacity;
+  const proj = room.prizeProjection || null;
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const canOperate = isAdmin || Boolean(room.staffRole);
   let paidRoom = false;
@@ -226,18 +243,42 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
               <h2 className="text-lg font-black">💰 فرمول جایزه و اقتصاد روم</h2>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-5 text-center">
                 <div className="rounded-2xl bg-black/30 p-3"><div className="text-[9px] text-gray-500">ورودی</div><div className="font-black text-sm mt-1">{BigInt(room.entryFeeRial) === BigInt(0) ? "رایگان" : `${toman(room.entryFeeRial)} ت`}</div></div>
-                <div className="rounded-2xl bg-black/30 p-3"><div className="text-[9px] text-gray-500">{room.rewardConfig.killLadder ? "اولین Kill" : "هر Kill"}</div><div className="font-black text-sm mt-1 text-orange-300">{toman(room.rewardConfig.killLadder ? room.rewardConfig.killLadder.firstKillRial : room.rewardConfig.perKillRial)} ت</div></div>
+                <div className="rounded-2xl bg-black/30 p-3"><div className="text-[9px] text-gray-500">{room.rewardConfig.killLadder ? "اولین Kill" : "هر Kill"}</div><div className="font-black text-sm mt-1 text-orange-300">{toman(proj ? (proj.killLadderCurrent ? proj.killLadderCurrent.firstKillRial : proj.perKillCurrentRial) : (room.rewardConfig.killLadder ? room.rewardConfig.killLadder.firstKillRial : room.rewardConfig.perKillRial))} ت</div></div>
                 <div className="rounded-2xl bg-black/30 p-3"><div className="text-[9px] text-gray-500">جایزه حضور</div><div className="font-black text-sm mt-1">{toman(room.rewardConfig.participationRial)} ت</div></div>
                 <div className="rounded-2xl bg-black/30 p-3"><div className="text-[9px] text-gray-500">سقف بودجه مصوب</div><div className="font-black text-sm mt-1">{toman(room.prizeBudgetRial)} ت</div></div>
               </div>
-              {(room.rewardConfig.placementRules || []).length > 0 && <div className="mt-5 space-y-2">{room.rewardConfig.placementRules!.map((rule) => <div key={`${rule.from}-${rule.to}`} className="flex justify-between rounded-xl bg-black/25 px-4 py-3 text-xs"><span>جایگاه {rule.from === rule.to ? rule.from.toLocaleString("fa-IR") : `${rule.from.toLocaleString("fa-IR")} تا ${rule.to.toLocaleString("fa-IR")}`}</span><b>{toman(rule.amountRial)} تومان {room.rewardConfig.placementPayout === "per_entry" ? "برای هر بازیکن" : room.teamMode === "solo" ? "" : "برای کل تیم"}</b></div>)}</div>}
+              {proj && proj.rows.length > 0 && <div className="mt-5">
+                {proj.mode === "scaled" && <div className={`rounded-2xl border p-4 mb-3 ${proj.isFullPayout ? "border-emerald-500/25 bg-emerald-500/10" : "border-amber-500/25 bg-amber-500/10"}`}>
+                  <div className="flex items-center justify-between gap-3">
+                    <b className="text-xs">{proj.isFullPayout ? "ظرفیت تکمیل است — جایزه کامل پرداخت می‌شود" : "جایزه متناسب با تعداد شرکت‌کننده"}</b>
+                    <span className="shrink-0 rounded-full bg-black/40 px-3 py-1 text-[10px] font-black">{proj.scalePercent.toLocaleString("fa-IR")}٪</span>
+                  </div>
+                  <p className="mt-2 text-[10px] leading-5 text-gray-300">
+                    مبالغ زیر برای ظرفیت کامل ({proj.capacity.toLocaleString("fa-IR")} نفر) اعلام شده‌اند. در حال حاضر {proj.registeredCount.toLocaleString("fa-IR")} نفر ثبت‌نام کرده‌اند، بنابراین جایزه‌ی فعلی {proj.scalePercent.toLocaleString("fa-IR")}٪ مبلغ اعلام‌شده است. با پر شدن روم، جایزه‌ها تا سقف کامل بالا می‌روند.
+                  </p>
+                  <div className="mt-3 h-1.5 rounded-full bg-black/40 overflow-hidden"><div className="h-full bg-gradient-to-l from-amber-400 to-emerald-400 transition-all" style={{ width: `${Math.min(100, proj.fillPercent)}%` }} /></div>
+                  {!proj.meetsMinimum && <p className="mt-2 text-[10px] font-black text-amber-200">حداقل {proj.minimumPlayers.toLocaleString("fa-IR")} نفر برای برگزاری روم لازم است؛ در غیر این صورت روم لغو و ورودی‌ها بازگردانده می‌شود.</p>}
+                </div>}
+                <div className="space-y-2">{proj.rows.map((row) => <div key={`${row.from}-${row.to}`} className="flex items-center justify-between gap-3 rounded-xl bg-black/25 px-4 py-3 text-xs">
+                  <span>جایگاه {row.from === row.to ? row.from.toLocaleString("fa-IR") : `${row.from.toLocaleString("fa-IR")} تا ${row.to.toLocaleString("fa-IR")}`}</span>
+                  <span className="text-left">
+                    {!proj.isFullPayout && <span className="text-[10px] text-gray-600 line-through block">{toman(row.fullAmountRial)}</span>}
+                    <b>{toman(row.currentAmountRial)} تومان {room.rewardConfig.placementPayout === "per_entry" ? "برای هر بازیکن" : room.teamMode === "solo" ? "" : "برای کل تیم"}</b>
+                    {room.teamMode !== "solo" && room.rewardConfig.placementPayout !== "per_entry" && <span className="block text-[10px] text-gray-500">هر نفر {toman(row.perPlayerRial)} تومان</span>}
+                  </span>
+                </div>)}</div>
+                <div className="mt-3 flex items-center justify-between rounded-xl border border-white/10 px-4 py-3 text-xs">
+                  <span className="text-gray-400">مجموع جایزه در این لحظه</span>
+                  <b className="text-emerald-300">{toman(proj.totalCurrentRial)} تومان{!proj.isFullPayout && <span className="text-gray-500 font-normal"> از {toman(proj.totalFullRial)}</span>}</b>
+                </div>
+              </div>}
               {room.rewardConfig.killLadder && <div className="mt-5 rounded-2xl border border-orange-500/20 bg-orange-500/5 p-4">
                 <div className="text-xs font-black text-orange-200">نردبان کاهشی Kill</div>
                 <p className="mt-1 text-[10px] leading-5 text-gray-400">هر Kill نسبت به Kill قبلی تقسیم بر {room.rewardConfig.killLadder.divisor.toLocaleString("fa-IR")} می‌شود{BigInt(room.rewardConfig.killLadder.minKillRial || "0") > BigInt(0) ? ` و کمتر از ${toman(room.rewardConfig.killLadder.minKillRial)} تومان نمی‌شود` : ""}.</p>
                 <div className="mt-3 flex flex-wrap gap-2">{[0,1,2,3].map((step) => {
-                  let value = BigInt(room.rewardConfig.killLadder!.firstKillRial);
+                  let value = BigInt(proj?.killLadderCurrent?.firstKillRial ?? room.rewardConfig.killLadder!.firstKillRial);
                   for (let i = 0; i < step; i += 1) value = value / BigInt(room.rewardConfig.killLadder!.divisor);
-                  const floorRial = BigInt(room.rewardConfig.killLadder!.minKillRial || "0");
+                  const floorRial = BigInt(proj?.killLadderCurrent?.minKillRial ?? room.rewardConfig.killLadder!.minKillRial ?? "0");
                   if (value < floorRial) value = floorRial;
                   return <span key={step} className="rounded-xl bg-black/35 px-3 py-2 text-[10px]">Kill {(step + 1).toLocaleString("fa-IR")}: <b className="text-orange-300">{toman(value.toString())} ت</b></span>;
                 })}</div>

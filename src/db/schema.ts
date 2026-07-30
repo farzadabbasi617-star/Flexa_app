@@ -1107,6 +1107,7 @@ export const codRooms = pgTable("cod_rooms", {
   category: varchar("category", { length: 60 }),
   originalEntryFeeRial: numeric("original_entry_fee_rial", { precision: 20, scale: 0 }),
   matchSettings: jsonb("match_settings").notNull().default('{}'),
+  prizeScaling: jsonb("prize_scaling").notNull().default('{}'),
   faq: jsonb("faq").notNull().default('[]'),
   rules: text("rules"),
   rulesVersion: varchar("rules_version", { length: 40 }).notNull().default("cod-beta-1"),

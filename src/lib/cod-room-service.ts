@@ -31,7 +31,10 @@ import {
   codRankTier,
   codReferralCommissionRial,
   estimateCodRoomMaximumLiability,
+  codPrizeScaleBps,
   normalizeCodBannerUrl,
+  normalizeCodPrizeScaling,
+  projectCodPrizeTable,
   normalizeCodFaq,
   normalizeCodMatchSettings,
   isOfficialCodMobileInviteUrl,
@@ -111,6 +114,7 @@ async function createCodArenaSchema(client: any) {
   await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS min_cod_level integer NOT NULL DEFAULT 0`));
   await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS match_settings jsonb NOT NULL DEFAULT '{}'::jsonb`));
   await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS faq jsonb NOT NULL DEFAULT '[]'::jsonb`));
+  await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS prize_scaling jsonb NOT NULL DEFAULT '{}'::jsonb`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_rooms_category_start_idx ON cod_rooms(category,starts_at) WHERE is_published = true`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_rooms_status_start_idx ON cod_rooms(status,starts_at)`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_rooms_region_published_idx ON cod_rooms(region,is_published)`));
@@ -299,6 +303,7 @@ export function normalizeCodRoomInput(raw: Record<string, unknown>) {
     throw new Error("قیمت قبل از تخفیف باید از ورودی فعلی بیشتر باشد");
   }
   const matchSettings = normalizeCodMatchSettings(raw.matchSettings);
+  const prizeScaling = normalizeCodPrizeScaling(raw.prizeScaling);
   const faq = normalizeCodFaq(raw.faq);
   return {
     title,
@@ -321,6 +326,7 @@ export function normalizeCodRoomInput(raw: Record<string, unknown>) {
     category: raw.category ? String(raw.category).trim().slice(0, 60) : null,
     originalEntryFeeRial,
     matchSettings,
+    prizeScaling,
     faq,
     rules: raw.rules ? String(raw.rules).trim().slice(0, 12_000) : null,
     rulesVersion: String(raw.rulesVersion || "cod-beta-1").trim().slice(0, 40),
@@ -367,6 +373,7 @@ export async function listCodRooms(input: { includeUnpublished?: boolean; region
     category: codRooms.category,
     originalEntryFeeRial: codRooms.originalEntryFeeRial,
     matchSettings: codRooms.matchSettings,
+    prizeScaling: codRooms.prizeScaling,
     requiresRecording: codRooms.requiresRecording,
     checkInOpensAt: codRooms.checkInOpensAt,
     checkInClosesAt: codRooms.checkInClosesAt,
@@ -435,6 +442,15 @@ export async function getCodRoomDetail(roomId: string, viewerId?: string | null,
     roomPassword: reveal ? room.roomPassword : null,
     officialJoinUrl: reveal ? room.officialJoinUrl : null,
     credentialsVisible: reveal,
+    // What the prize table pays at the room's current occupancy, so a player is
+    // never shown a headline they will not actually receive.
+    prizeProjection: projectCodPrizeTable({
+      rewardConfig: room.rewardConfig,
+      scaling: room.prizeScaling,
+      registeredCount: entries.length,
+      capacity: room.capacity,
+      teamMode: room.teamMode as CodBrTeamMode,
+    }),
     checkInAvailable: Boolean(myEntry && !myEntry.checkedInAt &&
       (!room.checkInOpensAt || new Date() >= room.checkInOpensAt) &&
       (!room.checkInClosesAt || new Date() <= room.checkInClosesAt)),
@@ -794,6 +810,55 @@ export interface CodSettlementResultInput {
   placement?: number | null;
 }
 
+/**
+ * The reward each checked-in entry is owed, as a pure function of the room
+ * configuration and the operator's submitted results.
+ *
+ * Extracted from `settleCodRoom` so the money maths is testable without a
+ * database: the transaction around it is plumbing, this is the part that
+ * decides what people get paid.
+ */
+export function computeCodSettlementRewards<T extends { id: string }>(input: {
+  room: { rewardConfig: unknown; prizeScaling: unknown; capacity: number };
+  entries: T[];
+  results: CodSettlementResultInput[];
+  /**
+   * Everyone who held a seat, including no-shows. This is the occupancy players
+   * saw on the room page, so it is what the advertised prize table scales
+   * against -- a no-show should not shrink the prize for those who turned up.
+   */
+  advertisedEntryCount: number;
+}) {
+  const byEntry = new Map(input.results.map((row) => [row.entryId, row]));
+  // A placement prize is a squad prize by default, so count how many settled
+  // players share each placement before splitting it between them.
+  const sharersByPlacement = new Map<number, number>();
+  for (const entry of input.entries) {
+    const placement = byEntry.get(entry.id)?.placement;
+    if (placement == null) continue;
+    sharersByPlacement.set(placement, (sharersByPlacement.get(placement) || 0) + 1);
+  }
+  // Prizes are advertised for a full lobby. If the room did not fill, the whole
+  // table scales down by the same ratio so the operator's margin survives a
+  // quiet night.
+  const scaleBps = codPrizeScaleBps(
+    normalizeCodPrizeScaling(input.room.prizeScaling),
+    input.advertisedEntryCount,
+    input.room.capacity,
+  );
+  return input.entries.map((entry) => {
+    const result = byEntry.get(entry.id) || { entryId: entry.id, kills: 0, placement: null };
+    const placementSharers = result.placement == null ? 1 : sharersByPlacement.get(result.placement) || 1;
+    return {
+      entry,
+      reward: calculateCodEntryReward(input.room.rewardConfig, result.kills, result.placement, {
+        placementSharers,
+        scaleBps,
+      }),
+    };
+  });
+}
+
 export async function settleCodRoom(input: {
   roomId: string;
   adminId: string;
@@ -840,21 +905,15 @@ export async function settleCodRoom(input: {
       const placements = input.results.map((row) => row.placement).filter((value): value is number => value != null);
       if (new Set(placements).size !== placements.length) throw new Error("COD_SETTLEMENT_DUPLICATE_PLACEMENT");
     }
-    // A placement prize is a squad prize by default, so count how many settled players
-    // share each placement before splitting it between them.
-    const sharersByPlacement = new Map<number, number>();
-    for (const entry of entries) {
-      const placement = byEntry.get(entry.id)?.placement;
-      if (placement == null) continue;
-      sharersByPlacement.set(placement, (sharersByPlacement.get(placement) || 0) + 1);
-    }
-    const calculated = entries.map((entry) => {
-      const result = byEntry.get(entry.id) || { entryId: entry.id, kills: 0, placement: null };
-      const placementSharers = result.placement == null ? 1 : sharersByPlacement.get(result.placement) || 1;
-      return {
-        entry,
-        reward: calculateCodEntryReward(room.rewardConfig, result.kills, result.placement, { placementSharers }),
-      };
+    const calculated = computeCodSettlementRewards({
+      room: {
+        rewardConfig: room.rewardConfig,
+        prizeScaling: room.prizeScaling,
+        capacity: room.capacity,
+      },
+      entries,
+      results: input.results,
+      advertisedEntryCount: allEntries.length,
     });
     const totalReward = calculated.reduce((sum, row) => sum + row.reward.totalRewardRial, BigInt(0));
     if (totalReward > bigIntFromText(room.prizeBudgetRial)) throw new Error("COD_SETTLEMENT_OVER_BUDGET");
