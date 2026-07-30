@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import "./globals.css";
 import { LanguageProvider } from "@/contexts/LanguageContext";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { UnreadNotificationsProvider } from "@/contexts/UnreadNotificationsContext";
 import { QueryProvider } from "@/components/QueryProvider";
 import { LayoutWrapper } from "@/components/LayoutWrapper";
 import BrandFooter from "@/components/BrandFooter";
@@ -178,9 +179,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="text-white antialiased font-gaming min-h-screen">
         <QueryProvider>
           <AuthProvider>
-            <LanguageProvider>
-              <LayoutWrapper>{children}</LayoutWrapper>
-            </LanguageProvider>
+            <UnreadNotificationsProvider>
+              <LanguageProvider>
+                <LayoutWrapper>{children}</LayoutWrapper>
+              </LanguageProvider>
+            </UnreadNotificationsProvider>
           </AuthProvider>
         </QueryProvider>
         <BrandFooter />

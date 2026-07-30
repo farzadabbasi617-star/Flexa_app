@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUnreadNotifications } from "@/contexts/UnreadNotificationsContext";
 import AppImage from "@/components/AppImage";
 
 export default function Navbar() {
@@ -12,27 +13,11 @@ export default function Navbar() {
   const router = useRouter();
   const { lang, setLang, t } = useLanguage();
   const { user, loading, logout } = useAuth();
+  const { unreadCount: unreadNotifications, refresh: refreshUnread } = useUnreadNotifications();
   const [showUserMenu, setShowUserMenu] = useState(false);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadUnread() {
-      if (!user) { setUnreadNotifications(0); return; }
-      try {
-        const response = await fetch("/api/notifications?limit=1", { cache: "no-store", credentials: "include" });
-        const data = await response.json().catch(() => ({}));
-        if (!cancelled && response.ok) setUnreadNotifications(Number(data.unreadCount || 0));
-      } catch {
-        if (!cancelled) setUnreadNotifications(0);
-      }
-    }
-    loadUnread();
-    const timer = setInterval(loadUnread, 60_000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [user]);
 
   const navItems = [
     { href: "/", label: t.nav.home, icon: "🏠" },
@@ -141,7 +126,7 @@ export default function Navbar() {
                         <Link href="/profile/edit" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                           <span>🎮</span> {t.auth.gameIds}
                         </Link>
-                        <Link href="/notifications" className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => { setShowUserMenu(false); setUnreadNotifications(0); }}>
+                        <Link href="/notifications" className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => { setShowUserMenu(false); setTimeout(refreshUnread, 1200); }}>
                           <span className="flex items-center gap-3"><span>🔔</span> {t.notif.title}</span>
                           {unreadNotifications > 0 && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}
                         </Link>

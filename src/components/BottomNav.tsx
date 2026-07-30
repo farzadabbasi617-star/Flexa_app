@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUnreadNotifications } from "@/contexts/UnreadNotificationsContext";
 import AppImage from "@/components/AppImage";
 
 interface SiteImage {
@@ -32,8 +33,8 @@ const customIcons: Record<string, string> = {
 export default function BottomNav() {
   const pathname = usePathname();
   const { user } = useAuth();
+  const { unreadCount: unreadNotifications } = useUnreadNotifications();
   const [icons, setIcons] = useState<SiteImage[]>([]);
-  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     // Was `cache: "no-store"`, which bypassed the server's Cache-Control
@@ -47,25 +48,6 @@ export default function BottomNav() {
       .catch(() => setIcons([]));
   }, []);
 
-  useEffect(() => {
-    let cancelled = false;
-    async function loadUnread() {
-      if (!user) {
-        setUnreadNotifications(0);
-        return;
-      }
-      try {
-        const response = await fetch("/api/notifications?limit=1", { cache: "no-store", credentials: "include" });
-        const data = await response.json().catch(() => ({}));
-        if (!cancelled && response.ok) setUnreadNotifications(Number(data.unreadCount || 0));
-      } catch {
-        if (!cancelled) setUnreadNotifications(0);
-      }
-    }
-    loadUnread();
-    const timer = setInterval(loadUnread, 60_000);
-    return () => { cancelled = true; clearInterval(timer); };
-  }, [user]);
 
   const iconMap = useMemo(() => {
     const map: Record<string, SiteImage> = {};
