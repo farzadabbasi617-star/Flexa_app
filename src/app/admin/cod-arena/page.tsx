@@ -13,6 +13,7 @@ interface RoomRow {
   id: string; title: string; description: string | null; region: "global"|"garena"; map: string; teamMode: "solo"|"duo"|"squad"; perspective: string;
   status: string; isPublished: boolean; capacity: number; registeredCount: number; entryFeeRial: string; serviceFeeRial: string; prizeBudgetRial: string;
   rewardConfig: { perKillRial?: string; participationRial?: string; maxKillsPerEntry?: number; maxTotalKills?: number; placementPayout?: "per_team"|"per_entry"; killLadder?: { firstKillRial:string; divisor:number; minKillRial:string }|null; placementRules?: Array<{ from:number;to:number;amountRial:string }> };
+  bannerImageUrl?: string|null; category?: string|null; originalEntryFeeRial?: string|null; minCodLevel?: number;
   referralRateBps?: number; minRankPoints: number; requiresRecording: boolean; startsAt: string; endsAt: string|null; checkInOpensAt: string|null; checkInClosesAt: string|null; credentialsRevealAt: string|null;
 }
 interface DetailEntry { id?: string; displayName: string; codUsername: string; status: string; checkedIn: boolean; kills?: number|null; placement?: number|null; resultStatus?: string; }
@@ -198,10 +199,19 @@ const initialForm = {
   id:"",title:"",description:"",region:"global" as "global"|"garena",map:"isolated",teamMode:"solo" as "solo"|"duo"|"squad",perspective:"tpp",status:"draft",isPublished:false,
   capacity:40,entryFeeToman:"0",serviceFeeToman:"0",prizeBudgetToman:"0",referralPercent:"20",perKillToman:"0",participationToman:"0",maxKillsPerEntry:40,
   maxTotalKills:"0",placementPayout:"per_team" as "per_team"|"per_entry",
+  bannerImageUrl:"",category:"",originalEntryFeeToman:"",minCodLevel:0,
   killLadderEnabled:false,ladderFirstKillToman:"0",ladderDivisor:2,ladderMinKillToman:"0",
   minRankPoints:0,requiresRecording:true,rulesVersion:"cod-beta-1",rules:"",
   roomCode:"",roomPassword:"",officialJoinUrl:"",checkInOpensAt:"",checkInClosesAt:"",credentialsRevealAt:"",startsAt:"",endsAt:"",
 };
+
+const COD_BANNERS = [
+  { url:"/cod/banner-isolated-br.jpg", label:"Isolated — بتل رویال" },
+  { url:"/cod/banner-rebirth.jpg", label:"Rebirth Island" },
+  { url:"/cod/banner-killrace.jpg", label:"کیلی / Kill Race" },
+  { url:"/cod/banner-economy.jpg", label:"اقتصادی / سطح پایین" },
+];
+const COD_CATEGORY_SUGGESTIONS = ["صد نفره","چهل نفره","سولو","دابل","اقتصادی (سطح پایین)","کیلی","ریبرث"];
 
 const DEFAULT_PLACEMENTS: PlacementRow[] = [
   { from:"1", to:"1", amountToman:"0" },
@@ -229,7 +239,9 @@ export default function AdminCodArenaPage(){
   const payload=useMemo(()=>({
     ...form,
     lobbyOverrideConfirmed:lobbyStartOverrideConfirmed,
-    entryFeeRial:tomanToRial(form.entryFeeToman),serviceFeeRial:tomanToRial(form.serviceFeeToman),prizeBudgetRial:tomanToRial(form.prizeBudgetToman),referralRateBps:Math.round(Number(normalizeDigits(String(form.referralPercent||0)).replace("٫","."))*100),
+    entryFeeRial:tomanToRial(form.entryFeeToman),serviceFeeRial:tomanToRial(form.serviceFeeToman),prizeBudgetRial:tomanToRial(form.prizeBudgetToman),
+    bannerImageUrl:form.bannerImageUrl||null,category:form.category||null,minCodLevel:Number(form.minCodLevel)||0,
+    originalEntryFeeRial:String(form.originalEntryFeeToman||"").trim()?tomanToRial(form.originalEntryFeeToman):null,referralRateBps:Math.round(Number(normalizeDigits(String(form.referralPercent||0)).replace("٫","."))*100),
     rewardConfig:{
       perKillRial:form.killLadderEnabled?"0":tomanToRial(form.perKillToman),
       participationRial:tomanToRial(form.participationToman),
@@ -256,7 +268,7 @@ export default function AdminCodArenaPage(){
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||"اطلاعات روم دریافت نشد");
       const full=data.room as DetailRoom;
-      setForm({...initialForm,id:full.id,title:full.title,description:full.description||"",region:full.region,map:full.map,teamMode:full.teamMode,perspective:full.perspective,status:full.status,isPublished:full.isPublished,capacity:full.capacity,entryFeeToman:rialToToman(full.entryFeeRial),serviceFeeToman:rialToToman(full.serviceFeeRial),prizeBudgetToman:rialToToman(full.prizeBudgetRial),referralPercent:String(Number(full.referralRateBps||0)/100),perKillToman:rialToToman(full.rewardConfig?.perKillRial),participationToman:rialToToman(full.rewardConfig?.participationRial),maxKillsPerEntry:Number(full.rewardConfig?.maxKillsPerEntry||40),maxTotalKills:String(full.rewardConfig?.maxTotalKills||0),placementPayout:(full.rewardConfig?.placementPayout==="per_entry"?"per_entry":"per_team"),killLadderEnabled:Boolean(full.rewardConfig?.killLadder),ladderFirstKillToman:rialToToman(full.rewardConfig?.killLadder?.firstKillRial),ladderDivisor:Number(full.rewardConfig?.killLadder?.divisor||2),ladderMinKillToman:rialToToman(full.rewardConfig?.killLadder?.minKillRial),minRankPoints:full.minRankPoints,requiresRecording:full.requiresRecording,rulesVersion:full.rulesVersion||"cod-beta-1",rules:full.rules||"",roomCode:full.roomCode||"",roomPassword:full.roomPassword||"",officialJoinUrl:full.officialJoinUrl||"",startsAt:localDate(full.startsAt),endsAt:localDate(full.endsAt),checkInOpensAt:localDate(full.checkInOpensAt),checkInClosesAt:localDate(full.checkInClosesAt),credentialsRevealAt:localDate(full.credentialsRevealAt)});
+      setForm({...initialForm,id:full.id,title:full.title,description:full.description||"",region:full.region,map:full.map,teamMode:full.teamMode,perspective:full.perspective,status:full.status,isPublished:full.isPublished,capacity:full.capacity,entryFeeToman:rialToToman(full.entryFeeRial),serviceFeeToman:rialToToman(full.serviceFeeRial),prizeBudgetToman:rialToToman(full.prizeBudgetRial),referralPercent:String(Number(full.referralRateBps||0)/100),perKillToman:rialToToman(full.rewardConfig?.perKillRial),participationToman:rialToToman(full.rewardConfig?.participationRial),maxKillsPerEntry:Number(full.rewardConfig?.maxKillsPerEntry||40),maxTotalKills:String(full.rewardConfig?.maxTotalKills||0),bannerImageUrl:full.bannerImageUrl||"",category:full.category||"",originalEntryFeeToman:full.originalEntryFeeRial?rialToToman(full.originalEntryFeeRial):"",minCodLevel:Number(full.minCodLevel||0),placementPayout:(full.rewardConfig?.placementPayout==="per_entry"?"per_entry":"per_team"),killLadderEnabled:Boolean(full.rewardConfig?.killLadder),ladderFirstKillToman:rialToToman(full.rewardConfig?.killLadder?.firstKillRial),ladderDivisor:Number(full.rewardConfig?.killLadder?.divisor||2),ladderMinKillToman:rialToToman(full.rewardConfig?.killLadder?.minKillRial),minRankPoints:full.minRankPoints,requiresRecording:full.requiresRecording,rulesVersion:full.rulesVersion||"cod-beta-1",rules:full.rules||"",roomCode:full.roomCode||"",roomPassword:full.roomPassword||"",officialJoinUrl:full.officialJoinUrl||"",startsAt:localDate(full.startsAt),endsAt:localDate(full.endsAt),checkInOpensAt:localDate(full.checkInOpensAt),checkInClosesAt:localDate(full.checkInClosesAt),credentialsRevealAt:localDate(full.credentialsRevealAt)});
       setPlacements(placementRowsFromConfig(full.rewardConfig?.placementRules));
       setLobbyStartOverrideConfirmed(false);setShowForm(true);setSelected(null);scrollTo({top:0,behavior:"smooth"});
     } catch(e){setError(e instanceof Error?e.message:"اطلاعات روم دریافت نشد");}
@@ -281,6 +293,31 @@ export default function AdminCodArenaPage(){
       <div className="flex justify-between"><h2 className="text-xl font-black">{form.id?"ویرایش روم":"ساخت روم COD"}</h2><button type="button" onClick={()=>setShowForm(false)} className="text-gray-500">✕</button></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"><label className="lg:col-span-2 text-xs text-gray-400">عنوان<input required value={form.title} onChange={e=>setForm({...form,title:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">ریجن<select value={form.region} onChange={e=>setForm({...form,region:e.target.value as "global"|"garena"})} className={`${input} mt-1`}><option value="global">Global</option><option value="garena">Garena</option></select></label><label className="text-xs text-gray-400">حالت<select value={form.teamMode} onChange={e=>setForm({...form,teamMode:e.target.value as "solo"|"duo"|"squad"})} className={`${input} mt-1`}><option value="solo">Solo</option><option value="duo">Duo</option><option value="squad">Squad</option></select></label><label className="text-xs text-gray-400">Map<input value={form.map} onChange={e=>setForm({...form,map:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">Perspective<select value={form.perspective} onChange={e=>setForm({...form,perspective:e.target.value})} className={`${input} mt-1`}><option value="tpp">TPP</option><option value="fpp">FPP</option></select></label><label className="text-xs text-gray-400">ظرفیت<input type="number" min={2} max={100} value={form.capacity} onChange={e=>setForm({...form,capacity:Number(e.target.value)})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">حداقل RP<input type="number" min={0} value={form.minRankPoints} onChange={e=>setForm({...form,minRankPoints:Number(e.target.value)})} className={`${input} mt-1`}/></label></div>
       <label className="block text-xs text-gray-400">توضیحات<textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows={3} className={`${input} mt-1`}/></label>
+      <div><h3 className="font-black text-orange-300 mb-3">نمایش روم</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <label className="text-xs text-gray-400">دسته‌بندی (قفسه صفحه اصلی)
+            <input list="cod-category-list" value={form.category} onChange={e=>setForm({...form,category:e.target.value})} className={`${input} mt-1`} placeholder="مثلاً: صد نفره"/>
+            <datalist id="cod-category-list">{COD_CATEGORY_SUGGESTIONS.map(c=><option key={c} value={c}/>)}</datalist>
+          </label>
+          <label className="text-xs text-gray-400">قیمت قبل از تخفیف (اختیاری)<input inputMode="numeric" value={form.originalEntryFeeToman} onChange={e=>setForm({...form,originalEntryFeeToman:e.target.value})} className={`${input} mt-1`} placeholder="خالی = بدون تخفیف"/></label>
+          <label className="text-xs text-gray-400">حداقل لول اکانت کالاف<input type="number" min={0} max={500} value={form.minCodLevel} onChange={e=>setForm({...form,minCodLevel:Number(e.target.value)})} className={`${input} mt-1`}/></label>
+        </div>
+        <div className="mt-4">
+          <div className="text-xs text-gray-400 mb-2">بنر روم</div>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+            {COD_BANNERS.map((banner)=>(
+              <button type="button" key={banner.url} onClick={()=>setForm({...form,bannerImageUrl:form.bannerImageUrl===banner.url?"":banner.url})}
+                className={`overflow-hidden rounded-2xl border text-right transition ${form.bannerImageUrl===banner.url?"border-orange-400 ring-2 ring-orange-400/40":"border-white/10 hover:border-white/25"}`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={banner.url} alt={banner.label} width={320} height={136} className="h-20 w-full object-cover" loading="lazy"/>
+                <span className="block p-2 text-[10px] font-black">{banner.label}</span>
+              </button>
+            ))}
+          </div>
+          <input value={form.bannerImageUrl} onChange={e=>setForm({...form,bannerImageUrl:e.target.value})} dir="ltr" placeholder="یا آدرس HTTPS بنر دلخواه" className={`${input} mt-2`}/>
+        </div>
+      </div>
+
       <div><h3 className="font-black text-orange-300 mb-3">اقتصاد روم — تومان</h3><div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{[["ورودی","entryFeeToman"],["کارمزد Gament","serviceFeeToman"],["بودجه جایزه","prizeBudgetToman"],["رفرال از کارمزد %","referralPercent"],["جایزه حضور","participationToman"]].map(([label,key])=><label key={key} className="text-xs text-gray-400">{label}<input inputMode="numeric" value={String(form[key as keyof typeof form])} onChange={e=>setForm({...form,[key]:e.target.value})} className={`${input} mt-1`}/></label>)}</div></div>
 
       <div><h3 className="font-black text-orange-300 mb-3">جایزه Kill</h3>

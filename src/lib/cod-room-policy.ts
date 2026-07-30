@@ -223,6 +223,76 @@ export function estimateCodRoomMaximumLiability(
   return killLiability + participationLiability + placementLiability;
 }
 
+/**
+ * Structured match settings. Iranian Call of Duty rooms all publish the same
+ * handful of lobby toggles, and burying them in free text means players cannot
+ * filter on them and operators mistype them.
+ */
+export const COD_REVIVE_MODES = ["disabled", "enabled", "auto"] as const;
+export const COD_ZONE_SPEEDS = ["slow", "normal", "fast"] as const;
+
+export interface CodMatchSettings {
+  revive: (typeof COD_REVIVE_MODES)[number] | null;
+  limitedAmmo: boolean | null;
+  zoneSpeed: (typeof COD_ZONE_SPEEDS)[number] | null;
+  doubleGroundLoot: boolean | null;
+  vehiclesEnabled: boolean | null;
+}
+
+export function normalizeCodMatchSettings(input: unknown): CodMatchSettings {
+  const raw = input && typeof input === "object" ? input as Record<string, unknown> : {};
+  const enumOrNull = <T extends readonly string[]>(value: unknown, allowed: T) => {
+    const normalized = String(value ?? "").trim();
+    return (allowed as readonly string[]).includes(normalized) ? normalized as T[number] : null;
+  };
+  const boolOrNull = (value: unknown) => (typeof value === "boolean" ? value : null);
+  return {
+    revive: enumOrNull(raw.revive, COD_REVIVE_MODES),
+    limitedAmmo: boolOrNull(raw.limitedAmmo),
+    zoneSpeed: enumOrNull(raw.zoneSpeed, COD_ZONE_SPEEDS),
+    doubleGroundLoot: boolOrNull(raw.doubleGroundLoot),
+    vehiclesEnabled: boolOrNull(raw.vehiclesEnabled),
+  };
+}
+
+export interface CodFaqEntry {
+  question: string;
+  answer: string;
+}
+
+export function normalizeCodFaq(input: unknown): CodFaqEntry[] {
+  if (!Array.isArray(input)) return [];
+  return input
+    .map((item) => {
+      const entry = item && typeof item === "object" ? item as Record<string, unknown> : {};
+      return {
+        question: String(entry.question ?? "").trim().slice(0, 200),
+        answer: String(entry.answer ?? "").trim().slice(0, 4_000),
+      };
+    })
+    .filter((entry) => entry.question.length > 0 && entry.answer.length > 0)
+    .slice(0, 20);
+}
+
+/**
+ * Room key art is rendered full-bleed at the top of the room page, so it must
+ * not be an attacker-supplied `javascript:` or `data:` URL. Same-origin paths
+ * (our own bundled art) and plain HTTPS URLs are the only things allowed.
+ */
+export function normalizeCodBannerUrl(value: unknown): string | null {
+  const raw = String(value ?? "").trim();
+  if (!raw) return null;
+  if (raw.startsWith("/") && !raw.startsWith("//")) return raw.slice(0, 500);
+  try {
+    const url = new URL(raw);
+    if (url.protocol !== "https:") throw new Error("فقط آدرس HTTPS برای بنر روم مجاز است");
+    return url.toString().slice(0, 500);
+  } catch (error) {
+    if (error instanceof Error && error.message.includes("HTTPS")) throw error;
+    throw new Error("آدرس بنر روم معتبر نیست");
+  }
+}
+
 export function codReferralCommissionRial(serviceFeeRialInput: bigint, referralRateBpsInput: number) {
   const bps = boundedInteger(referralRateBpsInput, 0, 10_000, "درصد کمیسیون معرفی");
   if (serviceFeeRialInput <= BigInt(0) || bps === 0) return BigInt(0);

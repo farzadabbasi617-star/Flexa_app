@@ -83,6 +83,7 @@ psql "$DATABASE_URL" -f drizzle/manual/0001_add_rate_limits.sql
 | `0039_add_session_and_hot_table_indexes.sql` | Performance-only indexes for previously unindexed hot tables: `sessions` (user_id, expires_at), plus teams, judges, ai_proposals and classified_scrape_logs. |
 | `0040_drop_kyc_selfie_requirement.sql` | Makes `kyc_profiles.selfie_image_url` nullable. Seller verification no longer collects a selfie; the column is kept so historical submissions stay readable. |
 | `0041_widen_kyc_image_columns.sql` | Converts `kyc_profiles` image columns from `varchar(500)` to `text`. With Cloudinary unconfigured the uploader returns base64 data URLs, which overflowed the old cap and made every real KYC submission fail. |
+| `0042_add_cod_room_presentation.sql` | Adds presentation columns to `cod_rooms`: `banner_image_url` (key art), `category` (home-page shelf), `original_entry_fee_rial` (struck-through price), `min_cod_level` (in-game level gate, distinct from Gament rank points), `match_settings` and `faq` (structured JSON instead of free text). Adds a partial index on `(category, starts_at)` for published rooms. |
 
 > **Email verification (required before deploying the email-OTP auth flow):**
 > Run `0019_add_email_verification.sql` and set `RESEND_API_KEY` (and

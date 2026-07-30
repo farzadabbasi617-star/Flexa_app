@@ -37,6 +37,10 @@ interface CodRoomListItem {
     placementRules?: Array<{ from: number; to: number; amountRial: string }>;
   };
   minRankPoints: number;
+  minCodLevel?: number;
+  bannerImageUrl?: string | null;
+  category?: string | null;
+  originalEntryFeeRial?: string | null;
   requiresRecording: boolean;
   startsAt: string;
   checkInOpensAt: string | null;
@@ -66,6 +70,52 @@ function relativeStart(value: string) {
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours.toLocaleString("fa-IR")} ساعت دیگر`;
   return new Intl.DateTimeFormat("fa-IR", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Tehran" }).format(new Date(value));
+}
+
+function CodRoomCard({ room }: { room: CodRoomListItem }) {
+                const full = room.registeredCount >= room.capacity;
+  const remaining = Math.max(0, room.capacity - room.registeredCount);
+  let discounted = false;
+  try { discounted = Boolean(room.originalEntryFeeRial) && BigInt(room.originalEntryFeeRial!) > BigInt(room.entryFeeRial); } catch { discounted = false; }
+  const ladder = room.rewardConfig?.killLadder;
+  const perKill = BigInt(ladder?.firstKillRial || room.rewardConfig?.perKillRial || "0");
+  return (
+    <article key={room.id} className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#18130f] via-[#0d0d0d] to-black p-5 sm:p-6 hover:border-orange-400/30 transition">
+      <div className="absolute -top-20 -left-20 w-52 h-52 rounded-full bg-orange-500/10 blur-3xl group-hover:bg-orange-500/15 transition" />
+      {room.bannerImageUrl && (
+        <div className="relative -mx-5 -mt-5 sm:-mx-6 sm:-mt-6 mb-5 h-32 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={room.bannerImageUrl} alt="" width={640} height={272} loading="lazy" className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d]/40 to-transparent" />
+          <div className="absolute bottom-2 right-4 left-4 flex items-end justify-between gap-3">
+            <span className="text-lg font-black drop-shadow-lg">{room.title}</span>
+            {remaining > 0 && <span className="shrink-0 rounded-full bg-black/60 px-3 py-1 text-[9px] font-black text-orange-200">{remaining.toLocaleString("fa-IR")} نفر باقی مانده</span>}
+          </div>
+        </div>
+      )}
+      <div className="relative">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex gap-2">
+            <span className="rounded-full bg-orange-500/15 border border-orange-500/20 px-3 py-1 text-[9px] font-black text-orange-300">{room.region.toUpperCase()}</span>
+            <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-[9px] font-black text-gray-300">{modeLabel[room.teamMode]} • {room.perspective.toUpperCase()}</span>
+          </div>
+          <span className="text-[9px] font-black text-emerald-300">{statusLabel[room.status] || room.status}</span>
+        </div>
+        {!room.bannerImageUrl && <h3 className="text-xl font-black mt-5 leading-7">{room.title}</h3>}
+        <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-6">{room.description || `${room.map} • کاستوم‌روم امن Gament`}</p>
+        <div className="grid grid-cols-3 gap-2 mt-5 text-center">
+          <div className="rounded-2xl bg-black/35 border border-white/5 p-3"><div className="text-[9px] text-gray-500">ورودی</div>{discounted && <div className="text-[9px] text-gray-600 line-through">{toman(room.originalEntryFeeRial)} ت</div>}<div className={`text-xs font-black ${discounted ? "" : "mt-1"}`}>{BigInt(room.entryFeeRial) === BigInt(0) ? "رایگان" : `${toman(room.entryFeeRial)} ت`}</div></div>
+          <div className="rounded-2xl bg-black/35 border border-white/5 p-3"><div className="text-[9px] text-gray-500">{ladder ? "اولین Kill" : "هر Kill"}</div><div className="text-xs font-black mt-1 text-orange-300">{perKill === BigInt(0) ? "—" : `${toman(perKill.toString())} ت`}</div></div>
+          <div className="rounded-2xl bg-black/35 border border-white/5 p-3"><div className="text-[9px] text-gray-500">ظرفیت</div><div className="text-xs font-black mt-1">{room.registeredCount.toLocaleString("fa-IR")}/{room.capacity.toLocaleString("fa-IR")}</div></div>
+        </div>
+        <div className="mt-5 h-1.5 rounded-full bg-white/5 overflow-hidden"><div className="h-full bg-gradient-to-l from-yellow-400 to-orange-600" style={{ width: `${Math.min(100, (room.registeredCount / room.capacity) * 100)}%` }} /></div>
+        <div className="flex items-center justify-between mt-5">
+          <div className="text-[10px] text-gray-400"><span className="text-orange-300 font-black">⏱ {relativeStart(room.startsAt)}</span><br /><span>{room.map}</span></div>
+          <Link href={`/cod-arena/${room.id}`} className={`rounded-2xl px-5 py-3 text-xs font-black ${full ? "bg-white/5 text-gray-500" : "bg-orange-500 text-black"}`}>{full ? "ظرفیت تکمیل" : "جزئیات و عضویت"}</Link>
+        </div>
+      </div>
+    </article>
+  );
 }
 
 export default function CodArenaPage() {
@@ -103,6 +153,22 @@ export default function CodArenaPage() {
   useEffect(() => { load(); }, [load]);
 
   const activeCount = useMemo(() => rooms.filter((room) => !["completed", "cancelled"].includes(room.status)).length, [rooms]);
+
+  // Rooms are grouped into named shelves ("100 players", "budget", "kill race")
+  // so a long list stays scannable. Rooms without a category fall into one
+  // trailing shelf rather than disappearing.
+  const groupedRooms = useMemo(() => {
+    const shelves = new Map<string, CodRoomListItem[]>();
+    for (const room of rooms) {
+      const key = room.category?.trim() || "سایر روم‌ها";
+      const bucket = shelves.get(key);
+      if (bucket) bucket.push(room);
+      else shelves.set(key, [room]);
+    }
+    return [...shelves.entries()]
+      .map(([category, items]) => ({ category, rooms: items }))
+      .sort((a, b) => (a.category === "سایر روم‌ها" ? 1 : b.category === "سایر روم‌ها" ? -1 : 0));
+  }, [rooms]);
 
   return (
     <div className="min-h-screen bg-[#060606] text-white overflow-x-hidden">
@@ -167,38 +233,20 @@ export default function CodArenaPage() {
               <p className="text-sm text-gray-400 leading-7 mt-3 max-w-xl mx-auto">به‌زودی روم‌های جدید کالاف با Check-in امن، بررسی لابی و تسویه جایزه فعال می‌شوند.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {rooms.map((room) => {
-                const full = room.registeredCount >= room.capacity;
-                const ladder = room.rewardConfig?.killLadder;
-                const perKill = BigInt(ladder?.firstKillRial || room.rewardConfig?.perKillRial || "0");
-                return (
-                  <article key={room.id} className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#18130f] via-[#0d0d0d] to-black p-5 sm:p-6 hover:border-orange-400/30 transition">
-                    <div className="absolute -top-20 -left-20 w-52 h-52 rounded-full bg-orange-500/10 blur-3xl group-hover:bg-orange-500/15 transition" />
-                    <div className="relative">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="flex gap-2">
-                          <span className="rounded-full bg-orange-500/15 border border-orange-500/20 px-3 py-1 text-[9px] font-black text-orange-300">{room.region.toUpperCase()}</span>
-                          <span className="rounded-full bg-white/5 border border-white/10 px-3 py-1 text-[9px] font-black text-gray-300">{modeLabel[room.teamMode]} • {room.perspective.toUpperCase()}</span>
-                        </div>
-                        <span className="text-[9px] font-black text-emerald-300">{statusLabel[room.status] || room.status}</span>
-                      </div>
-                      <h3 className="text-xl font-black mt-5 leading-7">{room.title}</h3>
-                      <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-6">{room.description || `${room.map} • کاستوم‌روم امن Gament`}</p>
-                      <div className="grid grid-cols-3 gap-2 mt-5 text-center">
-                        <div className="rounded-2xl bg-black/35 border border-white/5 p-3"><div className="text-[9px] text-gray-500">ورودی</div><div className="text-xs font-black mt-1">{BigInt(room.entryFeeRial) === BigInt(0) ? "رایگان" : `${toman(room.entryFeeRial)} ت`}</div></div>
-                        <div className="rounded-2xl bg-black/35 border border-white/5 p-3"><div className="text-[9px] text-gray-500">{ladder ? "اولین Kill" : "هر Kill"}</div><div className="text-xs font-black mt-1 text-orange-300">{perKill === BigInt(0) ? "—" : `${toman(perKill.toString())} ت`}</div></div>
-                        <div className="rounded-2xl bg-black/35 border border-white/5 p-3"><div className="text-[9px] text-gray-500">ظرفیت</div><div className="text-xs font-black mt-1">{room.registeredCount.toLocaleString("fa-IR")}/{room.capacity.toLocaleString("fa-IR")}</div></div>
-                      </div>
-                      <div className="mt-5 h-1.5 rounded-full bg-white/5 overflow-hidden"><div className="h-full bg-gradient-to-l from-yellow-400 to-orange-600" style={{ width: `${Math.min(100, (room.registeredCount / room.capacity) * 100)}%` }} /></div>
-                      <div className="flex items-center justify-between mt-5">
-                        <div className="text-[10px] text-gray-400"><span className="text-orange-300 font-black">⏱ {relativeStart(room.startsAt)}</span><br /><span>{room.map}</span></div>
-                        <Link href={`/cod-arena/${room.id}`} className={`rounded-2xl px-5 py-3 text-xs font-black ${full ? "bg-white/5 text-gray-500" : "bg-orange-500 text-black"}`}>{full ? "ظرفیت تکمیل" : "جزئیات و عضویت"}</Link>
-                      </div>
+            <div className="space-y-10">
+              {groupedRooms.map((shelf) => (
+                <div key={shelf.category}>
+                  {groupedRooms.length > 1 && (
+                    <div className="flex items-center justify-between gap-4 mb-4">
+                      <h3 className="text-lg sm:text-xl font-black">{shelf.category}</h3>
+                      <span className="text-[10px] font-black text-gray-500">{shelf.rooms.length.toLocaleString("fa-IR")} روم</span>
                     </div>
-                  </article>
-                );
-              })}
+                  )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    {shelf.rooms.map((room) => <CodRoomCard key={room.id} room={room} />)}
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </section>

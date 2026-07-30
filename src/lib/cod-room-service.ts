@@ -31,6 +31,9 @@ import {
   codRankTier,
   codReferralCommissionRial,
   estimateCodRoomMaximumLiability,
+  normalizeCodBannerUrl,
+  normalizeCodFaq,
+  normalizeCodMatchSettings,
   isOfficialCodMobileInviteUrl,
   normalizeCodRewardConfig,
   shouldRevealCodRoomCredentials,
@@ -100,6 +103,15 @@ async function createCodArenaSchema(client: any) {
     `DO $$ BEGIN ALTER TABLE cod_rooms ADD CONSTRAINT cod_rooms_referral_bps_check CHECK (referral_rate_bps BETWEEN 0 AND 10000); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
   ];
   for (const statement of constraints) await client.execute(sql.raw(statement));
+  // Presentation columns (migration 0042): key art, shelf grouping, struck-through
+  // price, in-game level gate, structured settings and FAQ.
+  await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS banner_image_url text`));
+  await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS category varchar(60)`));
+  await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS original_entry_fee_rial numeric(20,0)`));
+  await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS min_cod_level integer NOT NULL DEFAULT 0`));
+  await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS match_settings jsonb NOT NULL DEFAULT '{}'::jsonb`));
+  await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS faq jsonb NOT NULL DEFAULT '[]'::jsonb`));
+  await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_rooms_category_start_idx ON cod_rooms(category,starts_at) WHERE is_published = true`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_rooms_status_start_idx ON cod_rooms(status,starts_at)`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_rooms_region_published_idx ON cod_rooms(region,is_published)`));
   await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS cod_room_staff (
@@ -277,6 +289,17 @@ export function normalizeCodRoomInput(raw: Record<string, unknown>) {
   }
   const officialJoinUrl = raw.officialJoinUrl ? String(raw.officialJoinUrl).trim() : null;
   if (officialJoinUrl && !isOfficialCodMobileInviteUrl(officialJoinUrl)) throw new Error("فقط لینک رسمی دعوت Call of Duty Mobile پذیرفته می‌شود");
+  const minCodLevel = Number(raw.minCodLevel || 0);
+  if (!Number.isInteger(minCodLevel) || minCodLevel < 0 || minCodLevel > 500) throw new Error("حداقل لول کالاف معتبر نیست");
+  const bannerImageUrl = normalizeCodBannerUrl(raw.bannerImageUrl);
+  const originalEntryFeeRial = raw.originalEntryFeeRial == null || String(raw.originalEntryFeeRial).trim() === ""
+    ? null
+    : moneyString(raw.originalEntryFeeRial, "قیمت قبل از تخفیف");
+  if (originalEntryFeeRial && BigInt(originalEntryFeeRial) <= BigInt(entryFeeRial)) {
+    throw new Error("قیمت قبل از تخفیف باید از ورودی فعلی بیشتر باشد");
+  }
+  const matchSettings = normalizeCodMatchSettings(raw.matchSettings);
+  const faq = normalizeCodFaq(raw.faq);
   return {
     title,
     description: raw.description ? String(raw.description).trim().slice(0, 3000) : null,
@@ -293,6 +316,12 @@ export function normalizeCodRoomInput(raw: Record<string, unknown>) {
     referralRateBps,
     rewardConfig,
     minRankPoints,
+    minCodLevel,
+    bannerImageUrl,
+    category: raw.category ? String(raw.category).trim().slice(0, 60) : null,
+    originalEntryFeeRial,
+    matchSettings,
+    faq,
     rules: raw.rules ? String(raw.rules).trim().slice(0, 12_000) : null,
     rulesVersion: String(raw.rulesVersion || "cod-beta-1").trim().slice(0, 40),
     requiresRecording: raw.requiresRecording !== false,
@@ -333,6 +362,11 @@ export async function listCodRooms(input: { includeUnpublished?: boolean; region
     prizeBudgetRial: codRooms.prizeBudgetRial,
     rewardConfig: codRooms.rewardConfig,
     minRankPoints: codRooms.minRankPoints,
+    minCodLevel: codRooms.minCodLevel,
+    bannerImageUrl: codRooms.bannerImageUrl,
+    category: codRooms.category,
+    originalEntryFeeRial: codRooms.originalEntryFeeRial,
+    matchSettings: codRooms.matchSettings,
     requiresRecording: codRooms.requiresRecording,
     checkInOpensAt: codRooms.checkInOpensAt,
     checkInClosesAt: codRooms.checkInClosesAt,
