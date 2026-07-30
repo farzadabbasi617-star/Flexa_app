@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import AutoNewsButton from "@/components/admin/AutoNewsButton";
 import { useAuth } from "@/contexts/AuthContext";
 
 type TabKey = "overview" | "users" | "tournaments" | "matches" | "judgments" | "disputes" | "messages" | "telegram" | "media";
@@ -229,6 +230,20 @@ export default function AdminPage() {
         )}
 
         {activeTab === "overview" && (
+          <div className="mb-5 gaming-card border-emerald-500/25 p-5">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="font-black text-emerald-300">📰 جستجو و ساخت خبر تالار افتخارات</h2>
+                <p className="mt-1 text-xs leading-6 text-gray-400">
+                  منابع رسمی گیمینگ همین حالا بررسی می‌شوند و خبر تازه بلافاصله منتشر می‌شود. خبر تکراری ساخته نمی‌شود.
+                </p>
+              </div>
+              <AutoNewsButton className="shrink-0" />
+            </div>
+          </div>
+        )}
+
+        {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
             {[
               { href: "/admin/users", icon: "👥", title: "مدیریت کاربران", desc: "مشاهده، افزودن، نقش‌دهی، حذف امن و تأیید کاربران" },
@@ -255,6 +270,7 @@ export default function AdminPage() {
               { href: "/admin/tournaments", icon: "🧩", title: "کنترل کامل تورنومنت", desc: "ویرایش کامل رویدادها، جوایز، قوانین، وضعیت و بنر" },
               { href: "/admin/honors", icon: "🏆", title: "تالار افتخارات", desc: "مدیریت محتوا، تأیید پیشنهادات هوش مصنوعی و انتشار اخبار" },
               { href: "/admin/media-partners", icon: "📣", title: "شرکای رسانه‌ای", desc: "تأیید قراردادها، رسانه‌ها، کمیسیون‌ها و تسویه افیلیت" },
+              { href: "/admin/settings", icon: "⚙️", title: "تنظیمات سایت", desc: "اطلاعات سایت، تماس، تورنومنت، AI و جستجوی دستی خبر تالار افتخارات" },
             ].map((item) => (
               <Link key={item.href} href={item.href} onClick={() => item.href === "#telegram" && setActiveTab("telegram")} className="gaming-card p-6 group hover:border-neon-purple/50 transition-all relative overflow-hidden">
                 <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity bg-gradient-to-br from-neon-purple/10 to-neon-blue/5" />

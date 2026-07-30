@@ -134,6 +134,20 @@ export default function AdminSettingsPage() {
         </div>
 
         <div className="space-y-6">
+          {/* An action, not a stored setting, so it sits above the fields and
+              away from the save button. */}
+          <div className="gaming-card border-emerald-500/25 p-6">
+            <h2 className="font-bold text-emerald-300 mb-1">
+              {lang === "fa" ? "📰 جستجو و ساخت خبر تالار افتخارات" : "📰 Honors News Sweep"}
+            </h2>
+            <p className="text-xs leading-6 text-gray-400 mb-4">
+              {lang === "fa"
+                ? "با زدن این دکمه، منابع رسمی گیمینگ همین حالا بررسی می‌شوند و اگر خبر تازه‌ای باشد که قبلاً منتشر نشده، ترجمه و بلافاصله در تالار افتخارات منتشر می‌شود. خبر تکراری ساخته نمی‌شود و نیازی به ذخیره تنظیمات نیست."
+                : "Sweeps trusted gaming sources now and publishes any genuinely new story straight to Honors. Duplicates are never created; no need to save settings."}
+            </p>
+            <AutoNewsButton />
+          </div>
+
           {sections.map((section) => (
             <div key={section.title} className="gaming-card p-6">
               <h2 className="font-bold text-neon-blue mb-4">{section.title}</h2>
@@ -188,19 +202,6 @@ export default function AdminSettingsPage() {
             </div>
           ))}
 
-          {/* Actions, as opposed to stored settings. Kept below the fields so
-              the save button above never looks like it applies to them. */}
-          <div className="gaming-card p-6">
-            <h2 className="font-bold text-neon-blue mb-1">
-              {lang === "fa" ? "📰 خبر تالار افتخارات" : "📰 Honors News"}
-            </h2>
-            <p className="text-xs leading-6 text-gray-400 mb-4">
-              {lang === "fa"
-                ? "منابع رسمی گیمینگ را همین حالا بررسی می‌کند و اگر خبر تازه‌ای باشد که قبلاً منتشر نشده، ترجمه و بلافاصله در تالار افتخارات منتشر می‌شود. خبر تکراری ساخته نمی‌شود."
-                : "Sweeps trusted gaming sources now and publishes any genuinely new story straight to Honors. Duplicates are never created."}
-            </p>
-            <AutoNewsButton />
-          </div>
         </div>
       </div>
     </div>
