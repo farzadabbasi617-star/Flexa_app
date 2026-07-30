@@ -1,4 +1,5 @@
 import logger from "@/lib/logger";
+import { formatCodRoomChannelPost, type CodRoomChannelPost } from "./cod-channel-post";
 import { db } from "@/db";
 import { registrations, telegramAccounts } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -142,6 +143,44 @@ export async function publishTournamentToTelegramChannel(tournament: TelegramTou
   });
 }
 
+
+/**
+ * Announces a Call of Duty room in the channel. Mirrors the tournament publisher:
+ * try a photo post so the room's key art carries the message, fall back to text.
+ */
+export async function publishCodRoomToTelegramChannel(room: CodRoomChannelPost & { bannerUrl?: string | null }) {
+  const channelId = getTelegramChannelChatId();
+  const url = `${appUrl()}/cod-arena/${room.id}`;
+  const caption = formatCodRoomChannelPost(room);
+  const replyMarkup = {
+    inline_keyboard: [[
+      { text: "🎯 ثبت‌نام در روم", web_app: { url } },
+      { text: "⚡ ورود به گیمنت", web_app: { url: appUrl() } },
+    ]],
+  };
+
+  if (room.bannerUrl) {
+    const absoluteBanner = room.bannerUrl.startsWith("http")
+      ? room.bannerUrl
+      : `${appUrl()}${room.bannerUrl}`;
+    const photoResult = await telegramApi("sendPhoto", {
+      chat_id: channelId,
+      photo: absoluteBanner,
+      caption,
+      parse_mode: "HTML",
+      reply_markup: replyMarkup,
+    });
+    if (photoResult.ok) return photoResult;
+  }
+
+  return telegramApi("sendMessage", {
+    chat_id: channelId,
+    text: caption,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+    reply_markup: replyMarkup,
+  });
+}
 
 export function getTelegramAdminIds() {
   return (process.env.TELEGRAM_ADMIN_IDS || "")

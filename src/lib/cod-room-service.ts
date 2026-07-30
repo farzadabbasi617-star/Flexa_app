@@ -1,4 +1,5 @@
 import { and, count, desc, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
+import { codReadinessBlockers, evaluateCodRoomReadiness, type CodReadinessIssue } from "./cod-room-readiness";
 import { db } from "@/db";
 import {
   affiliateAttributions,
@@ -642,10 +643,49 @@ export async function addCodRoomEvidence(input: {
   }
 }
 
+
+/**
+ * Refuses to publish a room that cannot actually be played. Reads staff and
+ * reward state that `normalizeCodRoomInput` cannot see on its own.
+ */
+async function assertCodRoomPublishable(client: any, roomId: string | null, values: ReturnType<typeof normalizeCodRoomInput>) {
+  if (!values.isPublished) return;
+  let hasRoomer = false;
+  if (roomId) {
+    const [roomer] = await client.select({ id: codRoomStaff.id }).from(codRoomStaff)
+      .where(and(eq(codRoomStaff.roomId, roomId), eq(codRoomStaff.role, "roomer"))).limit(1);
+    hasRoomer = Boolean(roomer);
+  }
+  const reward = values.rewardConfig;
+  const hasAnyReward = reward.placementRules.length > 0
+    || BigInt(reward.perKillRial || "0") > BigInt(0)
+    || BigInt(reward.participationRial || "0") > BigInt(0)
+    || Boolean(reward.killLadder);
+  const blockers = codReadinessBlockers(evaluateCodRoomReadiness({
+    status: values.status,
+    isPublished: values.isPublished,
+    roomCode: values.roomCode,
+    roomPassword: values.roomPassword,
+    officialJoinUrl: values.officialJoinUrl,
+    bannerImageUrl: values.bannerImageUrl,
+    faq: values.faq,
+    rules: values.rules,
+    hasRoomer,
+    startsAt: values.startsAt,
+    credentialsRevealAt: values.credentialsRevealAt,
+    entryFeeRial: values.entryFeeRial,
+    hasAnyReward,
+  }));
+  if (blockers.length > 0) {
+    throw new Error(`روم آماده انتشار نیست: ${blockers.map((b: CodReadinessIssue) => b.message).join(" ")}`);
+  }
+}
+
 export async function createCodRoom(raw: Record<string, unknown>, adminId: string) {
   await ensureCodArenaSchema();
   const values = normalizeCodRoomInput(raw);
   if (values.startsAt.getTime() <= Date.now() + 5 * 60_000) throw new Error("زمان شروع روم جدید باید حداقل ۵ دقیقه در آینده باشد");
+  await assertCodRoomPublishable(db, null, values);
   const { maximumLiabilityRial, ...databaseValues } = values;
   const [created] = await db.insert(codRooms).values({ ...databaseValues, createdById: adminId }).returning();
   await db.insert(codRoomAuditEvents).values({ roomId: created.id, actorId: adminId, eventType: "room_created", payload: { maximumLiabilityRial } });
@@ -660,6 +700,7 @@ export async function updateCodRoom(roomId: string, raw: Record<string, unknown>
     const [before] = await tx.select().from(codRooms).where(eq(codRooms.id, roomId)).limit(1);
     if (!before) throw new Error("COD_ROOM_NOT_FOUND");
     if (!canTransitionCodRoomStatus(before.status as CodRoomStatus, values.status)) throw new Error("COD_STATUS_TRANSITION_INVALID");
+    await assertCodRoomPublishable(tx, roomId, values);
     const [{ value: entryCount }] = await tx.select({ value: count() }).from(codRoomEntries).where(eq(codRoomEntries.roomId, roomId));
     if (Number(entryCount || 0) > 0) {
       const commercialTermsChanged = before.entryFeeRial !== values.entryFeeRial ||

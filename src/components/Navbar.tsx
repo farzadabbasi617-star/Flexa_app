@@ -246,6 +246,7 @@ export default function Navbar() {
               
               const customIcons: Record<string, string> = {
                 "/tournaments": "/icons/honors_icon.png",
+                "/cod-arena": "/icons/icon-cod-arena.png",
                 "/leaderboard": "/icons/rankings_icon.png",
                 "/judging": "/icons/icon-judging.png", // Exclusive custom neon gavel/scale icon!
                 "/teams": "/icons/icon-teams.png",     // Exclusive custom neon guild shield icon!

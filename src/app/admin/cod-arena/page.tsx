@@ -213,6 +213,19 @@ const FAQ_TEMPLATE: FaqRow[] = [
   { question:"چجوری جایزه رو دریافت کنیم؟", answer:"چند دقیقه پس از اتمام روم در صورت برنده بودن حساب کیف پولتون شارژ میشه، نگران نباشین." },
 ];
 
+function ReadinessPanel({report}:{report?:{issues:Array<{key:string;level:string;message:string}>;publishable:boolean}}){
+  if(!report||report.issues.length===0)return null;
+  const blockers=report.issues.filter((i)=>i.level==="blocker");
+  const warnings=report.issues.filter((i)=>i.level==="warning");
+  return <div className={`mt-4 rounded-2xl border p-3 ${blockers.length?"border-red-500/30 bg-red-500/10":"border-amber-500/25 bg-amber-500/[.07]"}`}>
+    <div className="text-[10px] font-black">{blockers.length?`❌ ${blockers.length.toLocaleString("fa-IR")} مورد مانع انتشار`:`⚠️ ${warnings.length.toLocaleString("fa-IR")} هشدار`}</div>
+    <ul className="mt-2 space-y-1">
+      {blockers.map((i)=><li key={i.key} className="text-[10px] leading-5 text-red-200">• {i.message}</li>)}
+      {warnings.map((i)=><li key={i.key} className="text-[10px] leading-5 text-amber-200/80">• {i.message}</li>)}
+    </ul>
+  </div>;
+}
+
 const initialForm = {
   id:"",title:"",description:"",region:"global" as "global"|"garena",map:"isolated",teamMode:"solo" as "solo"|"duo"|"squad",perspective:"tpp",status:"draft",isPublished:false,
   capacity:40,entryFeeToman:"0",serviceFeeToman:"0",prizeBudgetToman:"0",referralPercent:"20",perKillToman:"0",participationToman:"0",maxKillsPerEntry:40,
@@ -252,11 +265,27 @@ export default function AdminCodArenaPage(){
   const [results,setResults]=useState<Record<string,{kills:string;placement:string}>>({}); const [evidenceConfirmed,setEvidenceConfirmed]=useState(false); const [lobbyOverrideConfirmed,setLobbyOverrideConfirmed]=useState(false); const [lobbyStartOverrideConfirmed,setLobbyStartOverrideConfirmed]=useState(false); const [staff,setStaff]=useState({identifier:"",role:"roomer"});
   const [placements,setPlacements]=useState<PlacementRow[]>(()=>DEFAULT_PLACEMENTS.map((row)=>({...row})));
   const [faq,setFaq]=useState<FaqRow[]>([]);
+  const [readiness,setReadiness]=useState<Record<string,{issues:Array<{key:string;level:string;message:string}>;publishable:boolean}>>({});
+  const [announcing,setAnnouncing]=useState("");
   const isAdmin=user?.role==="admin"||user?.role==="super_admin";
 
   useEffect(()=>{if(!authLoading&&(!user||!isAdmin))router.push("/");},[authLoading,user,isAdmin,router]);
   const load=useCallback(async()=>{setLoading(true);try{const r=await fetch("/api/admin/cod/rooms",{cache:"no-store"});const d=await r.json();if(!r.ok)throw new Error(d.error);setRooms(d.rooms||[]);}catch(e){setError(e instanceof Error?e.message:"بارگذاری نشد");}finally{setLoading(false);}},[]);
   useEffect(()=>{if(isAdmin)load();},[isAdmin,load]);
+  const checkReadiness=useCallback(async(id:string)=>{
+    try{
+      const r=await fetch(`/api/admin/cod/rooms/${id}/announce`,{cache:"no-store",credentials:"include"});
+      const d=await r.json();
+      if(r.ok)setReadiness((prev)=>({...prev,[id]:d}));
+    }catch{/* the checklist is advisory; a failed probe must not break the page */}
+  },[]);
+  // Probe each room once the list arrives. Fire-and-forget: the checklist is
+  // advisory and must never block the page from rendering.
+  useEffect(()=>{
+    let cancelled=false;
+    (async()=>{for(const room of rooms){if(cancelled)return;await checkReadiness(room.id);}})();
+    return ()=>{cancelled=true;};
+  },[rooms,checkReadiness]);
 
   const payload=useMemo(()=>({
     ...form,
@@ -311,6 +340,16 @@ export default function AdminCodArenaPage(){
     } catch(e){setError(e instanceof Error?e.message:"اطلاعات روم دریافت نشد");}
   }
   async function save(e:FormEvent){e.preventDefault();setSaving(true);setError("");setMessage("");try{const r=await fetch("/api/admin/cod/rooms",{method:form.id?"PATCH":"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||"ذخیره نشد");setMessage(form.id?"روم به‌روزرسانی شد":"روم COD ساخته شد");setShowForm(false);setForm(initialForm);setPlacements(DEFAULT_PLACEMENTS.map((row)=>({...row})));setFaq([]);await load();}catch(e){setError(e instanceof Error?e.message:"ذخیره نشد");}finally{setSaving(false);}}
+  async function announce(id:string){
+    setAnnouncing(id);setError("");setMessage("");
+    try{
+      const r=await fetch(`/api/admin/cod/rooms/${id}/announce`,{method:"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},credentials:"include"});
+      const d=await r.json();
+      if(!r.ok)throw new Error(d.error||"ارسال نشد");
+      setMessage("اعلان روم در کانال تلگرام منتشر شد.");
+    }catch(e){setError(e instanceof Error?e.message:"ارسال نشد");}
+    finally{setAnnouncing("");}
+  }
   async function remove(id:string){if(!confirm("فقط Draft خالی قابل حذف است. حذف شود؟"))return;const r=await fetch("/api/admin/cod/rooms",{method:"DELETE",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify({id})});const d=await r.json();if(!r.ok){setError(d.error||"حذف نشد");return;}load();}
   async function openOps(id:string){setError("");const r=await fetch(`/api/cod/rooms/${id}`,{cache:"no-store"});const d=await r.json();if(!r.ok){setError(d.error||"دریافت نشد");return;}setSelected(d.room);const next:Record<string,{kills:string;placement:string}>={};for(const e of d.room.entries||[])if(e.id)next[e.id]={kills:String(e.kills||0),placement:e.placement?String(e.placement):""};setResults(next);setEvidenceConfirmed(false);setLobbyOverrideConfirmed(false);setShowForm(false);}
   async function settle(){if(!selected||!confirm("نتایج نهایی و روم تسویه شود؟"))return;setSaving(true);setError("");try{const eligibleIds=new Set(selected.entries.filter(entry=>entry.id&&entry.checkedIn).map(entry=>entry.id));const body={evidenceConfirmed,lobbyOverrideConfirmed,results:Object.entries(results).filter(([entryId])=>eligibleIds.has(entryId)).map(([entryId,v])=>({entryId,kills:Number(v.kills||0),placement:v.placement?Number(v.placement):null}))};const r=await fetch(`/api/admin/cod/rooms/${selected.id}/settle`,{method:"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.error||"تسویه نشد");setMessage(`تسویه ${d.settlement.entryCount} بازیکن با موفقیت ثبت شد.`);setSelected(null);await load();}catch(e){setError(e instanceof Error?e.message:"تسویه نشد");}finally{setSaving(false);}}
@@ -470,7 +509,7 @@ export default function AdminCodArenaPage(){
       <label className="flex gap-3 items-start text-xs leading-6 mt-5"><input type="checkbox" checked={evidenceConfirmed} onChange={e=>setEvidenceConfirmed(e.target.checked)} className="mt-1"/><span>رکورد Lobby، Scoreboard و موارد مشکوک را بررسی کرده‌ام و مسئولیت تأیید نتیجه را می‌پذیرم.</span></label><div className="flex flex-wrap gap-2 mt-4"><Link href={`/cod-arena/${selected.id}`} className="rounded-xl border border-white/10 px-4 py-3 text-xs font-black">ثبت/مشاهده مدارک</Link><button onClick={settle} disabled={saving||!evidenceConfirmed||(selected.latestLobbyCheck?.status==="flagged"&&!lobbyOverrideConfirmed)||settlementPreview(selected,results).overBudget||!["in_progress","settling"].includes(selected.status)} className="rounded-xl bg-emerald-500 text-black px-5 py-3 text-xs font-black disabled:opacity-40">تسویه نهایی</button></div>
     </section>}
 
-    {view==="rooms"&&<section className="mt-7"><h2 className="text-xl font-black mb-4">روم‌ها</h2>{loading?<div className="p-10 text-center text-gray-500">در حال بارگذاری...</div>:rooms.length===0?<div className="rounded-3xl border border-white/5 p-10 text-center text-gray-500">هنوز رومی ساخته نشده است.</div>:<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{rooms.map(room=><article key={room.id} className="rounded-3xl border border-white/10 bg-white/[.025] p-5"><div className="flex justify-between gap-3"><div><div className="flex gap-2 text-[9px]"><span className="rounded-full bg-orange-500/10 text-orange-300 px-2 py-1">{room.region.toUpperCase()}</span><span className="rounded-full bg-white/5 px-2 py-1">{statusFa[room.status]}</span>{!room.isPublished&&<span className="rounded-full bg-gray-500/10 px-2 py-1">مخفی</span>}</div><h3 className="font-black text-lg mt-3">{room.title}</h3><p className="text-[10px] text-gray-500 mt-2">{localDate(room.startsAt).replace("T"," ")} • {room.teamMode.toUpperCase()} • {room.map}</p></div><div className="text-left"><div className="text-xl font-black">{room.registeredCount}/{room.capacity}</div><div className="text-[9px] text-gray-500">بازیکن</div></div></div><div className="flex flex-wrap gap-2 mt-5"><button onClick={()=>edit(room)} className="rounded-xl border border-white/10 px-3 py-2 text-xs">ویرایش</button><button onClick={()=>openOps(room.id)} className="rounded-xl bg-purple-600 px-3 py-2 text-xs font-black">عملیات/نتیجه</button><Link href={`/cod-arena/${room.id}`} className="rounded-xl border border-orange-500/20 text-orange-300 px-3 py-2 text-xs">نمای روم</Link>{room.status==="draft"&&room.registeredCount===0&&<button onClick={()=>remove(room.id)} className="rounded-xl text-red-400 px-3 py-2 text-xs">حذف</button>}</div></article>)}</div>}</section>}
+    {view==="rooms"&&<section className="mt-7"><h2 className="text-xl font-black mb-4">روم‌ها</h2>{loading?<div className="p-10 text-center text-gray-500">در حال بارگذاری...</div>:rooms.length===0?<div className="rounded-3xl border border-white/5 p-10 text-center text-gray-500">هنوز رومی ساخته نشده است.</div>:<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{rooms.map(room=><article key={room.id} className="rounded-3xl border border-white/10 bg-white/[.025] p-5"><div className="flex justify-between gap-3"><div><div className="flex gap-2 text-[9px]"><span className="rounded-full bg-orange-500/10 text-orange-300 px-2 py-1">{room.region.toUpperCase()}</span><span className="rounded-full bg-white/5 px-2 py-1">{statusFa[room.status]}</span>{!room.isPublished&&<span className="rounded-full bg-gray-500/10 px-2 py-1">مخفی</span>}</div><h3 className="font-black text-lg mt-3">{room.title}</h3><p className="text-[10px] text-gray-500 mt-2">{localDate(room.startsAt).replace("T"," ")} • {room.teamMode.toUpperCase()} • {room.map}</p></div><div className="text-left"><div className="text-xl font-black">{room.registeredCount}/{room.capacity}</div><div className="text-[9px] text-gray-500">بازیکن</div></div></div><ReadinessPanel report={readiness[room.id]}/><div className="flex flex-wrap gap-2 mt-5"><button onClick={()=>edit(room)} className="rounded-xl border border-white/10 px-3 py-2 text-xs">ویرایش</button><button onClick={()=>openOps(room.id)} className="rounded-xl bg-purple-600 px-3 py-2 text-xs font-black">عملیات/نتیجه</button><Link href={`/cod-arena/${room.id}`} className="rounded-xl border border-orange-500/20 text-orange-300 px-3 py-2 text-xs">نمای روم</Link>{room.isPublished&&<button onClick={()=>announce(room.id)} disabled={announcing===room.id} className="rounded-xl border border-cyan-500/25 text-cyan-200 px-3 py-2 text-xs font-black disabled:opacity-40">{announcing===room.id?"در حال ارسال...":"📣 اعلان در تلگرام"}</button>}{room.status==="draft"&&room.registeredCount===0&&<button onClick={()=>remove(room.id)} className="rounded-xl text-red-400 px-3 py-2 text-xs">حذف</button>}</div></article>)}</div>}</section>}
     {view==="audit"&&<AuditFeed/>}
   </main></div>;
 }
