@@ -3,22 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
+import AutoNewsButton from "@/components/admin/AutoNewsButton";
 
-const AUTO_NEWS_REASON_LABELS: Record<string, string> = {
-  no_recent_complete_sources: "در ۹۶ ساعت اخیر خبر کامل و معتبری همراه تصویر رسمی پیدا نشد.",
-  no_new_trusted_sources: "همه خبرهای معتبر فعلی قبلاً منتشر شده‌اند؛ خبر تکراری ساخته نشد.",
-  ai_provider_not_configured: "سرویس ترجمه هوش مصنوعی تنظیم نشده است.",
-  ai_provider_unavailable: "سرویس ترجمه هوش مصنوعی موقتاً پاسخ نداد.",
-  all_source_translations_rejected: "منبع پیدا شد اما ترجمه‌ها کنترل کیفیت فارسی را پاس نکردند.",
-  source_translation_rejected: "ترجمه وفادار به منبع نبود و برای جلوگیری از خبرسازی رد شد.",
-  persian_quality_rejected: "کیفیت متن فارسی کافی نبود و خبر منتشر نشد.",
-  missing_trusted_source_image: "تصویر رسمی همان منبع پیدا نشد.",
-};
-
-function autoNewsReason(value: unknown) {
-  const key = String(value || "");
-  return AUTO_NEWS_REASON_LABELS[key] || key || "منبع تازه‌ای برای انتشار وجود ندارد.";
-}
 
 interface Honor {
   id: string;
@@ -45,7 +31,6 @@ export default function AdminHonorsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<any>({});
   const [aiDraftLoading, setAiDraftLoading] = useState(false);
-  const [autoNewsLoading, setAutoNewsLoading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [feedback, setFeedback] = useState<{ ok: boolean; text: string; details?: string } | null>(null);
   const [telegramDraft, setTelegramDraft] = useState("");
@@ -149,42 +134,6 @@ export default function AdminHonorsPage() {
   };
 
 
-  const generateAutoNews = async () => {
-    setAutoNewsLoading(true);
-    setFeedback(null);
-    try {
-      const res = await fetch("/api/admin/honors/auto-news", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-        // Never force a duplicate source. Manual runs use the same strict
-        // source, image and Persian-quality policy as the scheduled workflow.
-        body: JSON.stringify({ force: false }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.details || data.error || "ساخت خبر خودکار انجام نشد");
-      const diagnostics = data.diagnostics || {};
-      const details = `کشف‌شده: ${Number(diagnostics.discovered || 0).toLocaleString("fa-IR")} · تازه: ${Number(diagnostics.recent || 0).toLocaleString("fa-IR")} · کامل و قابل‌اعتماد: ${Number(diagnostics.accepted || 0).toLocaleString("fa-IR")}`;
-      if (data.generated) {
-        const titles = Array.isArray(data.items)
-          ? data.items.filter((item: any) => item.generated).map((item: any) => item.title).filter(Boolean).join("، ")
-          : "";
-        setFeedback({
-          ok: true,
-          text: `${Number(data.generatedCount || 1).toLocaleString("fa-IR")} خبر معتبر ساخته و منتشر شد${titles ? `: ${titles}` : ""}`,
-          details,
-        });
-        await fetchHonors();
-      } else {
-        setFeedback({ ok: false, text: autoNewsReason(data.reason), details });
-      }
-    } catch (err) {
-      setFeedback({ ok: false, text: err instanceof Error ? err.message : "ساخت خبر خودکار انجام نشد" });
-    } finally {
-      setAutoNewsLoading(false);
-    }
-  };
-
   const createHonor = async () => {
     if (!newHonor.title.trim() || !newHonor.description.trim()) {
       setFeedback({ ok: false, text: "عنوان و توضیحات برای ایجاد محتوا الزامی است." });
@@ -284,13 +233,11 @@ export default function AdminHonorsPage() {
             <p className="text-sm text-gray-400 mt-1">ایجاد، ویرایش، تأیید و حذف محتوا</p>
           </div>
           <div className="flex items-center gap-3">
-            <button
-              onClick={generateAutoNews}
-              disabled={autoNewsLoading}
-              className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 px-4 py-2 rounded-xl text-xs font-black transition-all"
-            >
-              {autoNewsLoading ? "در حال بررسی منابع رسمی..." : "📰 بررسی و ساخت خبر معتبر"}
-            </button>
+            <AutoNewsButton
+              onCreated={fetchHonors}
+              showResult={false}
+              onOutcome={(outcome) => setFeedback({ ok: outcome.ok, text: outcome.text, details: outcome.details })}
+            />
             <Link href="/admin" className="text-sm text-purple-400">← بازگشت به پنل</Link>
           </div>
         </div>

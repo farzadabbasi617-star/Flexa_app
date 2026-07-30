@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import AutoNewsButton from "@/components/admin/AutoNewsButton";
 
 export default function AdminSettingsPage() {
   const { lang } = useLanguage();
@@ -186,6 +187,20 @@ export default function AdminSettingsPage() {
               </div>
             </div>
           ))}
+
+          {/* Actions, as opposed to stored settings. Kept below the fields so
+              the save button above never looks like it applies to them. */}
+          <div className="gaming-card p-6">
+            <h2 className="font-bold text-neon-blue mb-1">
+              {lang === "fa" ? "📰 خبر تالار افتخارات" : "📰 Honors News"}
+            </h2>
+            <p className="text-xs leading-6 text-gray-400 mb-4">
+              {lang === "fa"
+                ? "منابع رسمی گیمینگ را همین حالا بررسی می‌کند و اگر خبر تازه‌ای باشد که قبلاً منتشر نشده، ترجمه و بلافاصله در تالار افتخارات منتشر می‌شود. خبر تکراری ساخته نمی‌شود."
+                : "Sweeps trusted gaming sources now and publishes any genuinely new story straight to Honors. Duplicates are never created."}
+            </p>
+            <AutoNewsButton />
+          </div>
         </div>
       </div>
     </div>
