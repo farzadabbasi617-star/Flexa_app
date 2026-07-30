@@ -10,10 +10,12 @@ export const COD_ROOM_STATUSES = [
   "completed",
   "cancelled",
 ] as const;
+export const COD_PLACEMENT_PAYOUTS = ["per_team", "per_entry"] as const;
 
 export type CodRegion = (typeof COD_REGIONS)[number];
 export type CodBrTeamMode = (typeof COD_BR_TEAM_MODES)[number];
 export type CodRoomStatus = (typeof COD_ROOM_STATUSES)[number];
+export type CodPlacementPayout = (typeof COD_PLACEMENT_PAYOUTS)[number];
 
 export interface CodPlacementRewardRule {
   from: number;
@@ -21,20 +23,41 @@ export interface CodPlacementRewardRule {
   amountRial: string;
 }
 
+/**
+ * Diminishing per-kill payout, e.g. 1st kill 100k toman, 2nd 50k, 3rd 25k...
+ * The infinite sum converges to `firstKillRial * divisor / (divisor - 1)`, which
+ * is what makes this model safe to offer with a high headline number.
+ */
+export interface CodKillLadderConfig {
+  firstKillRial: string;
+  divisor: number;
+  minKillRial: string;
+}
+
 export interface CodRewardConfig {
   perKillRial: string;
   participationRial: string;
   maxKillsPerEntry: number;
+  /** Room-wide ceiling on scoring kills. 0 derives it from capacity * maxKillsPerEntry. */
+  maxTotalKills: number;
   placementRules: CodPlacementRewardRule[];
-  placementPayout: "per_entry";
+  /**
+   * `per_team` treats a placement amount as the prize for the whole squad and splits
+   * it between the players that actually finished in that placement. `per_entry`
+   * pays the full amount to every single player.
+   */
+  placementPayout: CodPlacementPayout;
+  killLadder: CodKillLadderConfig | null;
 }
 
 export const DEFAULT_COD_REWARD_CONFIG: CodRewardConfig = {
   perKillRial: "0",
   participationRial: "0",
   maxKillsPerEntry: 40,
+  maxTotalKills: 0,
   placementRules: [],
-  placementPayout: "per_entry",
+  placementPayout: "per_team",
+  killLadder: null,
 };
 
 function nonNegativeMoney(value: unknown, field: string) {
@@ -49,6 +72,18 @@ function boundedInteger(value: unknown, min: number, max: number, field: string)
     throw new Error(`${field} باید بین ${min} و ${max} باشد`);
   }
   return parsed;
+}
+
+function normalizeKillLadder(input: unknown): CodKillLadderConfig | null {
+  if (!input || typeof input !== "object") return null;
+  const raw = input as Record<string, unknown>;
+  const firstKillRial = nonNegativeMoney(raw.firstKillRial, "جایزه اولین Kill");
+  if (BigInt(firstKillRial) === BigInt(0)) return null;
+  return {
+    firstKillRial,
+    divisor: boundedInteger(raw.divisor ?? 2, 2, 10, "ضریب کاهش نردبان Kill"),
+    minKillRial: nonNegativeMoney(raw.minKillRial, "کف جایزه هر Kill"),
+  };
 }
 
 export function normalizeCodRewardConfig(input: unknown): CodRewardConfig {
@@ -71,32 +106,68 @@ export function normalizeCodRewardConfig(input: unknown): CodRewardConfig {
     }
   }
 
+  const placementPayoutRaw = String(raw.placementPayout ?? "per_team");
+  if (!(COD_PLACEMENT_PAYOUTS as readonly string[]).includes(placementPayoutRaw)) {
+    throw new Error("نوع پرداخت جایزه جایگاه معتبر نیست");
+  }
+
   return {
     perKillRial: nonNegativeMoney(raw.perKillRial, "جایزه هر Kill"),
     participationRial: nonNegativeMoney(raw.participationRial, "جایزه حضور"),
     maxKillsPerEntry: boundedInteger(raw.maxKillsPerEntry ?? 40, 1, 100, "سقف Kill"),
+    maxTotalKills: boundedInteger(raw.maxTotalKills ?? 0, 0, 10_000, "سقف Kill کل روم"),
     placementRules,
-    placementPayout: "per_entry",
+    placementPayout: placementPayoutRaw as CodPlacementPayout,
+    killLadder: normalizeKillLadder(raw.killLadder),
   };
 }
 
-export function calculateCodEntryReward(configInput: unknown, killsInput: number, placementInput?: number | null) {
+/** Total payout for `kills` kills under a halving ladder. */
+export function codKillLadderTotalRial(ladder: CodKillLadderConfig, kills: number) {
+  const first = BigInt(ladder.firstKillRial);
+  const floorRial = BigInt(ladder.minKillRial);
+  const divisor = BigInt(ladder.divisor);
+  let current = first;
+  let total = BigInt(0);
+  for (let index = 0; index < kills; index += 1) {
+    const payout = current > floorRial ? current : floorRial;
+    total += payout;
+    current = current / divisor;
+  }
+  return total;
+}
+
+function killRewardRial(config: CodRewardConfig, kills: number) {
+  if (config.killLadder) return codKillLadderTotalRial(config.killLadder, kills);
+  return BigInt(config.perKillRial) * BigInt(kills);
+}
+
+export function calculateCodEntryReward(
+  configInput: unknown,
+  killsInput: number,
+  placementInput?: number | null,
+  options: { placementSharers?: number } = {},
+) {
   const config = normalizeCodRewardConfig(configInput);
   const kills = boundedInteger(killsInput, 0, config.maxKillsPerEntry, "تعداد Kill");
   const placement = placementInput == null ? null : boundedInteger(placementInput, 1, 100, "جایگاه");
-  const killRewardRial = BigInt(config.perKillRial) * BigInt(kills);
+  const killRewardTotal = killRewardRial(config, kills);
   const placementRule = placement == null
     ? undefined
     : config.placementRules.find((rule) => placement >= rule.from && placement <= rule.to);
-  const placementRewardRial = BigInt(placementRule?.amountRial || "0");
+  const nominalPlacementRial = BigInt(placementRule?.amountRial || "0");
+  const sharers = config.placementPayout === "per_team"
+    ? BigInt(Math.max(1, Math.floor(Number(options.placementSharers) || 1)))
+    : BigInt(1);
+  const placementRewardRial = nominalPlacementRial / sharers;
   const participationRewardRial = BigInt(config.participationRial);
   return {
     kills,
     placement,
-    killRewardRial,
+    killRewardRial: killRewardTotal,
     placementRewardRial,
     participationRewardRial,
-    totalRewardRial: killRewardRial + placementRewardRial + participationRewardRial,
+    totalRewardRial: killRewardTotal + placementRewardRial + participationRewardRial,
   };
 }
 
@@ -104,6 +175,23 @@ function teamSize(mode: CodBrTeamMode) {
   if (mode === "duo") return 2;
   if (mode === "squad") return 4;
   return 1;
+}
+
+/**
+ * Worst-case kill spend for the room. A diminishing ladder pays the most when kills are
+ * spread one-per-player (every kill is somebody's expensive first kill), so the ceiling is
+ * the flattest legal distribution of the room-wide kill budget.
+ */
+export function estimateCodKillLiability(config: CodRewardConfig, capacity: number) {
+  const perEntryCeiling = capacity * config.maxKillsPerEntry;
+  const totalKills = config.maxTotalKills > 0
+    ? Math.min(config.maxTotalKills, perEntryCeiling)
+    : perEntryCeiling;
+  if (!config.killLadder) return BigInt(config.perKillRial) * BigInt(totalKills);
+  const base = Math.floor(totalKills / capacity);
+  const remainder = totalKills % capacity;
+  return codKillLadderTotalRial(config.killLadder, base + 1) * BigInt(remainder)
+    + codKillLadderTotalRial(config.killLadder, base) * BigInt(capacity - remainder);
 }
 
 /** Conservative maximum liability used before an operator publishes a room. */
@@ -114,7 +202,7 @@ export function estimateCodRoomMaximumLiability(
 ) {
   const config = normalizeCodRewardConfig(configInput);
   const capacity = boundedInteger(capacityInput, 2, 100, "ظرفیت روم");
-  const killLiability = BigInt(config.perKillRial) * BigInt(config.maxKillsPerEntry) * BigInt(capacity);
+  const killLiability = estimateCodKillLiability(config, capacity);
   const participationLiability = BigInt(config.participationRial) * BigInt(capacity);
   const membersPerPlacement = teamSize(mode);
   let placementLiability = BigInt(0);
@@ -123,7 +211,13 @@ export function estimateCodRoomMaximumLiability(
     const available = Math.max(0, capacity - rewardedEntries);
     const positions = rule.to - rule.from + 1;
     const entries = Math.min(available, positions * membersPerPlacement);
-    placementLiability += BigInt(rule.amountRial) * BigInt(entries);
+    if (config.placementPayout === "per_team") {
+      // The amount is the squad prize, so each rewarded squad costs it exactly once.
+      const squads = Math.ceil(entries / membersPerPlacement);
+      placementLiability += BigInt(rule.amountRial) * BigInt(squads);
+    } else {
+      placementLiability += BigInt(rule.amountRial) * BigInt(entries);
+    }
     rewardedEntries += entries;
   }
   return killLiability + participationLiability + placementLiability;

@@ -32,6 +32,8 @@ interface CodRoomListItem {
   prizeBudgetRial: string;
   rewardConfig: {
     perKillRial?: string;
+    killLadder?: { firstKillRial: string; divisor: number; minKillRial: string } | null;
+    placementPayout?: "per_team" | "per_entry";
     placementRules?: Array<{ from: number; to: number; amountRial: string }>;
   };
   minRankPoints: number;
@@ -168,7 +170,8 @@ export default function CodArenaPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
               {rooms.map((room) => {
                 const full = room.registeredCount >= room.capacity;
-                const perKill = BigInt(room.rewardConfig?.perKillRial || "0");
+                const ladder = room.rewardConfig?.killLadder;
+                const perKill = BigInt(ladder?.firstKillRial || room.rewardConfig?.perKillRial || "0");
                 return (
                   <article key={room.id} className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-gradient-to-br from-[#18130f] via-[#0d0d0d] to-black p-5 sm:p-6 hover:border-orange-400/30 transition">
                     <div className="absolute -top-20 -left-20 w-52 h-52 rounded-full bg-orange-500/10 blur-3xl group-hover:bg-orange-500/15 transition" />
@@ -184,7 +187,7 @@ export default function CodArenaPage() {
                       <p className="text-xs text-gray-500 mt-2 line-clamp-2 leading-6">{room.description || `${room.map} • کاستوم‌روم امن Gament`}</p>
                       <div className="grid grid-cols-3 gap-2 mt-5 text-center">
                         <div className="rounded-2xl bg-black/35 border border-white/5 p-3"><div className="text-[9px] text-gray-500">ورودی</div><div className="text-xs font-black mt-1">{BigInt(room.entryFeeRial) === BigInt(0) ? "رایگان" : `${toman(room.entryFeeRial)} ت`}</div></div>
-                        <div className="rounded-2xl bg-black/35 border border-white/5 p-3"><div className="text-[9px] text-gray-500">هر Kill</div><div className="text-xs font-black mt-1 text-orange-300">{perKill === BigInt(0) ? "—" : `${toman(perKill.toString())} ت`}</div></div>
+                        <div className="rounded-2xl bg-black/35 border border-white/5 p-3"><div className="text-[9px] text-gray-500">{ladder ? "اولین Kill" : "هر Kill"}</div><div className="text-xs font-black mt-1 text-orange-300">{perKill === BigInt(0) ? "—" : `${toman(perKill.toString())} ت`}</div></div>
                         <div className="rounded-2xl bg-black/35 border border-white/5 p-3"><div className="text-[9px] text-gray-500">ظرفیت</div><div className="text-xs font-black mt-1">{room.registeredCount.toLocaleString("fa-IR")}/{room.capacity.toLocaleString("fa-IR")}</div></div>
                       </div>
                       <div className="mt-5 h-1.5 rounded-full bg-white/5 overflow-hidden"><div className="h-full bg-gradient-to-l from-yellow-400 to-orange-600" style={{ width: `${Math.min(100, (room.registeredCount / room.capacity) * 100)}%` }} /></div>

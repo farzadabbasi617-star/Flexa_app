@@ -806,9 +806,21 @@ export async function settleCodRoom(input: {
       const placements = input.results.map((row) => row.placement).filter((value): value is number => value != null);
       if (new Set(placements).size !== placements.length) throw new Error("COD_SETTLEMENT_DUPLICATE_PLACEMENT");
     }
+    // A placement prize is a squad prize by default, so count how many settled players
+    // share each placement before splitting it between them.
+    const sharersByPlacement = new Map<number, number>();
+    for (const entry of entries) {
+      const placement = byEntry.get(entry.id)?.placement;
+      if (placement == null) continue;
+      sharersByPlacement.set(placement, (sharersByPlacement.get(placement) || 0) + 1);
+    }
     const calculated = entries.map((entry) => {
       const result = byEntry.get(entry.id) || { entryId: entry.id, kills: 0, placement: null };
-      return { entry, reward: calculateCodEntryReward(room.rewardConfig, result.kills, result.placement) };
+      const placementSharers = result.placement == null ? 1 : sharersByPlacement.get(result.placement) || 1;
+      return {
+        entry,
+        reward: calculateCodEntryReward(room.rewardConfig, result.kills, result.placement, { placementSharers }),
+      };
     });
     const totalReward = calculated.reduce((sum, row) => sum + row.reward.totalRewardRial, BigInt(0));
     if (totalReward > bigIntFromText(room.prizeBudgetRial)) throw new Error("COD_SETTLEMENT_OVER_BUDGET");

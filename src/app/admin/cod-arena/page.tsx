@@ -7,11 +7,12 @@ import Navbar from "@/components/Navbar";
 import { useAuth } from "@/contexts/AuthContext";
 import { parseTomanToRial } from "@/lib/money";
 import { normalizeDigits } from "@/lib/phone";
+import { calculateCodEntryReward } from "@/lib/cod-room-policy";
 
 interface RoomRow {
   id: string; title: string; description: string | null; region: "global"|"garena"; map: string; teamMode: "solo"|"duo"|"squad"; perspective: string;
   status: string; isPublished: boolean; capacity: number; registeredCount: number; entryFeeRial: string; serviceFeeRial: string; prizeBudgetRial: string;
-  rewardConfig: { perKillRial?: string; participationRial?: string; maxKillsPerEntry?: number; placementRules?: Array<{ from:number;to:number;amountRial:string }> };
+  rewardConfig: { perKillRial?: string; participationRial?: string; maxKillsPerEntry?: number; maxTotalKills?: number; placementPayout?: "per_team"|"per_entry"; killLadder?: { firstKillRial:string; divisor:number; minKillRial:string }|null; placementRules?: Array<{ from:number;to:number;amountRial:string }> };
   referralRateBps?: number; minRankPoints: number; requiresRecording: boolean; startsAt: string; endsAt: string|null; checkInOpensAt: string|null; checkInClosesAt: string|null; credentialsRevealAt: string|null;
 }
 interface DetailEntry { id?: string; displayName: string; codUsername: string; status: string; checkedIn: boolean; kills?: number|null; placement?: number|null; resultStatus?: string; }
@@ -86,18 +87,27 @@ function buildSettlementCsv(room: DetailRoom, preview: ReturnType<typeof settlem
   }
   return lines.join("\r\n");
 }
-function entryRewardBreakdown(room: DetailRoom, row?: {kills:string;placement:string}){
-  const config=room.rewardConfig||{};
-  const maxKills=Number(config.maxKillsPerEntry||100);
+/**
+ * Reuses the same reward engine the settlement endpoint runs, so what an operator
+ * previews here is exactly what the backend will pay out.
+ */
+function entryRewardBreakdown(room: DetailRoom, row: {kills:string;placement:string}|undefined, placementSharers: number){
+  const maxKills=Number(room.rewardConfig?.maxKillsPerEntry||100);
   const kills=Math.max(0,Math.min(maxKills,Number(row?.kills||0)));
   const placement=row?.placement?Number(row.placement):null;
-  const perKill=safeRial(config.perKillRial);
-  const participation=safeRial(config.participationRial);
-  const placementRule=placement==null?undefined:(config.placementRules||[]).find((rule)=>placement>=rule.from&&placement<=rule.to);
-  const killReward=perKill*BigInt(kills);
-  const placementReward=safeRial(placementRule?.amountRial);
-  const total=killReward+placementReward+participation;
-  return {kills,placement,perKill,killReward,placementReward,participation,total};
+  try {
+    const reward=calculateCodEntryReward(room.rewardConfig||{},kills,placement,{placementSharers});
+    return {
+      kills:reward.kills,
+      placement:reward.placement,
+      killReward:reward.killRewardRial,
+      placementReward:reward.placementRewardRial,
+      participation:reward.participationRewardRial,
+      total:reward.totalRewardRial,
+    };
+  } catch {
+    return {kills,placement,killReward:BigInt(0),placementReward:BigInt(0),participation:BigInt(0),total:BigInt(0)};
+  }
 }
 function settlementPreview(room: DetailRoom, results: Record<string,{kills:string;placement:string}>){
   const activeEntries=room.entries.filter((entry)=>entry.status!=="cancelled"&&entry.status!=="refunded");
@@ -107,7 +117,19 @@ function settlementPreview(room: DetailRoom, results: Record<string,{kills:strin
   const prizeBudget=safeRial(room.prizeBudgetRial);
   const grossEntry=entryFee*BigInt(activeEntries.length);
   const grossService=serviceFee*BigInt(activeEntries.length);
-  const rewards=checkedIn.map((entry)=>({entry,breakdown:entryRewardBreakdown(room,entry.id?results[entry.id]:undefined)}));
+  // A placement prize is a squad prize, so mirror the backend and count how many
+  // checked-in players share each placement before splitting it.
+  const sharersByPlacement=new Map<number,number>();
+  for(const entry of checkedIn){
+    const placement=entry.id?Number(results[entry.id]?.placement||0):0;
+    if(!placement)continue;
+    sharersByPlacement.set(placement,(sharersByPlacement.get(placement)||0)+1);
+  }
+  const rewards=checkedIn.map((entry)=>{
+    const row=entry.id?results[entry.id]:undefined;
+    const placement=Number(row?.placement||0);
+    return {entry,breakdown:entryRewardBreakdown(room,row,placement?sharersByPlacement.get(placement)||1:1)};
+  });
   const totalReward=rewards.reduce((sum,row)=>sum+row.breakdown.total,BigInt(0));
   const remaining=prizeBudget-totalReward;
   const netAfterPrize=grossEntry-totalReward;
@@ -170,18 +192,34 @@ function AuditFeed(){
   );
 }
 
+interface PlacementRow { from:string; to:string; amountToman:string }
+
 const initialForm = {
   id:"",title:"",description:"",region:"global" as "global"|"garena",map:"isolated",teamMode:"solo" as "solo"|"duo"|"squad",perspective:"tpp",status:"draft",isPublished:false,
   capacity:40,entryFeeToman:"0",serviceFeeToman:"0",prizeBudgetToman:"0",referralPercent:"20",perKillToman:"0",participationToman:"0",maxKillsPerEntry:40,
-  firstToman:"0",secondToman:"0",thirdToman:"0",minRankPoints:0,requiresRecording:true,rulesVersion:"cod-beta-1",rules:"",
+  maxTotalKills:"0",placementPayout:"per_team" as "per_team"|"per_entry",
+  killLadderEnabled:false,ladderFirstKillToman:"0",ladderDivisor:2,ladderMinKillToman:"0",
+  minRankPoints:0,requiresRecording:true,rulesVersion:"cod-beta-1",rules:"",
   roomCode:"",roomPassword:"",officialJoinUrl:"",checkInOpensAt:"",checkInClosesAt:"",credentialsRevealAt:"",startsAt:"",endsAt:"",
 };
+
+const DEFAULT_PLACEMENTS: PlacementRow[] = [
+  { from:"1", to:"1", amountToman:"0" },
+  { from:"2", to:"2", amountToman:"0" },
+  { from:"3", to:"3", amountToman:"0" },
+];
+
+function placementRowsFromConfig(rules?: Array<{from:number;to:number;amountRial:string}>): PlacementRow[] {
+  if(!rules?.length) return DEFAULT_PLACEMENTS.map((row)=>({...row}));
+  return rules.map((rule)=>({ from:String(rule.from), to:String(rule.to), amountToman:rialToToman(rule.amountRial) }));
+}
 
 export default function AdminCodArenaPage(){
   const {user,loading:authLoading}=useAuth(); const router=useRouter();
   const [rooms,setRooms]=useState<RoomRow[]>([]); const [loading,setLoading]=useState(true); const [form,setForm]=useState(initialForm); const [showForm,setShowForm]=useState(false);
   const [saving,setSaving]=useState(false); const [error,setError]=useState(""); const [message,setMessage]=useState(""); const [selected,setSelected]=useState<DetailRoom|null>(null); const [view,setView]=useState<"rooms"|"audit">("rooms");
   const [results,setResults]=useState<Record<string,{kills:string;placement:string}>>({}); const [evidenceConfirmed,setEvidenceConfirmed]=useState(false); const [lobbyOverrideConfirmed,setLobbyOverrideConfirmed]=useState(false); const [lobbyStartOverrideConfirmed,setLobbyStartOverrideConfirmed]=useState(false); const [staff,setStaff]=useState({identifier:"",role:"roomer"});
+  const [placements,setPlacements]=useState<PlacementRow[]>(()=>DEFAULT_PLACEMENTS.map((row)=>({...row})));
   const isAdmin=user?.role==="admin"||user?.role==="super_admin";
 
   useEffect(()=>{if(!authLoading&&(!user||!isAdmin))router.push("/");},[authLoading,user,isAdmin,router]);
@@ -192,13 +230,25 @@ export default function AdminCodArenaPage(){
     ...form,
     lobbyOverrideConfirmed:lobbyStartOverrideConfirmed,
     entryFeeRial:tomanToRial(form.entryFeeToman),serviceFeeRial:tomanToRial(form.serviceFeeToman),prizeBudgetRial:tomanToRial(form.prizeBudgetToman),referralRateBps:Math.round(Number(normalizeDigits(String(form.referralPercent||0)).replace("٫","."))*100),
-    rewardConfig:{perKillRial:tomanToRial(form.perKillToman),participationRial:tomanToRial(form.participationToman),maxKillsPerEntry:Number(form.maxKillsPerEntry),placementRules:[
-      ...(Number(form.firstToman)>0?[{from:1,to:1,amountRial:tomanToRial(form.firstToman)}]:[]),...(Number(form.secondToman)>0?[{from:2,to:2,amountRial:tomanToRial(form.secondToman)}]:[]),...(Number(form.thirdToman)>0?[{from:3,to:3,amountRial:tomanToRial(form.thirdToman)}]:[]),
-    ]},
+    rewardConfig:{
+      perKillRial:form.killLadderEnabled?"0":tomanToRial(form.perKillToman),
+      participationRial:tomanToRial(form.participationToman),
+      maxKillsPerEntry:Number(form.maxKillsPerEntry),
+      maxTotalKills:Number(normalizeDigits(String(form.maxTotalKills||0)))||0,
+      placementPayout:form.placementPayout,
+      killLadder:form.killLadderEnabled&&Number(normalizeDigits(form.ladderFirstKillToman||"0"))>0?{
+        firstKillRial:tomanToRial(form.ladderFirstKillToman),
+        divisor:Number(form.ladderDivisor)||2,
+        minKillRial:tomanToRial(form.ladderMinKillToman),
+      }:null,
+      placementRules:placements
+        .filter((row)=>Number(normalizeDigits(row.amountToman||"0"))>0&&Number(row.from)>0)
+        .map((row)=>({from:Number(row.from),to:Number(row.to||row.from),amountRial:tomanToRial(row.amountToman)})),
+    },
     startsAt:iso(form.startsAt),endsAt:iso(form.endsAt),checkInOpensAt:iso(form.checkInOpensAt),checkInClosesAt:iso(form.checkInClosesAt),credentialsRevealAt:iso(form.credentialsRevealAt),
-  }),[form,lobbyStartOverrideConfirmed]);
+  }),[form,lobbyStartOverrideConfirmed,placements]);
 
-  function begin(){setForm({...initialForm,startsAt:localDate(new Date(Date.now()+24*60*60_000).toISOString())});setLobbyStartOverrideConfirmed(false);setShowForm(true);setSelected(null);setError("");}
+  function begin(){setForm({...initialForm,startsAt:localDate(new Date(Date.now()+24*60*60_000).toISOString())});setPlacements(DEFAULT_PLACEMENTS.map((row)=>({...row})));setLobbyStartOverrideConfirmed(false);setShowForm(true);setSelected(null);setError("");}
   async function edit(room:RoomRow){
     setError("");
     try {
@@ -206,11 +256,12 @@ export default function AdminCodArenaPage(){
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||"اطلاعات روم دریافت نشد");
       const full=data.room as DetailRoom;
-      setForm({...initialForm,id:full.id,title:full.title,description:full.description||"",region:full.region,map:full.map,teamMode:full.teamMode,perspective:full.perspective,status:full.status,isPublished:full.isPublished,capacity:full.capacity,entryFeeToman:rialToToman(full.entryFeeRial),serviceFeeToman:rialToToman(full.serviceFeeRial),prizeBudgetToman:rialToToman(full.prizeBudgetRial),referralPercent:String(Number(full.referralRateBps||0)/100),perKillToman:rialToToman(full.rewardConfig?.perKillRial),participationToman:rialToToman(full.rewardConfig?.participationRial),maxKillsPerEntry:Number(full.rewardConfig?.maxKillsPerEntry||40),firstToman:rialToToman(full.rewardConfig?.placementRules?.find(x=>x.from===1)?.amountRial),secondToman:rialToToman(full.rewardConfig?.placementRules?.find(x=>x.from===2)?.amountRial),thirdToman:rialToToman(full.rewardConfig?.placementRules?.find(x=>x.from===3)?.amountRial),minRankPoints:full.minRankPoints,requiresRecording:full.requiresRecording,rulesVersion:full.rulesVersion||"cod-beta-1",rules:full.rules||"",roomCode:full.roomCode||"",roomPassword:full.roomPassword||"",officialJoinUrl:full.officialJoinUrl||"",startsAt:localDate(full.startsAt),endsAt:localDate(full.endsAt),checkInOpensAt:localDate(full.checkInOpensAt),checkInClosesAt:localDate(full.checkInClosesAt),credentialsRevealAt:localDate(full.credentialsRevealAt)});
+      setForm({...initialForm,id:full.id,title:full.title,description:full.description||"",region:full.region,map:full.map,teamMode:full.teamMode,perspective:full.perspective,status:full.status,isPublished:full.isPublished,capacity:full.capacity,entryFeeToman:rialToToman(full.entryFeeRial),serviceFeeToman:rialToToman(full.serviceFeeRial),prizeBudgetToman:rialToToman(full.prizeBudgetRial),referralPercent:String(Number(full.referralRateBps||0)/100),perKillToman:rialToToman(full.rewardConfig?.perKillRial),participationToman:rialToToman(full.rewardConfig?.participationRial),maxKillsPerEntry:Number(full.rewardConfig?.maxKillsPerEntry||40),maxTotalKills:String(full.rewardConfig?.maxTotalKills||0),placementPayout:(full.rewardConfig?.placementPayout==="per_entry"?"per_entry":"per_team"),killLadderEnabled:Boolean(full.rewardConfig?.killLadder),ladderFirstKillToman:rialToToman(full.rewardConfig?.killLadder?.firstKillRial),ladderDivisor:Number(full.rewardConfig?.killLadder?.divisor||2),ladderMinKillToman:rialToToman(full.rewardConfig?.killLadder?.minKillRial),minRankPoints:full.minRankPoints,requiresRecording:full.requiresRecording,rulesVersion:full.rulesVersion||"cod-beta-1",rules:full.rules||"",roomCode:full.roomCode||"",roomPassword:full.roomPassword||"",officialJoinUrl:full.officialJoinUrl||"",startsAt:localDate(full.startsAt),endsAt:localDate(full.endsAt),checkInOpensAt:localDate(full.checkInOpensAt),checkInClosesAt:localDate(full.checkInClosesAt),credentialsRevealAt:localDate(full.credentialsRevealAt)});
+      setPlacements(placementRowsFromConfig(full.rewardConfig?.placementRules));
       setLobbyStartOverrideConfirmed(false);setShowForm(true);setSelected(null);scrollTo({top:0,behavior:"smooth"});
     } catch(e){setError(e instanceof Error?e.message:"اطلاعات روم دریافت نشد");}
   }
-  async function save(e:FormEvent){e.preventDefault();setSaving(true);setError("");setMessage("");try{const r=await fetch("/api/admin/cod/rooms",{method:form.id?"PATCH":"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||"ذخیره نشد");setMessage(form.id?"روم به‌روزرسانی شد":"روم COD ساخته شد");setShowForm(false);setForm(initialForm);await load();}catch(e){setError(e instanceof Error?e.message:"ذخیره نشد");}finally{setSaving(false);}}
+  async function save(e:FormEvent){e.preventDefault();setSaving(true);setError("");setMessage("");try{const r=await fetch("/api/admin/cod/rooms",{method:form.id?"PATCH":"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify(payload)});const d=await r.json();if(!r.ok)throw new Error(d.error||"ذخیره نشد");setMessage(form.id?"روم به‌روزرسانی شد":"روم COD ساخته شد");setShowForm(false);setForm(initialForm);setPlacements(DEFAULT_PLACEMENTS.map((row)=>({...row})));await load();}catch(e){setError(e instanceof Error?e.message:"ذخیره نشد");}finally{setSaving(false);}}
   async function remove(id:string){if(!confirm("فقط Draft خالی قابل حذف است. حذف شود؟"))return;const r=await fetch("/api/admin/cod/rooms",{method:"DELETE",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify({id})});const d=await r.json();if(!r.ok){setError(d.error||"حذف نشد");return;}load();}
   async function openOps(id:string){setError("");const r=await fetch(`/api/cod/rooms/${id}`,{cache:"no-store"});const d=await r.json();if(!r.ok){setError(d.error||"دریافت نشد");return;}setSelected(d.room);const next:Record<string,{kills:string;placement:string}>={};for(const e of d.room.entries||[])if(e.id)next[e.id]={kills:String(e.kills||0),placement:e.placement?String(e.placement):""};setResults(next);setEvidenceConfirmed(false);setLobbyOverrideConfirmed(false);setShowForm(false);}
   async function settle(){if(!selected||!confirm("نتایج نهایی و روم تسویه شود؟"))return;setSaving(true);setError("");try{const eligibleIds=new Set(selected.entries.filter(entry=>entry.id&&entry.checkedIn).map(entry=>entry.id));const body={evidenceConfirmed,lobbyOverrideConfirmed,results:Object.entries(results).filter(([entryId])=>eligibleIds.has(entryId)).map(([entryId,v])=>({entryId,kills:Number(v.kills||0),placement:v.placement?Number(v.placement):null}))};const r=await fetch(`/api/admin/cod/rooms/${selected.id}/settle`,{method:"POST",headers:{"Content-Type":"application/json","X-Requested-With":"XMLHttpRequest"},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.error||"تسویه نشد");setMessage(`تسویه ${d.settlement.entryCount} بازیکن با موفقیت ثبت شد.`);setSelected(null);await load();}catch(e){setError(e instanceof Error?e.message:"تسویه نشد");}finally{setSaving(false);}}
@@ -230,7 +281,37 @@ export default function AdminCodArenaPage(){
       <div className="flex justify-between"><h2 className="text-xl font-black">{form.id?"ویرایش روم":"ساخت روم COD"}</h2><button type="button" onClick={()=>setShowForm(false)} className="text-gray-500">✕</button></div>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3"><label className="lg:col-span-2 text-xs text-gray-400">عنوان<input required value={form.title} onChange={e=>setForm({...form,title:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">ریجن<select value={form.region} onChange={e=>setForm({...form,region:e.target.value as "global"|"garena"})} className={`${input} mt-1`}><option value="global">Global</option><option value="garena">Garena</option></select></label><label className="text-xs text-gray-400">حالت<select value={form.teamMode} onChange={e=>setForm({...form,teamMode:e.target.value as "solo"|"duo"|"squad"})} className={`${input} mt-1`}><option value="solo">Solo</option><option value="duo">Duo</option><option value="squad">Squad</option></select></label><label className="text-xs text-gray-400">Map<input value={form.map} onChange={e=>setForm({...form,map:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">Perspective<select value={form.perspective} onChange={e=>setForm({...form,perspective:e.target.value})} className={`${input} mt-1`}><option value="tpp">TPP</option><option value="fpp">FPP</option></select></label><label className="text-xs text-gray-400">ظرفیت<input type="number" min={2} max={100} value={form.capacity} onChange={e=>setForm({...form,capacity:Number(e.target.value)})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">حداقل RP<input type="number" min={0} value={form.minRankPoints} onChange={e=>setForm({...form,minRankPoints:Number(e.target.value)})} className={`${input} mt-1`}/></label></div>
       <label className="block text-xs text-gray-400">توضیحات<textarea value={form.description} onChange={e=>setForm({...form,description:e.target.value})} rows={3} className={`${input} mt-1`}/></label>
-      <div><h3 className="font-black text-orange-300 mb-3">اقتصاد روم — تومان</h3><div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{[["ورودی","entryFeeToman"],["کارمزد Gament","serviceFeeToman"],["بودجه جایزه","prizeBudgetToman"],["رفرال از کارمزد %","referralPercent"],["هر Kill","perKillToman"],["جایزه حضور","participationToman"],["نفر اول","firstToman"],["نفر دوم","secondToman"],["نفر سوم","thirdToman"]].map(([label,key])=><label key={key} className="text-xs text-gray-400">{label}<input inputMode="numeric" value={String(form[key as keyof typeof form])} onChange={e=>setForm({...form,[key]:e.target.value})} className={`${input} mt-1`}/></label>)}<label className="text-xs text-gray-400">سقف Kill<input type="number" min={1} max={100} value={form.maxKillsPerEntry} onChange={e=>setForm({...form,maxKillsPerEntry:Number(e.target.value)})} className={`${input} mt-1`}/></label></div></div>
+      <div><h3 className="font-black text-orange-300 mb-3">اقتصاد روم — تومان</h3><div className="grid grid-cols-2 sm:grid-cols-4 gap-3">{[["ورودی","entryFeeToman"],["کارمزد Gament","serviceFeeToman"],["بودجه جایزه","prizeBudgetToman"],["رفرال از کارمزد %","referralPercent"],["جایزه حضور","participationToman"]].map(([label,key])=><label key={key} className="text-xs text-gray-400">{label}<input inputMode="numeric" value={String(form[key as keyof typeof form])} onChange={e=>setForm({...form,[key]:e.target.value})} className={`${input} mt-1`}/></label>)}</div></div>
+
+      <div><h3 className="font-black text-orange-300 mb-3">جایزه Kill</h3>
+        <label className="flex items-center gap-2 text-xs mb-3"><input type="checkbox" checked={form.killLadderEnabled} onChange={e=>setForm({...form,killLadderEnabled:e.target.checked})}/> نردبان کاهشی (کیل اول گران، هر کیل بعدی تقسیم بر ضریب)</label>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {!form.killLadderEnabled&&<label className="text-xs text-gray-400">هر Kill<input inputMode="numeric" value={form.perKillToman} onChange={e=>setForm({...form,perKillToman:e.target.value})} className={`${input} mt-1`}/></label>}
+          {form.killLadderEnabled&&<><label className="text-xs text-gray-400">اولین Kill<input inputMode="numeric" value={form.ladderFirstKillToman} onChange={e=>setForm({...form,ladderFirstKillToman:e.target.value})} className={`${input} mt-1`}/></label>
+          <label className="text-xs text-gray-400">ضریب کاهش<input type="number" min={2} max={10} value={form.ladderDivisor} onChange={e=>setForm({...form,ladderDivisor:Number(e.target.value)})} className={`${input} mt-1`}/></label>
+          <label className="text-xs text-gray-400">کف هر Kill<input inputMode="numeric" value={form.ladderMinKillToman} onChange={e=>setForm({...form,ladderMinKillToman:e.target.value})} className={`${input} mt-1`}/></label></>}
+          <label className="text-xs text-gray-400">سقف Kill هر بازیکن<input type="number" min={1} max={100} value={form.maxKillsPerEntry} onChange={e=>setForm({...form,maxKillsPerEntry:Number(e.target.value)})} className={`${input} mt-1`}/></label>
+          <label className="text-xs text-gray-400">سقف Kill کل روم<input inputMode="numeric" value={form.maxTotalKills} onChange={e=>setForm({...form,maxTotalKills:e.target.value})} className={`${input} mt-1`} placeholder="۰ = بدون سقف"/></label>
+        </div>
+        <p className="mt-2 text-[10px] leading-5 text-gray-500">سقف Kill کل روم جلوی تعهد نجومی را می‌گیرد. بدون آن، بودجه لازم = جایزه هر Kill × سقف هر بازیکن × ظرفیت محاسبه می‌شود و انتشار روم کیلی عملاً غیرممکن می‌شود.</p>
+      </div>
+
+      <div><div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3"><h3 className="font-black text-orange-300">جایزه جایگاه</h3>
+        <label className="text-xs text-gray-400 flex items-center gap-2">نوع پرداخت
+          <select value={form.placementPayout} onChange={e=>setForm({...form,placementPayout:e.target.value as "per_team"|"per_entry"})} className="rounded-xl border border-white/10 bg-black/35 px-3 py-2 text-xs outline-none focus:border-orange-400">
+            <option value="per_team">جایزه تیمی (بین اعضای تیم تقسیم شود)</option>
+            <option value="per_entry">جایزه نفری (به هر بازیکن کامل پرداخت شود)</option>
+          </select>
+        </label></div>
+        <div className="space-y-2">{placements.map((row,index)=><div key={index} className="grid grid-cols-[1fr_1fr_2fr_auto] gap-2 items-end">
+          <label className="text-[10px] text-gray-500">از جایگاه<input type="number" min={1} max={100} value={row.from} onChange={e=>setPlacements(placements.map((r,i)=>i===index?{...r,from:e.target.value}:r))} className={`${input} mt-1`}/></label>
+          <label className="text-[10px] text-gray-500">تا جایگاه<input type="number" min={1} max={100} value={row.to} onChange={e=>setPlacements(placements.map((r,i)=>i===index?{...r,to:e.target.value}:r))} className={`${input} mt-1`}/></label>
+          <label className="text-[10px] text-gray-500">مبلغ (تومان)<input inputMode="numeric" value={row.amountToman} onChange={e=>setPlacements(placements.map((r,i)=>i===index?{...r,amountToman:e.target.value}:r))} className={`${input} mt-1`}/></label>
+          <button type="button" onClick={()=>setPlacements(placements.filter((_,i)=>i!==index))} className="rounded-xl border border-red-500/25 px-3 py-3 text-xs text-red-300">حذف</button>
+        </div>)}</div>
+        <button type="button" onClick={()=>setPlacements([...placements,{from:String(placements.length+1),to:String(placements.length+1),amountToman:"0"}])} className="mt-3 rounded-xl border border-white/10 px-4 py-2 text-xs font-black">+ بازه جایگاه</button>
+        <p className="mt-2 text-[10px] leading-5 text-gray-500">{form.placementPayout==="per_team"?"مبلغ هر بازه، جایزه کل آن تیم است و بین اعضایی که آن جایگاه را گرفته‌اند تقسیم می‌شود.":"هشدار: هر بازیکن مبلغ کامل را می‌گیرد؛ در روم ۴ نفره یعنی ۴ برابر هزینه."}</p>
+      </div>
       <div><h3 className="font-black text-orange-300 mb-3">زمان‌بندی</h3><div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><label className="text-xs text-gray-400">شروع روم<input required type="datetime-local" value={form.startsAt} onChange={e=>setForm({...form,startsAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">شروع Check-in<input type="datetime-local" value={form.checkInOpensAt} onChange={e=>setForm({...form,checkInOpensAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">پایان Check-in<input type="datetime-local" value={form.checkInClosesAt} onChange={e=>setForm({...form,checkInClosesAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">نمایش کد و لینک<input type="datetime-local" value={form.credentialsRevealAt} onChange={e=>setForm({...form,credentialsRevealAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">پایان تقریبی<input type="datetime-local" value={form.endsAt} onChange={e=>setForm({...form,endsAt:e.target.value})} className={`${input} mt-1`}/></label></div></div>
       <div><h3 className="font-black text-orange-300 mb-3">اطلاعات محرمانه Lobby</h3><div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><label className="text-xs text-gray-400">Room Code<input value={form.roomCode} onChange={e=>setForm({...form,roomCode:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label><label className="text-xs text-gray-400">Password<input value={form.roomPassword} onChange={e=>setForm({...form,roomPassword:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label><label className="text-xs text-gray-400">لینک رسمی COD<input value={form.officialJoinUrl} onChange={e=>setForm({...form,officialJoinUrl:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label></div></div>
       <label className="block text-xs text-gray-400">قوانین<textarea value={form.rules} onChange={e=>setForm({...form,rules:e.target.value})} rows={6} className={`${input} mt-1`}/></label>

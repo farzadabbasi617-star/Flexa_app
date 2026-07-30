@@ -48,7 +48,14 @@ describe("COD room reward policy", () => {
     const solo = estimateCodRoomMaximumLiability(config, 40, "solo");
     const squad = estimateCodRoomMaximumLiability(config, 40, "squad");
     expect(solo).toBe(BigInt(42_400_000));
-    expect(squad).toBe(BigInt(48_400_000));
+    // A placement amount is a squad prize by default, so widening the team size does not
+    // multiply the placement bill; both modes pay the same three placements.
+    expect(squad).toBe(BigInt(42_400_000));
+  });
+
+  it("multiplies placement liability per player only when asked to", () => {
+    const perEntry = { ...config, placementPayout: "per_entry" as const };
+    expect(estimateCodRoomMaximumLiability(perEntry, 40, "squad")).toBe(BigInt(48_400_000));
   });
 });
 
