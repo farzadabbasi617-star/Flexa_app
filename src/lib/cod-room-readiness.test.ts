@@ -122,3 +122,13 @@ describe("warnings that do not stop publication", () => {
     expect(issues.map((issue) => issue.key)).not.toContain("password");
   });
 });
+
+describe("a room created by a single admin", () => {
+  it("counts its creator as the roomer so publishing is not deadlocked", () => {
+    // createCodRoom assigns the creator as roomer. Before that, a solo operator
+    // was told to assign a roomer from a form only reachable after the room
+    // already existed -- an instruction they could not follow.
+    const asCreated = { ...runnable, hasRoomer: true };
+    expect(codReadinessBlockers(evaluateCodRoomReadiness(asCreated))).toEqual([]);
+  });
+});

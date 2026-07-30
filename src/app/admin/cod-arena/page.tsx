@@ -213,15 +213,34 @@ const FAQ_TEMPLATE: FaqRow[] = [
   { question:"چجوری جایزه رو دریافت کنیم؟", answer:"چند دقیقه پس از اتمام روم در صورت برنده بودن حساب کیف پولتون شارژ میشه، نگران نباشین." },
 ];
 
-function ReadinessPanel({report}:{report?:{issues:Array<{key:string;level:string;message:string}>;publishable:boolean}}){
+/** Where an operator goes to clear each blocker. */
+const FIX_HINT: Record<string,string> = {
+  credentials: "ویرایش ← اطلاعات ورود به لابی",
+  password: "ویرایش ← اطلاعات ورود به لابی",
+  roomer: "عملیات/نتیجه ← تخصیص عوامل",
+  rewards: "ویرایش ← جایزه جایگاه",
+  banner: "ویرایش ← نمایش روم",
+  faq: "ویرایش ← سوالات پرتکرار",
+  rules: "ویرایش ← قوانین",
+  reveal_after_start: "ویرایش ← زمان‌بندی",
+  start_in_past: "ویرایش ← زمان‌بندی",
+};
+
+function ReadinessPanel({report,onFix,onOps}:{report?:{issues:Array<{key:string;level:string;message:string}>;publishable:boolean};onFix:()=>void;onOps:()=>void}){
   if(!report||report.issues.length===0)return null;
   const blockers=report.issues.filter((i)=>i.level==="blocker");
   const warnings=report.issues.filter((i)=>i.level==="warning");
+  const row=(i:{key:string;level:string;message:string},tone:string)=>(
+    <li key={i.key} className={`text-[10px] leading-5 ${tone}`}>
+      • {i.message}
+      {FIX_HINT[i.key]&&<button type="button" onClick={i.key==="roomer"?onOps:onFix} className="mr-1 underline decoration-dotted opacity-80 hover:opacity-100">{FIX_HINT[i.key]}</button>}
+    </li>
+  );
   return <div className={`mt-4 rounded-2xl border p-3 ${blockers.length?"border-red-500/30 bg-red-500/10":"border-amber-500/25 bg-amber-500/[.07]"}`}>
     <div className="text-[10px] font-black">{blockers.length?`❌ ${blockers.length.toLocaleString("fa-IR")} مورد مانع انتشار`:`⚠️ ${warnings.length.toLocaleString("fa-IR")} هشدار`}</div>
     <ul className="mt-2 space-y-1">
-      {blockers.map((i)=><li key={i.key} className="text-[10px] leading-5 text-red-200">• {i.message}</li>)}
-      {warnings.map((i)=><li key={i.key} className="text-[10px] leading-5 text-amber-200/80">• {i.message}</li>)}
+      {blockers.map((i)=>row(i,"text-red-200"))}
+      {warnings.map((i)=>row(i,"text-amber-200/80"))}
     </ul>
   </div>;
 }
@@ -357,6 +376,8 @@ export default function AdminCodArenaPage(){
   if(authLoading||!isAdmin)return null;
 
   const input="w-full rounded-xl border border-white/10 bg-black/35 px-3 py-3 text-sm outline-none focus:border-orange-400";
+  // Either a room code or an official invite link gets players into the lobby.
+  const lobbyEntryMissing=!String(form.roomCode||"").trim()&&!String(form.officialJoinUrl||"").trim();
   return <div className="min-h-screen bg-[#070707] text-white"><Navbar/><main className="max-w-7xl mx-auto px-4 sm:px-6 py-7" dir="rtl">
     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"><div><Link href="/admin" className="text-xs text-gray-500">← داشبورد</Link><h1 className="text-3xl font-black mt-3">🎯 مرکز عملیات COD Arena</h1><p className="text-xs text-gray-500 mt-2">ساخت روم، چرخه Lobby، عوامل اجرایی، مدرک، نتیجه، رنک، جایزه و رفرال</p></div><div className="flex gap-2"><Link href="/cod-arena" className="rounded-xl border border-white/10 px-4 py-3 text-xs font-black">نمای بازیکن</Link><button onClick={begin} className="rounded-xl bg-orange-500 text-black px-5 py-3 text-xs font-black">+ روم جدید</button></div></div>
     <div className="mt-5 flex flex-wrap gap-2">
@@ -447,7 +468,29 @@ export default function AdminCodArenaPage(){
         </div>
       </div>
       <div><h3 className="font-black text-orange-300 mb-3">زمان‌بندی</h3><div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><label className="text-xs text-gray-400">شروع روم<input required type="datetime-local" value={form.startsAt} onChange={e=>setForm({...form,startsAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">شروع Check-in<input type="datetime-local" value={form.checkInOpensAt} onChange={e=>setForm({...form,checkInOpensAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">پایان Check-in<input type="datetime-local" value={form.checkInClosesAt} onChange={e=>setForm({...form,checkInClosesAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">نمایش کد و لینک<input type="datetime-local" value={form.credentialsRevealAt} onChange={e=>setForm({...form,credentialsRevealAt:e.target.value})} className={`${input} mt-1`}/></label><label className="text-xs text-gray-400">پایان تقریبی<input type="datetime-local" value={form.endsAt} onChange={e=>setForm({...form,endsAt:e.target.value})} className={`${input} mt-1`}/></label></div></div>
-      <div><h3 className="font-black text-orange-300 mb-3">اطلاعات محرمانه Lobby</h3><div className="grid grid-cols-1 sm:grid-cols-3 gap-3"><label className="text-xs text-gray-400">Room Code<input value={form.roomCode} onChange={e=>setForm({...form,roomCode:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label><label className="text-xs text-gray-400">Password<input value={form.roomPassword} onChange={e=>setForm({...form,roomPassword:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label><label className="text-xs text-gray-400">لینک رسمی COD<input value={form.officialJoinUrl} onChange={e=>setForm({...form,officialJoinUrl:e.target.value})} className={`${input} mt-1`} dir="ltr"/></label></div></div>
+      <div className={`rounded-2xl border p-4 ${lobbyEntryMissing&&form.isPublished?"border-red-500/30 bg-red-500/[.07]":"border-white/10"}`}>
+        <h3 className="font-black text-orange-300 mb-1">اطلاعات ورود به لابی</h3>
+        <p className="text-[10px] leading-5 text-gray-400 mb-3">
+          برای انتشار روم پولی، یکی از این دو لازم است: <b>کد روم</b> (که داخل بازی می‌سازی) یا <b>لینک رسمی دعوت</b>.
+          این اطلاعات تا زمان «نمایش کد» فقط برای بازیکنانی که Check-in کرده‌اند نمایش داده می‌شود.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <label className="text-xs text-gray-400">Room Code
+            <div className="flex gap-2 mt-1">
+              <input value={form.roomCode} onChange={e=>setForm({...form,roomCode:e.target.value})} className={input} dir="ltr" placeholder="مثلاً 1234567"/>
+              <button type="button" onClick={()=>setForm({...form,roomCode:String(Math.floor(1000000+Math.random()*9000000))})} className="shrink-0 rounded-xl border border-white/10 px-3 text-[10px] font-black" title="تولید کد تصادفی">تولید</button>
+            </div>
+          </label>
+          <label className="text-xs text-gray-400">Password
+            <div className="flex gap-2 mt-1">
+              <input value={form.roomPassword} onChange={e=>setForm({...form,roomPassword:e.target.value})} className={input} dir="ltr" placeholder="اختیاری"/>
+              <button type="button" onClick={()=>setForm({...form,roomPassword:String(Math.floor(1000+Math.random()*9000))})} className="shrink-0 rounded-xl border border-white/10 px-3 text-[10px] font-black">تولید</button>
+            </div>
+          </label>
+          <label className="text-xs text-gray-400">لینک رسمی COD<input value={form.officialJoinUrl} onChange={e=>setForm({...form,officialJoinUrl:e.target.value})} className={`${input} mt-1`} dir="ltr" placeholder="https://www.callofduty.com/cdn/codm/teaminvite/..."/></label>
+        </div>
+        {lobbyEntryMissing&&<p className="mt-3 text-[10px] font-black text-red-300">تا وقتی کد روم یا لینک رسمی وارد نشود، امکان انتشار روم پولی وجود ندارد.</p>}
+      </div>
       <div><h3 className="font-black text-orange-300 mb-3">تنظیمات بازی</h3>
         <p className="text-[10px] leading-5 text-gray-500 mb-3">این موارد به‌صورت برچسب روی صفحه روم نمایش داده می‌شوند. هر کدام را خالی بگذاری، اصلاً نشان داده نمی‌شود.</p>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -509,7 +552,7 @@ export default function AdminCodArenaPage(){
       <label className="flex gap-3 items-start text-xs leading-6 mt-5"><input type="checkbox" checked={evidenceConfirmed} onChange={e=>setEvidenceConfirmed(e.target.checked)} className="mt-1"/><span>رکورد Lobby، Scoreboard و موارد مشکوک را بررسی کرده‌ام و مسئولیت تأیید نتیجه را می‌پذیرم.</span></label><div className="flex flex-wrap gap-2 mt-4"><Link href={`/cod-arena/${selected.id}`} className="rounded-xl border border-white/10 px-4 py-3 text-xs font-black">ثبت/مشاهده مدارک</Link><button onClick={settle} disabled={saving||!evidenceConfirmed||(selected.latestLobbyCheck?.status==="flagged"&&!lobbyOverrideConfirmed)||settlementPreview(selected,results).overBudget||!["in_progress","settling"].includes(selected.status)} className="rounded-xl bg-emerald-500 text-black px-5 py-3 text-xs font-black disabled:opacity-40">تسویه نهایی</button></div>
     </section>}
 
-    {view==="rooms"&&<section className="mt-7"><h2 className="text-xl font-black mb-4">روم‌ها</h2>{loading?<div className="p-10 text-center text-gray-500">در حال بارگذاری...</div>:rooms.length===0?<div className="rounded-3xl border border-white/5 p-10 text-center text-gray-500">هنوز رومی ساخته نشده است.</div>:<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{rooms.map(room=><article key={room.id} className="rounded-3xl border border-white/10 bg-white/[.025] p-5"><div className="flex justify-between gap-3"><div><div className="flex gap-2 text-[9px]"><span className="rounded-full bg-orange-500/10 text-orange-300 px-2 py-1">{room.region.toUpperCase()}</span><span className="rounded-full bg-white/5 px-2 py-1">{statusFa[room.status]}</span>{!room.isPublished&&<span className="rounded-full bg-gray-500/10 px-2 py-1">مخفی</span>}</div><h3 className="font-black text-lg mt-3">{room.title}</h3><p className="text-[10px] text-gray-500 mt-2">{localDate(room.startsAt).replace("T"," ")} • {room.teamMode.toUpperCase()} • {room.map}</p></div><div className="text-left"><div className="text-xl font-black">{room.registeredCount}/{room.capacity}</div><div className="text-[9px] text-gray-500">بازیکن</div></div></div><ReadinessPanel report={readiness[room.id]}/><div className="flex flex-wrap gap-2 mt-5"><button onClick={()=>edit(room)} className="rounded-xl border border-white/10 px-3 py-2 text-xs">ویرایش</button><button onClick={()=>openOps(room.id)} className="rounded-xl bg-purple-600 px-3 py-2 text-xs font-black">عملیات/نتیجه</button><Link href={`/cod-arena/${room.id}`} className="rounded-xl border border-orange-500/20 text-orange-300 px-3 py-2 text-xs">نمای روم</Link>{room.isPublished&&<button onClick={()=>announce(room.id)} disabled={announcing===room.id} className="rounded-xl border border-cyan-500/25 text-cyan-200 px-3 py-2 text-xs font-black disabled:opacity-40">{announcing===room.id?"در حال ارسال...":"📣 اعلان در تلگرام"}</button>}{room.status==="draft"&&room.registeredCount===0&&<button onClick={()=>remove(room.id)} className="rounded-xl text-red-400 px-3 py-2 text-xs">حذف</button>}</div></article>)}</div>}</section>}
+    {view==="rooms"&&<section className="mt-7"><h2 className="text-xl font-black mb-4">روم‌ها</h2>{loading?<div className="p-10 text-center text-gray-500">در حال بارگذاری...</div>:rooms.length===0?<div className="rounded-3xl border border-white/5 p-10 text-center text-gray-500">هنوز رومی ساخته نشده است.</div>:<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">{rooms.map(room=><article key={room.id} className="rounded-3xl border border-white/10 bg-white/[.025] p-5"><div className="flex justify-between gap-3"><div><div className="flex gap-2 text-[9px]"><span className="rounded-full bg-orange-500/10 text-orange-300 px-2 py-1">{room.region.toUpperCase()}</span><span className="rounded-full bg-white/5 px-2 py-1">{statusFa[room.status]}</span>{!room.isPublished&&<span className="rounded-full bg-gray-500/10 px-2 py-1">مخفی</span>}</div><h3 className="font-black text-lg mt-3">{room.title}</h3><p className="text-[10px] text-gray-500 mt-2">{localDate(room.startsAt).replace("T"," ")} • {room.teamMode.toUpperCase()} • {room.map}</p></div><div className="text-left"><div className="text-xl font-black">{room.registeredCount}/{room.capacity}</div><div className="text-[9px] text-gray-500">بازیکن</div></div></div><ReadinessPanel report={readiness[room.id]} onFix={()=>edit(room)} onOps={()=>openOps(room.id)}/><div className="flex flex-wrap gap-2 mt-5"><button onClick={()=>edit(room)} className="rounded-xl border border-white/10 px-3 py-2 text-xs">ویرایش</button><button onClick={()=>openOps(room.id)} className="rounded-xl bg-purple-600 px-3 py-2 text-xs font-black">عملیات/نتیجه</button><Link href={`/cod-arena/${room.id}`} className="rounded-xl border border-orange-500/20 text-orange-300 px-3 py-2 text-xs">نمای روم</Link>{room.isPublished&&<button onClick={()=>announce(room.id)} disabled={announcing===room.id} className="rounded-xl border border-cyan-500/25 text-cyan-200 px-3 py-2 text-xs font-black disabled:opacity-40">{announcing===room.id?"در حال ارسال...":"📣 اعلان در تلگرام"}</button>}{room.status==="draft"&&room.registeredCount===0&&<button onClick={()=>remove(room.id)} className="rounded-xl text-red-400 px-3 py-2 text-xs">حذف</button>}</div></article>)}</div>}</section>}
     {view==="audit"&&<AuditFeed/>}
   </main></div>;
 }

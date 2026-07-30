@@ -648,9 +648,14 @@ export async function addCodRoomEvidence(input: {
  * Refuses to publish a room that cannot actually be played. Reads staff and
  * reward state that `normalizeCodRoomInput` cannot see on its own.
  */
-async function assertCodRoomPublishable(client: any, roomId: string | null, values: ReturnType<typeof normalizeCodRoomInput>) {
+async function assertCodRoomPublishable(
+  client: any,
+  roomId: string | null,
+  values: ReturnType<typeof normalizeCodRoomInput>,
+  options: { assumeRoomer?: boolean } = {},
+) {
   if (!values.isPublished) return;
-  let hasRoomer = false;
+  let hasRoomer = Boolean(options.assumeRoomer);
   if (roomId) {
     const [roomer] = await client.select({ id: codRoomStaff.id }).from(codRoomStaff)
       .where(and(eq(codRoomStaff.roomId, roomId), eq(codRoomStaff.role, "roomer"))).limit(1);
@@ -685,9 +690,15 @@ export async function createCodRoom(raw: Record<string, unknown>, adminId: strin
   await ensureCodArenaSchema();
   const values = normalizeCodRoomInput(raw);
   if (values.startsAt.getTime() <= Date.now() + 5 * 60_000) throw new Error("زمان شروع روم جدید باید حداقل ۵ دقیقه در آینده باشد");
-  await assertCodRoomPublishable(db, null, values);
+  await assertCodRoomPublishable(db, null, values, { assumeRoomer: true });
   const { maximumLiabilityRial, ...databaseValues } = values;
   const [created] = await db.insert(codRooms).values({ ...databaseValues, createdById: adminId }).returning();
+  // Whoever creates a room is its operator until someone else is assigned.
+  // Without this a solo admin can never satisfy the "needs a roomer" check from
+  // the create form, which is the only place they are told about it.
+  await db.insert(codRoomStaff)
+    .values({ roomId: created.id, userId: adminId, role: "roomer" })
+    .onConflictDoNothing();
   await db.insert(codRoomAuditEvents).values({ roomId: created.id, actorId: adminId, eventType: "room_created", payload: { maximumLiabilityRial } });
   return { ...created, maximumLiabilityRial };
 }
