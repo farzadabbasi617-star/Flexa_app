@@ -1087,6 +1087,7 @@ export const transactions = pgTable("transactions", {
 // COD_ARENA_LIVE=true is explicitly enabled after private-beta review.
 export const codRooms = pgTable("cod_rooms", {
   id: uuid("id").defaultRandom().primaryKey(),
+  game: varchar("game", { length: 24 }).notNull().default("cod_mobile"),
   title: varchar("title", { length: 180 }).notNull(),
   description: text("description"),
   region: varchar("region", { length: 16 }).notNull().default("global"),
@@ -1141,6 +1142,7 @@ export const codRoomStaff = pgTable("cod_room_staff", {
 
 export const codRoomEntries = pgTable("cod_room_entries", {
   id: uuid("id").defaultRandom().primaryKey(),
+  game: varchar("game", { length: 24 }).notNull().default("cod_mobile"),
   roomId: uuid("room_id").notNull().references(() => codRooms.id),
   userId: uuid("user_id").notNull().references(() => users.id),
   playerId: uuid("player_id").references(() => players.id),

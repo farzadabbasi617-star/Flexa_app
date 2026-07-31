@@ -192,8 +192,11 @@ export function calculateCodEntryReward(
   };
 }
 
-function teamSize(mode: CodBrTeamMode) {
+function teamSize(mode: string) {
+  // Fortnite has trios; falling through to 1 would have priced a three-player
+  // squad prize as if each player won it outright.
   if (mode === "duo") return 2;
+  if (mode === "trio") return 3;
   if (mode === "squad") return 4;
   return 1;
 }
@@ -219,7 +222,7 @@ export function estimateCodKillLiability(config: CodRewardConfig, capacity: numb
 export function estimateCodRoomMaximumLiability(
   configInput: unknown,
   capacityInput: number,
-  mode: CodBrTeamMode,
+  mode: CodBrTeamMode | string,
 ) {
   const config = normalizeCodRewardConfig(configInput);
   const capacity = boundedInteger(capacityInput, 2, 100, "ظرفیت روم");
@@ -388,12 +391,12 @@ export function projectCodPrizeTable(input: {
   scaling?: unknown;
   registeredCount: number;
   capacity: number;
-  teamMode: CodBrTeamMode;
+  teamMode: CodBrTeamMode | string;
 }) {
   const config = normalizeCodRewardConfig(input.rewardConfig);
   const scaling = normalizeCodPrizeScaling(input.scaling);
   const scaleBps = codPrizeScaleBps(scaling, input.registeredCount, input.capacity);
-  const members = input.teamMode === "duo" ? 2 : input.teamMode === "squad" ? 4 : 1;
+  const members = teamSize(input.teamMode);
   const seats = Math.max(1, Math.floor(input.capacity) || 1);
   const filled = Math.max(0, Math.min(seats, Math.floor(input.registeredCount) || 0));
 

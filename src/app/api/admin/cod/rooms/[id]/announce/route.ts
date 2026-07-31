@@ -35,6 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   } catch { hasAnyReward = false; }
 
   const issues = evaluateCodRoomReadiness({
+    game: room.game,
     status: room.status,
     isPublished: room.isPublished,
     roomCode: room.roomCode,

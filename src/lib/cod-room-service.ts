@@ -1,5 +1,6 @@
 import { and, count, desc, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
 import { codReadinessBlockers, evaluateCodRoomReadiness, type CodReadinessIssue } from "./cod-room-readiness";
+import { arenaGameConfig, isArenaGame, isOfficialInviteUrl, type ArenaGame } from "./arena-games";
 import { db } from "@/db";
 import {
   affiliateAttributions,
@@ -99,8 +100,10 @@ async function createCodArenaSchema(client: any) {
   )`));
   const constraints = [
     `DO $$ BEGIN ALTER TABLE users ADD CONSTRAINT users_cod_mobile_region_check CHECK (cod_mobile_region IN ('global','garena')); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
-    `DO $$ BEGIN ALTER TABLE cod_rooms ADD CONSTRAINT cod_rooms_region_check CHECK (region IN ('global','garena')); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
-    `DO $$ BEGIN ALTER TABLE cod_rooms ADD CONSTRAINT cod_rooms_team_mode_check CHECK (team_mode IN ('solo','duo','squad')); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    // Union of every supported game's regions and team modes (migration 0044).
+    // Per-game validity lives in arena-games.ts.
+    `DO $$ BEGIN ALTER TABLE cod_rooms ADD CONSTRAINT cod_rooms_region_check CHECK (region IN ('global','garena','eu','nae','naw','me','asia','oce','brazil')); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
+    `DO $$ BEGIN ALTER TABLE cod_rooms ADD CONSTRAINT cod_rooms_team_mode_check CHECK (team_mode IN ('solo','duo','trio','squad')); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     `DO $$ BEGIN ALTER TABLE cod_rooms ADD CONSTRAINT cod_rooms_perspective_check CHECK (perspective IN ('fpp','tpp')); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     `DO $$ BEGIN ALTER TABLE cod_rooms ADD CONSTRAINT cod_rooms_capacity_check CHECK (capacity BETWEEN 2 AND 100); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
     `DO $$ BEGIN ALTER TABLE cod_rooms ADD CONSTRAINT cod_rooms_money_check CHECK (entry_fee_rial >= 0 AND service_fee_rial >= 0 AND prize_budget_rial >= 0 AND service_fee_rial <= entry_fee_rial); EXCEPTION WHEN duplicate_object THEN NULL; END $$`,
@@ -116,6 +119,8 @@ async function createCodArenaSchema(client: any) {
   await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS match_settings jsonb NOT NULL DEFAULT '{}'::jsonb`));
   await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS faq jsonb NOT NULL DEFAULT '[]'::jsonb`));
   await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS prize_scaling jsonb NOT NULL DEFAULT '{}'::jsonb`));
+  await client.execute(sql.raw(`ALTER TABLE cod_rooms ADD COLUMN IF NOT EXISTS game varchar(24) NOT NULL DEFAULT 'cod_mobile'`));
+  await client.execute(sql.raw(`ALTER TABLE cod_room_entries ADD COLUMN IF NOT EXISTS game varchar(24) NOT NULL DEFAULT 'cod_mobile'`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_rooms_category_start_idx ON cod_rooms(category,starts_at) WHERE is_published = true`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_rooms_status_start_idx ON cod_rooms(status,starts_at)`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS cod_rooms_region_published_idx ON cod_rooms(region,is_published)`));
@@ -259,11 +264,13 @@ function dateValue(value: unknown, field: string, required = false) {
 export function normalizeCodRoomInput(raw: Record<string, unknown>) {
   const title = String(raw.title || "").trim();
   if (title.length < 3 || title.length > 180) throw new Error("عنوان روم باید بین ۳ تا ۱۸۰ کاراکتر باشد");
-  const region = String(raw.region || "global") as CodRegion;
-  const teamMode = String(raw.teamMode || "solo") as CodBrTeamMode;
+  const game = (isArenaGame(raw.game) ? raw.game : "cod_mobile") as ArenaGame;
+  const gameConfig = arenaGameConfig(game);
+  const region = String(raw.region || gameConfig.defaults.region) as CodRegion;
+  const teamMode = String(raw.teamMode || gameConfig.defaults.teamMode) as CodBrTeamMode;
   const status = String(raw.status || "draft") as CodRoomStatus;
-  if (!(COD_REGIONS as readonly string[]).includes(region)) throw new Error("ریجن کالاف معتبر نیست");
-  if (!(COD_BR_TEAM_MODES as readonly string[]).includes(teamMode)) throw new Error("حالت تیم معتبر نیست");
+  if (!gameConfig.regions.includes(region)) throw new Error(`ریجن برای ${gameConfig.label} معتبر نیست`);
+  if (!gameConfig.teamModes.includes(teamMode)) throw new Error("حالت تیم معتبر نیست");
   if (!(COD_ROOM_STATUSES as readonly string[]).includes(status)) throw new Error("وضعیت روم معتبر نیست");
   const capacity = Number(raw.capacity ?? 40);
   if (!Number.isInteger(capacity) || capacity < 2 || capacity > 100) throw new Error("ظرفیت روم باید بین ۲ تا ۱۰۰ باشد");
@@ -293,7 +300,11 @@ export function normalizeCodRoomInput(raw: Record<string, unknown>) {
     throw new Error(`بودجه جایزه برای حداکثر تعهد کافی نیست؛ حداقل ${maximumLiability.toString()} ریال لازم است`);
   }
   const officialJoinUrl = raw.officialJoinUrl ? String(raw.officialJoinUrl).trim() : null;
-  if (officialJoinUrl && !isOfficialCodMobileInviteUrl(officialJoinUrl)) throw new Error("فقط لینک رسمی دعوت Call of Duty Mobile پذیرفته می‌شود");
+  if (officialJoinUrl && !isOfficialInviteUrl(game, officialJoinUrl)) {
+    throw new Error(gameConfig.inviteLink
+      ? `فقط لینک رسمی دعوت ${gameConfig.label} پذیرفته می‌شود`
+      : `${gameConfig.label} لینک دعوت رسمی ندارد؛ از کد روم استفاده کن`);
+  }
   const minCodLevel = Number(raw.minCodLevel || 0);
   if (!Number.isInteger(minCodLevel) || minCodLevel < 0 || minCodLevel > 500) throw new Error("حداقل لول کالاف معتبر نیست");
   const bannerImageUrl = normalizeCodBannerUrl(raw.bannerImageUrl);
@@ -307,6 +318,7 @@ export function normalizeCodRoomInput(raw: Record<string, unknown>) {
   const prizeScaling = normalizeCodPrizeScaling(raw.prizeScaling);
   const faq = normalizeCodFaq(raw.faq);
   return {
+    game,
     title,
     description: raw.description ? String(raw.description).trim().slice(0, 3000) : null,
     region,
@@ -344,17 +356,19 @@ export function normalizeCodRoomInput(raw: Record<string, unknown>) {
   };
 }
 
-export async function listCodRooms(input: { includeUnpublished?: boolean; region?: string | null; limit?: number } = {}) {
+export async function listCodRooms(input: { includeUnpublished?: boolean; region?: string | null; game?: string | null; limit?: number } = {}) {
   await ensureCodArenaSchema();
   const conditions = [];
   if (!input.includeUnpublished) {
     conditions.push(eq(codRooms.isPublished, true));
     conditions.push(inArray(codRooms.status, ["registration", "check_in", "lobby_open", "in_progress", "settling"]));
   }
-  if (input.region && (COD_REGIONS as readonly string[]).includes(input.region)) conditions.push(eq(codRooms.region, input.region));
+  if (input.region) conditions.push(eq(codRooms.region, input.region));
+  if (isArenaGame(input.game)) conditions.push(eq(codRooms.game, input.game));
   const where = conditions.length === 0 ? undefined : conditions.length === 1 ? conditions[0] : and(...conditions);
   return db.select({
     id: codRooms.id,
+    game: codRooms.game,
     title: codRooms.title,
     description: codRooms.description,
     region: codRooms.region,
@@ -496,14 +510,24 @@ export async function joinCodRoom(input: { roomId: string; userId: string; rules
         .where(and(eq(codRoomStaff.roomId, room.id), eq(codRoomStaff.userId, account.id))).limit(1);
       if (!betaStaff) throw new Error("COD_ROOM_NOT_FOUND");
     }
-    if (!account.codMobileId || !account.codMobileUsername) throw new Error("COD_PROFILE_REQUIRED");
-    if (account.codMobileRegion !== room.region) throw new Error("COD_REGION_MISMATCH");
+    // Each game keeps its own in-game identity on `users`; check the one this
+    // room is actually for.
+    const roomGameConfig = arenaGameConfig(room.game);
+    const profile = account as unknown as Record<string, string | null>;
+    const playerGameId = profile[roomGameConfig.profileFields.id];
+    const playerGameName = profile[roomGameConfig.profileFields.username];
+    if (!playerGameId || !playerGameName) throw new Error("COD_PROFILE_REQUIRED");
+    // Only games that partition players by region enforce a region match.
+    if (roomGameConfig.profileFields.region) {
+      const playerRegion = profile[roomGameConfig.profileFields.region];
+      if (playerRegion !== room.region) throw new Error("COD_REGION_MISMATCH");
+    }
     const [existing] = await tx.select({ id: codRoomEntries.id }).from(codRoomEntries)
       .where(and(eq(codRoomEntries.roomId, room.id), eq(codRoomEntries.userId, account.id))).limit(1);
     if (existing) throw new Error("COD_ALREADY_JOINED");
     const [sameCodUid] = await tx.select({ id: codRoomEntries.id }).from(codRoomEntries).where(and(
       eq(codRoomEntries.roomId, room.id),
-      eq(codRoomEntries.codUidSnapshot, account.codMobileId),
+      eq(codRoomEntries.codUidSnapshot, playerGameId),
       sql`${codRoomEntries.status} NOT IN ('cancelled','refunded')`,
     )).limit(1);
     if (sameCodUid) throw new Error("COD_UID_ALREADY_JOINED");
@@ -518,7 +542,7 @@ export async function joinCodRoom(input: { roomId: string; userId: string; rules
     if (live && entryFee > BigInt(0)) {
       const gate = checkAgeGate({ birthDate: account.birthDate, nationalId: account.nationalId });
       if (!gate.ok) throw new Error("COD_AGE_GATE_BLOCKED");
-      if (account.codMobileStatus !== "verified") throw new Error("COD_PROFILE_NOT_VERIFIED");
+      if (profile[roomGameConfig.profileFields.status] !== "verified") throw new Error("COD_PROFILE_NOT_VERIFIED");
       let [wallet] = await tx.select().from(wallets).where(eq(wallets.userId, account.id)).limit(1);
       if (!wallet) [wallet] = await tx.insert(wallets).values({ userId: account.id, balance: "0", currency: "RIAL" }).returning();
       const debited = await updateWalletBalanceSafely(tx, wallet.id, entryFee, "decrease");
@@ -547,8 +571,9 @@ export async function joinCodRoom(input: { roomId: string; userId: string; rules
       roomId: room.id,
       userId: account.id,
       playerId: player.id,
-      codUidSnapshot: account.codMobileId,
-      codUsernameSnapshot: account.codMobileUsername,
+      game: room.game,
+      codUidSnapshot: playerGameId,
+      codUsernameSnapshot: playerGameName,
       region: room.region,
       status: "registered",
       paymentMode: live ? "live" : "shadow",
@@ -667,6 +692,7 @@ async function assertCodRoomPublishable(
     || BigInt(reward.participationRial || "0") > BigInt(0)
     || Boolean(reward.killLadder);
   const blockers = codReadinessBlockers(evaluateCodRoomReadiness({
+    game: values.game,
     status: values.status,
     isPublished: values.isPublished,
     roomCode: values.roomCode,

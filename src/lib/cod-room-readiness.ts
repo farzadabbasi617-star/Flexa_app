@@ -1,4 +1,4 @@
-import { isOfficialCodMobileInviteUrl } from "./cod-room-policy";
+import { arenaGameConfig, isOfficialInviteUrl } from "./arena-games";
 
 /**
  * Whether a room is actually runnable, as opposed to merely well-formed.
@@ -21,6 +21,7 @@ export interface CodReadinessIssue {
 }
 
 export interface CodRoomReadinessInput {
+  game?: string;
   status: string;
   isPublished: boolean;
   roomCode?: string | null;
@@ -54,13 +55,18 @@ export function evaluateCodRoomReadiness(input: CodRoomReadinessInput): CodReadi
 
   // A player can only join the lobby with a code+password or an official invite
   // link. Without either, the room cannot be played at all.
+  const gameConfig = arenaGameConfig(input.game);
   const hasCode = Boolean(input.roomCode && String(input.roomCode).trim());
-  const hasInvite = isOfficialCodMobileInviteUrl(input.officialJoinUrl);
+  const hasInvite = isOfficialInviteUrl(input.game, input.officialJoinUrl);
   if (!hasCode && !hasInvite) {
     issues.push({
       key: "credentials",
       level: paid ? "blocker" : "warning",
-      message: "کد روم یا لینک رسمی دعوت کالاف وارد نشده؛ بدون آن هیچ بازیکنی نمی‌تواند وارد لابی شود.",
+      // Fortnite rooms are entered with an Epic Custom Matchmaking Key and have
+      // no invite-link form, so asking for one would be misleading.
+      message: gameConfig.inviteLink
+        ? `کد روم یا لینک رسمی دعوت ${gameConfig.label} وارد نشده؛ بدون آن هیچ بازیکنی نمی‌تواند وارد لابی شود.`
+        : `کد روم (Custom Matchmaking Key) وارد نشده؛ بدون آن هیچ بازیکنی نمی‌تواند وارد لابی شود.`,
     });
   } else if (hasCode && !input.roomPassword) {
     issues.push({
