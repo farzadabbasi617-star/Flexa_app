@@ -227,10 +227,12 @@ function isTrustedNewsUrl(value: string, game: NewsItem["game"]) {
 }
 
 async function fetchTrustedReaderCopy(item: NewsItem) {
-  // Fortnite blocks ordinary server-side readers with HTTP 403. Jina Reader is
-  // used only as a transport for that official URL; the canonical source and
-  // every accepted image are still revalidated against Epic's allowlist.
-  if (item.game !== "fortnite" || !isTrustedNewsUrl(item.link, item.game)) return null;
+  // Some publishers refuse server-side fetches outright: Fortnite answers 403
+  // and Call of Duty simply never replies. Jina Reader is a transport of last
+  // resort for those official URLs; the canonical source and every accepted
+  // image are still revalidated against the per-game allowlist afterwards, so
+  // the proxy cannot introduce an untrusted source.
+  if (!isTrustedNewsUrl(item.link, item.game)) return null;
   try {
     const response = await fetch(`https://r.jina.ai/${item.link}`, {
       headers: { Accept: "text/plain", "User-Agent": "GamentNewsReader/2.0" },
@@ -260,8 +262,14 @@ async function fetchTrustedArticleDetails(item: NewsItem) {
       signal: controller.signal,
       redirect: "follow",
       headers: {
-        "User-Agent": "Mozilla/5.0 (compatible; GamentNews/2.0; +https://www.gament1.ir)",
-        Accept: "text/html,application/xhtml+xml",
+        // Identifying as a bot gets this request black-holed by
+        // callofduty.com: the TLS handshake completes and the server then
+        // never replies, so every article timed out. Publishers increasingly
+        // treat an unknown bot UA as hostile; present as a browser and keep
+        // the crawl polite instead (one request, no parallel hammering).
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
       },
       cache: "no-store",
     });
