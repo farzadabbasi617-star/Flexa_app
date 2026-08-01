@@ -25,6 +25,7 @@ export async function POST(request: NextRequest) {
         partner_not_active: "طرح معرفی یا قرارداد شما فعال نیست",
         no_available_balance: "موجودی آزادشده‌ای برای انتقال ندارید",
         sheba_required: "برای برداشت نقدی ابتدا شماره شبا ثبت کنید",
+        identity_required: "برای برداشت نقدی باید کد ملی را در پروفایل ثبت کنی",
         payout_already_pending: "یک درخواست تسویه در حال بررسی دارید",
         below_minimum: "موجودی نقدی به حداقل ۲۰۰ هزار تومان نرسیده است",
       };

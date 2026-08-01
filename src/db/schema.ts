@@ -803,7 +803,9 @@ export const mediaPartners = pgTable("media_partners", {
   partnerType: varchar("partner_type", { length: 20 }).notNull().default("media"),
   referralCode: varchar("referral_code", { length: 24 }).notNull().unique(),
   legalName: varchar("legal_name", { length: 160 }).notNull(),
-  nationalId: varchar("national_id", { length: 10 }).notNull(),
+  // Nullable since migration 0046: a personal referrer gets a link before
+  // supplying any legal identity. Required again to withdraw cash.
+  nationalId: varchar("national_id", { length: 10 }),
   sheba: varchar("sheba", { length: 26 }),
   mediaName: varchar("media_name", { length: 160 }).notNull(),
   mediaType: varchar("media_type", { length: 30 }).notNull(),
@@ -815,6 +817,9 @@ export const mediaPartners = pgTable("media_partners", {
   attributionDays: integer("attribution_days").notNull().default(30),
   minimumPayoutRial: numeric("minimum_payout_rial", { precision: 20, scale: 0 }).notNull().default("3000000"),
   contractAcceptedAt: timestamp("contract_accepted_at"),
+  /** Stage 1: the three short rules that unlock a referral link. */
+  quickRulesAcceptedAt: timestamp("quick_rules_accepted_at"),
+  quickRulesVersion: varchar("quick_rules_version", { length: 60 }),
   approvedById: uuid("approved_by_id").references(() => users.id),
   approvedAt: timestamp("approved_at"),
   rejectionReason: text("rejection_reason"),

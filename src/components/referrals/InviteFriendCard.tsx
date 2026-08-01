@@ -33,7 +33,9 @@ export default function InviteFriendCard({ variant = "full" }: { variant?: "full
         }
         const data = await response.json();
         if (cancelled) return;
-        if (data?.partner?.status === "active" && data.partner.referralCode) {
+        // Stage-based, not status-based: a link is live once the short rules
+        // are accepted, before any contract is signed.
+        if (data?.stage && data.stage !== "anonymous" && data?.partner?.referralCode) {
           setState({
             status: "ready",
             referralCode: data.partner.referralCode,
@@ -86,7 +88,7 @@ export default function InviteFriendCard({ variant = "full" }: { variant?: "full
             <p className="mt-1 text-[11px] leading-5 text-gray-400">
               {state.status === "anonymous"
                 ? "بعد از ورود به حساب، لینک دعوت اختصاصی‌ات فعال می‌شود."
-                : "لینک دعوت اختصاصی‌ات هنوز فعال نشده. یک‌بار فعالش کن و همیشه استفاده کن."}
+                : "با تأیید سه قانون کوتاه، لینک دعوتت همین حالا فعال می‌شود. نیازی به کد ملی یا شبا نیست."}
             </p>
           </div>
         </div>
@@ -94,7 +96,7 @@ export default function InviteFriendCard({ variant = "full" }: { variant?: "full
           href={state.status === "anonymous" ? "/login" : "/referrals"}
           className="mt-4 block rounded-xl bg-cyan-600 py-2.5 text-center text-xs font-black text-white active:scale-95"
         >
-          {state.status === "anonymous" ? "ورود به حساب" : "فعال‌سازی لینک دعوت"}
+          {state.status === "anonymous" ? "ورود به حساب" : "دریافت لینک دعوت"}
         </Link>
       </div>
     );

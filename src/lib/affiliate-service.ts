@@ -22,6 +22,7 @@ import {
 } from "@/db/schema";
 import { updateWalletBalanceSafely } from "@/lib/wallet-balance-service";
 import { serverBotUsername } from "@/lib/telegram-bot-username";
+import { REFERRAL_QUICK_RULES_VERSION, hasUsableNationalId } from "@/lib/referral-onboarding";
 
 export const AFFILIATE_ATTRIBUTION_DAYS = 30;
 export const AFFILIATE_COMMISSION_TOMAN = 7_000;
@@ -102,6 +103,11 @@ async function createAffiliateSchema(client: any) {
   )`));
   await client.execute(sql.raw(`ALTER TABLE media_partners ADD COLUMN IF NOT EXISTS partner_type varchar(20) NOT NULL DEFAULT 'media'`));
   await client.execute(sql.raw(`ALTER TABLE media_partners ALTER COLUMN sheba DROP NOT NULL`));
+  // Two-stage onboarding (migration 0046): a link needs only the short rules.
+  await client.execute(sql.raw(`ALTER TABLE media_partners ADD COLUMN IF NOT EXISTS quick_rules_accepted_at timestamp`));
+  await client.execute(sql.raw(`ALTER TABLE media_partners ADD COLUMN IF NOT EXISTS quick_rules_version varchar(60)`));
+  await client.execute(sql.raw(`ALTER TABLE media_partners ALTER COLUMN national_id DROP NOT NULL`));
+  await client.execute(sql.raw(`UPDATE media_partners SET quick_rules_accepted_at=COALESCE(contract_accepted_at,created_at), quick_rules_version='legacy-full-contract' WHERE quick_rules_accepted_at IS NULL AND partner_type='personal'`));
   await client.execute(sql.raw(`CREATE INDEX IF NOT EXISTS media_partners_type_status_idx ON media_partners(partner_type,status)`));
   await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS media_partner_agreements (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(), partner_id uuid NOT NULL REFERENCES media_partners(id),
@@ -598,20 +604,42 @@ export async function getMediaPartnerDashboard(userId: string) {
   };
 }
 
+/**
+ * Creates a personal referral account and issues its code.
+ *
+ * Since the two-stage rework this needs nothing but a logged-in user who has
+ * accepted the three short rules. The national id, the full contract and the
+ * sheba moved to the cash-withdrawal stage where they are legally required --
+ * demanding them here is what kept the programme at 8 clicks and no
+ * commissions, and locked out the third of users with no national id on file.
+ */
 export async function createPersonalReferralAccount(input: {
   userId: string;
   displayName: string;
   nationalId?: string | null;
+  quickRulesAccepted?: boolean;
 }) {
   await ensureAffiliateSchema();
-  if (!input.nationalId || !/^\d{10}$/.test(input.nationalId)) {
-    return { created: false as const, reason: "identity_required" as const };
+  if (!input.quickRulesAccepted) {
+    return { created: false as const, reason: "quick_rules_required" as const };
   }
   const [existing] = await db.select().from(mediaPartners).where(eq(mediaPartners.userId, input.userId)).limit(1);
   if (existing) {
-    return existing.partnerType === "personal"
-      ? { created: false as const, reason: "already_exists" as const, partner: existing }
-      : { created: false as const, reason: "media_partner_exists" as const, partner: existing };
+    if (existing.partnerType !== "personal") {
+      return { created: false as const, reason: "media_partner_exists" as const, partner: existing };
+    }
+    // Someone who started under the old flow and stalled at the contract has a
+    // draft row with no link. Accepting the short rules activates it in place.
+    if (!existing.quickRulesAcceptedAt) {
+      const [upgraded] = await db.update(mediaPartners).set({
+        quickRulesAcceptedAt: new Date(),
+        quickRulesVersion: REFERRAL_QUICK_RULES_VERSION,
+        status: existing.status === "draft" ? "active" : existing.status,
+        updatedAt: new Date(),
+      }).where(eq(mediaPartners.id, existing.id)).returning();
+      return { created: false as const, reason: "already_exists" as const, partner: upgraded || existing };
+    }
+    return { created: false as const, reason: "already_exists" as const, partner: existing };
   }
   for (let attempt = 0; attempt < 4; attempt += 1) {
     try {
@@ -620,13 +648,17 @@ export async function createPersonalReferralAccount(input: {
         partnerType: "personal",
         referralCode: generateAffiliateCode(),
         legalName: input.displayName,
-        nationalId: input.nationalId,
+        nationalId: hasUsableNationalId(input.nationalId) ? input.nationalId : null,
         sheba: null,
         mediaName: input.displayName,
         mediaType: "personal_referrer",
         mediaUrl: "https://www.gament1.ir/referrals",
         followerCount: 0,
-        status: "draft",
+        // Active immediately: the link works from here. Cash withdrawal is
+        // gated separately by the contract + identity checks.
+        status: "active",
+        quickRulesAcceptedAt: new Date(),
+        quickRulesVersion: REFERRAL_QUICK_RULES_VERSION,
         attributionDays: AFFILIATE_ATTRIBUTION_DAYS,
         commissionRialPerMatch: AFFILIATE_COMMISSION_RIAL.toString(),
         minimumPayoutRial: PERSONAL_REFERRAL_MINIMUM_PAYOUT_RIAL.toString(),
@@ -705,6 +737,10 @@ export async function requestAffiliatePayout(userId: string) {
   return db.transaction(async (tx) => {
     const [partner] = await tx.select().from(mediaPartners).where(eq(mediaPartners.userId, userId)).for("update").limit(1);
     if (!partner || partner.status !== "active" || !partner.contractAcceptedAt) return { ok: false as const, reason: "partner_not_active" as const };
+    // The national id used to be collected at signup. Now that a link needs no
+    // legal identity, cash withdrawal has to check for it explicitly -- this is
+    // the point where it is actually required.
+    if (!hasUsableNationalId(partner.nationalId)) return { ok: false as const, reason: "identity_required" as const };
     if (!partner.sheba) return { ok: false as const, reason: "sheba_required" as const };
     const [pending] = await tx.select({ id: affiliatePayouts.id }).from(affiliatePayouts).where(and(
       eq(affiliatePayouts.partnerId, partner.id), inArray(affiliatePayouts.status, ["requested", "approved"]),

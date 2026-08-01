@@ -28,7 +28,7 @@ function publicDashboard(data: Awaited<ReturnType<typeof getMediaPartnerDashboar
     ...data,
     partner: {
       ...data.partner,
-      nationalId: `${data.partner.nationalId.slice(0, 3)}••••${data.partner.nationalId.slice(-3)}`,
+      nationalId: data.partner.nationalId ? `${data.partner.nationalId.slice(0, 3)}••••${data.partner.nationalId.slice(-3)}` : null,
       sheba: redactSheba(data.partner.sheba),
       referralLink: affiliatePublicLink(data.partner.referralCode),
     },
