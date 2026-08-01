@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
@@ -16,6 +16,7 @@ import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 import JalaliDatePicker from "@/components/JalaliDatePicker";
 import { isValidIranianNationalId } from "@/lib/validations";
 import { calculateAgeYears, MIN_ADULT_AGE, parseBirthDate } from "@/lib/age-gate";
+import { REFERRAL_CODE_COOKIE, normalizeInviteCode } from "@/lib/referral-invite";
 
 export default function RegisterPage() {
   const { t, lang } = useLanguage();
@@ -36,6 +37,16 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // Set by /r/<code>. Purely informational: the binding itself happens
+  // server-side from the httpOnly companion cookie, so it cannot be spoofed
+  // by editing this value.
+  const [inviteCode, setInviteCode] = useState("");
+
+  useEffect(() => {
+    const fromCookie = document.cookie.split("; ").find((row) => row.startsWith(`${REFERRAL_CODE_COOKIE}=`));
+    const value = fromCookie ? decodeURIComponent(fromCookie.split("=")[1] || "") : "";
+    if (value) setInviteCode(normalizeInviteCode(value));
+  }, []);
 
   // Step 2: email OTP confirmation, shown after a successful registration.
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
@@ -285,6 +296,17 @@ export default function RegisterPage() {
               {lang === "fa" ? "حساب گیمنت بسازید و وارد آرنا شوید" : "Create your Gament account and enter the arena"}
             </p>
           </div>
+
+          {inviteCode && (
+            <div className="bg-cyan-500/10 border border-cyan-400/30 text-cyan-200 px-4 py-3 rounded-xl mb-4 text-xs leading-6 flex items-center gap-2">
+              <span className="text-base">🎁</span>
+              <span>
+                {lang === "fa"
+                  ? <>با دعوت کد <b dir="ltr">{inviteCode}</b> وارد شدی. ثبت‌نامت به‌نام دعوت‌کننده ثبت می‌شود.</>
+                  : <>You were invited with code <b dir="ltr">{inviteCode}</b>.</>}
+              </span>
+            </div>
+          )}
 
           <div className="bg-neon-blue/10 border border-neon-blue/30 text-neon-blue px-4 py-3 rounded-xl mb-6 text-xs leading-6">
             {lang === "fa"

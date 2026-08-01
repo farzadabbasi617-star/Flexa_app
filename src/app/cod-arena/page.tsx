@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
+import InviteFriendCard from "@/components/referrals/InviteFriendCard";
 
 interface CodRankRow {
   displayName: string;
@@ -261,6 +262,10 @@ export default function CodArenaPage() {
         <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-10" dir="rtl">
           <div className="flex items-end justify-between gap-4 mb-5"><div><h2 className="text-2xl font-black">لیدربرد COD Arena</h2><p className="text-xs text-gray-500 mt-2">فقط نتیجه تأییدشده امتیاز می‌سازد.</p></div><span className="text-[10px] font-black text-orange-300">{region === "garena" ? "GARENA" : "GLOBAL"}</span></div>
           {ranks.length === 0 ? <div className="rounded-3xl border border-white/5 bg-white/[.02] p-8 text-center text-sm text-gray-500">اولین روم‌های تأییدشده، لیدربرد واقعی را می‌سازند.</div> : <div className="grid grid-cols-1 md:grid-cols-2 gap-2">{ranks.map((rank,index)=><div key={`${rank.codUsername}-${index}`} className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[.025] px-4 py-3"><div className="flex items-center gap-3 min-w-0"><span className={`w-8 h-8 rounded-xl grid place-items-center font-black text-xs ${index<3?"bg-orange-500 text-black":"bg-white/5 text-gray-400"}`}>{(index+1).toLocaleString("fa-IR")}</span><img src={rank.avatarUrl||"/icons/profile_icon.png"} alt="" className="w-10 h-10 rounded-xl object-cover"/><div className="min-w-0"><div className="font-black text-sm truncate">{rank.displayName}</div><div className="text-[9px] text-gray-500 truncate" dir="ltr">{rank.codUsername}</div></div></div><div className="text-left shrink-0"><div className="font-black text-orange-300">{rank.points.toLocaleString("fa-IR")} RP</div><div className="text-[9px] text-gray-600">{rank.totalKills.toLocaleString("fa-IR")} Kill • {rank.tier}</div></div></div>)}</div>}
+        </section>
+
+        <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-8" dir="rtl">
+          <InviteFriendCard />
         </section>
 
         <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-12" dir="rtl">

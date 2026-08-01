@@ -867,6 +867,12 @@ export const affiliateAttributions = pgTable("affiliate_attributions", {
   id: uuid("id").defaultRandom().primaryKey(),
   partnerId: uuid("partner_id").notNull().references(() => mediaPartners.id),
   telegramId: varchar("telegram_id", { length: 32 }).notNull().unique(),
+  /**
+   * Channel-agnostic visitor identity: `tg:<telegramId>` for the bot flow,
+   * `web:<uuid>` for an invite link opened in a browser. Telegram was the only
+   * possible entry point before this existed.
+   */
+  visitorKey: varchar("visitor_key", { length: 64 }),
   userId: uuid("user_id").references(() => users.id).unique(),
   campaignCode: varchar("campaign_code", { length: 60 }),
   source: varchar("source", { length: 30 }).notNull().default("telegram_deep_link"),

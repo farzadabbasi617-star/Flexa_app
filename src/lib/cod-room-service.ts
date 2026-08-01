@@ -34,6 +34,7 @@ import {
   codRankTier,
   codReferralCommissionRial,
   estimateCodRoomMaximumLiability,
+  codKillBudgetScaleBps,
   codPrizeScaleBps,
   normalizeCodBannerUrl,
   normalizeCodPrizeScaling,
@@ -556,11 +557,20 @@ export async function joinCodRoom(input: { roomId: string; userId: string; rules
     // the seat away: flipping COD_ARENA_LIVE off must not turn paid rooms into
     // free ones.
     if (!live && entryFee > BigInt(0)) throw new Error("COD_PAID_ROOM_NOT_LIVE");
-    let paymentTransactionId: string | null = null;
-    if (live && entryFee > BigInt(0)) {
+    // A free room that still pays cash prizes has the same integrity
+    // requirements as a paid one: a minor must not win money, and an
+    // unverified game ID cannot be matched against the scoreboard at
+    // settlement. Gating on `entryFee > 0` alone let a free prize room admit
+    // both.
+    const paysPrizes = bigIntFromText(room.prizeBudgetRial) > BigInt(0);
+    if (entryFee > BigInt(0) || paysPrizes) {
       const gate = checkAgeGate({ birthDate: account.birthDate, nationalId: account.nationalId });
       if (!gate.ok) throw new Error("COD_AGE_GATE_BLOCKED");
       if (profile[roomGameConfig.profileFields.status] !== "verified") throw new Error("COD_PROFILE_NOT_VERIFIED");
+    }
+
+    let paymentTransactionId: string | null = null;
+    if (live && entryFee > BigInt(0)) {
       let [wallet] = await tx.select().from(wallets).where(eq(wallets.userId, account.id)).limit(1);
       if (!wallet) [wallet] = await tx.insert(wallets).values({ userId: account.id, balance: "0", currency: "RIAL" }).returning();
       const debited = await updateWalletBalanceSafely(tx, wallet.id, entryFee, "decrease");
@@ -963,15 +973,40 @@ export function computeCodSettlementRewards<T extends { id: string }>(input: {
     input.advertisedEntryCount,
     input.room.capacity,
   );
+  // The room-wide kill cap is part of the advertised budget, so it has to bind
+  // at settlement too -- not just in the pre-publish estimate. A lobby that
+  // produces more scoring kills than the cap pays the same total, spread over
+  // more kills, instead of blowing through the budget.
+  const rewardConfig = normalizeCodRewardConfig(input.room.rewardConfig);
+  const recordedKills = input.entries.reduce((sum, entry) => {
+    const kills = byEntry.get(entry.id)?.kills;
+    return sum + Math.min(Math.max(0, Math.floor(Number(kills) || 0)), rewardConfig.maxKillsPerEntry);
+  }, 0);
+  const killBudgetBps = codKillBudgetScaleBps(rewardConfig.maxTotalKills, recordedKills);
+  const killScaleBps = Math.floor((scaleBps * killBudgetBps) / 10_000);
+
   return input.entries.map((entry) => {
     const result = byEntry.get(entry.id) || { entryId: entry.id, kills: 0, placement: null };
     const placementSharers = result.placement == null ? 1 : sharersByPlacement.get(result.placement) || 1;
+    const full = calculateCodEntryReward(input.room.rewardConfig, result.kills, result.placement, {
+      placementSharers,
+      scaleBps,
+    });
+    if (killBudgetBps >= 10_000) return { entry, reward: full };
+    // Recompute only the kill component under the tightened budget; placement
+    // and participation prizes are unaffected by a kill overshoot.
+    const capped = calculateCodEntryReward(input.room.rewardConfig, result.kills, result.placement, {
+      placementSharers,
+      scaleBps: killScaleBps,
+    });
     return {
       entry,
-      reward: calculateCodEntryReward(input.room.rewardConfig, result.kills, result.placement, {
-        placementSharers,
-        scaleBps,
-      }),
+      reward: {
+        ...full,
+        killRewardRial: capped.killRewardRial,
+        killBudgetBps,
+        totalRewardRial: capped.killRewardRial + full.placementRewardRial + full.participationRewardRial,
+      },
     };
   });
 }

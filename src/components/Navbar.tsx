@@ -28,6 +28,9 @@ export default function Navbar() {
     { href: "/judging", label: t.nav.judging, icon: "⚖️" },
     { href: "/teams", label: t.teamsPage.title, icon: "🛡️" },
     { href: "/achievements", label: t.achievementsPage.title, icon: "🏅" },
+    // The referral programme was live but reachable only from one tile buried
+    // in the profile page, which is why it had 8 clicks in its lifetime.
+    { href: "/referrals", label: lang === "fa" ? "دعوت دوستان" : "Invite", icon: "🎁" },
   ];
 
   if (isAdmin) {
@@ -129,6 +132,9 @@ export default function Navbar() {
                         <Link href="/notifications" className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => { setShowUserMenu(false); setTimeout(refreshUnread, 1200); }}>
                           <span className="flex items-center gap-3"><span>🔔</span> {t.notif.title}</span>
                           {unreadNotifications > 0 && <span className="rounded-full bg-red-500 px-2 py-0.5 text-[10px] font-black text-white">{unreadNotifications > 99 ? "99+" : unreadNotifications}</span>}
+                        </Link>
+                        <Link href="/referrals" className="flex items-center gap-3 px-4 py-2.5 text-sm text-cyan-300 hover:bg-cyan-500/10 rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
+                          <span>🎁</span> {lang === "fa" ? "دعوت دوستان و درآمد" : "Invite & Earn"}
                         </Link>
                         <Link href="/support" className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:bg-neon-purple/10 hover:text-neon-purple rounded-xl transition-all" onClick={() => setShowUserMenu(false)}>
                           <span>🎧</span> پشتیبانی

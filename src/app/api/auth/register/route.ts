@@ -10,6 +10,8 @@ import { EmailService } from "@/lib/email-service";
 import logger from "@/lib/logger";
 import { TERMS_VERSION } from "@/lib/terms";
 import { initialPublicDisplayName } from "@/lib/public-profile-policy";
+import { bindWebAffiliateAttribution } from "@/lib/affiliate-service";
+import { REFERRAL_VISITOR_COOKIE } from "@/lib/referral-invite";
 
 export const dynamic = "force-dynamic";
 
@@ -190,7 +192,21 @@ export async function POST(request: NextRequest) {
       return created;
     });
 
-    // 6. Send the email OTP. If email delivery is not configured, the OTP
+    // 6. Attach any referral captured from a web invite link (/r/<code>).
+    // Best-effort: a failure here must never fail an otherwise valid signup,
+    // it only means the referrer goes unpaid, which is the pre-existing
+    // behaviour for every non-Telegram channel.
+    const referralVisitor = request.cookies.get(REFERRAL_VISITOR_COOKIE)?.value;
+    if (referralVisitor) {
+      try {
+        const bound = await bindWebAffiliateAttribution(referralVisitor, user.id);
+        logger.info({ userId: user.id, bound: bound.bound, reason: "reason" in bound ? bound.reason : null }, "Web referral attribution bound at signup");
+      } catch (error) {
+        logger.warn({ error, userId: user.id }, "Binding web referral attribution failed");
+      }
+    }
+
+    // 7. Send the email OTP. If email delivery is not configured, the OTP
     // is still generated (see EmailService) so the account can be verified
     // manually in development.
     await EmailService.sendVerificationCode(user.email!);

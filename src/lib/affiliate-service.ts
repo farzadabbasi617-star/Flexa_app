@@ -125,6 +125,10 @@ async function createAffiliateSchema(client: any) {
     attributed_at timestamp NOT NULL DEFAULT now(), expires_at timestamp NOT NULL,
     metadata jsonb NOT NULL DEFAULT '{}'::jsonb, updated_at timestamp NOT NULL DEFAULT now()
   )`));
+  // Web invite links (/r/<code>) have no Telegram id; see migration 0045.
+  await client.execute(sql.raw(`ALTER TABLE affiliate_attributions ADD COLUMN IF NOT EXISTS visitor_key varchar(64)`));
+  await client.execute(sql.raw(`UPDATE affiliate_attributions SET visitor_key='tg:'||telegram_id WHERE visitor_key IS NULL`));
+  await client.execute(sql.raw(`CREATE UNIQUE INDEX IF NOT EXISTS affiliate_attributions_visitor_key_idx ON affiliate_attributions (visitor_key) WHERE visitor_key IS NOT NULL`));
   await client.execute(sql.raw(`CREATE TABLE IF NOT EXISTS affiliate_clicks (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(), partner_id uuid NOT NULL REFERENCES media_partners(id),
     telegram_id varchar(32), campaign_code varchar(60), source varchar(30) NOT NULL DEFAULT 'telegram',
@@ -289,6 +293,104 @@ export async function recordAffiliateStart(input: {
     if (existing) await tx.update(affiliateAttributions).set(values).where(eq(affiliateAttributions.id, existing.id));
     else await tx.insert(affiliateAttributions).values(values);
     return { attributed: true as const, partnerId: partner.id, mediaName: partner.mediaName, expiresAt };
+  });
+}
+
+/**
+ * Records a click on a web invite link (`/r/<code>`).
+ *
+ * The Telegram flow identifies a visitor by their Telegram id. A browser has no
+ * such thing, so the caller mints an opaque cookie value and passes it here as
+ * `visitorKey`; it is stored in `telegram_id` too (prefixed, so it can never
+ * collide with a real numeric Telegram id) because that column is NOT NULL.
+ *
+ * First touch wins, exactly like the Telegram path: an existing live
+ * attribution is never overwritten.
+ */
+export async function recordWebAffiliateVisit(input: {
+  visitorKey: string;
+  referralCode: string;
+  campaignCode?: string | null;
+  metadata?: Record<string, unknown>;
+}) {
+  await ensureAffiliateSchema();
+  const code = normalizeAffiliateCode(input.referralCode);
+  const visitorKey = String(input.visitorKey || "").trim().slice(0, 64);
+  if (!visitorKey) return { attributed: false as const, reason: "missing_visitor" as const };
+  const [partner] = await db.select().from(mediaPartners).where(and(
+    eq(mediaPartners.referralCode, code),
+    eq(mediaPartners.status, "active"),
+  )).limit(1);
+  if (!partner) return { attributed: false as const, reason: "partner_not_active" as const };
+
+  await db.insert(affiliateClicks).values({
+    partnerId: partner.id,
+    telegramId: null,
+    campaignCode: input.campaignCode || null,
+    source: "web_invite_link",
+    metadata: { ...(input.metadata || {}), visitorKey },
+  });
+
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`affiliate:${visitorKey}`}))`);
+    const now = new Date();
+    const [existing] = await tx.select().from(affiliateAttributions)
+      .where(eq(affiliateAttributions.visitorKey, visitorKey)).for("update").limit(1);
+    if (existing?.status === "active" && existing.expiresAt > now) {
+      return { attributed: false as const, reason: "existing_first_touch" as const, partnerId: existing.partnerId };
+    }
+    const expiresAt = affiliateAttributionExpiresAt(now, partner.attributionDays);
+    const values = {
+      partnerId: partner.id,
+      // NOT NULL column; the prefix keeps it disjoint from real Telegram ids.
+      telegramId: visitorKey.slice(0, 32),
+      visitorKey,
+      campaignCode: input.campaignCode || null,
+      source: "web_invite_link",
+      status: "active",
+      attributedAt: now,
+      expiresAt,
+      metadata: input.metadata || {},
+      updatedAt: now,
+    } as const;
+    if (existing) await tx.update(affiliateAttributions).set(values).where(eq(affiliateAttributions.id, existing.id));
+    else await tx.insert(affiliateAttributions).values(values);
+    return { attributed: true as const, partnerId: partner.id, mediaName: partner.mediaName, expiresAt };
+  });
+}
+
+/**
+ * Attaches a freshly registered account to a web attribution captured before
+ * signup. Mirrors `bindAffiliateAttribution`, including the self-referral and
+ * already-active-player guards.
+ */
+export async function bindWebAffiliateAttribution(visitorKey: string, userId: string) {
+  await ensureAffiliateSchema();
+  const key = String(visitorKey || "").trim().slice(0, 64);
+  if (!key) return { bound: false as const, reason: "missing_visitor" as const };
+  return db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`affiliate-bind:${userId}`}))`);
+    const [attribution] = await tx.select().from(affiliateAttributions)
+      .where(eq(affiliateAttributions.visitorKey, key)).for("update").limit(1);
+    if (!attribution || attribution.status !== "active" || attribution.expiresAt <= new Date()) return { bound: false as const };
+    if (attribution.userId && attribution.userId !== userId) return { bound: false as const, reason: "visitor_already_bound" as const };
+    const [owner] = await tx.select({ userId: mediaPartners.userId }).from(mediaPartners)
+      .where(eq(mediaPartners.id, attribution.partnerId)).limit(1);
+    if (owner?.userId === userId) {
+      await tx.update(affiliateAttributions).set({ status: "revoked", updatedAt: new Date() })
+        .where(eq(affiliateAttributions.id, attribution.id));
+      return { bound: false as const, reason: "self_referral" as const };
+    }
+    if (await hasRecentPaidMatch(userId, attribution.attributedAt)) {
+      await tx.update(affiliateAttributions).set({ status: "ineligible_active_user", userId, updatedAt: new Date() })
+        .where(eq(affiliateAttributions.id, attribution.id));
+      return { bound: false as const, reason: "existing_active_player" as const };
+    }
+    const [other] = await tx.select({ id: affiliateAttributions.id }).from(affiliateAttributions)
+      .where(and(eq(affiliateAttributions.userId, userId), sql`${affiliateAttributions.id} <> ${attribution.id}`)).limit(1);
+    if (other) return { bound: false as const, reason: "user_already_attributed" as const };
+    await tx.update(affiliateAttributions).set({ userId, updatedAt: new Date() }).where(eq(affiliateAttributions.id, attribution.id));
+    return { bound: true as const, partnerId: attribution.partnerId, expiresAt: attribution.expiresAt };
   });
 }
 

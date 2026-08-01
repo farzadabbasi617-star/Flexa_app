@@ -122,6 +122,24 @@ export function normalizeCodRewardConfig(input: unknown): CodRewardConfig {
   };
 }
 
+/**
+ * How much the room-wide kill budget has to shrink for a lobby that produced
+ * more scoring kills than `maxTotalKills`.
+ *
+ * `maxTotalKills` was only ever read by the pre-publish estimate, so a room
+ * advertising a 450,000 toman kill budget would happily pay 1,350,000 if the
+ * lobby produced three times the expected kills. Settlement now applies the
+ * same ceiling: recorded kills stay factual, the per-kill amount scales down.
+ *
+ * Returns basis points (10000 = no reduction).
+ */
+export function codKillBudgetScaleBps(maxTotalKills: number, recordedTotalKills: number) {
+  const cap = Math.max(0, Math.floor(Number(maxTotalKills) || 0));
+  const recorded = Math.max(0, Math.floor(Number(recordedTotalKills) || 0));
+  if (cap <= 0 || recorded <= cap) return 10_000;
+  return Math.floor((cap * 10_000) / recorded);
+}
+
 /** Total payout for `kills` kills under a halving ladder. */
 export function codKillLadderTotalRial(ladder: CodKillLadderConfig, kills: number) {
   const first = BigInt(ladder.firstKillRial);
