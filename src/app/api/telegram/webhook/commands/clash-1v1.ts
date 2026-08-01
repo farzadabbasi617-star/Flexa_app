@@ -476,12 +476,12 @@ async function notifyMatchStartedSide(pair: QueuePair, player: QueueParticipant)
     "هر دو بازیکن آماده‌اند. همین الان Friendly Battle را آغاز کنید.",
     `🎮 مود اجباری: <b>${html(clashDuelModeLabel(player.gameMode || "normal"))}</b>`,
     `👑 میزبان: <b>${html(participantName(pair.player1))}</b>`,
-    "پس از پایان، نتیجه را مستقل ثبت کنید؛ سیستم Battle Log کلش رویال و مود انجام‌شده را بررسی می‌کند.",
+    "پس از پایان بازی، دکمه «بررسی نتیجه» را بزنید؛ سیستم مستقیم از Battle Log کلش رویال برنده را تشخیص می‌دهد. نیازی به اعلام نتیجه نیست.",
     "",
     `Match ID: <code>${html(pair.matchId.slice(0, 8))}</code>`,
   ].filter(Boolean).join("\n"), {
     inline_keyboard: [
-      [{ text: "✅ بردم", callback_data: `result:win:${pair.matchId}` }, { text: "❌ باختم", callback_data: `result:lose:${pair.matchId}` }],
+      [{ text: "🔍 بررسی نتیجه", callback_data: `result:verify:${pair.matchId}` }],
       [{ text: "📎 ارسال اسکرین‌شات", callback_data: `evidence:${pair.matchId}` }, { text: "🚨 اعتراض", callback_data: `dispute:${pair.matchId}` }],
     ],
   });

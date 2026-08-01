@@ -12,7 +12,7 @@ import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } 
 import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achievement-service";
 import { LevelingService } from "@/lib/leveling-service";
 import { CLASH_1V1_CONFIG, ensureClash1v1Schema, finalizeMatchResult, refundClash1v1Match, suspendClash1v1Telegram } from "@/lib/clash-1v1";
-import { resolveMatchResultClaims, type MatchResultClaimValue } from "@/lib/match-result-policy";
+import { clashVerdictMessage, decideClashVerdict } from "@/lib/clash-api-verdict";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 import {
   ensurePrivateTournamentAttendanceSchema,
@@ -1711,10 +1711,6 @@ async function loadMatchResultContext(matchId: string, client: any = db) {
   };
 }
 
-function resultClaimLabel(claim?: string | null) {
-  return claim === "win" ? "برد" : claim === "lose" ? "باخت" : "ثبت نشده";
-}
-
 async function notifyResultAdmins(matchId: string, message: string, customKeyboard?: Record<string, unknown>) {
   const keyboard = customKeyboard || {
     inline_keyboard: [[
@@ -1776,24 +1772,36 @@ type ClashApiSettlementResult =
   | { state: "disputed"; reason: string }
   | { state: "no_consensus" };
 
-async function verifyAndFinalizeAgreedMatch(matchId: string): Promise<ClashApiSettlementResult> {
+/**
+ * Reads the Clash Royale Battle Log and settles the match from it.
+ *
+ * Players no longer self-report. The Battle Log names the winner by crown
+ * count, so asking "did you win?" only ever added a way to lie or to deadlock.
+ * The dispute button is untouched: the API is authoritative about the score,
+ * not about fairness.
+ *
+ * Idempotent -- pressing the button twice on a settled match returns the
+ * existing result rather than paying twice.
+ */
+async function verifyMatchFromBattleLog(matchId: string): Promise<ClashApiSettlementResult> {
   const context = await loadMatchResultContext(matchId);
   if (!context) return { state: "no_consensus" };
-  const claimRows = await db
-    .select({ playerId: matchResultClaims.playerId, claim: matchResultClaims.claim })
-    .from(matchResultClaims)
-    .where(eq(matchResultClaims.matchId, matchId));
-  const claims = claimRows
-    .filter((claim) => claim.claim === "win" || claim.claim === "lose")
-    .map((claim) => ({ playerId: claim.playerId, claim: claim.claim as MatchResultClaimValue }));
-  const resolution = resolveMatchResultClaims(context.player1.id, context.player2.id, claims);
-  if (resolution.state !== "agreed") return { state: "no_consensus" };
 
   const apiConfig = getClashRoyaleApiConfiguration();
-  if (!apiConfig.configured) return { state: "api_error", reason: "not_configured" };
   const player1Tag = normalizeClashRoyaleTag(context.player1.clashRoyaleTag);
   const player2Tag = normalizeClashRoyaleTag(context.player2.clashRoyaleTag);
-  if (!player1Tag || !player2Tag) return { state: "missing_tags" };
+
+  if (!apiConfig.configured || !player1Tag || !player2Tag) {
+    const verdict = decideClashVerdict({
+      battle: null,
+      player1Tag,
+      player2Tag,
+      apiConfigured: apiConfig.configured,
+    });
+    return verdict.state === "missing_tags"
+      ? { state: "missing_tags" }
+      : { state: "api_error", reason: verdict.reason || "not_configured" };
+  }
 
   try {
     const battle = await verifyClashRoyaleHeadToHead({
@@ -1801,42 +1809,64 @@ async function verifyAndFinalizeAgreedMatch(matchId: string): Promise<ClashApiSe
       player2Tag,
       notBefore: new Date(new Date(context.scheduledAt || context.createdAt).getTime() - 30_000),
     });
-    if (!battle) return { state: "pending_api" };
+
     const expectedMode = context.duel.gameMode || "normal";
-    if (isClashDuelGameMode(expectedMode) && !clashBattleMatchesExpectedMode(expectedMode, battle)) {
-      const evidence = {
-        source: "clash_api_mode_mismatch",
-        expectedGameMode: expectedMode,
-        actualGameMode: battle.gameMode,
-        actualBattleType: battle.battleType,
-        actualDeckSelection: battle.raw.deckSelection || null,
-        battleTime: battle.battleTime.toISOString(),
-        responsiblePlayerId: context.player1.id,
-        responsibleRole: "host",
-        stakeMode: context.duel.stakeMode,
-        action: "admin_penalty_required",
-      };
-      await db.update(matches).set({ status: "disputed", evidence }).where(eq(matches.id, matchId));
-      return { state: "disputed", reason: "api_mode_mismatch" };
-    }
-    const claimedWinner = resolution.winnerId === context.player1.id ? player1Tag : player2Tag;
-    if (!battle.winnerTag || battle.winnerTag !== claimedWinner) {
+    const modeMatters = isClashDuelGameMode(expectedMode);
+    const verdict = decideClashVerdict({
+      battle: battle && {
+        battleTime: battle.battleTime,
+        winnerTag: battle.winnerTag,
+        player1Tag: battle.player1Tag,
+        player2Tag: battle.player2Tag,
+        player1Crowns: battle.player1Crowns,
+        player2Crowns: battle.player2Crowns,
+      },
+      player1Tag,
+      player2Tag,
+      apiConfigured: true,
+      modeMatches: battle && modeMatters ? clashBattleMatchesExpectedMode(expectedMode, battle) : undefined,
+    });
+
+    if (verdict.state === "pending_api") return { state: "pending_api" };
+
+    if (verdict.state === "mode_mismatch") {
       await db.update(matches).set({
         status: "disputed",
         evidence: {
-          source: "clash_api_mismatch",
-          claimedWinnerId: resolution.winnerId,
-          apiWinnerTag: battle.winnerTag,
-          battleTime: battle.battleTime.toISOString(),
-          player1Crowns: battle.player1Crowns,
-          player2Crowns: battle.player2Crowns,
+          source: "clash_api_mode_mismatch",
+          expectedGameMode: expectedMode,
+          actualGameMode: battle?.gameMode ?? null,
+          actualBattleType: battle?.battleType ?? null,
+          actualDeckSelection: battle?.raw.deckSelection || null,
+          battleTime: verdict.battleTime,
+          responsiblePlayerId: context.player1.id,
+          responsibleRole: "host",
+          stakeMode: context.duel.stakeMode,
+          action: "admin_penalty_required",
         },
       }).where(eq(matches.id, matchId));
-      return { state: "disputed", reason: "api_result_mismatch" };
+      return { state: "disputed", reason: "api_mode_mismatch" };
     }
 
+    if (verdict.state === "draw") {
+      // Equal crowns. There is no winner to pay, and refunding automatically
+      // would be a money decision made without a human, so it goes to judging.
+      await db.update(matches).set({
+        status: "disputed",
+        evidence: {
+          source: "clash_api_draw",
+          battleTime: verdict.battleTime,
+          player1Crowns: verdict.player1Crowns,
+          player2Crowns: verdict.player2Crowns,
+          stakeMode: context.duel.stakeMode,
+        },
+      }).where(eq(matches.id, matchId));
+      return { state: "disputed", reason: "api_draw" };
+    }
+
+    const winnerId = verdict.winnerTag === player1Tag ? context.player1.id : context.player2.id;
     await ensureAffiliateSchema();
-    const finalized = await db.transaction(async (tx) => finalizeMatchResult(tx, matchId, resolution.winnerId, { affiliateEligible: true }));
+    const finalized = await db.transaction(async (tx) => finalizeMatchResult(tx, matchId, winnerId, { affiliateEligible: true }));
     if (!finalized.completed) return { state: "api_error", reason: finalized.reason };
     return {
       state: "completed",
@@ -1887,177 +1917,159 @@ async function handleMatchAction(chatId: number, telegramId: string, matchId: st
   }
   await sendMessage(chatId, `⚔️ <b>${html(match.tournamentName || "مسابقه")}</b>\nوضعیت: <b>${html(match.status)}</b>\n\nنتیجه یا عملیات را انتخاب کن:`, {
     inline_keyboard: [
-      [{ text: "✅ بردم", callback_data: `result:win:${matchId}` }, { text: "❌ باختم", callback_data: `result:lose:${matchId}` }],
+      [{ text: "🔍 بررسی نتیجه", callback_data: `result:verify:${matchId}` }],
       [{ text: "📎 ارسال اسکرین‌شات", callback_data: `evidence:${matchId}` }],
       [{ text: "🚨 اعتراض دارم", callback_data: `dispute:${matchId}` }],
     ],
   });
 }
 
-async function submitTelegramResult(chatId: number, telegramId: string, matchId: string, action: MatchResultClaimValue) {
+/**
+ * Records that a Battle Log lookup came back empty.
+ *
+ * The cron sweep (`verifyPendingClash1v1Results`) already re-checks every
+ * in-progress 1V1 match on each cycle, so this does not need its own queue --
+ * it stamps the match so the attempt count is visible in the admin evidence
+ * view and in logs, and so a match that never resolves is findable.
+ */
+async function scheduleClashVerdictRetry(matchId: string) {
+  try {
+    const [row] = await db.select({ evidence: matches.evidence }).from(matches).where(eq(matches.id, matchId)).limit(1);
+    const previous = row?.evidence && typeof row.evidence === "object" && !Array.isArray(row.evidence)
+      ? row.evidence as Record<string, unknown>
+      : {};
+    const attempts = Number(previous.verificationAttempts || 0) + 1;
+    await db.update(matches).set({
+      evidence: {
+        ...previous,
+        source: "clash_api_awaiting_battle_log",
+        verificationAttempts: attempts,
+        lastVerificationAt: new Date().toISOString(),
+      },
+    }).where(eq(matches.id, matchId));
+  } catch (error) {
+    // Never let bookkeeping break the player's flow.
+    logger.warn({ error, matchId }, "Recording Clash verification attempt failed");
+  }
+}
+
+/**
+ * The single result action a player has: ask the system to read the Battle Log.
+ *
+ * Replaces the old "✅ بردم / ❌ باختم" pair. Any participant can press it, at
+ * any time, as often as they like -- the outcome depends on Supercell's data,
+ * not on who pressed first, so there is nothing to race and nothing to game.
+ */
+async function verifyTelegramResult(chatId: number, telegramId: string, matchId: string) {
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!linked?.userId) {
-    await sendMessage(chatId, "برای ثبت نتیجه، ابتدا حساب تلگرام را به Gament وصل کن.");
-    return;
-  }
-
-  await ensureClash1v1Schema();
-  const outcome = await db.transaction(async (tx) => {
-    await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`match-result:${matchId}`}))`);
-    const [match] = await tx.select().from(matches).where(eq(matches.id, matchId)).limit(1);
-    if (!match?.player1Id || !match.player2Id) return { kind: "missing" as const };
-    if (match.status === "completed") return { kind: "completed" as const, winnerId: match.winnerId };
-    if (match.status === "pending") return { kind: "not_started" as const };
-
-    const participants = await tx
-      .select({ id: players.id, userId: players.visibleUserId })
-      .from(players)
-      .where(inArray(players.id, [match.player1Id, match.player2Id]));
-    const reporter = participants.find((player: { userId: string | null }) => player.userId === linked.userId);
-    if (!reporter) return { kind: "forbidden" as const };
-
-    await tx
-      .insert(matchResultClaims)
-      .values({
-        matchId,
-        playerId: reporter.id,
-        userId: linked.userId,
-        telegramId,
-        claim: action,
-        submittedAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [matchResultClaims.matchId, matchResultClaims.playerId],
-        set: { claim: action, telegramId, updatedAt: new Date() },
-      });
-
-    const claimRows = await tx
-      .select({ playerId: matchResultClaims.playerId, claim: matchResultClaims.claim })
-      .from(matchResultClaims)
-      .where(eq(matchResultClaims.matchId, matchId));
-    const claims = claimRows
-      .filter((claim: { claim: string }) => claim.claim === "win" || claim.claim === "lose")
-      .map((claim: { playerId: string; claim: string }) => ({
-        playerId: claim.playerId,
-        claim: claim.claim as MatchResultClaimValue,
-      }));
-    const resolution = resolveMatchResultClaims(match.player1Id, match.player2Id, claims);
-    const evidenceSummary = {
-      source: "telegram_claims_v2",
-      claims,
-      resolution,
-      updatedAt: new Date().toISOString(),
-    };
-
-    if (resolution.state === "pending") {
-      // One report alone is not a judging case. Keep the match active and wait
-      // for the opponent's independent claim.
-      await tx.update(matches).set({ status: "in_progress", evidence: evidenceSummary }).where(eq(matches.id, matchId));
-      return { kind: "pending" as const, reporterPlayerId: reporter.id, claims, match };
-    }
-    if (resolution.state === "conflict") {
-      await tx.update(matches).set({ status: "disputed", evidence: evidenceSummary }).where(eq(matches.id, matchId));
-      return { kind: "conflict" as const, reason: resolution.reason, claims, match };
-    }
-
-    await tx.update(matches).set({ status: "in_progress", evidence: evidenceSummary }).where(eq(matches.id, matchId));
-    return { kind: "agreed" as const, resolution, claims, match };
-  });
-
-  if (outcome.kind === "missing" || outcome.kind === "forbidden") {
-    await sendMessage(chatId, "این مسابقه برای حساب شما پیدا نشد.");
-    return;
-  }
-  if (outcome.kind === "completed") {
-    await sendMessage(chatId, "✅ نتیجه این مسابقه قبلاً نهایی شده است.");
-    return;
-  }
-  if (outcome.kind === "not_started") {
-    await sendMessage(chatId, "ثبت نتیجه هنوز فعال نیست. هر دو بازیکن باید ابتدا دکمه «آماده‌ام» را بزنند تا Match رسمی شروع شود.");
+    await sendMessage(chatId, "برای بررسی نتیجه، ابتدا حساب تلگرام را به Gament وصل کن.");
     return;
   }
 
   const context = await loadMatchResultContext(matchId);
-  const claimsText = context
-    ? [
-        `بازیکن ۱: <b>${html(resultClaimLabel(outcome.claims.find((c) => c.playerId === context.player1.id)?.claim))}</b>`,
-        `بازیکن ۲: <b>${html(resultClaimLabel(outcome.claims.find((c) => c.playerId === context.player2.id)?.claim))}</b>`,
-      ].join("\n")
-    : "";
-
-  if (outcome.kind === "pending") {
-    await sendMessage(chatId, [
-      "✅ نتیجه شما مستقل ثبت شد.",
-      "منتظر گزارش حریف هستیم. برای بررسی بهتر می‌توانی اسکرین‌شات نتیجه را هم ارسال کنی.",
-    ].join("\n"), {
-      inline_keyboard: [[{ text: "📎 ارسال اسکرین‌شات", callback_data: `evidence:${matchId}` }]],
-    });
-    if (context) {
-      const opponent = context.player1.id === outcome.reporterPlayerId ? context.player2 : context.player1;
-      await notifyLinkedUserOnTelegram(opponent.userId, "⚔️ حریف نتیجه مسابقه را ثبت کرده است. لطفاً نتیجه خودت را مستقل اعلام کن.", {
-        inline_keyboard: [[
-          { text: "✅ بردم", callback_data: `result:win:${matchId}` },
-          { text: "❌ باختم", callback_data: `result:lose:${matchId}` },
-        ], [{ text: "🚨 اعتراض", callback_data: `dispute:${matchId}` }]],
-      }).catch(() => undefined);
-    }
+  if (!context) {
+    await sendMessage(chatId, "این مسابقه برای حساب شما پیدا نشد.");
+    return;
+  }
+  const isParticipant = [context.player1.userId, context.player2.userId].includes(linked.userId);
+  if (!isParticipant) {
+    await sendMessage(chatId, "این مسابقه برای حساب شما پیدا نشد.");
+    return;
+  }
+  if (context.status === "completed") {
+    await sendMessage(chatId, "✅ نتیجه این مسابقه قبلاً نهایی شده است.");
+    return;
+  }
+  if (context.status === "pending") {
+    await sendMessage(chatId, "بررسی نتیجه هنوز فعال نیست. هر دو بازیکن باید ابتدا دکمه «آماده‌ام» را بزنند تا Match رسمی شروع شود.");
     return;
   }
 
-  if (outcome.kind === "conflict") {
-    await sendMessage(chatId, "🚨 گزارش دو بازیکن با هم سازگار نیست. مسابقه برای داوری انسانی ارسال شد.");
-    if (context) {
-      await Promise.allSettled([
-        notifyLinkedUserOnTelegram(context.player1.userId, "🚨 گزارش‌های مسابقه با هم اختلاف دارند و برای داوری انسانی ارسال شدند."),
-        notifyLinkedUserOnTelegram(context.player2.userId, "🚨 گزارش‌های مسابقه با هم اختلاف دارند و برای داوری انسانی ارسال شدند."),
-      ]);
-    }
-    await notifyResultAdmins(matchId, `🚨 <b>اختلاف نتیجه 1V1</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>\n${claimsText}`);
-    return;
-  }
+  await sendMessage(chatId, "🔍 در حال بررسی Battle Log کلش رویال...");
+  const settlement = await verifyMatchFromBattleLog(matchId);
+  await announceClashSettlement(chatId, matchId, settlement, context);
+}
 
-  const settlement = await verifyAndFinalizeAgreedMatch(matchId);
+/**
+ * Turns a settlement into player and admin messages.
+ *
+ * Shared by the manual button and the automatic retry sweep so both report the
+ * same thing; the retry path passes `chatId = null` because it has nobody to
+ * reply to.
+ */
+async function announceClashSettlement(
+  chatId: number | null,
+  matchId: string,
+  settlement: ClashApiSettlementResult,
+  context: Awaited<ReturnType<typeof loadMatchResultContext>>,
+) {
   if (settlement.state === "completed") {
-    // Complementary claims settle privately after the Battle Log confirms the
-    // same winner. No judge/admin notification is created.
     await notifyFinalMatchResult(matchId, settlement.winnerId, settlement.prizePaid);
+    if (chatId) await sendMessage(chatId, clashVerdictMessage("decided"));
     return;
   }
+
   if (settlement.state === "disputed") {
-    const mismatchText = settlement.reason === "api_mode_mismatch"
-      ? `🚨 مود بازی انجام‌شده با مود توافق‌شده «${html(clashDuelModeLabel(context?.duel.gameMode || "normal"))}» مطابقت ندارد و برای داوری ارسال شد.`
-      : "🚨 نتیجه ثبت‌شده با Battle Log کلش رویال مطابقت ندارد و برای داوری ارسال شد.";
+    const isDraw = settlement.reason === "api_draw";
+    const isMode = settlement.reason === "api_mode_mismatch";
+    const playerText = isDraw
+      ? clashVerdictMessage("draw")
+      : isMode
+        ? `🚨 مود بازی انجام‌شده با مود توافق‌شده «${html(clashDuelModeLabel(context?.duel.gameMode || "normal"))}» مطابقت ندارد و برای داوری ارسال شد.`
+        : "🚨 نتیجه با Battle Log کلش رویال قابل تأیید نبود و برای داوری ارسال شد.";
     if (context) {
       await Promise.allSettled([
-        notifyLinkedUserOnTelegram(context.player1.userId, mismatchText),
-        notifyLinkedUserOnTelegram(context.player2.userId, mismatchText),
+        notifyLinkedUserOnTelegram(context.player1.userId, playerText),
+        notifyLinkedUserOnTelegram(context.player2.userId, playerText),
       ]);
     }
-    const adminKeyboard = settlement.reason === "api_mode_mismatch" ? {
+    const adminKeyboard = isMode ? {
       inline_keyboard: [
         [{ text: "⚠️ باخت فنی میزبان", callback_data: `judge:mode_forfeit:${matchId}` }],
         [{ text: "🔁 تکرار مسابقه", callback_data: `judge:mode_replay:${matchId}` }, { text: "💳 بازپرداخت", callback_data: `judge:mode_refund:${matchId}` }],
         [{ text: "⛔ تعلیق ۲۴ ساعته میزبان", callback_data: `judge:mode_suspend:${matchId}` }],
         [{ text: "⚖️ جزئیات و مدارک", callback_data: `judge:info:${matchId}` }],
       ],
+    } : isDraw ? {
+      inline_keyboard: [
+        [{ text: "💳 بازپرداخت هر دو", callback_data: `judge:mode_refund:${matchId}` }],
+        [{ text: "🔁 تکرار مسابقه", callback_data: `judge:mode_replay:${matchId}` }],
+        [{ text: "⚖️ جزئیات و مدارک", callback_data: `judge:info:${matchId}` }],
+      ],
     } : undefined;
-    await notifyResultAdmins(matchId, `🚨 <b>اختلاف با Clash Royale API</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>\nReason: <code>${html(settlement.reason)}</code>${settlement.reason === "api_mode_mismatch" ? `\nمیزبان مسئول: <b>${html(context?.player1.name || context?.player1.username || "بازیکن ۱")}</b>` : ""}`, adminKeyboard);
+    const heading = isDraw ? "🤝 <b>تساوی در Battle Log</b>" : "🚨 <b>اختلاف با Clash Royale API</b>";
+    await notifyResultAdmins(
+      matchId,
+      `${heading}\nMatch: <code>${html(matchId.slice(0, 8))}</code>\nReason: <code>${html(settlement.reason)}</code>${isMode ? `\nمیزبان مسئول: <b>${html(context?.player1.name || context?.player1.username || "بازیکن ۱")}</b>` : ""}`,
+      adminKeyboard,
+    );
+    if (chatId) await sendMessage(chatId, playerText);
     return;
   }
+
   if (settlement.state === "missing_tags") {
+    const text = `⚠️ برای بررسی خودکار، هر دو بازیکن باید Player Tag تأییدشده داشته باشند. از پروفایل Gament ثبتش کنید: ${html(`${APP_URL}/profile/edit`)}`;
     if (context) {
-      const text = `⚠️ برای بررسی خودکار، هر دو بازیکن باید Player Tag تأییدشده داشته باشند. از پروفایل Gament ثبتش کنید: ${html(`${APP_URL}/profile/edit`)}`;
       await Promise.allSettled([
         notifyLinkedUserOnTelegram(context.player1.userId, text),
         notifyLinkedUserOnTelegram(context.player2.userId, text),
       ]);
     }
+    if (chatId) await sendMessage(chatId, text);
     return;
   }
-  // Battle logs can appear with a short delay, and proxy/network failures are
-  // transient. Keep the match active and expose an idempotent retry button.
-  await notifyApiVerificationPending(matchId, context);
+
+  // pending_api / api_error / no_consensus: the Battle Log may still appear, so
+  // schedule automatic retries and leave a manual button for the impatient.
+  await scheduleClashVerdictRetry(matchId);
+  if (chatId) {
+    await sendMessage(
+      chatId,
+      clashVerdictMessage(settlement.state === "api_error" ? "api_error" : "pending_api"),
+      { inline_keyboard: [[{ text: "🔄 بررسی دوباره", callback_data: `result:verify:${matchId}` }]] },
+    );
+  }
 }
 
 async function startDispute(chatId: number, telegramId: string, matchId: string) {
@@ -2966,6 +2978,20 @@ async function judgeCommand(chatId: number, telegramId: string) {
   });
 }
 
+/** Human-readable summary of what the Clash API said, for the judging panel. */
+function clashEvidenceLines(evidence: unknown): string[] {
+  if (!evidence || typeof evidence !== "object" || Array.isArray(evidence)) return ["منبع: <code>—</code>"];
+  const data = evidence as Record<string, unknown>;
+  const lines = [`منبع: <code>${html(String(data.source || "—"))}</code>`];
+  if (data.player1Crowns != null || data.player2Crowns != null) {
+    lines.push(`تاج‌ها: <b>${html(String(data.player1Crowns ?? "?"))}</b> - <b>${html(String(data.player2Crowns ?? "?"))}</b>`);
+  }
+  if (data.battleTime) lines.push(`زمان بازی: <code>${html(String(data.battleTime))}</code>`);
+  if (data.expectedGameMode) lines.push(`مود انتظاری: <code>${html(String(data.expectedGameMode))}</code> / واقعی: <code>${html(String(data.actualGameMode ?? "?"))}</code>`);
+  if (data.verificationAttempts) lines.push(`تلاش بررسی: <b>${html(String(data.verificationAttempts))}</b>`);
+  return lines;
+}
+
 async function handleJudgeAction(chatId: number, telegramId: string, action: string, matchId: string) {
   const linked = await getLinkedUserByTelegram(telegramId);
   if (!hasAdminAccess(telegramId) && !["judge", "moderator", "admin", "super_admin"].includes(String(linked?.role || ""))) {
@@ -2975,14 +3001,6 @@ async function handleJudgeAction(chatId: number, telegramId: string, action: str
   const context = await loadMatchResultContext(matchId);
   if (!context) return sendMessage(chatId, "مسابقه پیدا نشد.");
 
-  const claimRows = await db
-    .select({ playerId: matchResultClaims.playerId, claim: matchResultClaims.claim, updatedAt: matchResultClaims.updatedAt })
-    .from(matchResultClaims)
-    .where(eq(matchResultClaims.matchId, matchId));
-  const claims = claimRows
-    .filter((claim) => claim.claim === "win" || claim.claim === "lose")
-    .map((claim) => ({ playerId: claim.playerId, claim: claim.claim as MatchResultClaimValue }));
-  const resolution = resolveMatchResultClaims(context.player1.id, context.player2.id, claims);
 
   if (action === "mode_replay") {
     await db.transaction(async (tx) => {
@@ -3028,9 +3046,13 @@ async function handleJudgeAction(chatId: number, telegramId: string, action: str
       `Match: <code>${html(matchId)}</code>`,
       `وضعیت: <b>${html(context.status)}</b>`,
       "",
-      `1) ${html(context.player1.name || context.player1.username || "بازیکن ۱")}: <b>${html(resultClaimLabel(claims.find((c) => c.playerId === context.player1.id)?.claim))}</b>`,
-      `2) ${html(context.player2.name || context.player2.username || "بازیکن ۲")}: <b>${html(resultClaimLabel(claims.find((c) => c.playerId === context.player2.id)?.claim))}</b>`,
-      `مدارک: <b>${evidenceRows.length.toLocaleString("fa-IR")}</b>`,
+      `1) ${html(context.player1.name || context.player1.username || "بازیکن ۱")}`,
+      `2) ${html(context.player2.name || context.player2.username || "بازیکن ۲")}`,
+      "",
+      // Players no longer self-report, so the useful evidence is what the
+      // Battle Log said and why it could not settle on its own.
+      ...clashEvidenceLines(context.evidence),
+      `مدارک آپلودشده: <b>${evidenceRows.length.toLocaleString("fa-IR")}</b>`,
     ].join("\n"), {
       inline_keyboard: [[
         { text: "🏆 بازیکن ۱ برنده", callback_data: `judge:p1:${matchId}` },
@@ -3058,9 +3080,16 @@ async function handleJudgeAction(chatId: number, telegramId: string, action: str
   if (action === "p1") winnerId = context.player1.id;
   if (action === "p2") winnerId = context.player2.id;
   if (action === "mode_forfeit") winnerId = context.player2.id;
-  if (action === "approve" && resolution.state === "agreed") winnerId = resolution.winnerId;
-  if (action === "approve" && !winnerId) {
-    return sendMessage(chatId, "نتیجه دو طرف موافق نیست؛ لطفاً صریحاً «بازیکن ۱» یا «بازیکن ۲» را به‌عنوان برنده انتخاب کن.");
+  if (action === "approve") {
+    // Players no longer self-report, so "approve" means "ask the Battle Log
+    // again" -- useful when the match was disputed before Supercell published
+    // it. Anything the API cannot decide still needs an explicit p1/p2 call.
+    const settlement = await verifyMatchFromBattleLog(matchId);
+    if (settlement.state === "completed") {
+      await notifyFinalMatchResult(matchId, settlement.winnerId, settlement.prizePaid);
+      return sendMessage(chatId, "✅ Battle Log نتیجه را تأیید کرد و جایزه نهایی شد.");
+    }
+    return sendMessage(chatId, `Battle Log نتیجه قطعی نداد (<code>${html(settlement.state)}</code>). برنده را صریحاً انتخاب کن: «بازیکن ۱» یا «بازیکن ۲».`);
   }
   if (!winnerId) return sendMessage(chatId, "عملیات داوری نامعتبر است.");
 
@@ -4020,22 +4049,10 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data.startsWith("match:")) return handleMatchAction(chatId, telegramId, data.replace("match:", ""));
   if (data.startsWith("result:")) {
     const [, action, matchId] = data.split(":");
-    if ((action === "win" || action === "lose") && matchId) return submitTelegramResult(chatId, telegramId, matchId, action);
-    if (action === "verify" && matchId) {
-      const { linked, rows } = await userMatchRows(telegramId);
-      if (!linked || !rows.some((match) => match.id === matchId)) return sendMessage(chatId, "این مسابقه برای حساب شما پیدا نشد.");
-      const settlement = await verifyAndFinalizeAgreedMatch(matchId);
-      if (settlement.state === "completed") {
-        await notifyFinalMatchResult(matchId, settlement.winnerId, settlement.prizePaid);
-        return sendMessage(chatId, "✅ Battle Log تأیید شد و نتیجه/جایزه نهایی شد.");
-      }
-      if (settlement.state === "disputed") {
-        await notifyResultAdmins(matchId, `🚨 <b>اختلاف با Clash Royale API</b>\nMatch: <code>${html(matchId.slice(0, 8))}</code>`);
-        return sendMessage(chatId, "🚨 نتیجه با Battle Log مطابقت ندارد و برای داوری ارسال شد.");
-      }
-      if (settlement.state === "missing_tags") return sendMessage(chatId, "هر دو بازیکن باید Player Tag تأییدشده را در پروفایل ثبت کنند.");
-      return sendMessage(chatId, "⏳ Battle Log هنوز در API دیده نمی‌شود. یک دقیقه دیگر دوباره تلاش کن.");
-    }
+    if (action === "verify" && matchId) return verifyTelegramResult(chatId, telegramId, matchId);
+    // Legacy win/lose buttons may still exist in old chat messages. Route them
+    // to the Battle Log check rather than failing, so nobody is stuck.
+    if ((action === "win" || action === "lose") && matchId) return verifyTelegramResult(chatId, telegramId, matchId);
   }
   if (data.startsWith("dispute:")) return startDispute(chatId, telegramId, data.replace("dispute:", ""));
   if (data.startsWith("evidence:")) return startEvidenceUpload(chatId, telegramId, data.replace("evidence:", ""));

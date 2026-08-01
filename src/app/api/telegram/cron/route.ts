@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { clash1v1Entries, codRoomEntries, codRooms, matchResultClaims, matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions, users, honors, honorLikes, honorViews } from "@/db/schema";
+import { clash1v1Entries, codRoomEntries, codRooms, matches, players, registrations, telegramAccounts, telegramPreRegistrations, telegramSentNotifications, tickets, tournaments, transactions, users, honors, honorLikes, honorViews } from "@/db/schema";
 import { getTelegramChannelChatId } from "@/lib/telegram";
 import {
   cleanupTelegramReliability,
@@ -13,8 +13,8 @@ import logger from "@/lib/logger";
 import { processClash1v1ReadyTimeouts, runClash1v1MatchmakingAndNotify } from "../webhook/commands/clash-1v1";
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 import { ensurePrivateTournamentAttendanceSchema, privateCheckInWindow } from "@/lib/private-tournament-attendance";
+import { decideClashVerdict } from "@/lib/clash-api-verdict";
 import { CLASH_1V1_CONFIG, expireClash1v1Challenges, finalizeMatchResult } from "@/lib/clash-1v1";
-import { resolveMatchResultClaims, type MatchResultClaimValue } from "@/lib/match-result-policy";
 import { clashBattleMatchesExpectedMode, isClashDuelGameMode } from "@/lib/clash-duel-policy";
 import { getClashRoyaleApiConfiguration, normalizeClashRoyaleTag, verifyClashRoyaleHeadToHead } from "@/lib/clash-royale-api";
 import { processStoreOrderDeadlines } from "@/lib/store-service";
@@ -353,6 +353,18 @@ async function promptPrivateTournamentLeaderboardUploads() {
   return prompted;
 }
 
+/**
+ * Automatic Battle Log sweep for live 1V1 matches.
+ *
+ * Players no longer self-report a result, so this is the primary settlement
+ * path: every cron cycle it re-reads the Battle Log for matches still in
+ * progress and finalises the ones Supercell has published. The manual
+ * "🔍 بررسی نتیجه" button in the bot runs the same logic on demand for players
+ * who do not want to wait.
+ *
+ * Previously this was gated on the two players having filed agreeing claims,
+ * which meant a match where one player never answered sat in progress forever.
+ */
 async function verifyPendingClash1v1Results() {
   if (!getClashRoyaleApiConfiguration().configured) return { checked: 0, settled: 0, disputed: 0, reason: "api_not_configured" };
   const pending = await db
@@ -377,12 +389,6 @@ async function verifyPendingClash1v1Results() {
 
   for (const match of pending) {
     if (!match.player1Id || !match.player2Id || !match.scheduledAt) continue;
-    const claims = await db.select({ playerId: matchResultClaims.playerId, claim: matchResultClaims.claim })
-      .from(matchResultClaims).where(eq(matchResultClaims.matchId, match.id));
-    const validClaims = claims.filter((claim) => claim.claim === "win" || claim.claim === "lose")
-      .map((claim) => ({ playerId: claim.playerId, claim: claim.claim as MatchResultClaimValue }));
-    const resolution = resolveMatchResultClaims(match.player1Id, match.player2Id, validClaims);
-    if (resolution.state !== "agreed") continue;
 
     const participantRows = await db.select({
       playerId: players.id,
@@ -404,24 +410,43 @@ async function verifyPendingClash1v1Results() {
         player2Tag,
         notBefore: new Date(new Date(match.scheduledAt).getTime() - 30_000),
       });
-      if (!battle) continue;
       const [duelEntry] = await db.select({ gameMode: clash1v1Entries.gameMode, stakeMode: clash1v1Entries.stakeMode })
         .from(clash1v1Entries).where(eq(clash1v1Entries.matchedMatchId, match.id)).limit(1);
       const expectedMode = duelEntry?.gameMode || "normal";
-      if (isClashDuelGameMode(expectedMode) && !clashBattleMatchesExpectedMode(expectedMode, battle)) {
-        const evidence = {
+      const modeMatters = isClashDuelGameMode(expectedMode);
+
+      const verdict = decideClashVerdict({
+        battle: battle && {
+          battleTime: battle.battleTime,
+          winnerTag: battle.winnerTag,
+          player1Tag: battle.player1Tag,
+          player2Tag: battle.player2Tag,
+          player1Crowns: battle.player1Crowns,
+          player2Crowns: battle.player2Crowns,
+        },
+        player1Tag,
+        player2Tag,
+        apiConfigured: true,
+        modeMatches: battle && modeMatters ? clashBattleMatchesExpectedMode(expectedMode, battle) : undefined,
+      });
+
+      // Not published by Supercell yet. Leave it in progress; the next cycle
+      // picks it up again.
+      if (verdict.state === "pending_api") continue;
+
+      if (verdict.state === "mode_mismatch") {
+        await db.update(matches).set({ status: "disputed", evidence: {
           source: "clash_api_cron_mode_mismatch",
           expectedGameMode: expectedMode,
-          actualGameMode: battle.gameMode,
-          actualBattleType: battle.battleType,
-          actualDeckSelection: battle.raw.deckSelection || null,
-          battleTime: battle.battleTime.toISOString(),
+          actualGameMode: battle?.gameMode ?? null,
+          actualBattleType: battle?.battleType ?? null,
+          actualDeckSelection: battle?.raw.deckSelection || null,
+          battleTime: verdict.battleTime,
           responsiblePlayerId: match.player1Id,
           responsibleRole: "host",
           stakeMode: duelEntry?.stakeMode || "paid",
           action: "admin_penalty_required",
-        };
-        await db.update(matches).set({ status: "disputed", evidence }).where(eq(matches.id, match.id));
+        } }).where(eq(matches.id, match.id));
         for (const player of [player1, player2]) {
           if (!player?.userId) continue;
           const [account] = await db.select({ telegramId: telegramAccounts.telegramId }).from(telegramAccounts)
@@ -438,28 +463,35 @@ async function verifyPendingClash1v1Results() {
         disputed += 1;
         continue;
       }
-      const claimedWinnerTag = resolution.winnerId === match.player1Id ? player1Tag : player2Tag;
-      if (!battle.winnerTag || battle.winnerTag !== claimedWinnerTag) {
+
+      if (verdict.state === "draw") {
+        // Level crowns: there is nobody to pay. Refunding is a money decision,
+        // so a human makes it.
         await db.update(matches).set({ status: "disputed", evidence: {
-          source: "clash_api_cron_mismatch",
-          claimedWinnerId: resolution.winnerId,
-          apiWinnerTag: battle.winnerTag,
-          battleTime: battle.battleTime.toISOString(),
-          player1Crowns: battle.player1Crowns,
-          player2Crowns: battle.player2Crowns,
-        }}).where(eq(matches.id, match.id));
+          source: "clash_api_cron_draw",
+          battleTime: verdict.battleTime,
+          player1Crowns: verdict.player1Crowns,
+          player2Crowns: verdict.player2Crowns,
+          stakeMode: duelEntry?.stakeMode || "paid",
+        } }).where(eq(matches.id, match.id));
         for (const player of [player1, player2]) {
           if (!player?.userId) continue;
           const [account] = await db.select({ telegramId: telegramAccounts.telegramId }).from(telegramAccounts)
             .where(eq(telegramAccounts.userId, player.userId)).limit(1);
-          if (account?.telegramId) await sendTelegramMessage(account.telegramId, "🚨 نتیجه ثبت‌شده با Battle Log مطابقت ندارد و برای داوری ارسال شد.");
+          if (account?.telegramId) await sendTelegramMessage(account.telegramId, "🤝 Battle Log تساوی نشان می‌دهد (تعداد تاج‌ها برابر است). پرونده برای تصمیم مالی به ادمین ارسال شد.");
         }
-        await sendToAdmins(`🚨 <b>اختلاف نتیجه با Clash API</b>\nMatch: <code>${html(match.id.slice(0, 8))}</code>`);
+        await sendToAdmins(`🤝 <b>تساوی در Battle Log</b>\nMatch: <code>${html(match.id.slice(0, 8))}</code>`, {
+          inline_keyboard: [
+            [{ text: "💳 بازپرداخت هر دو", callback_data: `judge:mode_refund:${match.id}` }],
+            [{ text: "🔁 تکرار مسابقه", callback_data: `judge:mode_replay:${match.id}` }],
+          ],
+        });
         disputed += 1;
         continue;
       }
 
-      const finalized = await db.transaction((tx) => finalizeMatchResult(tx, match.id, resolution.winnerId, { affiliateEligible: true }));
+      const winnerId = verdict.winnerTag === player1Tag ? match.player1Id : match.player2Id;
+      const finalized = await db.transaction((tx) => finalizeMatchResult(tx, match.id, winnerId, { affiliateEligible: true }));
       if (!finalized.completed) continue;
       const winner = byId.get(finalized.winnerId);
       const loser = byId.get(finalized.loserId);
