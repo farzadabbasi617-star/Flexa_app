@@ -558,7 +558,15 @@ function sourceFingerprint(items: NewsItem[]) {
     .slice(0, 24);
 }
 
-async function generateNewsFromItem(item: NewsItem, force: boolean) {
+/**
+ * Translates one trusted source item.
+ *
+ * With `previewOnly` it stops short of writing anything: no honour row, no
+ * dedupe marker, no notifications. That lets an operator read the translation
+ * and decide, instead of the sweep publishing straight to the site. The
+ * returned draft carries everything needed to publish it later unchanged.
+ */
+async function generateNewsFromItem(item: NewsItem, force: boolean, previewOnly = false) {
   const game = item.game;
   const items = [item];
   const fingerprint = sourceFingerprint(items);
@@ -659,8 +667,8 @@ ${sourcesText}
     : [];
   const seoKeywords = [...new Set([...generatedKeywords, ...GAME_SEO_KEYWORDS[game]])].slice(0, 8);
 
-  const [created] = await db.insert(honors).values({
-    type: "news",
+  const draftValues = {
+    type: "news" as const,
     title,
     description,
     icon,
@@ -689,7 +697,20 @@ ${sourcesText}
       imageOrigin: "trusted_source_image",
       contentFramework: "gament_news_v4_source_translation",
     },
-  }).returning();
+  };
+
+  if (previewOnly) {
+    // Nothing is written. `sourceKey` travels with the draft so publishing it
+    // later still records the dedupe marker against the same source.
+    return {
+      generated: false as const,
+      preview: true as const,
+      game,
+      draft: { ...draftValues, sourceKey, sourceLink: item.link, sourceName: item.source },
+    };
+  }
+
+  const [created] = await db.insert(honors).values(draftValues).returning();
   await markGenerated(sourceKey);
   await notifyAllUsersInApp({
     type: "news",
@@ -700,6 +721,135 @@ ${sourcesText}
   }).catch((err) => logger.warn({ err, honorId: created.id }, "Failed to create app notifications for generated news"));
   logger.info({ honorId: created.id, title, game, sources: items.length }, "Generated daily game news");
   return { generated: true as const, honorId: created.id, title, game, sources: items.length, provider: ai.provider };
+}
+
+export interface NewsDraft {
+  id: string;
+  game: string;
+  title: string;
+  summary: string;
+  description: string;
+  imageUrl: string;
+  imageAlt: string;
+  icon: string;
+  seoKeywords: string[];
+  readTimeMinutes: number;
+  sourceName: string;
+  sourceLink: string;
+  sourceKey: string;
+  publishPayload: Record<string, unknown>;
+}
+
+/**
+ * Finds and translates new stories without publishing any of them.
+ *
+ * The scheduled sweep writes straight to the site; this is the manual path,
+ * where an operator reads each translation first. Drafts are returned to the
+ * caller and never stored, so abandoning the review leaves no trace and the
+ * same source can be found again on the next search.
+ */
+export async function discoverGamingNewsDrafts({ limit = 6 } = {}) {
+  const collection = await collectGamingNewsItems();
+  const items = collection.items
+    .sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime());
+  const configuredProviders = [
+    ["openrouter", process.env.OPENROUTER_API_KEY],
+    ["groq", process.env.GROQ_API_KEY],
+    ["huggingface", process.env.HUGGINGFACE_API_KEY],
+  ].filter(([, value]) => isUsableAISecret(normalizeAIEnvValue(value))).map(([name]) => name);
+  const diagnostics = { ...collection.diagnostics, configuredProviders };
+
+  if (!items.length) return { drafts: [] as NewsDraft[], reason: "no_recent_complete_sources", diagnostics };
+  if (!configuredProviders.length) return { drafts: [] as NewsDraft[], reason: "ai_provider_not_configured", diagnostics };
+
+  const cap = Math.min(10, Math.max(1, Math.floor(limit) || 6));
+  const candidates: NewsItem[] = [];
+  for (const item of items) {
+    if (candidates.length >= cap) break;
+    // Skip anything already published, so review only ever shows genuinely new
+    // stories.
+    if (!(await hasGenerated(`gaming-news-source:${sourceFingerprint([item])}`))) candidates.push(item);
+  }
+  if (!candidates.length) return { drafts: [] as NewsDraft[], reason: "no_new_trusted_sources", diagnostics };
+
+  const results: Awaited<ReturnType<typeof generateNewsFromItem>>[] = [];
+  for (let index = 0; index < candidates.length; index += 2) {
+    results.push(...await Promise.all(
+      candidates.slice(index, index + 2).map((item) => generateNewsFromItem(item, false, true)),
+    ));
+  }
+
+  const drafts: NewsDraft[] = [];
+  const rejected: Array<{ game: string; reason: string }> = [];
+  for (const result of results) {
+    if ("preview" in result && result.preview && "draft" in result) {
+      const draft = result.draft as Record<string, any>;
+      const meta = (draft.metadata || {}) as Record<string, any>;
+      drafts.push({
+        id: String(draft.sourceKey),
+        game: String(draft.game),
+        title: String(draft.title),
+        summary: String(meta.summary || ""),
+        description: String(draft.description),
+        imageUrl: String(draft.imageUrl || ""),
+        imageAlt: String(meta.imageAlt || draft.title),
+        icon: String(draft.icon || ""),
+        seoKeywords: Array.isArray(meta.seoKeywords) ? meta.seoKeywords.map(String) : [],
+        readTimeMinutes: Number(meta.readTimeMinutes || 0),
+        sourceName: String(draft.sourceName || ""),
+        sourceLink: String(draft.sourceLink || ""),
+        sourceKey: String(draft.sourceKey),
+        publishPayload: {
+          type: draft.type, title: draft.title, description: draft.description,
+          icon: draft.icon, imageUrl: draft.imageUrl, game: draft.game,
+          source: draft.source, metadata: draft.metadata,
+        },
+      });
+    } else if (!result.generated && "reason" in result) {
+      rejected.push({ game: String(result.game), reason: String(result.reason) });
+    }
+  }
+
+  return { drafts, rejected, diagnostics, reason: drafts.length ? null : "all_source_translations_rejected" };
+}
+
+/**
+ * Publishes a draft the operator approved. Records the dedupe marker so the
+ * same source is not offered again, and notifies users exactly as the
+ * scheduled sweep does.
+ */
+export async function publishReviewedNewsDraft(draft: {
+  sourceKey: string;
+  publishPayload: Record<string, unknown>;
+}) {
+  const payload = draft.publishPayload as Record<string, any>;
+  if (!payload?.title || !payload?.description) throw new Error("NEWS_DRAFT_INCOMPLETE");
+  if (await hasGenerated(draft.sourceKey)) return { published: false as const, reason: "source_already_used" };
+
+  const [created] = await db.insert(honors).values({
+    type: "news",
+    title: String(payload.title),
+    description: String(payload.description),
+    icon: String(payload.icon || ""),
+    imageUrl: String(payload.imageUrl || ""),
+    game: String(payload.game),
+    status: "approved",
+    highlight: false,
+    publishedAt: new Date(),
+    source: "ai_news",
+    metadata: { ...(payload.metadata || {}), reviewedByAdmin: true },
+  }).returning();
+
+  await markGenerated(draft.sourceKey);
+  await notifyAllUsersInApp({
+    type: "news",
+    title: "خبر جدید گیمینگ",
+    message: String(payload.title),
+    link: `/honors/${created.id}`,
+    dedupeKey: `app-news:${created.id}`,
+  }).catch((err) => logger.warn({ err, honorId: created.id }, "Failed to notify users about reviewed news"));
+
+  return { published: true as const, honorId: created.id, title: created.title };
 }
 
 export async function generateDailyGamingNews({ force = false } = {}) {

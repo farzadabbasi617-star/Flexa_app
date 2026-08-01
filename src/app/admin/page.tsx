@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
-import AutoNewsButton from "@/components/admin/AutoNewsButton";
+import NewsReviewPanel from "@/components/admin/NewsReviewPanel";
 import { useAuth } from "@/contexts/AuthContext";
 
-type TabKey = "overview" | "users" | "tournaments" | "matches" | "judgments" | "disputes" | "messages" | "telegram" | "media";
+type TabKey = "overview" | "users" | "tournaments" | "matches" | "judgments" | "disputes" | "messages" | "telegram" | "media" | "news";
 
 interface ConsoleData {
   stats: Record<string, number>;
@@ -31,6 +31,7 @@ const tabs: Array<{ key: TabKey; label: string; icon: string }> = [
   { key: "messages", label: "پیام‌ها", icon: "💬" },
   { key: "telegram", label: "تلگرام", icon: "⚡" },
   { key: "media", label: "رسانه و ظاهر", icon: "🖼️" },
+  { key: "news", label: "اخبار", icon: "📰" },
 ];
 
 function fmt(value: unknown) {
@@ -65,7 +66,12 @@ function StatusPill({ value }: { value: string }) {
 export default function AdminPage() {
   const { user, loading, refreshUser } = useAuth();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabKey>("overview");
+  const [activeTab, setActiveTab] = useState<TabKey>(() => {
+    // Honour ?tab= so links from elsewhere in the panel land on the right tab.
+    if (typeof window === "undefined") return "overview";
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    return (tabs.some((tab) => tab.key === requested) ? requested : "overview") as TabKey;
+  });
   const [data, setData] = useState<ConsoleData | null>(null);
   const [busy, setBusy] = useState(true);
   const [error, setError] = useState("");
@@ -222,26 +228,14 @@ export default function AdminPage() {
           </div>
         </section>
 
-        {activeTab !== "overview" && (
+        {activeTab !== "overview" && activeTab !== "news" && (
           <div className="mb-5 flex flex-col sm:flex-row gap-3 sm:items-center justify-between">
             <input value={query} onChange={(e) => setQuery(e.target.value)} className="gaming-input max-w-md" placeholder="جستجو در همین بخش..." />
             <button onClick={loadConsole} className="px-4 py-3 rounded-xl bg-dark-700 text-sm font-bold hover:bg-dark-600">🔄 بروزرسانی</button>
           </div>
         )}
 
-        {activeTab === "overview" && (
-          <div className="mb-5 gaming-card border-emerald-500/25 p-5">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <h2 className="font-black text-emerald-300">📰 جستجو و ساخت خبر تالار افتخارات</h2>
-                <p className="mt-1 text-xs leading-6 text-gray-400">
-                  منابع رسمی گیمینگ همین حالا بررسی می‌شوند و خبر تازه بلافاصله منتشر می‌شود. خبر تکراری ساخته نمی‌شود.
-                </p>
-              </div>
-              <AutoNewsButton className="shrink-0" />
-            </div>
-          </div>
-        )}
+        {activeTab === "news" && <div dir="rtl"><NewsReviewPanel /></div>}
 
         {activeTab === "overview" && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">

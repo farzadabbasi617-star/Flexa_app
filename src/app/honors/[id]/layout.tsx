@@ -5,6 +5,8 @@ import { db } from "@/db";
 import { honors } from "@/db/schema";
 import { createPageMetadata, gameNamesFa } from "@/lib/seo";
 import { getStaticHonorById } from "@/lib/static-honors";
+import { getHonorArticleForSeo, honorNewsArticleJsonLd, honorParagraphs } from "@/lib/honor-article-seo";
+import { SITE_URL } from "@/lib/seo";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
@@ -55,6 +57,48 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
   });
 }
 
-export default function Layout({ children }: { children: ReactNode }) {
-  return children;
+/**
+ * Emits the article body in the server response.
+ *
+ * The page itself is a client component that fetches after hydration, so the
+ * first HTML a crawler receives contained the title and meta description but no
+ * article text. Google indexes the initial response and defers JavaScript to a
+ * slower second pass, so the body was effectively unindexed.
+ *
+ * The copy here is visually hidden rather than removed: it must be real text in
+ * the DOM for crawlers, but the client component renders the same article with
+ * full styling once it loads, and showing both would duplicate it on screen.
+ */
+export default async function Layout({
+  children,
+  params,
+}: {
+  children: ReactNode;
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const article = await getHonorArticleForSeo(id);
+  if (!article) return children;
+
+  const paragraphs = honorParagraphs(article.description);
+  const jsonLd = honorNewsArticleJsonLd(article, SITE_URL);
+
+  return (
+    <>
+      <script
+        type="application/ld+json"
+        // Escaping "<" prevents a stray closing tag inside the article from
+        // terminating this script block early.
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, "\\u003c") }}
+      />
+      <article className="sr-only" aria-hidden="true">
+        <h1>{article.title}</h1>
+        {article.summary && <p>{article.summary}</p>}
+        {paragraphs.map((paragraph, index) => (
+          <p key={index}>{paragraph}</p>
+        ))}
+      </article>
+      {children}
+    </>
+  );
 }

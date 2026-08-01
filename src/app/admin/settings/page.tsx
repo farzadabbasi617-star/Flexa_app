@@ -140,11 +140,14 @@ export default function AdminSettingsPage() {
             <h2 className="font-bold text-emerald-300 mb-1">
               {lang === "fa" ? "📰 جستجو و ساخت خبر تالار افتخارات" : "📰 Honors News Sweep"}
             </h2>
-            <p className="text-xs leading-6 text-gray-400 mb-4">
+            <p className="text-xs leading-6 text-gray-400 mb-3">
               {lang === "fa"
-                ? "با زدن این دکمه، منابع رسمی گیمینگ همین حالا بررسی می‌شوند و اگر خبر تازه‌ای باشد که قبلاً منتشر نشده، ترجمه و بلافاصله در تالار افتخارات منتشر می‌شود. خبر تکراری ساخته نمی‌شود و نیازی به ذخیره تنظیمات نیست."
-                : "Sweeps trusted gaming sources now and publishes any genuinely new story straight to Honors. Duplicates are never created; no need to save settings."}
+                ? "این دکمه خبر را بدون بازبینی مستقیم منتشر می‌کند. اگر می‌خواهی قبل از انتشار خبرها را بخوانی و تأیید کنی، از تب «📰 اخبار» در پنل مدیریت استفاده کن."
+                : "This publishes immediately, without review. To read and approve stories before they go live, use the 📰 News tab in the admin panel."}
             </p>
+            <a href="/admin?tab=news" className="mb-4 inline-block text-[11px] font-black text-cyan-300 hover:text-cyan-200">
+              {lang === "fa" ? "رفتن به تب اخبار با بازبینی ←" : "Go to the reviewed News tab →"}
+            </a>
             <AutoNewsButton />
           </div>
 
