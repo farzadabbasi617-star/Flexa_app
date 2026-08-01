@@ -32,6 +32,23 @@ export function referralAppUrl() {
   return (process.env.APP_URL || DEFAULT_APP_URL).replace(/\/$/, "");
 }
 
+/**
+ * Public origin of the current request.
+ *
+ * `request.nextUrl.origin` is the address the Node process is bound to, which
+ * behind Render's proxy is `https://localhost:10000` -- redirecting there sends
+ * every invite click to a dead page. The forwarded headers carry the real host,
+ * with APP_URL as the final fallback.
+ */
+export function publicOriginFromHeaders(headers: {
+  get(name: string): string | null;
+}, fallback = referralAppUrl()) {
+  const host = headers.get("x-forwarded-host") || headers.get("host");
+  if (!host || host.startsWith("localhost") || host.startsWith("127.0.0.1")) return fallback.replace(/\/$/, "");
+  const proto = headers.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+  return `${proto}://${host}`.replace(/\/$/, "");
+}
+
 /** Short web link that works in any messenger, not just Telegram. */
 export function referralWebLink(referralCode: string, appUrl = referralAppUrl()) {
   const code = normalizeInviteCode(referralCode);

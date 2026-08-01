@@ -6,6 +6,7 @@ import {
   REFERRAL_VISITOR_COOKIE,
   isValidInviteCode,
   normalizeInviteCode,
+  publicOriginFromHeaders,
 } from "@/lib/referral-invite";
 import logger from "@/lib/logger";
 
@@ -25,7 +26,9 @@ const ATTRIBUTION_MAX_AGE = 60 * 60 * 24 * 30; // matches AFFILIATE_ATTRIBUTION_
 export async function GET(request: NextRequest, context: { params: Promise<{ code: string }> }) {
   const { code: rawCode } = await context.params;
   const code = normalizeInviteCode(rawCode);
-  const destination = new URL("/register", request.nextUrl.origin);
+  // Not request.nextUrl.origin: behind Render's proxy that is
+  // https://localhost:10000 and every invite click would dead-end.
+  const destination = new URL("/register", publicOriginFromHeaders(request.headers));
 
   if (!isValidInviteCode(code)) {
     return NextResponse.redirect(destination, { status: 307 });

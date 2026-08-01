@@ -3,6 +3,7 @@ import {
   isValidInviteCode,
   normalizeInviteCode,
   referralShareMessage,
+  publicOriginFromHeaders,
   referralWebLink,
   shareTargetUrl,
 } from "./referral-invite";
@@ -56,6 +57,45 @@ describe("referralShareMessage", () => {
     const message = referralShareMessage({ referralCode: "ABC123" });
     expect(message).toContain("https://www.gament1.ir/r/ABC123");
     expect(message).toContain("گیمنت");
+  });
+});
+
+describe("publicOriginFromHeaders", () => {
+  const headers = (map: Record<string, string>) => ({
+    get: (name: string) => map[name.toLowerCase()] ?? null,
+  });
+
+  it("uses the forwarded host, not the bind address", () => {
+    // Render binds the Node process to localhost:10000; nextUrl.origin returns
+    // that and sent every invite click to a dead page in production.
+    const origin = publicOriginFromHeaders(headers({
+      "x-forwarded-host": "www.gament1.ir",
+      "x-forwarded-proto": "https",
+      host: "localhost:10000",
+    }));
+    expect(origin).toBe("https://www.gament1.ir");
+  });
+
+  it("falls back to APP_URL when the host header is the bind address", () => {
+    const origin = publicOriginFromHeaders(headers({ host: "localhost:10000" }), "https://www.gament1.ir");
+    expect(origin).toBe("https://www.gament1.ir");
+  });
+
+  it("never emits a localhost origin", () => {
+    expect(publicOriginFromHeaders(headers({ host: "127.0.0.1:3000" }), "https://www.gament1.ir"))
+      .toBe("https://www.gament1.ir");
+  });
+
+  it("takes the first proto when the proxy chains them", () => {
+    const origin = publicOriginFromHeaders(headers({
+      "x-forwarded-host": "www.gament1.ir",
+      "x-forwarded-proto": "https,http",
+    }));
+    expect(origin).toBe("https://www.gament1.ir");
+  });
+
+  it("defaults to https when no proto header is present", () => {
+    expect(publicOriginFromHeaders(headers({ host: "www.gament1.ir" }))).toBe("https://www.gament1.ir");
   });
 });
 
