@@ -20,6 +20,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   } catch (error) {
     const code = error instanceof Error ? error.message : "UNKNOWN";
     if (code === "COD_ROOM_NOT_FOUND" || code === "COD_ENTRY_NOT_FOUND") return NextResponse.json({ error: "ثبت‌نام فعال برای این روم پیدا نشد", code }, { status: 404 });
+    if (code === "COD_ENTRY_NOT_PAID") return NextResponse.json({ error: "پرداخت ورودی این روم ثبت نشده است؛ تا تأیید پرداخت امکان Check-in و دریافت کد روم وجود ندارد", code }, { status: 402 });
     if (code === "COD_CHECKIN_NOT_OPEN") return NextResponse.json({ error: "زمان Check-in هنوز شروع نشده است", code }, { status: 409 });
     if (code === "COD_CHECKIN_CLOSED") return NextResponse.json({ error: "زمان Check-in تمام شده است", code }, { status: 409 });
     logger.error({ error, roomId: id }, "COD room check-in failed");

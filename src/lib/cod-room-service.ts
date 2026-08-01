@@ -1,5 +1,6 @@
 import { and, count, desc, eq, gt, gte, inArray, ne, sql } from "drizzle-orm";
 import { codReadinessBlockers, evaluateCodRoomReadiness, type CodReadinessIssue } from "./cod-room-readiness";
+import { codCredentialDenialMessage, decideCodCredentialAccess } from "./cod-credential-access";
 import { arenaGameConfig, isArenaGame, isOfficialInviteUrl, type ArenaGame } from "./arena-games";
 import { db } from "@/db";
 import {
@@ -416,6 +417,8 @@ export async function getCodRoomDetail(roomId: string, viewerId?: string | null,
     checkedInAt: codRoomEntries.checkedInAt,
     kills: codRoomEntries.kills,
     placement: codRoomEntries.placement,
+    paymentTransactionId: codRoomEntries.paymentTransactionId,
+    paymentMode: codRoomEntries.paymentMode,
     rewardRial: codRoomEntries.rewardRial,
     resultStatus: codRoomEntries.resultStatus,
     codUsername: codRoomEntries.codUsernameSnapshot,
@@ -432,13 +435,21 @@ export async function getCodRoomDetail(roomId: string, viewerId?: string | null,
     .where(and(eq(codRoomStaff.roomId, roomId), eq(codRoomStaff.userId, viewerId))).limit(1) : [];
   const privileged = isAdmin || Boolean(staff);
   if (!room.isPublished && !privileged && !myEntry) return { forbidden: true as const };
-  const reveal = shouldRevealCodRoomCredentials({
-    isAdmin: privileged,
-    isRegistered: Boolean(myEntry),
-    checkedIn: Boolean(myEntry?.checkedInAt),
+  // Payment is now an explicit condition, not something inferred from the
+  // existence of an entry row.
+  const credentialAccess = decideCodCredentialAccess({
+    isPrivileged: privileged,
+    entry: myEntry ? {
+      status: myEntry.status,
+      checkedInAt: myEntry.checkedInAt,
+      paymentTransactionId: myEntry.paymentTransactionId,
+      paymentMode: myEntry.paymentMode,
+    } : null,
+    entryFeeRial: room.entryFeeRial,
     revealAt: room.credentialsRevealAt,
     status: room.status as CodRoomStatus,
   });
+  const reveal = credentialAccess.allowed;
   const [evidenceRow] = privileged ? await db.select({ value: count() }).from(codRoomEvidence).where(eq(codRoomEvidence.roomId, roomId)) : [{ value: 0 }];
   const [latestLobbyCheck] = privileged ? await db.select({
     id: codRoomLobbyChecks.id,
@@ -457,6 +468,8 @@ export async function getCodRoomDetail(roomId: string, viewerId?: string | null,
     roomPassword: reveal ? room.roomPassword : null,
     officialJoinUrl: reveal ? room.officialJoinUrl : null,
     credentialsVisible: reveal,
+    credentialsHiddenReason: reveal ? null : credentialAccess.reason,
+    credentialsHiddenMessage: reveal ? null : codCredentialDenialMessage(credentialAccess.reason),
     // What the prize table pays at the room's current occupancy, so a player is
     // never shown a headline they will not actually receive.
     prizeProjection: projectCodPrizeTable({
@@ -538,6 +551,11 @@ export async function joinCodRoom(input: { roomId: string; userId: string; rules
     if (Number(rank?.points || 0) < room.minRankPoints) throw new Error("COD_RANK_TOO_LOW");
     const live = codArenaLive();
     const entryFee = bigIntFromText(room.entryFeeRial);
+    // A paid room while the arena is in shadow mode would admit everybody free
+    // and still advertise a price. Refuse the join rather than quietly giving
+    // the seat away: flipping COD_ARENA_LIVE off must not turn paid rooms into
+    // free ones.
+    if (!live && entryFee > BigInt(0)) throw new Error("COD_PAID_ROOM_NOT_LIVE");
     let paymentTransactionId: string | null = null;
     if (live && entryFee > BigInt(0)) {
       const gate = checkAgeGate({ birthDate: account.birthDate, nationalId: account.nationalId });
@@ -613,11 +631,32 @@ export async function checkInCodRoom(roomId: string, userId: string) {
     const now = new Date();
     if (room.checkInOpensAt && now < room.checkInOpensAt) throw new Error("COD_CHECKIN_NOT_OPEN");
     if (room.checkInClosesAt && now > room.checkInClosesAt) throw new Error("COD_CHECKIN_CLOSED");
+    // Check-in is the step that unlocks the room code, so it is the right place
+    // to insist the seat was actually paid for. Previously it only checked that
+    // an entry existed, which trusted joinCodRoom to be the only way one could
+    // appear.
+    const [existing] = await tx.select({
+      id: codRoomEntries.id,
+      paymentMode: codRoomEntries.paymentMode,
+      paymentTransactionId: codRoomEntries.paymentTransactionId,
+    }).from(codRoomEntries).where(and(
+      eq(codRoomEntries.roomId, roomId),
+      eq(codRoomEntries.userId, userId),
+      inArray(codRoomEntries.status, ["registered", "checked_in"]),
+    )).limit(1);
+    if (!existing) throw new Error("COD_ENTRY_NOT_FOUND");
+
+    let roomIsPaid = false;
+    try { roomIsPaid = BigInt(room.entryFeeRial || "0") > BigInt(0); } catch { roomIsPaid = false; }
+    if (roomIsPaid && (existing.paymentMode !== "live" || !existing.paymentTransactionId)) {
+      throw new Error("COD_ENTRY_NOT_PAID");
+    }
+
     const [entry] = await tx.update(codRoomEntries).set({
       status: "checked_in",
       checkedInAt: now,
       updatedAt: now,
-    }).where(and(eq(codRoomEntries.roomId, roomId), eq(codRoomEntries.userId, userId), inArray(codRoomEntries.status, ["registered", "checked_in"]))).returning();
+    }).where(eq(codRoomEntries.id, existing.id)).returning();
     if (!entry) throw new Error("COD_ENTRY_NOT_FOUND");
     await tx.insert(codRoomAuditEvents).values({ roomId, actorId: userId, eventType: "entry_checked_in", payload: { entryId: entry.id } });
     return entry;

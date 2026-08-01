@@ -73,6 +73,8 @@ interface RoomDetail {
   startsAt: string;
   endsAt: string | null;
   credentialsVisible: boolean;
+  credentialsHiddenReason?: string | null;
+  credentialsHiddenMessage?: string | null;
   checkInAvailable: boolean;
   registeredCount: number;
   latestLobbyCheck: null | {
@@ -461,7 +463,17 @@ export default function CodRoomDetailPage({ params }: { params: Promise<{ id: st
               {room.myEntry.checkedIn && <div className="rounded-2xl border border-emerald-500/20 bg-emerald-500/10 p-4 text-center text-sm font-black text-emerald-300 mt-4">حضور تأیید شده</div>}
               <div className="mt-5 border-t border-white/5 pt-5">
                 <h3 className="font-black text-sm">اطلاعات ورود</h3>
-                {room.credentialsVisible ? <div className="space-y-3 mt-3"><div className="rounded-xl bg-black/35 p-3"><span className="text-[9px] text-gray-500">Room Code</span><div className="font-mono text-xl font-black mt-1" dir="ltr">{room.roomCode || "اعلام نشده"}</div></div><div className="rounded-xl bg-black/35 p-3"><span className="text-[9px] text-gray-500">Password</span><div className="font-mono text-xl font-black mt-1" dir="ltr">{room.roomPassword || "ندارد"}</div></div>{room.officialJoinUrl && <a href={room.officialJoinUrl} target="_blank" rel="noopener noreferrer" className="block text-center rounded-xl bg-orange-500 text-black py-3 font-black text-xs">بازکردن مستقیم Call of Duty Mobile</a>}</div> : <p className="text-xs text-gray-500 leading-6 mt-3">پس از Check-in، اطلاعات در زمان {faDate(room.credentialsRevealAt)} نمایش داده می‌شود.</p>}
+                {room.credentialsVisible ? <div className="space-y-3 mt-3"><div className="rounded-xl bg-black/35 p-3"><span className="text-[9px] text-gray-500">Room Code</span><div className="font-mono text-xl font-black mt-1" dir="ltr">{room.roomCode || "اعلام نشده"}</div></div><div className="rounded-xl bg-black/35 p-3"><span className="text-[9px] text-gray-500">Password</span><div className="font-mono text-xl font-black mt-1" dir="ltr">{room.roomPassword || "ندارد"}</div></div>{room.officialJoinUrl && <a href={room.officialJoinUrl} target="_blank" rel="noopener noreferrer" className="block text-center rounded-xl bg-orange-500 text-black py-3 font-black text-xs">بازکردن مستقیم Call of Duty Mobile</a>}</div> : <div className="mt-3">
+                  {/* Say precisely why the code is withheld: "pay first" and
+                      "check in first" need different actions from the player. */}
+                  <p className="text-xs leading-6 text-gray-400">{room.credentialsHiddenMessage || "پس از Check-in، اطلاعات ورود نمایش داده می‌شود."}</p>
+                  {room.credentialsHiddenReason === "too_early" && (
+                    <p className="mt-2 text-[10px] text-gray-500">زمان نمایش: {faDate(room.credentialsRevealAt)}</p>
+                  )}
+                  {room.credentialsHiddenReason === "not_paid" && (
+                    <Link href="/wallet" className="mt-2 inline-block text-[11px] font-black text-orange-300">بررسی کیف پول ←</Link>
+                  )}
+                </div>}
               </div>
             </section>}
 
