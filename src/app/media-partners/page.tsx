@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import OtpCodeInput from "@/components/OtpCodeInput";
 import ImageUploader from "@/components/ImageUploader";
 import { copyTextSafely } from "@/lib/client-clipboard";
 
@@ -224,7 +225,7 @@ export default function MediaPartnersPage() {
             <pre className="mt-3 max-h-[520px] overflow-y-auto whitespace-pre-wrap rounded-2xl border border-white/[.08] bg-black/25 p-4 text-xs leading-7 text-gray-300">{contract.content}</pre>
             <div className="mt-5 space-y-2">{contract.confirmations.map((text,index)=><label key={text} className="flex cursor-pointer items-start gap-3 rounded-xl border border-white/[.06] bg-white/[.025] p-3 text-xs leading-6 text-gray-300"><input type="checkbox" className="mt-1 h-4 w-4 accent-violet-600" checked={confirmations[index]||false} onChange={(e)=>setConfirmations(confirmations.map((v,i)=>i===index?e.target.checked:v))}/><span>{text}</span></label>)}</div>
             <label className="mt-5 block text-xs text-gray-400">نام کامل امضاکننده<input className={`${inputClass} mt-2`} value={signerName} onChange={(e)=>setSignerName(e.target.value)} placeholder={partner.legalName}/></label>
-            {!otpSent ? <button onClick={sendOtp} disabled={busy||confirmations.some(v=>!v)} className="mt-4 w-full rounded-2xl bg-amber-500 py-3.5 text-sm font-black text-black disabled:opacity-40">ارسال کد OTP امضای قرارداد</button> : <div className="mt-4"><input value={otpCode} onChange={(e)=>setOtpCode(e.target.value.replace(/\D/g,"").slice(0,6))} inputMode="numeric" dir="ltr" maxLength={6} placeholder="کد ۶ رقمی" className={`${inputClass} text-center text-xl tracking-[.45em]`} /><button onClick={signContract} disabled={busy||otpCode.length!==6||confirmations.some(v=>!v)} className="mt-3 w-full rounded-2xl bg-emerald-600 py-3.5 text-sm font-black disabled:opacity-40">تأیید OTP و امضای قرارداد</button></div>}
+            {!otpSent ? <button onClick={sendOtp} disabled={busy||confirmations.some(v=>!v)} className="mt-4 w-full rounded-2xl bg-amber-500 py-3.5 text-sm font-black text-black disabled:opacity-40">ارسال کد OTP امضای قرارداد</button> : <div className="mt-4"><OtpCodeInput value={otpCode} onChange={setOtpCode} onComplete={()=>{ if(!confirmations.some(v=>!v)) signContract(); }} length={6} disabled={busy} label="کد ۶ رقمی ارسال‌شده به ایمیلت را وارد کن؛ خودکار امضا می‌شود"/>{busy&&<p className="mt-3 text-center text-xs font-bold text-cyan-300">در حال تأیید...</p>}</div>}
           </section>
         )}
 

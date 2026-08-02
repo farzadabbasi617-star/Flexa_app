@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
@@ -9,6 +9,7 @@ import TiltCard from "@/components/fx/TiltCard";
 import ParticleField from "@/components/fx/ParticleField";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import OtpCodeInput from "@/components/OtpCodeInput";
 import { EMAIL_OTP_RESEND_COOLDOWN_SECONDS } from "@/lib/email-policy";
 
 export default function LoginPage() {
@@ -26,6 +27,7 @@ export default function LoginPage() {
   const [otpCode, setOtpCode] = useState("");
   const [otpError, setOtpError] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
+  const [otpVerified, setOtpVerified] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendMessage, setResendMessage] = useState("");
 
@@ -46,26 +48,27 @@ export default function LoginPage() {
     setLoading(false);
   }
 
-  async function handleVerifyOtp(e: React.FormEvent) {
-    e.preventDefault();
-    if (!pendingEmail) return;
+  /** Fires automatically once the sixth digit lands; no submit button. */
+  const runVerification = useCallback(async (submitted: string) => {
+    if (!pendingEmail || otpLoading || otpVerified) return;
     setOtpError("");
-
-    if (!/^\d{6}$/.test(otpCode.trim())) {
+    if (!/^\d{6}$/.test(submitted.trim())) {
       setOtpError(lang === "fa" ? "کد تایید باید ۶ رقم باشد" : "Code must be 6 digits");
       return;
     }
 
     setOtpLoading(true);
-    const result = await verifyEmailOtp(pendingEmail, otpCode.trim());
+    const result = await verifyEmailOtp(pendingEmail, submitted.trim());
     setOtpLoading(false);
 
     if (result.success) {
-      router.push("/");
+      setOtpVerified(true);
+      setTimeout(() => router.push("/"), 1150);
     } else {
+      setOtpCode("");
       setOtpError(result.error || (lang === "fa" ? "تایید کد ناموفق بود" : "Verification failed"));
     }
-  }
+  }, [pendingEmail, otpLoading, otpVerified, lang, verifyEmailOtp, router]);
 
   async function handleResend() {
     if (!pendingEmail || resendCooldown > 0) return;
@@ -111,44 +114,30 @@ export default function LoginPage() {
                   </p>
                 </div>
 
-                {otpError && (
-                  <div className="bg-red-900/30 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg mb-6 text-sm">
-                    {otpError}
-                  </div>
-                )}
                 {resendMessage && (
                   <div className="bg-emerald-900/20 border border-emerald-500/40 text-emerald-400 px-4 py-3 rounded-lg mb-6 text-sm">
                     {resendMessage}
                   </div>
                 )}
 
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">
-                      {lang === "fa" ? "کد تایید" : "Verification code"} *
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      required
-                      dir="ltr"
-                      maxLength={6}
-                      className="gaming-input text-center tracking-[0.5em] text-xl font-black"
-                      placeholder="------"
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    />
-                  </div>
+                <OtpCodeInput
+                  value={otpCode}
+                  onChange={(next) => { setOtpCode(next); if (otpError) setOtpError(""); }}
+                  onComplete={runVerification}
+                  length={6}
+                  disabled={otpLoading}
+                  error={otpError}
+                  verified={otpVerified}
+                  verifiedTitle={lang === "fa" ? "تأیید شد" : "Verified"}
+                  verifiedSubtitle={lang === "fa" ? "در حال ورود..." : "Signing you in..."}
+                  label={lang === "fa" ? "کد ۶ رقمی را وارد کن؛ خودکار تأیید می‌شود" : "Enter the 6-digit code; it verifies automatically"}
+                />
 
-                  <button
-                    type="submit"
-                    disabled={otpLoading || otpCode.length !== 6}
-                    className="gaming-btn w-full py-3 text-base disabled:opacity-50"
-                  >
-                    {otpLoading ? (lang === "fa" ? "در حال تایید..." : "Verifying...") : (lang === "fa" ? "تایید و ورود" : "Verify & Continue")}
-                  </button>
-                </form>
+                {otpLoading && !otpVerified && (
+                  <p className="mt-4 text-center text-xs font-bold text-cyan-300">
+                    {lang === "fa" ? "در حال تایید..." : "Verifying..."}
+                  </p>
+                )}
 
                 <div className="text-center mt-6 text-sm text-gray-400">
                   {lang === "fa" ? "کدی دریافت نکردید؟" : "Didn't receive a code?"}{" "}

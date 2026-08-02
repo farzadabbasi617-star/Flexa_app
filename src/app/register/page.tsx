@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/Navbar";
@@ -13,6 +13,7 @@ import { EMAIL_OTP_RESEND_COOLDOWN_SECONDS } from "@/lib/email-policy";
 import { normalizePhoneNumber } from "@/lib/phone";
 import { isPasswordStrong } from "@/lib/password-strength";
 import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
+import OtpCodeInput from "@/components/OtpCodeInput";
 import JalaliDatePicker from "@/components/JalaliDatePicker";
 import { isValidIranianNationalId } from "@/lib/validations";
 import { calculateAgeYears, MIN_ADULT_AGE, parseBirthDate } from "@/lib/age-gate";
@@ -53,6 +54,8 @@ export default function RegisterPage() {
   const [otpCode, setOtpCode] = useState("");
   const [otpError, setOtpError] = useState("");
   const [otpLoading, setOtpLoading] = useState(false);
+  // Held briefly so the success tick is seen before we navigate away.
+  const [otpVerified, setOtpVerified] = useState(false);
   const [resendCooldown, setResendCooldown] = useState(0);
   const [resendMessage, setResendMessage] = useState("");
 
@@ -148,26 +151,32 @@ export default function RegisterPage() {
     setLoading(false);
   }
 
-  async function handleVerifyOtp(e: React.FormEvent) {
-    e.preventDefault();
-    if (!pendingEmail) return;
+  /**
+   * Runs automatically the moment the sixth digit lands -- there is no submit
+   * button any more. `submitted` is passed in because state may not have
+   * flushed yet when the auto-complete callback fires.
+   */
+  const runVerification = useCallback(async (submitted: string) => {
+    if (!pendingEmail || otpLoading || otpVerified) return;
     setOtpError("");
-
-    if (!/^\d{6}$/.test(otpCode.trim())) {
+    if (!/^\d{6}$/.test(submitted.trim())) {
       setOtpError(lang === "fa" ? "کد تایید باید ۶ رقم باشد" : "Code must be 6 digits");
       return;
     }
 
     setOtpLoading(true);
-    const result = await verifyEmailOtp(pendingEmail, otpCode.trim());
+    const result = await verifyEmailOtp(pendingEmail, submitted.trim());
     setOtpLoading(false);
 
     if (result.success) {
-      router.push("/");
+      // Let the tick animation play before leaving the page.
+      setOtpVerified(true);
+      setTimeout(() => router.push("/"), 1150);
     } else {
+      setOtpCode("");
       setOtpError(result.error || (lang === "fa" ? "تایید کد ناموفق بود" : "Verification failed"));
     }
-  }
+  }, [pendingEmail, otpLoading, otpVerified, lang, verifyEmailOtp, router]);
 
   async function handleResend() {
     if (!pendingEmail || resendCooldown > 0) return;
@@ -213,44 +222,30 @@ export default function RegisterPage() {
                   </p>
                 </div>
 
-                {otpError && (
-                  <div className="bg-red-900/30 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg mb-6 text-sm">
-                    {otpError}
-                  </div>
-                )}
                 {resendMessage && (
                   <div className="bg-emerald-900/20 border border-emerald-500/40 text-emerald-400 px-4 py-3 rounded-lg mb-6 text-sm">
                     {resendMessage}
                   </div>
                 )}
 
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  <div>
-                    <label className="block text-sm text-gray-400 mb-2">
-                      {lang === "fa" ? "کد تایید" : "Verification code"} *
-                    </label>
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      autoComplete="one-time-code"
-                      required
-                      dir="ltr"
-                      maxLength={6}
-                      className="gaming-input text-center tracking-[0.5em] text-xl font-black"
-                      placeholder="------"
-                      value={otpCode}
-                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                    />
-                  </div>
+                <OtpCodeInput
+                  value={otpCode}
+                  onChange={(next) => { setOtpCode(next); if (otpError) setOtpError(""); }}
+                  onComplete={runVerification}
+                  length={6}
+                  disabled={otpLoading}
+                  error={otpError}
+                  verified={otpVerified}
+                  verifiedTitle={lang === "fa" ? "ایمیل تأیید شد" : "Email verified"}
+                  verifiedSubtitle={lang === "fa" ? "در حال ورود به گیمنت..." : "Signing you in..."}
+                  label={lang === "fa" ? "کد ۶ رقمی را وارد کن؛ خودکار تأیید می‌شود" : "Enter the 6-digit code; it verifies automatically"}
+                />
 
-                  <button
-                    type="submit"
-                    disabled={otpLoading || otpCode.length !== 6}
-                    className="gaming-btn w-full py-3 text-base disabled:opacity-50"
-                  >
-                    {otpLoading ? (lang === "fa" ? "در حال تایید..." : "Verifying...") : (lang === "fa" ? "تایید و ورود" : "Verify & Continue")}
-                  </button>
-                </form>
+                {otpLoading && !otpVerified && (
+                  <p className="mt-4 text-center text-xs font-bold text-cyan-300">
+                    {lang === "fa" ? "در حال تایید..." : "Verifying..."}
+                  </p>
+                )}
 
                 <div className="text-center mt-6 text-sm text-gray-400">
                   {lang === "fa" ? "کدی دریافت نکردید؟" : "Didn't receive a code?"}{" "}

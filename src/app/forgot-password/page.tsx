@@ -5,6 +5,7 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 import { useLanguage } from "@/contexts/LanguageContext";
+import OtpCodeInput from "@/components/OtpCodeInput";
 import { EMAIL_OTP_RESEND_COOLDOWN_SECONDS } from "@/lib/email-policy";
 
 export default function ForgotPasswordPage() {
@@ -149,19 +150,10 @@ export default function ForgotPasswordPage() {
           {step === "reset" && (
             <form onSubmit={resetPassword} className="space-y-5">
               <div>
-                <label className="block text-sm text-gray-400 mb-2">{lang === "fa" ? "کد ۶ رقمی" : "6-digit code"}</label>
-                <input
-                  type="text"
-                  required
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  dir="ltr"
-                  maxLength={6}
-                  className="gaming-input text-center text-xl tracking-[0.45em] font-black"
-                  value={code}
-                  onChange={(event) => setCode(event.target.value.replace(/\D/g, "").slice(0, 6))}
-                  placeholder="------"
-                />
+                <label className="block text-sm text-gray-400 mb-3">{lang === "fa" ? "کد ۶ رقمی" : "6-digit code"}</label>
+                {/* No auto-submit here: the form also needs a new password, so
+                    completing the code is not the end of the interaction. */}
+                <OtpCodeInput value={code} onChange={setCode} length={6} disabled={busy} autoFocus={false} />
               </div>
               <div>
                 <label className="block text-sm text-gray-400 mb-2">{lang === "fa" ? "رمز عبور جدید" : "New password"}</label>
