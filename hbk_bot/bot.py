@@ -198,6 +198,9 @@ def run_health_check():
     server.serve_forever()
 
 # --- Main ---
+async def unknown_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("متوجه نشدم. از منوی زیر استفاده کن یا دستور /start رو بزن.")
+
 def main():
     threading.Thread(target=run_health_check, daemon=True).start()
     
@@ -219,8 +222,9 @@ def main():
     app.add_handler(MessageHandler(filters.Regex("^🔥 پرونده‌های داغ$"), list_hot_stories))
     app.add_handler(CallbackQueryHandler(handle_vote, pattern="^vote_"))
     app.add_handler(CallbackQueryHandler(view_callback, pattern="^view_"))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unknown_text))
     
-    print("Hagh Ba Kie Bot is running...")
+    print("Hagh Ba Kie Bot is starting...")
     app.run_polling()
 
 if __name__ == "__main__":
