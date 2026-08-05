@@ -198,12 +198,8 @@ def run_health_check():
     server.serve_forever()
 
 # --- Main ---
-async def unknown_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("متوجه نشدم. از منوی زیر استفاده کن یا دستور /start رو بزن.")
-
+# --- Main ---
 def main():
-    threading.Thread(target=run_health_check, daemon=True).start()
-    
     app = Application.builder().token(BOT_TOKEN).build()
     
     conv_handler = ConversationHandler(
@@ -222,10 +218,15 @@ def main():
     app.add_handler(MessageHandler(filters.Regex("^🔥 پرونده‌های داغ$"), list_hot_stories))
     app.add_handler(CallbackQueryHandler(handle_vote, pattern="^vote_"))
     app.add_handler(CallbackQueryHandler(view_callback, pattern="^view_"))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unknown_text))
     
-    print("Hagh Ba Kie Bot is starting...")
-    app.run_polling()
+    # Use Webhook for Render
+    url_path = BOT_TOKEN.split(":")[0]
+    app.run_webhook(
+        listen="0.0.0.0",
+        port=PORT,
+        url_path=url_path,
+        webhook_url=f"https://haghbakie-bot-independent.onrender.com/{url_path}"
+    )
 
 if __name__ == "__main__":
     main()
