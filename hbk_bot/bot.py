@@ -21,9 +21,16 @@ from telegram.ext import (
 BOT_TOKEN = "8790569799:AAFZuVDuVg62v87yQqmaQy3LS_w71-Q6yz0"
 DATABASE_URL = "postgresql://neondb_owner:npg_fLk5QncJezR8@ep-lucky-queen-adg9b8qq-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
 PORT = int(os.environ.get("PORT", 8000))
+ADMIN_IDS = [248175860]  # آیدی شما اضافه شد
 
-# States
-SUBMIT_STORY, SUBMIT_SIDE_A, SUBMIT_SIDE_B, CONFIRM_STORY = range(4)
+# ... در تابع استارت ...
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user = update.effective_user
+    register_user(user.id, user.username, user.full_name)
+    
+    # ادمین پنل ساده
+    if user.id in ADMIN_IDS:
+        logger.info(f"Admin {user.id} logged in.")
 
 # Logging
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
