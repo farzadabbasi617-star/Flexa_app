@@ -20,7 +20,6 @@ BOT_TOKEN = "8790569799:AAFZuVDuVg62v87yQqmaQy3LS_w71-Q6yz0"
 DATABASE_URL = "postgresql://neondb_owner:npg_fLk5QncJezR8@ep-lucky-queen-adg9b8qq-pooler.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require"
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 PORT = int(os.environ.get("PORT", 8000))
-# Render Public URL
 BASE_URL = "https://haghbakie-official.onrender.com"
 
 # States
@@ -101,32 +100,10 @@ async def confirm_story(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text(f"✅ منتشر شد!\nhttps://t.me/{(await context.bot.get_me()).username}?start=story_{s_id}")
     return ConversationHandler.END
 
-async def list_hot(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    with get_db_conn() as conn:
-        with conn.cursor() as cur:
-            cur.execute("SELECT id, title FROM hbk_stories ORDER BY created_at DESC LIMIT 5")
-            res = cur.fetchall()
-    if not res: return await update.message.reply_text("پرونده‌ای نیست.")
-    kb = [[InlineKeyboardButton(r['title'], callback_data=f"view_{r['id']}")] for r in res]
-    await update.message.reply_text("🔥 جدیدترین‌ها:", reply_markup=InlineKeyboardMarkup(kb))
-
-async def handle_vote(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    _, s_id, choice = query.data.split("_")
-    try:
-        with get_db_conn() as conn:
-            with conn.cursor() as cur:
-                cur.execute("INSERT INTO hbk_votes (story_id, voter_id, choice) VALUES (%s, %s, %s)", (s_id, update.effective_user.id, choice))
-            conn.commit()
-        await query.answer("✅ ثبت شد!")
-    except:
-        await query.answer("❌ قبلاً رأی دادی!")
-
 def main():
     init_db()
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.Regex("^🔥 پرونده‌های داغ$"), list_hot))
     app.add_handler(ConversationHandler(
         entry_points=[MessageHandler(filters.Regex("^⚖️ ثبت پرونده جدید$"), start_submit)],
         states={SUBMIT_STORY: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_content)],
@@ -135,16 +112,13 @@ def main():
                 CONFIRM_STORY: [CallbackQueryHandler(confirm_story, pattern="^(confirm|cancel)_story$")]},
         fallbacks=[CommandHandler("start", start)]
     ))
-    app.add_handler(CallbackQueryHandler(handle_vote, pattern="^v_"))
     
-    # ULTIMATE FIX: Webhook instead of Polling
-    # This prevents the "Conflict" error forever.
-    webhook_url = f"{BASE_URL}/{BOT_TOKEN.split(':')[0]}"
+    # Webhook config
     app.run_webhook(
         listen="0.0.0.0",
         port=PORT,
-        url_path=BOT_TOKEN.split(':')[0],
-        webhook_url=webhook_url
+        url_path="webhook",
+        webhook_url=f"{BASE_URL}/webhook"
     )
 
 if __name__ == "__main__":
