@@ -25,3 +25,5 @@ blob-report/
 uploads/
 *.local.jpg
 *.local.png
+.env
+__pycache__/
