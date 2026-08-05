@@ -292,6 +292,7 @@ async def vote(update, context):
 
 # ===================== ثبت پرونده =====================
 async def sub_start(update, context):
+    ensure_user(update.effective_user)
     await update.message.reply_text("⚖️ **ثبت پرونده جدید**\n\n📝 داستان را کامل بنویسید.\n/cancel برای لغو", parse_mode=ParseMode.MARKDOWN)
     return SUBMIT_STORY
 
@@ -321,26 +322,91 @@ async def sub_b(update, context):
     return CONFIRM_STORY
 
 async def sub_confirm(update, context):
-    q = update.callback_query; await q.answer()
-    if q.data == "confirm_story":
-        conn = get_db_conn()
+    q = update.callback_query
+    await q.answer()
+
+    if q.data != "confirm_story":
+        await q.edit_message_text("❌ ثبت پرونده لغو شد.", reply_markup=main_kb())
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    # ===== تایید و ثبت =====
+    # اطمینان از وجود کاربر در دیتابیس (برای Foreign Key)
+    ensure_user(update.effective_user)
+
+    # بررسی وجود داده‌های ضروری
+    ai_data = context.user_data.get('ai', {})
+    title = ai_data.get('title', 'داستان جدید')
+    verdict = ai_data.get('verdict', '⚖️ بدون نظر کارشناسی')
+    content = context.user_data.get('c', '')
+    side_a = context.user_data.get('a', 'من')
+    side_b = context.user_data.get('b', 'طرف مقابل')
+
+    if not content:
+        await q.edit_message_text("❌ خطا: متن داستان یافت نشد. لطفاً دوباره تلاش کنید.", reply_markup=main_kb())
+        context.user_data.clear()
+        return ConversationHandler.END
+
+    conn = get_db_conn()
+    try:
+        with DBCursor(conn) as cur:
+            cur.execute(
+                """INSERT INTO hbk_stories (creator_id, title, content, side_a, side_b, ai_verdict, expires_at)
+                   VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                (update.effective_user.id, title, content, side_a, side_b, verdict,
+                 datetime.now() + timedelta(hours=48))
+            )
+            sid = cur.fetchone()['id']
+        conn.commit()
+        logger.info(f"✅ Story #{sid} created by user {update.effective_user.id}")
+    except psycopg2.errors.ForeignKeyViolation:
+        conn.rollback()
+        logger.error(f"Foreign key violation for user {update.effective_user.id}")
+        # تلاش مجدد برای ثبت کاربر
+        ensure_user(update.effective_user)
         try:
             with DBCursor(conn) as cur:
-                cur.execute("""INSERT INTO hbk_stories (creator_id,title,content,side_a,side_b,ai_verdict,expires_at)
-                    VALUES (%s,%s,%s,%s,%s,%s,%s) RETURNING id""",
-                    (update.effective_user.id, context.user_data['ai']['title'], context.user_data['c'],
-                     context.user_data['a'], context.user_data['b'], context.user_data['ai']['verdict'],
-                     datetime.now()+timedelta(hours=48)))
+                cur.execute(
+                    """INSERT INTO hbk_stories (creator_id, title, content, side_a, side_b, ai_verdict, expires_at)
+                       VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id""",
+                    (update.effective_user.id, title, content, side_a, side_b, verdict,
+                     datetime.now() + timedelta(hours=48))
+                )
                 sid = cur.fetchone()['id']
             conn.commit()
-        except Exception as e:
-            logger.error(f"confirm: {e}"); conn.rollback()
-            await q.edit_message_text("❌ خطا در ثبت."); return ConversationHandler.END
-        finally: return_db_conn(conn)
+            logger.info(f"✅ Story #{sid} created on retry")
+        except Exception as e2:
+            conn.rollback()
+            logger.error(f"Retry also failed: {e2}")
+            await q.edit_message_text("❌ خطا در ثبت پرونده. لطفاً /start را بزنید و دوباره تلاش کنید.", reply_markup=main_kb())
+            context.user_data.clear()
+            return ConversationHandler.END
+    except Exception as e:
+        conn.rollback()
+        logger.error(f"Insert story error: {type(e).__name__}: {e}")
+        await q.edit_message_text(f"❌ خطا در ثبت پرونده. لطفاً دوباره تلاش کنید.\n(اگر تکرار شد /start را بزنید)", reply_markup=main_kb())
+        context.user_data.clear()
+        return ConversationHandler.END
+    finally:
+        return_db_conn(conn)
+
+    # موفقیت
+    try:
         bu = (await context.bot.get_me()).username
-        await q.edit_message_text(f"✅ **ثبت شد!**\n🔖 {context.user_data['ai']['title']}\n🆔 #{sid}\n🔗 https://t.me/{bu}?start=story_{sid}\n⏰ ۴۸ ساعت", parse_mode=ParseMode.MARKDOWN)
-    else:
-        await q.edit_message_text("❌ لغو شد.")
+    except Exception:
+        bu = "HaghBaKieBot"
+
+    await q.edit_message_text(
+        f"✅ **پرونده با موفقیت ثبت شد!**\n\n"
+        f"🔖 {title}\n"
+        f"🆔 شماره پرونده: #{sid}\n\n"
+        f"🔗 لینک اشتراک‌گذاری:\n"
+        f"https://t.me/{bu}?start=story_{sid}\n\n"
+        f"⏰ این پرونده ۴۸ ساعت باز است.\n"
+        f"📊 منتظر رأی دیگران باشید!",
+        parse_mode=ParseMode.MARKDOWN
+    )
+
     context.user_data.clear()
     return ConversationHandler.END
 
