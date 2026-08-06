@@ -79,11 +79,37 @@ def init_db():
                 voter_id BIGINT REFERENCES hbk_users(user_id), choice CHAR(1),
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(story_id, voter_id))""")
-            for col, ct in [("votes_a","INTEGER DEFAULT 0"),("votes_b","INTEGER DEFAULT 0")]:
-                try: cur.execute(f"ALTER TABLE hbk_stories ADD COLUMN IF NOT EXISTS {col} {ct}")
-                except: pass
-            try: cur.execute("ALTER TABLE hbk_votes ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-            except: pass
+            # === Migration: اضافه کردن ستون‌های جدید به جداول قدیمی ===
+            story_migrations = [
+                ("title", "TEXT"),
+                ("ai_verdict", "TEXT"),
+                ("category", "TEXT"),
+                ("votes_a", "INTEGER DEFAULT 0"),
+                ("votes_b", "INTEGER DEFAULT 0"),
+            ]
+            for col, ct in story_migrations:
+                try:
+                    cur.execute(f"ALTER TABLE hbk_stories ADD COLUMN IF NOT EXISTS {col} {ct}")
+                except Exception:
+                    pass
+
+            vote_migrations = [
+                ("created_at", "TIMESTAMP DEFAULT CURRENT_TIMESTAMP"),
+            ]
+            for col, ct in vote_migrations:
+                try:
+                    cur.execute(f"ALTER TABLE hbk_votes ADD COLUMN IF NOT EXISTS {col} {ct}")
+                except Exception:
+                    pass
+
+            user_migrations = [
+                ("points", "INTEGER DEFAULT 0"),
+            ]
+            for col, ct in user_migrations:
+                try:
+                    cur.execute(f"ALTER TABLE hbk_users ADD COLUMN IF NOT EXISTS {col} {ct}")
+                except Exception:
+                    pass
             conn.commit()
             logger.info("✅ DB ready")
     except Exception as e:
