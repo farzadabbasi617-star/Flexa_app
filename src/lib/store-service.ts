@@ -24,7 +24,7 @@ import {
  * Platform commission taken from user (P2P) sales, in basis points.
  * 500 = 5%. Official listings have no commission (platform is the seller).
  */
-export const PLATFORM_FEE_BPS = Number(process.env.STORE_FEE_BPS || "500");
+export const PLATFORM_FEE_BPS = Number(process.env.STORE_FEE_BPS || "0");
 
 let storeSchemaPromise: Promise<void> | null = null;
 export function ensureStoreOrderLifecycleSchema(client: any = db) {
