@@ -12,8 +12,43 @@ export function readRuntimeEnv(name: string): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function readSecretFile(filePath: string): string | undefined {
+  try {
+    // Lazy require keeps this safe in edge/runtime bundles that cannot use fs.
+    const fs = require("fs") as typeof import("fs");
+    if (!fs.existsSync(filePath)) return undefined;
+    const text = fs.readFileSync(filePath, "utf8").trim();
+    return text.length > 0 ? text : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * Render may mount a secret file instead of (or in addition to) an env var.
+ * Also accept Neon/Vercel-style aliases so a pasted "POSTGRES_URL" still works.
+ */
 export function getRuntimeDatabaseUrl() {
-  return normalizeDatabaseUrl(readRuntimeEnv("DATABASE_URL"));
+  const fromEnv =
+    readRuntimeEnv("DATABASE_URL") ||
+    readRuntimeEnv("POSTGRES_URL") ||
+    readRuntimeEnv("POSTGRES_PRISMA_URL") ||
+    readRuntimeEnv("NEON_DATABASE_URL");
+
+  if (fromEnv) return normalizeDatabaseUrl(fromEnv);
+
+  const fromFile =
+    readSecretFile("/etc/secrets/DATABASE_URL") ||
+    readSecretFile("/etc/secrets/.env");
+
+  if (!fromFile) return undefined;
+
+  if (fromFile.includes("\n") || fromFile.includes("=")) {
+    const match = fromFile.match(/^(?:export\s+)?DATABASE_URL\s*=\s*(.+)$/m);
+    if (match) return normalizeDatabaseUrl(match[1]);
+  }
+
+  return normalizeDatabaseUrl(fromFile);
 }
 
 export function normalizeDatabaseUrl(rawUrl: string | undefined | null) {
