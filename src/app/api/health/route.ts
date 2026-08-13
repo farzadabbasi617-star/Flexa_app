@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { isLikelyPostgresUrl, normalizeDatabaseUrl } from "@/lib/database-url";
+import { getRuntimeDatabaseUrl, isLikelyPostgresUrl } from "@/lib/database-url";
 import { sql } from "drizzle-orm";
 import { getEmailDeliveryConfiguration } from "@/lib/email-service";
 import { getClashRoyaleApiConfiguration } from "@/lib/clash-royale-api";
@@ -30,7 +30,7 @@ function unhealthy(error: string) {
 }
 
 export async function GET() {
-  const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
+  const databaseUrl = getRuntimeDatabaseUrl();
   const email = getEmailDeliveryConfiguration();
   const clashRoyaleApi = getClashRoyaleApiConfiguration();
 

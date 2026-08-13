@@ -1,3 +1,21 @@
+/**
+ * Read an env var at *runtime*. Dynamic key access (`env[name]`) prevents
+ * Next.js/webpack from inlining the value during `next build`. If Render
+ * does not expose DATABASE_URL at build time, a static `process.env.DATABASE_URL`
+ * can be baked in as `undefined` forever — even when the runtime env is set.
+ */
+export function readRuntimeEnv(name: string): string | undefined {
+  const env = process.env;
+  const value = env[name];
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : undefined;
+}
+
+export function getRuntimeDatabaseUrl() {
+  return normalizeDatabaseUrl(readRuntimeEnv("DATABASE_URL"));
+}
+
 export function normalizeDatabaseUrl(rawUrl: string | undefined | null) {
   if (!rawUrl) return undefined;
 

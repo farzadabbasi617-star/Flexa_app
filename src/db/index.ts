@@ -1,20 +1,31 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
-import { isLikelyPostgresUrl, normalizeDatabaseUrl } from "@/lib/database-url";
-
-const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
+import { getRuntimeDatabaseUrl, isLikelyPostgresUrl, readRuntimeEnv } from "@/lib/database-url";
 
 const isNextProductionBuild = process.env.NEXT_PHASE === "phase-production-build";
 
-if (!databaseUrl) {
-  // Route modules can be imported during `next build` even when no database is
-  // needed. Keep builds/CI noise-free; runtime health/API calls will still fail
-  // clearly if DATABASE_URL is missing.
-  if (!isNextProductionBuild) {
-    console.error("CRITICAL ERROR: DATABASE_URL is missing in environment variables!");
+function databaseUrlOrWarn() {
+  const databaseUrl = getRuntimeDatabaseUrl();
+  if (!databaseUrl) {
+    // Route modules can be imported during `next build` even when no database is
+    // needed. Keep builds/CI noise-free; runtime health/API calls will still fail
+    // clearly if DATABASE_URL is missing.
+    if (!isNextProductionBuild) {
+      const raw = readRuntimeEnv("DATABASE_URL");
+      console.error(
+        "CRITICAL ERROR: DATABASE_URL is missing in environment variables!",
+        {
+          present: Boolean(raw),
+          length: raw?.length ?? 0,
+        },
+      );
+    }
+    return undefined;
   }
-} else if (!isLikelyPostgresUrl(databaseUrl)) {
-  console.error("CRITICAL ERROR: DATABASE_URL must start with postgresql://");
+  if (!isLikelyPostgresUrl(databaseUrl)) {
+    console.error("CRITICAL ERROR: DATABASE_URL must start with postgresql://");
+  }
+  return databaseUrl;
 }
 
 /**
@@ -40,10 +51,9 @@ const poolMax = Number.isFinite(configuredPoolMax) && configuredPoolMax > 0
     ? 5
     : 10;
 
-export const pool =
-  globalForDb.__gamentPool ??
-  new Pool({
-    connectionString: databaseUrl,
+function createPool() {
+  return new Pool({
+    connectionString: databaseUrlOrWarn(),
     ssl: { rejectUnauthorized: !noVerify },
     max: poolMax,
     min: 0,
@@ -53,6 +63,9 @@ export const pool =
     keepAlive: true,
     application_name: process.env.DB_APPLICATION_NAME || "gament-next",
   });
+}
+
+export const pool = globalForDb.__gamentPool ?? createPool();
 
 if (process.env.NODE_ENV !== "production") {
   globalForDb.__gamentPool = pool;
