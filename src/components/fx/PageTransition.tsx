@@ -1,7 +1,8 @@
 "use client";
 
-import { PropsWithChildren, useEffect, useState } from "react";
+import { PropsWithChildren } from "react";
 import { usePathname } from "next/navigation";
+import { useIsHydrated } from "@/hooks/useIsHydrated";
 import { AnimatePresence, motion } from "framer-motion";
 
 /**
@@ -19,9 +20,7 @@ import { AnimatePresence, motion } from "framer-motion";
  */
 export default function PageTransition({ children }: PropsWithChildren) {
   const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  const mounted = useIsHydrated();
 
   // Server render (and the first client paint) emits the children as plain
   // markup. Wrapping them in AnimatePresence/motion on that first pass made

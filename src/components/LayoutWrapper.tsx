@@ -1,8 +1,9 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useLanguage } from "@/contexts/LanguageContext";
+import { useIsHydrated } from "@/hooks/useIsHydrated";
 import PageTransition from "./fx/PageTransition";
 
 /**
@@ -33,9 +34,7 @@ const AmbientBackdrop = dynamic(() => import("./fx/AmbientBackdrop"), { loading:
 
 export function LayoutWrapper({ children }: { children: ReactNode }) {
   const { dir, lang } = useLanguage();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => setMounted(true), []);
+  const mounted = useIsHydrated();
 
   useEffect(() => {
     document.documentElement.setAttribute("dir", dir);
