@@ -1,4 +1,5 @@
 import Link from "next/link";
+import EnamadSeal from "@/components/EnamadSeal";
 
 /**
  * Server-rendered brand footer present on every page.
@@ -50,8 +51,13 @@ export default function BrandFooter() {
           </nav>
         </div>
 
-        <div className="mt-6 border-t border-white/5 pt-4 text-[11px] text-gray-500">
-          © {new Date().getFullYear()} گیمنت | Gament — پلتفرم تورنومنت‌های گیمینگ. تمامی حقوق محفوظ است.
+        {/* Trust seal. e-Namad requires it to be reachable from every page and
+            to link out to their verification page, so it lives in the footer. */}
+        <div className="mt-6 flex flex-col items-center gap-3 border-t border-white/5 pt-6 sm:flex-row-reverse sm:items-center sm:justify-between">
+          <EnamadSeal />
+          <p className="text-center text-[11px] leading-6 text-gray-500 sm:text-right">
+            © {new Date().getFullYear()} گیمنت | Gament — پلتفرم تورنومنت‌های گیمینگ. تمامی حقوق محفوظ است.
+          </p>
         </div>
       </div>
     </footer>
