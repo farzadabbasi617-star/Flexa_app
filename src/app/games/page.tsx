@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AppImage from "@/components/AppImage";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import TiltCard from "@/components/fx/TiltCard";
@@ -24,7 +25,7 @@ export default function GamesPage() {
             <Reveal key={game.slug} delay={i * 0.08}>
               <TiltCard maxTilt={9} liftZ={16} className="rounded-3xl">
                 <Link href={`/games/${game.slug}`} className="gaming-card p-6 rounded-3xl border border-white/5 hover:border-purple-400/30 transition block text-right">
-                  <img src={game.icon} alt={game.title} className="w-16 h-16 object-contain mb-5" style={{ transform: "translateZ(24px)" }} loading="lazy" decoding="async" />
+                  <AppImage src={game.icon} alt={game.title} width={64} height={64} className="w-16 h-16 object-contain mb-5" style={{ transform: "translateZ(24px)" }} loading="lazy" decoding="async" />
                   <h2 className="text-xl font-black mb-3" style={{ transform: "translateZ(16px)" }}>{game.title}</h2>
                   <p className="text-sm text-gray-400 leading-7">{game.shortDescription}</p>
                 </Link>

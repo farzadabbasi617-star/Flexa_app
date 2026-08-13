@@ -1,5 +1,6 @@
 "use client";
 
+import AppImage from "@/components/AppImage";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
@@ -244,7 +245,7 @@ export default function UserProfileSettingsPage() {
 
         <header className="text-right mb-6">
           <div className="inline-flex items-center gap-2 text-[10px] font-black text-purple-300 bg-purple-500/10 border border-purple-500/20 rounded-full px-3 py-1 mb-3">
-            <img src="/icons/profile_icon.png" alt="پروفایل" className="w-5 h-5 object-contain" loading="lazy" decoding="async" />
+            <AppImage src="/icons/profile_icon.png" alt="پروفایل" width={20} height={20} className="w-5 h-5 object-contain" loading="lazy" decoding="async" />
             پروفایل کاربری
           </div>
           <h1 className="text-3xl font-black">پروفایل</h1>
@@ -254,7 +255,7 @@ export default function UserProfileSettingsPage() {
         <section className="glass-panel rounded-[32px] sm:rounded-[38px] p-4 sm:p-6 border border-white/5 mb-6">
           <div className="flex items-center gap-4 mb-5">
             <div className="p-0.5 rounded-full bg-gradient-to-tr from-[#bc00ff] to-[#00d2ff] shadow-[0_0_20px_rgba(188,0,255,0.35)]">
-              <img src={selectedAvatar} alt="Avatar" className="w-20 h-20 rounded-full border-4 border-[#09071f] object-cover bg-black/40" onError={(e) => ((e.target as HTMLImageElement).src = "/icons/profile_icon.png")} />
+              <AppImage src={selectedAvatar} alt="Avatar" width={80} height={80} className="w-20 h-20 rounded-full border-4 border-[#09071f] object-cover bg-black/40" onError={(e) => ((e.target as HTMLImageElement).src = "/icons/profile_icon.png")} />
             </div>
             <div className="text-right">
               <div className="font-black text-xl">{user.displayName}</div>
@@ -283,7 +284,7 @@ export default function UserProfileSettingsPage() {
                   const active = selectedAvatar === avatar.url;
                   return (
                     <button key={avatar.url} type="button" onClick={() => chooseAvatar(avatar.url)} disabled={saving} className={`rounded-2xl p-1 border transition-all aspect-square flex items-center justify-center relative ${active ? "border-yellow-500 bg-yellow-500/10 shadow-[0_0_16px_rgba(234,179,8,.2)]" : "border-white/10 bg-black/20 hover:border-purple-400/50"}`} title={avatar.label}>
-                      <img src={avatar.url} alt={avatar.label} className="w-full h-full rounded-xl object-cover" loading="lazy" decoding="async" />
+                      <AppImage src={avatar.url} alt={avatar.label} fill className="rounded-xl object-cover" loading="lazy" decoding="async" />
                       {active && <span className="absolute -top-1 -right-1 text-[10px] bg-yellow-500 text-black rounded-full w-5 h-5 grid place-items-center font-black">✓</span>}
                     </button>
                   );
@@ -362,7 +363,7 @@ export default function UserProfileSettingsPage() {
           <div className="space-y-2.5">
             {gameIds.map((game) => (
               <div key={game.label} className="flex items-center gap-3 bg-black/20 border border-white/5 rounded-2xl p-3">
-                <img src={game.icon} alt={game.label} className="w-9 h-9 rounded-xl object-contain bg-white/5 shrink-0" loading="lazy" decoding="async" />
+                <AppImage src={game.icon} alt={game.label} width={36} height={36} className="w-9 h-9 rounded-xl object-contain bg-white/5 shrink-0" loading="lazy" decoding="async" />
                 <div className="flex-1 text-right min-w-0">
                   <div className="text-xs font-black">{game.label}</div>
                   <div className="text-[10px] text-gray-400 mt-1 truncate" dir="ltr">{game.id || game.username ? `${game.username || "بدون نام"} ${game.id ? `• ${game.id}` : ""}` : "ثبت نشده"}</div>

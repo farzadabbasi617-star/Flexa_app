@@ -1,5 +1,6 @@
 "use client";
 
+import AppImage from "@/components/AppImage";
 import { useEffect, useState } from "react";
 
 export default function SplashScreen() {
@@ -62,12 +63,12 @@ export default function SplashScreen() {
           filter: "blur(26px)", animation: "gmtSpin 6s linear infinite",
         }} />
         {/* لوگوی اصلی گیمنت */}
-        <img
+        <AppImage
           src="/icons/gament-logo-square.png"
           alt="Gament"
           width={188} height={188}
           style={{
-            position: "relative", width: 188, height: 188,
+            position: "relative",
             objectFit: "contain", borderRadius: 28,
             animation: "gmtFloat 3.2s ease-in-out infinite, gmtGlow 2.4s ease-in-out infinite",
           }}

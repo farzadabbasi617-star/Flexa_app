@@ -1,5 +1,6 @@
 "use client";
 
+import AppImage from "@/components/AppImage";
 import { useCallback, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
@@ -267,9 +268,11 @@ export default function AchievementsPage() {
                             : "bg-dark-600"
                         }`}
                       >
-                        <img
+                        <AppImage
                           src={achievementIconUrl}
                           alt={lang === "fa" ? achievement.nameFA : achievement.name}
+                          width={64}
+                          height={64}
                           className={`w-full h-full object-cover ${
                             achievement.unlocked ? "opacity-100" : "opacity-30 grayscale"
                           }`}

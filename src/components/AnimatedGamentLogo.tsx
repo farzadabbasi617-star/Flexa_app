@@ -23,6 +23,10 @@ export default function AnimatedGamentLogo({ size = "md", showLabel = false, cla
           <span className="gament-spark spark-2" />
           <span className="gament-spark spark-3" />
           <span className="gament-scan" />
+          {/* Kept as a plain <img>: this decorative logo is sized 100%/100% by
+              CSS inside a 3D stage and uses a cache-busting query string, both
+              of which fight next/image's width/height-or-fill sizing. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/icons/gament-auth-royal-v2.png?v=20260624-royal" alt="Gament | گیمنت" className="gament-logo-img" />
         </div>
       </div>

@@ -1,5 +1,6 @@
 "use client";
 
+import AppImage from "@/components/AppImage";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -388,7 +389,7 @@ export default function AdminTournamentsPage() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {filtered.map((row) => (
               <article key={row.id} className="gaming-card p-4 sm:p-5 overflow-hidden relative">
-                {row.bannerUrl && <img src={row.bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-15" loading="lazy" decoding="async" />}
+                {row.bannerUrl && <AppImage src={row.bannerUrl} alt="" fill className="object-cover opacity-15" loading="lazy" decoding="async" />}
                 <div className="relative">
                   <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                     <div>

@@ -1,5 +1,6 @@
 "use client";
 
+import AppImage from "@/components/AppImage";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
@@ -177,7 +178,7 @@ export default function LeaderboardPage() {
                   : "bg-[#111114] border-white/5 text-gray-400 hover:border-white/10"
               }`}
             >
-              <img src={game.icon} alt={game.label} className="w-4 h-4 object-contain shrink-0" loading="lazy" decoding="async" />
+              <AppImage src={game.icon} alt={game.label} width={16} height={16} className="w-4 h-4 object-contain shrink-0" loading="lazy" decoding="async" />
               <span>{game.label}</span>
             </button>
           ))}
@@ -245,7 +246,7 @@ export default function LeaderboardPage() {
                     {/* User Profile Avatar */}
                     <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-gray-400 to-gray-600 overflow-hidden ring-4 ring-[#050508] mt-2 flex items-center justify-center">
                       {topThree[1].avatarUrl ? (
-                        <img src={topThree[1].avatarUrl} alt={topThree[1].displayName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                        <AppImage src={topThree[1].avatarUrl} alt={topThree[1].displayName} width={56} height={56} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : (
                         <span className="text-xl font-black">{topThree[1].displayName.charAt(0).toUpperCase()}</span>
                       )}
@@ -268,7 +269,7 @@ export default function LeaderboardPage() {
                     {/* User Profile Avatar */}
                     <div className="w-18 h-18 mx-auto rounded-full bg-gradient-to-br from-yellow-400 to-amber-600 overflow-hidden ring-4 ring-[#050508] mt-2 shadow-[0_0_15px_rgba(234,179,8,.3)] flex items-center justify-center">
                       {topThree[0].avatarUrl ? (
-                        <img src={topThree[0].avatarUrl} alt={topThree[0].displayName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                        <AppImage src={topThree[0].avatarUrl} alt={topThree[0].displayName} width={72} height={72} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : (
                         <span className="text-3xl font-black">{topThree[0].displayName.charAt(0).toUpperCase()}</span>
                       )}
@@ -291,7 +292,7 @@ export default function LeaderboardPage() {
                     {/* User Profile Avatar */}
                     <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-amber-700 to-amber-900 overflow-hidden ring-4 ring-[#050508] mt-2 flex items-center justify-center">
                       {topThree[2].avatarUrl ? (
-                        <img src={topThree[2].avatarUrl} alt={topThree[2].displayName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                        <AppImage src={topThree[2].avatarUrl} alt={topThree[2].displayName} width={56} height={56} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                       ) : (
                         <span className="text-xl font-black">{topThree[2].displayName.charAt(0).toUpperCase()}</span>
                       )}
@@ -339,7 +340,7 @@ export default function LeaderboardPage() {
                       {/* Avatar Image of user instead of first letter of their name */}
                       <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-600 to-blue-600 overflow-hidden ring-4 ring-[#050508] shadow-lg shrink-0 flex items-center justify-center">
                         {player.avatarUrl ? (
-                          <img src={player.avatarUrl} alt={player.displayName} className="w-full h-full object-cover" loading="lazy" decoding="async" />
+                          <AppImage src={player.avatarUrl} alt={player.displayName} width={44} height={44} className="w-full h-full object-cover" loading="lazy" decoding="async" />
                         ) : (
                           <span className="font-black text-lg">{player.displayName.charAt(0).toUpperCase()}</span>
                         )}

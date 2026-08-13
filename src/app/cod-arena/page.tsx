@@ -1,5 +1,6 @@
 "use client";
 
+import AppImage from "@/components/AppImage";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/Navbar";
@@ -206,7 +207,9 @@ export default function CodArenaPage() {
               <div className="relative w-56 h-56 sm:w-72 sm:h-72 shrink-0">
                 <div className="absolute inset-0 rounded-full bg-orange-500/20 blur-3xl" />
                 <div className="relative h-full rounded-[3rem] border border-orange-400/20 bg-black/45 backdrop-blur-xl grid place-items-center shadow-2xl rotate-3">
-                  <img src="/icons/icon-cod_mobile.png" alt="Call of Duty Mobile" className="w-36 h-36 sm:w-44 sm:h-44 object-contain drop-shadow-[0_0_30px_rgba(249,115,22,.35)]" />
+                  <div className="relative w-36 h-36 sm:w-44 sm:h-44">
+                    <AppImage src="/icons/icon-cod_mobile.png" alt="Call of Duty Mobile" fill className="object-contain drop-shadow-[0_0_30px_rgba(249,115,22,.35)]" />
+                  </div>
                   <div className="absolute bottom-5 left-5 right-5 flex justify-between text-[9px] font-black text-gray-400">
                     <span>{activeCount.toLocaleString("fa-IR")} ROOM</span><span>GLOBAL • GARENA</span>
                   </div>
@@ -261,7 +264,7 @@ export default function CodArenaPage() {
 
         <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-10" dir="rtl">
           <div className="flex items-end justify-between gap-4 mb-5"><div><h2 className="text-2xl font-black">لیدربرد COD Arena</h2><p className="text-xs text-gray-500 mt-2">فقط نتیجه تأییدشده امتیاز می‌سازد.</p></div><span className="text-[10px] font-black text-orange-300">{region === "garena" ? "GARENA" : "GLOBAL"}</span></div>
-          {ranks.length === 0 ? <div className="rounded-3xl border border-white/5 bg-white/[.02] p-8 text-center text-sm text-gray-500">اولین روم‌های تأییدشده، لیدربرد واقعی را می‌سازند.</div> : <div className="grid grid-cols-1 md:grid-cols-2 gap-2">{ranks.map((rank,index)=><div key={`${rank.codUsername}-${index}`} className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[.025] px-4 py-3"><div className="flex items-center gap-3 min-w-0"><span className={`w-8 h-8 rounded-xl grid place-items-center font-black text-xs ${index<3?"bg-orange-500 text-black":"bg-white/5 text-gray-400"}`}>{(index+1).toLocaleString("fa-IR")}</span><img src={rank.avatarUrl||"/icons/profile_icon.png"} alt="" className="w-10 h-10 rounded-xl object-cover"/><div className="min-w-0"><div className="font-black text-sm truncate">{rank.displayName}</div><div className="text-[9px] text-gray-500 truncate" dir="ltr">{rank.codUsername}</div></div></div><div className="text-left shrink-0"><div className="font-black text-orange-300">{rank.points.toLocaleString("fa-IR")} RP</div><div className="text-[9px] text-gray-600">{rank.totalKills.toLocaleString("fa-IR")} Kill • {rank.tier}</div></div></div>)}</div>}
+          {ranks.length === 0 ? <div className="rounded-3xl border border-white/5 bg-white/[.02] p-8 text-center text-sm text-gray-500">اولین روم‌های تأییدشده، لیدربرد واقعی را می‌سازند.</div> : <div className="grid grid-cols-1 md:grid-cols-2 gap-2">{ranks.map((rank,index)=><div key={`${rank.codUsername}-${index}`} className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/[.025] px-4 py-3"><div className="flex items-center gap-3 min-w-0"><span className={`w-8 h-8 rounded-xl grid place-items-center font-black text-xs ${index<3?"bg-orange-500 text-black":"bg-white/5 text-gray-400"}`}>{(index+1).toLocaleString("fa-IR")}</span><AppImage src={rank.avatarUrl||"/icons/profile_icon.png"} alt="" width={40} height={40} className="w-10 h-10 rounded-xl object-cover"/><div className="min-w-0"><div className="font-black text-sm truncate">{rank.displayName}</div><div className="text-[9px] text-gray-500 truncate" dir="ltr">{rank.codUsername}</div></div></div><div className="text-left shrink-0"><div className="font-black text-orange-300">{rank.points.toLocaleString("fa-IR")} RP</div><div className="text-[9px] text-gray-600">{rank.totalKills.toLocaleString("fa-IR")} Kill • {rank.tier}</div></div></div>)}</div>}
         </section>
 
         <section className="max-w-6xl mx-auto px-4 sm:px-6 pb-8" dir="rtl">

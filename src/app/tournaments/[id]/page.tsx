@@ -1,5 +1,6 @@
 "use client";
 
+import AppImage from "@/components/AppImage";
 import { useCallback, useEffect, useState, use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -350,7 +351,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* Tournament Header */}
         <div className="gaming-card p-6 sm:p-8 mb-8 overflow-hidden relative">
-          {tournament.bannerUrl && <img src={tournament.bannerUrl} alt="" className="absolute inset-0 w-full h-full object-cover opacity-20" loading="lazy" decoding="async" />}
+          {tournament.bannerUrl && <AppImage src={tournament.bannerUrl} alt="" fill className="object-cover opacity-20" loading="lazy" decoding="async" />}
           <div className="relative flex flex-col sm:flex-row items-start gap-6">
             <div className="text-6xl">{gameData.icon}</div>
             <div className="flex-1">

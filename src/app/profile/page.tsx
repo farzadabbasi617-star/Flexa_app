@@ -1,5 +1,6 @@
 "use client";
 
+import AppImage from "@/components/AppImage";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -418,7 +419,7 @@ export default function ProfilePage() {
                 <div className="text-[9px] font-black text-purple-400 tracking-[0.2em] uppercase leading-none">GAMENT ATHLETE LICENSE</div>
                 <div className="text-[10px] text-gray-500 font-bold mt-1 leading-none">کارت هویت رسمی بازیکن</div>
               </div>
-              <img src="/icons/gament-icon-192.png" alt="Gament Logo" className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(188,0,255,0.4)]" loading="lazy" decoding="async" />
+              <AppImage src="/icons/gament-icon-192.png" alt="Gament Logo" width={32} height={32} className="w-8 h-8 object-contain drop-shadow-[0_0_8px_rgba(188,0,255,0.4)]" loading="lazy" decoding="async" />
             </div>
 
             {/* Body of the Card */}
@@ -441,12 +442,15 @@ export default function ProfilePage() {
               {/* Avatar Box with level badge */}
               <div className="relative shrink-0">
                 <div className="p-0.5 rounded-full bg-gradient-to-tr from-[#bc00ff] to-[#00d2ff] shadow-[0_0_20px_rgba(188,0,255,0.35)]">
-                  <img
-                    src={selectedAvatar}
-                    alt="Avatar"
-                    className="w-18 h-18 sm:w-20 sm:h-20 rounded-full border-4 border-[#09071f] object-cover bg-black/40"
-                    onError={(e) => ((e.target as HTMLImageElement).src = "/icons/profile_icon.png")}
-                  />
+                  <div className="relative w-18 h-18 sm:w-20 sm:h-20 rounded-full border-4 border-[#09071f] overflow-hidden bg-black/40">
+                    <AppImage
+                      src={selectedAvatar}
+                      alt="Avatar"
+                      fill
+                      className="object-cover"
+                      onError={(e) => ((e.target as HTMLImageElement).src = "/icons/profile_icon.png")}
+                    />
+                  </div>
                 </div>
                 <div className="absolute -bottom-1 -right-1 bg-gradient-to-r from-purple-600 to-fuchsia-600 border-2 border-[#09071f] w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black num-en shadow-md">
                   {user.level || 1}
@@ -489,27 +493,27 @@ export default function ProfilePage() {
         {/* Settings tabs */}
         <section className="grid grid-cols-2 gap-3 mb-8" dir="rtl">
           <Link href="/profile/user" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-purple-500/20 rounded-2xl py-4 hover:border-purple-500/40 active:scale-95 transition-transform">
-            <img src="/icons/profile_icon.png" alt="پروفایل" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
+            <AppImage src="/icons/profile_icon.png" alt="پروفایل" width={24} height={24} className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black text-purple-200">پروفایل</span>
           </Link>
           <Link href="/wallet" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-purple-500/20 rounded-2xl py-4 hover:border-purple-500/40 active:scale-95 transition-transform">
-            <img src="/icons/wallet_icon.png" alt="کیف پول" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
+            <AppImage src="/icons/wallet_icon.png" alt="کیف پول" width={24} height={24} className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black text-purple-200">کیف پول</span>
           </Link>
           <Link href="/profile/descriptions" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-cyan-500/20 rounded-2xl py-4 hover:border-cyan-500/40 active:scale-95 transition-transform">
-            <img src="/icons/profile_descriptions.png" alt="توضیحات" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#00d2ff]" loading="lazy" decoding="async" />
+            <AppImage src="/icons/profile_descriptions.png" alt="توضیحات" width={24} height={24} className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#00d2ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black text-cyan-200">توضیحات</span>
           </Link>
           <Link href="/profile/security" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-white/10 rounded-2xl py-4 hover:border-white/20 active:scale-95 transition-transform">
-            <img src="/icons/profile_security.png" alt="امنیت حساب" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
+            <AppImage src="/icons/profile_security.png" alt="امنیت حساب" width={24} height={24} className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black">امنیت حساب</span>
           </Link>
           <Link href="/profile/privacy" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-white/10 rounded-2xl py-4 hover:border-white/20 active:scale-95 transition-transform">
-            <img src="/icons/profile_privacy.png" alt="حریم خصوصی" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
+            <AppImage src="/icons/profile_privacy.png" alt="حریم خصوصی" width={24} height={24} className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black">حریم خصوصی</span>
           </Link>
           <Link href="/support" className="settings-tile flex items-center justify-center gap-2 bg-[#111114] border border-white/10 rounded-2xl py-4 hover:border-white/20 active:scale-95 transition-transform">
-            <img src="/icons/profile_support_center.png" alt="پشتیبانی" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
+            <AppImage src="/icons/profile_support_center.png" alt="پشتیبانی" width={24} height={24} className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#bc00ff]" loading="lazy" decoding="async" />
             <span className="text-xs font-black">پشتیبانی</span>
           </Link>
           <Link href="/referrals" className="settings-tile flex items-center justify-center gap-2 bg-cyan-500/[.07] border border-cyan-400/20 rounded-2xl py-4 hover:border-cyan-400/40 active:scale-95 transition-transform">
@@ -522,7 +526,7 @@ export default function ProfilePage() {
           </Link>
           {isAdmin && (
             <Link href="/admin" className="col-span-2 flex items-center justify-center gap-2 bg-[#111114] border border-fuchsia-500/20 rounded-2xl py-4 hover:border-fuchsia-500/40 active:scale-95 transition-transform">
-              <img src="/icons/profile_super_admin.png" alt="پنل مدیریت ارشد" className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#e879f9]" loading="lazy" decoding="async" />
+              <AppImage src="/icons/profile_super_admin.png" alt="پنل مدیریت ارشد" width={24} height={24} className="w-6 h-6 object-contain drop-shadow-[0_0_8px_#e879f9]" loading="lazy" decoding="async" />
               <span className="text-xs font-black text-fuchsia-300">ورود به پنل مدیریت ارشد</span>
             </Link>
           )}

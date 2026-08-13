@@ -1,5 +1,6 @@
 "use client";
 
+import AppImage from "@/components/AppImage";
 import React, { memo, useMemo } from "react";
 import Link from "next/link";
 import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
@@ -135,7 +136,7 @@ const TournamentCardLuxury = ({ t, walletBalanceToman = null, isLoggedIn = false
       <div className="relative overflow-hidden rounded-[32px] bg-[#0f0f13] border border-white/8 shadow-2xl fx-card active:scale-[0.985] transition-transform">
         <div className="relative h-40 w-full">
           <div className="absolute inset-0" style={{ background: GAME_FALLBACK[t.game] || GAME_FALLBACK.clash_royale }} />
-          {bannerUrl && <img src={bannerUrl} alt={t.name} className="absolute inset-0 w-full h-full object-cover opacity-60" />}
+          {bannerUrl && <AppImage src={bannerUrl} alt={t.name} fill className="object-cover opacity-60" />}
           <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f13] via-black/30 to-black/10" />
 
           <div className="absolute bottom-4 left-5 right-5 text-right" style={{ transform: "translateZ(22px)" }}>

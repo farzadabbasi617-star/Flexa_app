@@ -1,5 +1,6 @@
 "use client";
 
+import AppImage from "@/components/AppImage";
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/Navbar";
@@ -381,8 +382,8 @@ function JudgingContent() {
                     return (
                       <div key={item.id} className="bg-dark-700 rounded-2xl border border-white/5 overflow-hidden">
                         {isImage ? (
-                          <a href={item.fileUrl} target="_blank" rel="noreferrer">
-                            <img src={item.fileUrl} alt={item.description || "مدرک مسابقه"} className="w-full h-40 object-cover" loading="lazy" decoding="async" />
+                          <a href={item.fileUrl} target="_blank" rel="noreferrer" className="relative block h-40">
+                            <AppImage src={item.fileUrl} alt={item.description || "مدرک مسابقه"} fill className="object-cover" loading="lazy" decoding="async" />
                           </a>
                         ) : (
                           <a href={item.fileUrl} target="_blank" rel="noreferrer" className="block p-5 text-neon-blue text-sm font-bold break-all">

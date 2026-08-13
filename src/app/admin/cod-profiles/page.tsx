@@ -1,5 +1,6 @@
 "use client";
 
+import AppImage from "@/components/AppImage";
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -119,7 +120,7 @@ export default function AdminCodProfilesPage() {
           const note = notes[profile.id] || "";
           const hasIdentity = Boolean(profile.birthDate && profile.nationalId);
           return <article key={profile.id} className="rounded-[2rem] border border-white/10 bg-white/[.025] p-5">
-            <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3 min-w-0"><img src={profile.avatarUrl || "/icons/profile_icon.png"} alt="" className="w-12 h-12 rounded-2xl object-cover" /><div className="min-w-0"><h2 className="font-black truncate">{profile.displayName}</h2><div className="text-[10px] text-gray-500 truncate" dir="ltr">{profile.gamentId} • @{profile.username}</div></div></div><span className={`rounded-full border px-3 py-1 text-[10px] font-black ${statusClass[profile.codMobileStatus] || "bg-white/5"}`}>{statusFa[profile.codMobileStatus]}</span></div>
+            <div className="flex items-start justify-between gap-3"><div className="flex items-center gap-3 min-w-0"><AppImage src={profile.avatarUrl || "/icons/profile_icon.png"} alt="" width={48} height={48} className="w-12 h-12 rounded-2xl object-cover" /><div className="min-w-0"><h2 className="font-black truncate">{profile.displayName}</h2><div className="text-[10px] text-gray-500 truncate" dir="ltr">{profile.gamentId} • @{profile.username}</div></div></div><span className={`rounded-full border px-3 py-1 text-[10px] font-black ${statusClass[profile.codMobileStatus] || "bg-white/5"}`}>{statusFa[profile.codMobileStatus]}</span></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4 text-xs">
               <div className="rounded-xl bg-black/25 p-3"><span className="text-gray-500">COD UID</span><div className="font-mono font-black mt-1" dir="ltr">{profile.codMobileId}</div></div>
               <div className="rounded-xl bg-black/25 p-3"><span className="text-gray-500">COD Username</span><div className="font-black mt-1" dir="ltr">{profile.codMobileUsername}</div></div>
