@@ -10,6 +10,7 @@ export type BotState =
   | "support_subject"
   | "support_message"
   | "wallet_deposit_amount"
+  | "wallet_online_amount"
   | "wallet_deposit_tracking"
   | "wallet_deposit_receipt"
   | "clash_qr_submission"

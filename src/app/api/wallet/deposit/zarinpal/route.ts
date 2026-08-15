@@ -1,19 +1,16 @@
 /**
- * Start an online wallet top-up through ZarinPal.
+ * Start an online wallet top-up through ZarinPal (web).
  *
- * Creates a pending deposit transaction first, then asks ZarinPal for an
- * authority. The pending row is the source of truth for the amount at verify
- * time, so the callback never trusts a number supplied by the browser.
+ * The pending transaction and the gateway request are created by
+ * startZarinpalDeposit, shared with the Telegram bot so both entry points
+ * produce rows the single callback route can settle identically.
  */
 import { NextRequest, NextResponse } from "next/server";
-import { db } from "@/db";
-import { transactions, wallets } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 import { checkAgeGate } from "@/lib/age-gate";
-import { parseTomanToRial, rialToTomanNumber } from "@/lib/money";
-import { createWalletReference, validateDepositAmountRial } from "@/lib/wallet-security";
-import { getZarinpalConfiguration, requestPayment } from "@/lib/zarinpal";
+import { parseTomanToRial } from "@/lib/money";
+import { startZarinpalDeposit } from "@/lib/zarinpal-deposit";
+import { getZarinpalConfiguration } from "@/lib/zarinpal";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
 
@@ -21,8 +18,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    const gateway = getZarinpalConfiguration();
-    if (!gateway.live) {
+    if (!getZarinpalConfiguration().live) {
       return NextResponse.json(
         { error: "پرداخت آنلاین در حال حاضر فعال نیست. لطفاً از روش کارت‌به‌کارت استفاده کنید." },
         { status: 503 }
@@ -61,105 +57,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const amountRial = parseTomanToRial(String(body?.amountToman ?? ""));
-    const amountCheck = validateDepositAmountRial(amountRial);
-    if (!amountCheck.ok) {
-      return NextResponse.json({ error: amountCheck.error }, { status: 400 });
-    }
-
-    const [wallet] = await db.select().from(wallets).where(eq(wallets.userId, user.id)).limit(1);
-    const walletRow =
-      wallet ||
-      (
-        await db
-          .insert(wallets)
-          .values({ userId: user.id, balance: "0", currency: "RIAL" })
-          .onConflictDoNothing({ target: wallets.userId })
-          .returning()
-      )[0] ||
-      (await db.select().from(wallets).where(eq(wallets.userId, user.id)).limit(1))[0];
-
-    if (!walletRow) {
-      return NextResponse.json({ error: "کیف پول یافت نشد." }, { status: 500 });
-    }
-
-    const reference = createWalletReference("deposit");
-    const amountToman = rialToTomanNumber(amountRial);
-
-    const [pending] = await db
-      .insert(transactions)
-      .values({
-        walletId: walletRow.id,
-        amount: amountRial.toString(),
-        type: "deposit",
-        status: "pending",
-        referenceId: reference,
-        metadata: {
-          method: "zarinpal",
-          gateway: "zarinpal",
-          sandbox: gateway.sandbox,
-          amountToman,
-          requestedAt: new Date().toISOString(),
-        },
-      })
-      .returning();
-
-    // Deliberately no query string. Some gateway configurations reject a
-    // callback_url that carries one, and we do not need it: ZarinPal always
-    // returns the Authority, and we store it on the pending row, so the
-    // callback can find the transaction by authority alone.
-    const callbackUrl = `${gateway.callbackBaseUrl}/api/wallet/deposit/zarinpal/callback`;
-
-    const result = await requestPayment({
-      amountRial,
-      description: `شارژ کیف پول گیمنت - ${amountToman.toLocaleString("fa-IR")} تومان`,
-      callbackUrl,
+    const result = await startZarinpalDeposit({
+      userId: user.id,
+      amountRial: parseTomanToRial(String(body?.amountToman ?? "")),
       mobile: user.phoneNumber ?? null,
       email: user.email ?? null,
-      orderId: reference,
+      origin: "web",
     });
 
     if (!result.ok) {
-      await db
-        .update(transactions)
-        .set({
-          status: "failed",
-          metadata: {
-            method: "zarinpal",
-            gateway: "zarinpal",
-            amountToman,
-            failedAt: new Date().toISOString(),
-            failureReason: result.error,
-            gatewayCode: result.code ?? null,
-          },
-          updatedAt: new Date(),
-        })
-        .where(eq(transactions.id, pending.id));
-
-      return NextResponse.json({ error: result.error }, { status: 502 });
+      return NextResponse.json({ error: result.error }, { status: result.status });
     }
 
-    await db
-      .update(transactions)
-      .set({
-        metadata: {
-          method: "zarinpal",
-          gateway: "zarinpal",
-          sandbox: gateway.sandbox,
-          amountToman,
-          authority: result.authority,
-          requestedAt: new Date().toISOString(),
-        },
-        updatedAt: new Date(),
-      })
-      .where(eq(transactions.id, pending.id));
-
-    logger.info(
-      { userId: user.id, reference, amountToman },
-      "ZarinPal deposit initiated"
-    );
-
-    return NextResponse.json({ paymentUrl: result.paymentUrl, reference });
+    return NextResponse.json({ paymentUrl: result.paymentUrl, reference: result.reference });
   } catch (error) {
     logger.error({ error }, "ZarinPal deposit initiation failed");
     return NextResponse.json({ error: "شروع پرداخت با خطا مواجه شد." }, { status: 500 });

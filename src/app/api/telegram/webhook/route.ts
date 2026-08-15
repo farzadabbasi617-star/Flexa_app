@@ -9,6 +9,9 @@ import { getGameIdGuide, gameGuideKeyboard } from "./guide";
 import { bigIntFromText, formatTomanFromRial, parseTomanToRial, rialToTomanNumber } from "@/lib/money";
 import { getEntryFeeRial } from "@/lib/tournament-finance";
 import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
+import { getZarinpalConfiguration } from "@/lib/zarinpal";
+import { startZarinpalDeposit } from "@/lib/zarinpal-deposit";
+import { checkAgeGate } from "@/lib/age-gate";
 import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achievement-service";
 import { LevelingService } from "@/lib/leveling-service";
 import { CLASH_1V1_CONFIG, ensureClash1v1Schema, finalizeMatchResult, refundClash1v1Match, suspendClash1v1Telegram } from "@/lib/clash-1v1";
@@ -153,6 +156,38 @@ async function startWalletDeposit(chatId: number, telegramId: string) {
   }
   await setSession(telegramId, "wallet_deposit_amount", {});
   await sendMessage(chatId, "💳 <b>ثبت فیش واریز کارت‌به‌کارت</b>\n\nمبلغ واریزی را به تومان وارد کن. مثال: <code>500000</code> یا <code>500,000</code>", replyKeyboard([[CANCEL_TEXT]]));
+}
+
+/**
+ * Online top-up from the bot. Telegram accounts are already bound to a Gament
+ * user, so the payer is known without a web login: the deposit is created here
+ * and the user is handed a one-tap gateway link.
+ *
+ * The pending row and gateway request go through the same shared service the
+ * web wallet uses, so the single callback route settles both identically.
+ */
+async function startWalletOnlineDeposit(chatId: number, telegramId: string) {
+  const linked = await getLinkedUserByTelegram(telegramId);
+  if (!linked?.userId) {
+    await sendMessage(chatId, "برای شارژ آنلاین، اول حساب تلگرامت را با /link به Gament وصل کن.", {
+      inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]],
+    });
+    return;
+  }
+
+  if (!getZarinpalConfiguration().live) {
+    await sendMessage(chatId, "پرداخت آنلاین در حال حاضر فعال نیست. می‌توانی از روش کارت‌به‌کارت استفاده کنی.", {
+      inline_keyboard: [[{ text: "💳 ثبت فیش کارت‌به‌کارت", callback_data: "wallet:deposit" }]],
+    });
+    return;
+  }
+
+  await setSession(telegramId, "wallet_online_amount", {});
+  await sendMessage(
+    chatId,
+    "🏦 <b>شارژ آنلاین کیف پول</b>\n\nمبلغ مورد نظر را به تومان وارد کن. مثال: <code>50000</code>\n\nحداقل ۱٬۰۰۰ تومان.",
+    replyKeyboard([[CANCEL_TEXT]])
+  );
 }
 
 async function rewardUserXP(userId: string, amount: number, reason: string) {
@@ -788,6 +823,11 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
     if (result.code === "INSUFFICIENT") {
       return sendMessage(chatId, `موجودی کیف پول کافی نیست.\nمبلغ لازم: <b>${html(formatTomanFromRial(result.finalEntryFeeRial || entryFeeRial))}</b>\nموجودی شما: <b>${html(formatTomanFromRial(result.balance || BigInt(0)))}</b>`, {
         inline_keyboard: [
+          // Instant top-up first: this is the exact moment the user is blocked,
+          // so a receipt that waits on manual approval loses the registration.
+          ...(getZarinpalConfiguration().live
+            ? [[{ text: "🏦 شارژ آنلاین (آنی)", callback_data: "wallet:online_deposit" }]]
+            : []),
           [{ text: "💳 ثبت فیش شارژ از همین بات", callback_data: "wallet:deposit" }],
           [{ text: "شارژ کیف پول در وب‌اپ", url: `${APP_URL}/wallet` }],
           [{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }],
@@ -1583,8 +1623,16 @@ async function walletCommand(chatId: number, telegramId: string) {
   const recent = txRows.length
     ? txRows.map((tx) => `• ${html(tx.type)}: <b>${html(formatTomanFromRial(bigIntFromText(tx.amount)))}</b> — ${html(tx.status)}`).join("\n")
     : "هنوز تراکنشی ندارید.";
+  // Online top-up is offered first when the gateway is live, since it credits
+  // instantly; the manual receipt flow stays available either way.
+  const onlineLive = getZarinpalConfiguration().live;
+  const walletButtons = [
+    ...(onlineLive ? [[{ text: "🏦 شارژ آنلاین (آنی)", callback_data: "wallet:online_deposit" }]] : []),
+    [{ text: "💳 ثبت فیش کارت‌به‌کارت", callback_data: "wallet:deposit" }],
+    [{ text: "تراکنش‌ها", url: `${APP_URL}/wallet` }],
+  ];
   await sendMessage(chatId, `💳 <b>کیف پول Gament</b>\n\nموجودی: <b>${html(formatTomanFromRial(balance))}</b>\n\nآخرین تراکنش‌ها:\n${recent}`, {
-    inline_keyboard: [[{ text: "شارژ کیف پول", url: `${APP_URL}/wallet` }], [{ text: "تراکنش‌ها", url: `${APP_URL}/wallet` }]],
+    inline_keyboard: walletButtons,
   });
 }
 
@@ -3496,6 +3544,70 @@ async function handleConversationMessage(message: TelegramMessage) {
   }
 
 
+  if (session.state === "wallet_online_amount") {
+    const linked = await getLinkedUserByTelegram(telegramId);
+    if (!linked?.userId) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "حساب شما لینک نیست. اول /link را انجام بده.", removeKeyboard());
+      return;
+    }
+
+    const amountRial = parseTomanToRial(text);
+    const validation = validateDepositAmountRial(amountRial);
+    if (!validation.ok) {
+      await sendMessage(chatId, `${html(validation.error)}\n\nمبلغ را دوباره به تومان وارد کن:`);
+      return;
+    }
+
+    // Paid tournaments are age-gated, and a deposit funds them, so the bot
+    // applies the same gate the web wallet does rather than routing around it.
+    const [payer] = await db
+      .select({ birthDate: users.birthDate, nationalId: users.nationalId, phoneNumber: users.phoneNumber, email: users.email })
+      .from(users)
+      .where(eq(users.id, linked.userId))
+      .limit(1);
+
+    if (payer) {
+      const gate = checkAgeGate({ birthDate: payer.birthDate, nationalId: payer.nationalId });
+      if (!gate.ok) {
+        await clearSession(telegramId);
+        await sendMessage(chatId, `${html(gate.message)}`, removeKeyboard());
+        return;
+      }
+    }
+
+    const limit = await rateLimit(`wallet:deposit:zarinpal:${linked.userId}`, 8, 10 * 60 * 1000);
+    if (!limit.success) {
+      await clearSession(telegramId);
+      await sendMessage(chatId, "تعداد درخواست‌های شارژ بیش از حد مجاز است. کمی بعد دوباره تلاش کن.", removeKeyboard());
+      return;
+    }
+
+    await clearSession(telegramId);
+
+    const result = await startZarinpalDeposit({
+      userId: linked.userId,
+      amountRial,
+      mobile: payer?.phoneNumber ?? null,
+      email: payer?.email ?? null,
+      origin: "telegram",
+      telegramId,
+    });
+
+    if (!result.ok) {
+      await sendMessage(chatId, `پرداخت شروع نشد.\n${html(result.error)}`, removeKeyboard());
+      return;
+    }
+
+    await sendMessage(chatId, "در حال انتقال به درگاه...", removeKeyboard());
+    await sendMessage(
+      chatId,
+      `🏦 <b>پرداخت ${html(formatTomanFromRial(amountRial))}</b>\n\nروی دکمه بزن تا به درگاه امن زرین‌پال بروی.\n\nبعد از پرداخت موفق، موجودی به‌صورت خودکار شارژ می‌شود و همین‌جا اطلاع می‌دهیم.\n\nاین لینک مخصوص همین پرداخت است؛ آن را برای کسی نفرست.`,
+      { inline_keyboard: [[{ text: "🏦 پرداخت در درگاه", url: result.paymentUrl }], [{ text: "💳 مشاهده کیف پول", callback_data: "menu:wallet" }]] }
+    );
+    return;
+  }
+
   if (session.state === "wallet_deposit_amount") {
     const linked = await getLinkedUserByTelegram(telegramId);
     if (!linked?.userId) {
@@ -4045,6 +4157,7 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   if (data === "menu:missions") { if (!(await ensureFeatureEnabled(chatId, "telegram_missions_enabled", "مأموریت‌ها"))) return; return missionsCommand(chatId, telegramId); }
   if (data === "menu:quiz") { if (!(await ensureFeatureEnabled(chatId, "telegram_quiz_enabled", "کوییز روزانه"))) return; return quizCommand(chatId, telegramId); }
   if (data === "menu:support") { if (!(await ensureFeatureEnabled(chatId, "telegram_support_enabled", "پشتیبانی"))) return; return supportStartCommand(chatId, telegramId); }
+  if (data === "wallet:online_deposit") return startWalletOnlineDeposit(chatId, telegramId);
   if (data === "wallet:deposit") { if (!(await ensureFeatureEnabled(chatId, "telegram_wallet_deposit_enabled", "ثبت فیش از ربات"))) return; return startWalletDeposit(chatId, telegramId); }
   if (data.startsWith("match:")) return handleMatchAction(chatId, telegramId, data.replace("match:", ""));
   if (data.startsWith("result:")) {
