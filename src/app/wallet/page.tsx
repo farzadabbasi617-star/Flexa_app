@@ -31,10 +31,7 @@ interface WalletData {
 }
 
 const WALLET_TERMS_ONLINE =
-  "شارژ کیف پول گیمنت از طریق درگاه پرداخت اینترنتی زرین‌پال انجام می‌شود و بلافاصله پس از تأیید بانک به موجودی شما اضافه می‌گردد. در صورت تمایل می‌توانید از روش کارت‌به‌کارت نیز استفاده کنید که پس از ارسال تصویر فیش، توسط مدیریت بررسی و تأیید می‌شود. مبالغ شارژ شده صرفاً برای خدمات داخل پلتفرم مثل ثبت‌نام تورنومنت قابل استفاده است و به‌صورت مستقیم قابل برداشت نیست. مبالغ قابل برداشت شامل جوایز، پاداش‌های رسمی و مبالغی است که طبق قوانین گیمنت قابل تسویه اعلام شده‌اند. درخواست‌های برداشت پس از ثبت اطلاعات بانکی معتبر و بررسی توسط تیم پشتیبانی، طی ۲۴ تا ۷۲ ساعت کاری پرداخت می‌شوند.";
-
-const WALLET_TERMS_MANUAL =
-  "شارژ کیف پول گیمنت فعلاً فقط از طریق کارت‌به‌کارت انجام می‌شود. بعد از انتقال وجه، تصویر فیش و در صورت امکان شماره پیگیری را ارسال کنید تا مدیریت پرداخت را بررسی و موجودی قابل استفاده داخل سایت را تأیید کند. مبالغ شارژ شده صرفاً برای خدمات داخل پلتفرم مثل ثبت‌نام تورنومنت قابل استفاده است و به‌صورت مستقیم قابل برداشت نیست. مبالغ قابل برداشت شامل جوایز، پاداش‌های رسمی و مبالغی است که طبق قوانین گیمنت قابل تسویه اعلام شده‌اند. درخواست‌های برداشت پس از ثبت اطلاعات بانکی معتبر و بررسی توسط تیم پشتیبانی، طی ۲۴ تا ۷۲ ساعت کاری پرداخت می‌شوند.";
+  "شارژ کیف پول گیمنت فقط از طریق درگاه پرداخت اینترنتی زرین‌پال انجام می‌شود و بلافاصله پس از تأیید بانک به موجودی شما اضافه می‌گردد. پیش از پرداخت حتماً فیلترشکن (VPN) خود را خاموش کنید؛ درگاه‌های بانکی ایران با آی‌پی خارج از کشور کار نمی‌کنند و پرداخت ناموفق می‌شود. توصیه می‌شود پرداخت را از داخل سایت انجام دهید، نه از مرورگر داخل تلگرام یا اینستاگرام. مبالغ شارژ شده صرفاً برای خدمات داخل پلتفرم مثل ثبت‌نام تورنومنت قابل استفاده است و به‌صورت مستقیم قابل برداشت نیست. مبالغ قابل برداشت شامل جوایز، پاداش‌های رسمی و مبالغی است که طبق قوانین گیمنت قابل تسویه اعلام شده‌اند. درخواست‌های برداشت پس از ثبت اطلاعات بانکی معتبر و بررسی توسط تیم پشتیبانی، طی ۲۴ تا ۷۲ ساعت کاری پرداخت می‌شوند.";
 
 const TYPE_LABELS: Record<string, string> = {
   deposit: "شارژ کیف پول",
@@ -52,10 +49,8 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 const QUICK_DEPOSIT_AMOUNTS = [50_000, 100_000, 200_000, 500_000, 1_000_000];
-const DEPOSIT_CARD_NUMBER = "5892101742614775";
 const DEPOSIT_CARD_OWNER = "فرزاد عباسی";
 const DEPOSIT_BANK_NAME = "بانک سپه";
-const MAX_RECEIPT_SIZE_MB = 1.2;
 
 function formatTomanInput(value: string) {
   const digits = value.replace(/[^\d۰-۹٠-٩]/g, "");
@@ -86,13 +81,8 @@ export default function WalletPage() {
   const [busy, setBusy] = useState(true);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [walletDialog, setWalletDialog] = useState<"deposit" | "withdrawal" | "">("");
-  const [depositStep, setDepositStep] = useState<1 | 2>(1);
   const [depositTermsOpen, setDepositTermsOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
-  const [depositTrackingNumber, setDepositTrackingNumber] = useState("");
-  const [depositNote, setDepositNote] = useState("");
-  const [depositReceiptFile, setDepositReceiptFile] = useState<File | null>(null);
-  const [depositReceiptPreview, setDepositReceiptPreview] = useState("");
   const [withdrawAmount, setWithdrawAmount] = useState("");
   const [accountOwner, setAccountOwner] = useState("");
   const [nationalId, setNationalId] = useState("");
@@ -165,7 +155,6 @@ export default function WalletPage() {
   function openDeposit() {
     setError("");
     setMessage("");
-    setDepositStep(1);
     setDepositTermsOpen(false);
     setWalletDialog("deposit");
   }
@@ -179,82 +168,7 @@ export default function WalletPage() {
   function closeWalletDialog() {
     if (submitting) return;
     setWalletDialog("");
-    setDepositStep(1);
     setDepositTermsOpen(false);
-  }
-
-  function handleDepositReceiptChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0] || null;
-    setDepositReceiptFile(null);
-    setDepositReceiptPreview("");
-
-    if (!file) return;
-
-    if (!file.type.startsWith("image/")) {
-      setError("فقط تصویر رسید قابل ارسال است.");
-      e.target.value = "";
-      return;
-    }
-
-    if (file.size > MAX_RECEIPT_SIZE_MB * 1024 * 1024) {
-      setError(`حجم تصویر رسید باید کمتر از ${MAX_RECEIPT_SIZE_MB} مگابایت باشد.`);
-      e.target.value = "";
-      return;
-    }
-
-    setError("");
-    setDepositReceiptFile(file);
-
-    const reader = new FileReader();
-    reader.onload = () => setDepositReceiptPreview(typeof reader.result === "string" ? reader.result : "");
-    reader.readAsDataURL(file);
-  }
-
-  function copyDepositCard() {
-    navigator.clipboard?.writeText(DEPOSIT_CARD_NUMBER).then(() => {
-      setMessage("شماره کارت کپی شد.");
-    }).catch(() => undefined);
-  }
-
-  async function requestDeposit(e: FormEvent) {
-    e.preventDefault();
-    setSubmitting("deposit");
-    setError("");
-    setMessage("");
-    try {
-      const form = new FormData();
-      form.append("action", "deposit");
-      form.append("amountToman", depositAmount);
-      form.append("trackingNumber", depositTrackingNumber);
-      form.append("note", depositNote);
-      form.append("acceptTerms", String(acceptedTerms));
-      if (depositReceiptFile) form.append("receipt", depositReceiptFile);
-
-      const res = await fetch("/api/wallet/transactions", {
-        method: "POST",
-        credentials: "include",
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-        body: form,
-      });
-      const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "درخواست شارژ ثبت نشد");
-      setMessage(json.message || "رسید کارت‌به‌کارت ثبت شد و پس از تأیید مدیریت، موجودی کیف پول افزایش می‌یابد.");
-      setDepositAmount("");
-      setDepositTrackingNumber("");
-      setDepositNote("");
-      setDepositReceiptFile(null);
-      setDepositReceiptPreview("");
-      setWalletDialog("");
-      setDepositStep(1);
-      setDepositTermsOpen(false);
-      const receiptInput = document.getElementById("wallet-deposit-receipt") as HTMLInputElement | null;
-      if (receiptInput) receiptInput.value = "";
-      load();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "درخواست شارژ ثبت نشد");
-    } finally {
-      setSubmitting("");
-    }
   }
 
   async function requestWithdrawal(e: FormEvent) {
@@ -420,14 +334,22 @@ export default function WalletPage() {
           <div className="w-full max-w-md max-h-[calc(100dvh-12px)] overflow-y-auto rounded-[2.25rem] bg-[#111016] border border-white/10 shadow-[0_0_80px_rgba(139,92,246,.25)] p-4 sm:p-5 animate-slide-up overscroll-contain">
             <div className="flex items-center justify-between mb-5">
               <button onClick={closeWalletDialog} className="w-11 h-11 rounded-full bg-white text-gray-700 text-2xl leading-none">×</button>
-              <div className="text-center">
-                <div className="text-xs text-purple-300 font-black mb-1">مرحله {depositStep} از ۲</div>
-                <h2 className="text-2xl font-black">افزایش موجودی</h2>
-              </div>
+              <h2 className="text-2xl font-black">افزایش موجودی</h2>
               <div className="w-11 h-11 rounded-2xl bg-purple-500/20 text-purple-200 flex items-center justify-center text-2xl">↙</div>
             </div>
 
-            {depositStep === 1 ? (
+            {!onlinePaymentAvailable ? (
+              <div className="space-y-5">
+                <div className="rounded-[2rem] bg-amber-500/10 border border-amber-300/25 p-5 text-center">
+                  <div className="text-4xl mb-3">🛠</div>
+                  <div className="font-black text-amber-100 mb-2">شارژ کیف پول موقتاً در دسترس نیست</div>
+                  <p className="text-sm leading-7 text-amber-100/80">
+                    درگاه پرداخت در حال حاضر فعال نیست. لطفاً کمی بعد دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.
+                  </p>
+                </div>
+                <Link href="/support" className="gaming-btn w-full block text-center">تماس با پشتیبانی</Link>
+              </div>
+            ) : (
               <div className="space-y-5">
                 <div className="rounded-[2rem] bg-gradient-to-br from-purple-950/80 to-[#191421] border border-purple-400/25 p-4">
                   <div className="text-xs font-black text-purple-200 mb-2">مبلغی که می‌خواهید واریز کنید</div>
@@ -457,44 +379,33 @@ export default function WalletPage() {
                   </div>
                 </div>
 
+                {/* Iranian payment gateways reject foreign IPs, so a VPN is the most
+                    common cause of a failed deposit. Warning before payment is far
+                    cheaper than a support ticket about money that did not arrive. */}
+                <div className="rounded-[2rem] bg-rose-500/10 border border-rose-300/30 p-4">
+                  <div className="flex items-center gap-2 font-black text-rose-100 mb-2">
+                    <span className="text-xl">⚠️</span>
+                    <span>قبل از پرداخت حتماً بخوانید</span>
+                  </div>
+                  <ul className="text-[13px] leading-7 text-rose-50/90 space-y-1.5 pr-1">
+                    <li>🔴 <b>فیلترشکن (VPN) خود را حتماً خاموش کنید.</b> درگاه‌های بانکی ایران با آی‌پی خارجی کار نمی‌کنند و پرداخت شما ناموفق می‌شود.</li>
+                    <li>💻 ترجیحاً پرداخت را <b>از داخل سایت</b> انجام دهید، نه از مرورگر داخل تلگرام یا اینستاگرام.</li>
+                    <li>⏳ بعد از پرداخت تا بازگشت کامل به سایت صبر کنید و صفحه را نبندید.</li>
+                  </ul>
+                </div>
+
                 <label className="flex items-start gap-3 rounded-3xl bg-purple-500/10 border border-purple-300/20 p-4 cursor-pointer">
                   <input type="checkbox" checked={acceptedTerms} onChange={(e) => toggleTerms(e.target.checked)} className="mt-1 w-5 h-5 accent-purple-500" />
-                  <span className="text-sm font-black leading-7 text-purple-100">
-                    {onlinePaymentAvailable
-                      ? "قوانین کیف پول را خوانده‌ام و قبول دارم."
-                      : "قوانین کیف پول و کارت‌به‌کارت را خوانده‌ام و قبول دارم."}
-                  </span>
+                  <span className="text-sm font-black leading-7 text-purple-100">قوانین کیف پول را خوانده‌ام و قبول دارم.</span>
                 </label>
-
-                {onlinePaymentAvailable && (
-                  <>
-                    <button
-                      type="button"
-                      disabled={!canContinueDeposit || submitting === "online"}
-                      onClick={startOnlineDeposit}
-                      className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      {submitting === "online" ? "در حال انتقال به درگاه..." : "پرداخت اینترنتی (آنی)"}
-                    </button>
-                    <div className="flex items-center gap-3 text-[11px] font-black text-gray-500">
-                      <span className="h-px flex-1 bg-white/10" />
-                      یا
-                      <span className="h-px flex-1 bg-white/10" />
-                    </div>
-                  </>
-                )}
 
                 <button
                   type="button"
-                  disabled={!canContinueDeposit}
-                  onClick={() => setDepositStep(2)}
-                  className={`w-full disabled:opacity-40 disabled:cursor-not-allowed ${
-                    onlinePaymentAvailable
-                      ? "px-4 py-3 rounded-2xl bg-white/5 border border-white/15 text-sm font-black text-gray-200 hover:border-purple-400/40"
-                      : "gaming-btn"
-                  }`}
+                  disabled={!canContinueDeposit || submitting === "online"}
+                  onClick={startOnlineDeposit}
+                  className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed"
                 >
-                  {onlinePaymentAvailable ? "کارت‌به‌کارت (بررسی دستی)" : "ادامه و دریافت شماره کارت"}
+                  {submitting === "online" ? "در حال انتقال به درگاه..." : "پرداخت اینترنتی (آنی)"}
                 </button>
 
                 <div className="rounded-3xl bg-white/[.04] border border-white/10 overflow-hidden">
@@ -507,70 +418,12 @@ export default function WalletPage() {
                     <span className={`w-9 h-9 rounded-xl bg-purple-500/15 border border-purple-300/20 flex items-center justify-center text-purple-200 transition-transform ${depositTermsOpen ? "rotate-180" : ""}`}>⌄</span>
                   </button>
                   {depositTermsOpen && (
-                    <div className="px-4 pb-4 animate-slide-up">
-                      <p className="text-xs leading-7 text-gray-400">
-                        {onlinePaymentAvailable ? WALLET_TERMS_ONLINE : WALLET_TERMS_MANUAL}
-                      </p>
+                    <div className="px-4 pb-4">
+                      <p className="text-xs leading-7 text-gray-400">{WALLET_TERMS_ONLINE}</p>
                     </div>
                   )}
                 </div>
               </div>
-            ) : (
-              <form onSubmit={requestDeposit} className="space-y-5">
-                <div className="rounded-[2rem] bg-white/[.04] border border-white/10 p-4 space-y-3">
-                  <div className="flex items-center justify-between gap-3 text-xs text-gray-300">
-                    <span className="font-black text-white">کارت مقصد</span>
-                    <span>{DEPOSIT_BANK_NAME} • به نام <b className="text-purple-200">{DEPOSIT_CARD_OWNER}</b></span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={copyDepositCard}
-                    className="w-full rounded-2xl bg-black/35 border border-white/10 px-4 py-4 text-center text-xl sm:text-2xl font-black tracking-[0.12em] num-en text-white hover:border-cyan-300/50"
-                    dir="ltr"
-                    title="کپی شماره کارت"
-                  >
-                    {DEPOSIT_CARD_NUMBER.replace(/(\d{4})(?=\d)/g, "$1 ")}
-                  </button>
-                  <div className="text-[10px] text-cyan-200/80 leading-5">روی شماره کارت بزنید تا کپی شود، سپس فیش واریز را ارسال کنید.</div>
-                </div>
-
-                <div className="rounded-3xl bg-purple-500/10 border border-purple-400/20 p-4 flex items-center justify-between">
-                  <span className="text-sm text-gray-300">مبلغ انتخابی</span>
-                  <b className="text-2xl text-white num-en">{depositAmount || "0"} تومان</b>
-                </div>
-
-                <input className="gaming-input text-left num-en" dir="ltr" placeholder="شماره پیگیری / ۴ رقم آخر کارت مبدأ" value={depositTrackingNumber} onChange={(e) => setDepositTrackingNumber(e.target.value.slice(0, 80))} />
-
-                <label htmlFor="wallet-deposit-receipt" className="block rounded-[2rem] border border-dashed border-purple-400/40 bg-purple-500/10 p-4 cursor-pointer hover:bg-purple-500/15 transition-colors">
-                  <input
-                    id="wallet-deposit-receipt"
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    onChange={handleDepositReceiptChange}
-                  />
-                  <div className="flex items-center gap-4">
-                    <div className="w-16 h-16 rounded-2xl bg-black/30 border border-white/10 overflow-hidden flex items-center justify-center shrink-0">
-                      {depositReceiptPreview ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={depositReceiptPreview} alt="پیش‌نمایش فیش واریز" className="w-full h-full object-cover" loading="lazy" decoding="async" />
-                      ) : <span className="text-3xl">🧾</span>}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="font-black text-white">انتخاب فیش از گالری</div>
-                      <div className="text-xs text-gray-400 leading-6 truncate">
-                        {depositReceiptFile ? depositReceiptFile.name : `JPG/PNG/WEBP تا ${MAX_RECEIPT_SIZE_MB}MB`}
-                      </div>
-                    </div>
-                  </div>
-                </label>
-
-                <textarea className="gaming-input min-h-20" placeholder="توضیح اختیاری" value={depositNote} onChange={(e) => setDepositNote(e.target.value)} />
-                <div className="sticky bottom-0 -mx-4 sm:-mx-5 px-4 sm:px-5 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] bg-gradient-to-t from-[#111016] via-[#111016]/95 to-transparent grid grid-cols-2 gap-3">
-                  <button type="button" onClick={() => setDepositStep(1)} className="px-4 py-4 rounded-2xl bg-white/10 border border-white/10 font-black text-gray-200">بازگشت</button>
-                  <button disabled={!acceptedTerms || submitting === "deposit" || !depositAmount} className="gaming-btn disabled:opacity-40 disabled:cursor-not-allowed">{submitting === "deposit" ? "در حال ثبت..." : "ثبت فیش"}</button>
-                </div>
-              </form>
             )}
           </div>
         </div>

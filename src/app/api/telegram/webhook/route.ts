@@ -146,16 +146,14 @@ async function notifyAdminsOnWalletDeposit(user: TelegramUser, userId: string, a
   }
 }
 
+// Card-to-card top-up is retired in favour of the payment gateway, which
+// credits instantly. Kept as a handler (rather than deleted) so /deposit and
+// any old inline button still land somewhere that explains the change instead
+// of silently doing nothing.
 async function startWalletDeposit(chatId: number, telegramId: string) {
-  const linked = await getLinkedUserByTelegram(telegramId);
-  if (!linked?.userId) {
-    await sendMessage(chatId, "برای ثبت فیش واریز، اول حساب تلگرامت را با /link به Gament وصل کن.", {
-      inline_keyboard: [[{ text: "🔗 اتصال حساب", callback_data: "menu:link" }]],
-    });
-    return;
-  }
-  await setSession(telegramId, "wallet_deposit_amount", {});
-  await sendMessage(chatId, "💳 <b>ثبت فیش واریز کارت‌به‌کارت</b>\n\nمبلغ واریزی را به تومان وارد کن. مثال: <code>500000</code> یا <code>500,000</code>", replyKeyboard([[CANCEL_TEXT]]));
+  await sendMessage(chatId, "💳 شارژ کارت‌به‌کارت غیرفعال شده است.\n\nحالا می‌توانی مستقیم و آنی از درگاه بانکی شارژ کنی.", {
+    inline_keyboard: [[{ text: "🏦 شارژ آنلاین (آنی)", callback_data: "wallet:online_deposit" }]],
+  });
 }
 
 /**
@@ -176,8 +174,8 @@ async function startWalletOnlineDeposit(chatId: number, telegramId: string) {
   }
 
   if (!getZarinpalConfiguration().live) {
-    await sendMessage(chatId, "پرداخت آنلاین در حال حاضر فعال نیست. می‌توانی از روش کارت‌به‌کارت استفاده کنی.", {
-      inline_keyboard: [[{ text: "💳 ثبت فیش کارت‌به‌کارت", callback_data: "wallet:deposit" }]],
+    await sendMessage(chatId, "شارژ کیف پول موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کن یا با پشتیبانی تماس بگیر.", {
+      inline_keyboard: [[{ text: "🎧 پشتیبانی", url: `${APP_URL}/support` }]],
     });
     return;
   }
@@ -185,7 +183,7 @@ async function startWalletOnlineDeposit(chatId: number, telegramId: string) {
   await setSession(telegramId, "wallet_online_amount", {});
   await sendMessage(
     chatId,
-    "🏦 <b>شارژ آنلاین کیف پول</b>\n\nمبلغ مورد نظر را به تومان وارد کن. مثال: <code>50000</code>\n\nحداقل ۱٬۰۰۰ تومان.",
+    "🏦 <b>شارژ آنلاین کیف پول</b>\n\n⚠️ <b>قبل از پرداخت، فیلترشکن (VPN) خود را حتماً خاموش کن.</b> درگاه‌های بانکی ایران با آی‌پی خارجی کار نمی‌کنند.\n\n💻 ترجیحاً پرداخت را از داخل سایت انجام بده.\n\nمبلغ مورد نظر را به تومان وارد کن. مثال: <code>50000</code>\n\nحداقل ۱٬۰۰۰ تومان.",
     replyKeyboard([[CANCEL_TEXT]])
   );
 }
@@ -828,7 +826,6 @@ async function joinTournamentFromTelegram(chatId: number, telegramId: string, to
           ...(getZarinpalConfiguration().live
             ? [[{ text: "🏦 شارژ آنلاین (آنی)", callback_data: "wallet:online_deposit" }]]
             : []),
-          [{ text: "💳 ثبت فیش شارژ از همین بات", callback_data: "wallet:deposit" }],
           [{ text: "شارژ کیف پول در وب‌اپ", url: `${APP_URL}/wallet` }],
           [{ text: "مشاهده تورنومنت", url: `${APP_URL}/tournaments/${tournament.id}` }],
         ],
@@ -1628,7 +1625,6 @@ async function walletCommand(chatId: number, telegramId: string) {
   const onlineLive = getZarinpalConfiguration().live;
   const walletButtons = [
     ...(onlineLive ? [[{ text: "🏦 شارژ آنلاین (آنی)", callback_data: "wallet:online_deposit" }]] : []),
-    [{ text: "💳 ثبت فیش کارت‌به‌کارت", callback_data: "wallet:deposit" }],
     [{ text: "تراکنش‌ها", url: `${APP_URL}/wallet` }],
   ];
   await sendMessage(chatId, `💳 <b>کیف پول Gament</b>\n\nموجودی: <b>${html(formatTomanFromRial(balance))}</b>\n\nآخرین تراکنش‌ها:\n${recent}`, {
@@ -2855,10 +2851,10 @@ const QUIZ_QUESTIONS = [
     explain: "اعتراض همراه با اسکرین‌شات/مدرک مسیر درست داوری است.",
   },
   {
-    question: "شارژ کیف پول کارت‌به‌کارت چه زمانی قابل استفاده می‌شود؟",
-    options: ["بعد از تأیید ادمین", "بلافاصله بدون فیش", "بعد از حذف حساب"],
+    question: "برای شارژ کیف پول، فیلترشکن باید روشن باشد یا خاموش؟",
+    options: ["خاموش", "روشن", "فرقی ندارد"],
     correct: 0,
-    explain: "فیش واریز باید بررسی شود و بعد موجودی داخل سایت فعال می‌شود.",
+    explain: "درگاه‌های بانکی ایران با آی‌پی خارج از کشور کار نمی‌کنند؛ با VPN روشن پرداخت ناموفق می‌شود.",
   },
   {
     question: "استفاده از چیت یا ابزار غیرمجاز چه نتیجه‌ای دارد؟",
@@ -3602,7 +3598,7 @@ async function handleConversationMessage(message: TelegramMessage) {
     await sendMessage(chatId, "در حال انتقال به درگاه...", removeKeyboard());
     await sendMessage(
       chatId,
-      `🏦 <b>پرداخت ${html(formatTomanFromRial(amountRial))}</b>\n\nروی دکمه بزن تا به درگاه امن زرین‌پال بروی.\n\nبعد از پرداخت موفق، موجودی به‌صورت خودکار شارژ می‌شود و همین‌جا اطلاع می‌دهیم.\n\nاین لینک مخصوص همین پرداخت است؛ آن را برای کسی نفرست.`,
+      `🏦 <b>پرداخت ${html(formatTomanFromRial(amountRial))}</b>\n\n⚠️ <b>فیلترشکن خاموش باشد</b>، وگرنه پرداخت ناموفق می‌شود.\n\nروی دکمه بزن تا به درگاه امن زرین‌پال بروی.\n\nبعد از پرداخت موفق، موجودی به‌صورت خودکار شارژ می‌شود و همین‌جا اطلاع می‌دهیم.\n\nاین لینک مخصوص همین پرداخت است؛ آن را برای کسی نفرست.`,
       { inline_keyboard: [[{ text: "🏦 پرداخت در درگاه", url: result.paymentUrl }], [{ text: "💳 مشاهده کیف پول", callback_data: "menu:wallet" }]] }
     );
     return;

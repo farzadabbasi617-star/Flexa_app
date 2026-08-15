@@ -152,51 +152,23 @@ export async function POST(request: NextRequest) {
     }
 
     if (action === "deposit") {
-      const limit = await rateLimit(`wallet:deposit:${user.id}`, 3, 10 * 60 * 1000);
-      if (!limit.success) {
-        return NextResponse.json(
-          { error: "تعداد درخواست‌های شارژ زیاد است. لطفاً چند دقیقه بعد دوباره امتحان کنید." },
-          { status: 429 }
-        );
-      }
-
-      const amountRial = parseTomanToRial(String(body.amountToman || ""));
-      const amountValidation = validateDepositAmountRial(amountRial);
-      if (!amountValidation.ok) return NextResponse.json({ error: amountValidation.error }, { status: 400 });
-
-      const receiptMetadata = await receiptToMetadata(body.receipt);
-      const wallet = await getOrCreateWallet(user.id);
-
-      const [tx] = await db
-        .insert(transactions)
-        .values({
-          walletId: wallet.id,
-          amount: amountRial.toString(),
-          type: "deposit",
-          status: "pending",
-          referenceId: createWalletReference("deposit"),
-          metadata: {
-            kind: "manual_deposit_request",
-            provider: "manual_until_gateway_connected",
-            withdrawable: false,
-            userId: user.id,
-            displayName: user.displayName,
-            note: sanitizeWalletNote(body.note),
-            trackingNumber: sanitizeShortText(body.trackingNumber, 80) || null,
-            receiptUploaded: Boolean(receiptMetadata),
-            ...receiptMetadata,
-            requestedIp: ip,
-            userAgent: ua.slice(0, 300),
-          },
-        })
-        .returning();
-
-      return NextResponse.json({
-        success: true,
-        message: "درخواست شارژ ثبت شد و پس از تأیید مدیریت به موجودی قابل استفاده داخل سایت اضافه می‌شود.",
-        transaction: tx,
-      }, { status: 201 });
+      // Card-to-card top-up is retired: deposits now go through the payment
+      // gateway, which credits instantly instead of waiting on a manual review.
+      // Rejected here as well as in the UI so a stale tab or a direct API call
+      // cannot create a pending receipt that nobody is watching for any more.
+      //
+      // This only blocks *new* receipts. Historical rows stay readable, and the
+      // admin approval endpoint is untouched so anything already pending can
+      // still be settled.
+      return NextResponse.json(
+        {
+          error: "شارژ کارت‌به‌کارت غیرفعال شده است. لطفاً از پرداخت اینترنتی استفاده کنید.",
+          code: "MANUAL_DEPOSIT_DISABLED",
+        },
+        { status: 410 }
+      );
     }
+
 
     const limit = await rateLimit(`wallet:withdrawal:${user.id}`, 2, 10 * 60 * 1000);
     if (!limit.success) {

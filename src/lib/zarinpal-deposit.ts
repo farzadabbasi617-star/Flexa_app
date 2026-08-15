@@ -50,7 +50,7 @@ export async function startZarinpalDeposit(input: {
     return {
       ok: false,
       status: 503,
-      error: "پرداخت آنلاین در حال حاضر فعال نیست. لطفاً از روش کارت‌به‌کارت استفاده کنید.",
+      error: "شارژ کیف پول موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کنید.",
     };
   }
 
