@@ -15,9 +15,12 @@
     "test:e2e": "playwright test",
     "test:production": "node scripts/production-smoke.mjs",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:migrate": "echo '' && echo '  REFUSED: this project does not use drizzle migration history.' && echo '  drizzle/manual/*.sql are idempotent and applied with:' && echo '' && echo '      DATABASE_URL=... ./scripts/apply-migrations.sh' && echo '' && echo '  See drizzle/manual/README.md. Use db:migrate:unsafe only on a fresh, empty database.' && echo '' && exit 1",
+    "db:migrate:unsafe": "drizzle-kit migrate",
+    "db:push": "echo '' && echo '  REFUSED: this project does not use drizzle migration history.' && echo '  drizzle/manual/*.sql are idempotent and applied with:' && echo '' && echo '      DATABASE_URL=... ./scripts/apply-migrations.sh' && echo '' && echo '  See drizzle/manual/README.md. Use db:migrate:unsafe only on a fresh, empty database.' && echo '' && exit 1",
+    "db:push:unsafe": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "db:apply": "./scripts/apply-migrations.sh"
   },
   "dependencies": {
     "@grammyjs/auto-retry": "^2.0.2",

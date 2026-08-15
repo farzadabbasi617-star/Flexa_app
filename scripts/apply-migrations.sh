@@ -34,7 +34,8 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-if ! command -v psql >/dev/null 2>&1; then
+# --dry-run only lists files, so it does not need a database client.
+if [ "$DRY_RUN" = false ] && ! command -v psql >/dev/null 2>&1; then
   echo "psql is not installed or not in PATH." >&2
   echo "  macOS:  brew install libpq" >&2
   echo "  Ubuntu: sudo apt install postgresql-client" >&2
