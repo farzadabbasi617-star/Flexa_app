@@ -51,7 +51,8 @@
     "@esbuild-kit/core-utils": {
       "esbuild": "^0.25.12"
     },
-    "sharp": "^0.35.3"
+    "sharp": "^0.35.3",
+    "nanoid": "^3.3.18"
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
