@@ -70,7 +70,7 @@ export function startPayUrl(authority: string) {
  * message rather than leaking a raw gateway string to the user.
  */
 const ERROR_MESSAGES: Record<number, string> = {
-  [-9]: "اطلاعات ارسال‌شده به درگاه معتبر نیست.",
+  [-9]: "اطلاعات ارسال‌شده به درگاه پذیرفته نشد (کد -9).",
   [-10]: "آی‌پی یا مرچنت کد پذیرنده صحیح نیست.",
   [-11]: "مرچنت کد فعال نیست. با پشتیبانی زرین‌پال تماس بگیرید.",
   [-12]: "تلاش بیش از حد مجاز. کمی بعد دوباره امتحان کنید.",
@@ -89,9 +89,38 @@ const ERROR_MESSAGES: Record<number, string> = {
   [101]: "این پرداخت قبلاً تأیید شده است.",
 };
 
-export function zarinpalErrorMessage(code: number | undefined) {
+/**
+ * `errors` is ZarinPal's error object. On a -9 it carries `validations`, an
+ * array naming the rejected field; surfacing that turns an opaque failure into
+ * something an operator can act on.
+ */
+export function zarinpalErrorMessage(
+  code: number | undefined,
+  errors?: { validations?: unknown; message?: unknown } | null
+) {
   if (code === undefined) return "ارتباط با درگاه پرداخت برقرار نشد.";
+
+  if (code === -9) {
+    const fields = extractValidationFields(errors?.validations);
+    if (fields.length) {
+      return `اطلاعات ارسالی به درگاه پذیرفته نشد (${fields.join("، ")}).`;
+    }
+  }
+
   return ERROR_MESSAGES[code] || `پرداخت انجام نشد (کد ${code}).`;
+}
+
+/** ZarinPal returns validations as [{ field: message }] or [{ field, message }]. */
+function extractValidationFields(validations: unknown): string[] {
+  if (!Array.isArray(validations)) return [];
+  const fields: string[] = [];
+  for (const entry of validations) {
+    if (!entry || typeof entry !== "object") continue;
+    const record = entry as Record<string, unknown>;
+    if (typeof record.field === "string") fields.push(record.field);
+    else fields.push(...Object.keys(record));
+  }
+  return [...new Set(fields)].slice(0, 4);
 }
 
 type RequestResult =
@@ -116,10 +145,31 @@ export async function requestPayment(input: {
     return { ok: false, error: "مبلغ درخواستی خارج از محدوده‌ی مجاز است." };
   }
 
+  // ZarinPal validates every metadata field it is given and rejects the whole
+  // request with -9 if one is malformed. These are all optional conveniences,
+  // so anything that does not match the expected shape is dropped rather than
+  // allowed to fail an otherwise valid payment.
   const metadata: Record<string, string> = {};
-  if (input.mobile) metadata.mobile = input.mobile;
-  if (input.email) metadata.email = input.email;
-  if (input.orderId) metadata.order_id = input.orderId;
+
+  // Must be exactly 09xxxxxxxxx. Accounts registered by Telegram or email may
+  // hold a differently shaped value.
+  if (input.mobile && /^09\d{9}$/.test(input.mobile)) {
+    metadata.mobile = input.mobile;
+  }
+
+  if (input.email && /^[^@\s]+@[^@\s.]+\.[^@\s]+$/.test(input.email) && input.email.length <= 100) {
+    metadata.email = input.email;
+  }
+
+  // Our wallet reference is `deposit-<epoch>-<uuid>`, around 50 characters.
+  // ZarinPal caps order_id well below that, and the value is redundant for us
+  // anyway: the callback carries the same reference in its own query string.
+  if (input.orderId && input.orderId.length <= 50) {
+    metadata.order_id = input.orderId;
+  }
+
+  // The description is required and length-limited by the gateway.
+  const description = input.description.trim().slice(0, 255) || "شارژ کیف پول";
 
   try {
     const response = await fetch(endpoints().request, {
@@ -129,7 +179,7 @@ export async function requestPayment(input: {
         merchant_id: merchantId,
         amount: Number(input.amountRial),
         currency: "IRR",
-        description: input.description,
+        description,
         callback_url: input.callbackUrl,
         ...(Object.keys(metadata).length ? { metadata } : {}),
       }),
@@ -145,9 +195,24 @@ export async function requestPayment(input: {
     }
 
     // `errors` is an object on failure and an empty array on success.
+    // On a 422 the object carries `validations`, naming the field ZarinPal
+    // rejected. Without it a -9 is undebuggable, so log the whole thing.
     const code = typeof errors?.code === "number" ? errors.code : data?.code;
-    logger.error({ code, status: response.status }, "ZarinPal payment request failed");
-    return { ok: false, code, error: zarinpalErrorMessage(code) };
+    logger.error(
+      {
+        code,
+        status: response.status,
+        gatewayMessage: errors?.message ?? null,
+        validations: errors?.validations ?? null,
+        sentAmount: Number(input.amountRial),
+        sentCallback: input.callbackUrl,
+        descriptionLength: input.description.length,
+        hasMobile: Boolean(input.mobile),
+        hasEmail: Boolean(input.email),
+      },
+      "ZarinPal payment request failed"
+    );
+    return { ok: false, code, error: zarinpalErrorMessage(code, errors) };
   } catch (error) {
     logger.error({ error }, "ZarinPal payment request error");
     return { ok: false, error: "ارتباط با درگاه پرداخت برقرار نشد. لطفاً دوباره تلاش کنید." };

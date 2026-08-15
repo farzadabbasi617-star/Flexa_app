@@ -43,18 +43,24 @@ export async function GET(request: NextRequest) {
   const status = (params.get("Status") || params.get("status") || "").toUpperCase();
 
   try {
-    if (!reference || !authority) {
+    if (!authority) {
       return fail("پارامترهای بازگشت از درگاه ناقص است.");
     }
 
-    const [pending] = await db
-      .select()
-      .from(transactions)
-      .where(eq(transactions.referenceId, reference))
-      .limit(1);
+    // The authority is the authoritative key: ZarinPal always returns it, we
+    // stored it when the payment was created, and it is unguessable. `ref` is
+    // only accepted as a fallback for payments started before the callback URL
+    // dropped its query string, and even then the stored authority must match.
+    const [pending] = reference
+      ? await db.select().from(transactions).where(eq(transactions.referenceId, reference)).limit(1)
+      : await db
+          .select()
+          .from(transactions)
+          .where(sql`${transactions.metadata}->>'authority' = ${authority}`)
+          .limit(1);
 
     if (!pending) {
-      logger.warn({ reference }, "ZarinPal callback for unknown reference");
+      logger.warn({ reference, authority }, "ZarinPal callback for unknown transaction");
       return fail("تراکنش یافت نشد.");
     }
 
@@ -62,7 +68,7 @@ export async function GET(request: NextRequest) {
 
     // Bind the authority to the row we issued it for.
     if (meta.authority && meta.authority !== authority) {
-      logger.error({ reference }, "ZarinPal callback authority mismatch");
+      logger.error({ reference, authority }, "ZarinPal callback authority mismatch");
       return fail("اطلاعات تراکنش معتبر نیست.");
     }
 
