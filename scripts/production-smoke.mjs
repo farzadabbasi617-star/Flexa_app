@@ -12,6 +12,9 @@ const expectedRelease = (process.env.EXPECTED_RELEASE || "").trim().toLowerCase(
 const attempts = positiveInteger(process.env.PRODUCTION_SMOKE_ATTEMPTS, 1);
 const delayMs = positiveInteger(process.env.PRODUCTION_SMOKE_DELAY_MS, 30_000);
 const timeoutMs = positiveInteger(process.env.PRODUCTION_SMOKE_TIMEOUT_MS, 20_000);
+// /api/health only returns the detailed integration payload to an authorised
+// caller; without this the deep assertions below cannot see those fields.
+const healthSecret = (process.env.HEALTH_SECRET || "").trim();
 const requestNonce = Date.now().toString(36);
 
 if (baseUrl.protocol !== "https:" && !["localhost", "127.0.0.1"].includes(baseUrl.hostname)) {
@@ -124,12 +127,21 @@ async function checkSecurityHeaders() {
 }
 
 async function checkHealthAndRelease() {
-  const { body: health } = await expectJson(`/api/health?smoke=${requestNonce}`);
+  const { body: health } = await expectJson(`/api/health?smoke=${requestNonce}`, {
+    headers: healthSecret ? { "x-health-secret": healthSecret } : {},
+  });
   assert(health?.ok === true, "/api/health: application is not healthy");
   assert(health?.database === true, "/api/health: database is not ready");
-  assert(health?.email?.configured === true, "/api/health: transactional email is not configured");
-  assert(health?.clashRoyaleApi?.configured === true, "/api/health: Clash Royale API is not configured");
-  assert(health?.telegramCron?.protected === true, "/api/health: Telegram cron is not protected by a secret");
+
+  // Without the secret the endpoint intentionally omits integration detail, so
+  // asserting on it would fail for the wrong reason. Say so loudly instead.
+  if (!healthSecret) {
+    console.warn("[production-smoke] HEALTH_SECRET not set - skipping integration assertions");
+  } else {
+    assert(health?.email?.configured === true, "/api/health: transactional email is not configured");
+    assert(health?.clashRoyaleApi?.configured === true, "/api/health: Clash Royale API is not configured");
+    assert(health?.telegramCron?.protected === true, "/api/health: Telegram cron is not protected by a secret");
+  }
 
   if (expectedRelease) {
     const liveRelease = String(health?.release || "").toLowerCase();

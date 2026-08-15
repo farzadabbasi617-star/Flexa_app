@@ -1,5 +1,19 @@
 import type { NextConfig } from "next";
 
+// Next's dev server needs eval for hot reload and the React refresh runtime.
+// Production has no such requirement, so allowing it there would keep the main
+// class of XSS that CSP is meant to stop.
+const isDev = process.env.NODE_ENV === "development";
+
+const scriptSrc = [
+  "'self'",
+  // Next inlines a bootstrap script and passes hydration data inline, so this
+  // cannot be dropped without moving to nonces across every rendered page.
+  "'unsafe-inline'",
+  ...(isDev ? ["'unsafe-eval'"] : []),
+  "https://telegram.org",
+].join(" ");
+
 const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
   { key: "X-Frame-Options", value: "SAMEORIGIN" },
@@ -8,14 +22,17 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), clipboard-write=(self)" },
   { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
   {
-    key: "Content-Security-Policy-Report-Only",
+    // Enforcing, not Report-Only. Report-Only ships the whole policy but tells
+    // the browser to allow every violation, so it blocked nothing.
+    key: "Content-Security-Policy",
     value: [
       "default-src 'self'",
       "base-uri 'self'",
       "object-src 'none'",
       "form-action 'self'",
       "frame-ancestors 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://telegram.org",
+      "upgrade-insecure-requests",
+      `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",

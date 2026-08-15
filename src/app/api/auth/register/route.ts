@@ -12,6 +12,7 @@ import { TERMS_VERSION } from "@/lib/terms";
 import { initialPublicDisplayName } from "@/lib/public-profile-policy";
 import { bindWebAffiliateAttribution } from "@/lib/affiliate-service";
 import { REFERRAL_VISITOR_COOKIE } from "@/lib/referral-invite";
+import { registrationConflictMessage } from "@/lib/registration-conflict";
 
 export const dynamic = "force-dynamic";
 
@@ -80,22 +81,20 @@ export async function POST(request: NextRequest) {
     const existingByEmail = existing.find((u) => u.email?.toLowerCase() === email.toLowerCase());
     const reclaimingStaleAccount = Boolean(existingByEmail && !existingByEmail.emailVerifiedAt);
 
-    if (existingByEmail && !reclaimingStaleAccount) {
-      return NextResponse.json({ error: "ایمیل قبلاً ثبت شده است" }, { status: 409 });
-    }
-    if (existing.some((u) => u.username === username && u.id !== existingByEmail?.id)) {
-      return NextResponse.json({ error: "نام کاربری قبلاً انتخاب شده است" }, { status: 409 });
-    }
-    if (existing.some((u) => u.phoneNumber === phoneNumber && u.id !== existingByEmail?.id)) {
-      return NextResponse.json({ error: "شماره موبایل قبلاً ثبت شده است" }, { status: 409 });
-    }
-    // National-ID must be unique across the site, EXCEPT when it belongs to
-    // the same abandoned-unverified row we're about to reclaim (same email).
-    if (existingByNationalId && existingByNationalId.id !== existingByEmail?.id) {
-      return NextResponse.json(
-        { error: "این کد ملی قبلاً برای حساب دیگری ثبت شده است." },
-        { status: 409 }
-      );
+    // Identity conflicts are reported with one neutral message so this endpoint
+    // cannot be used to confirm whether an email, phone or national id already
+    // belongs to someone. See registration-conflict.ts for the reasoning.
+    const conflict = registrationConflictMessage({
+      usernameTaken: existing.some((u) => u.username === username && u.id !== existingByEmail?.id),
+      emailTaken: Boolean(existingByEmail && !reclaimingStaleAccount),
+      phoneTaken: existing.some((u) => u.phoneNumber === phoneNumber && u.id !== existingByEmail?.id),
+      // National id must be unique site-wide, except on the abandoned
+      // unverified row we are about to reclaim (same email).
+      nationalIdTaken: Boolean(existingByNationalId && existingByNationalId.id !== existingByEmail?.id),
+    });
+
+    if (conflict) {
+      return NextResponse.json({ error: conflict }, { status: 409 });
     }
 
     // 4. Hash password.

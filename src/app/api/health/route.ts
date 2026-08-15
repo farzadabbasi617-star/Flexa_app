@@ -4,11 +4,9 @@ import { sql } from "drizzle-orm";
 import { getEmailDeliveryConfiguration } from "@/lib/email-service";
 import { getZarinpalConfiguration } from "@/lib/zarinpal";
 import { getClashRoyaleApiConfiguration } from "@/lib/clash-royale-api";
-import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
-import { ensureStoreOrderLifecycleSchema } from "@/lib/store-service";
-import { affiliateCanaryGamentIds, affiliateProgramLive, affiliateRolloutMode, ensureAffiliateSchema } from "@/lib/affiliate-service";
-import { ensurePublicIdentitySeparation } from "@/lib/public-profile";
-import { codArenaFinanceState, ensureCodArenaSchema } from "@/lib/cod-room-service";
+import { affiliateCanaryGamentIds, affiliateProgramLive, affiliateRolloutMode } from "@/lib/affiliate-service";
+import { codArenaFinanceState } from "@/lib/cod-room-service";
+import crypto from "crypto";
 
 export const dynamic = "force-dynamic";
 
@@ -30,7 +28,31 @@ function unhealthy(error: string) {
   );
 }
 
-export async function GET() {
+/**
+ * The detailed payload enumerates which integrations exist, which are live and
+ * which sender addresses/providers are in use. That is a free reconnaissance
+ * map for anyone probing the site, so it is gated.
+ *
+ * `ok`, `database` and `release` stay public: uptime monitors need them and
+ * they reveal nothing an attacker cannot already observe.
+ *
+ * Reuses TELEGRAM_CRON_SECRET rather than introducing another secret, since the
+ * deploy smoke check already holds it.
+ */
+function detailsAuthorised(request: Request) {
+  const expected = (process.env.TELEGRAM_CRON_SECRET || process.env.ADMIN_SETUP_SECRET || "").trim();
+  if (!expected) return false;
+
+  const provided = (request.headers.get("x-health-secret") || "").trim();
+  if (!provided) return false;
+
+  const a = Buffer.from(provided);
+  const b = Buffer.from(expected);
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+export async function GET(request: Request) {
   const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
   const email = getEmailDeliveryConfiguration();
   const paymentGateway = getZarinpalConfiguration();
@@ -40,14 +62,12 @@ export async function GET() {
   if (!isLikelyPostgresUrl(databaseUrl)) return unhealthy("DATABASE_URL_INVALID_FORMAT");
 
   try {
-    await Promise.all([
-      ensurePrivateTournamentAttendanceSchema(),
-      ensureStoreOrderLifecycleSchema(),
-      ensureAffiliateSchema(),
-      ensurePublicIdentitySeparation(),
-      ensureCodArenaSchema(),
-    ]);
     await db.execute(sql`select 1`);
+
+    if (!detailsAuthorised(request)) {
+      return Response.json({ ok: true, database: true, release }, { headers: healthHeaders });
+    }
+
     return Response.json(
       {
         ok: true,
