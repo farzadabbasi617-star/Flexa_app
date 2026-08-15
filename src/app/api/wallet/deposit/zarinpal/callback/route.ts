@@ -19,6 +19,7 @@ import { transactions, wallets, notifications } from "@/db/schema";
 import { and, eq, sql } from "drizzle-orm";
 import { verifyPayment, getZarinpalConfiguration } from "@/lib/zarinpal";
 import { rialToTomanNumber } from "@/lib/money";
+import { notifyLinkedUserOnTelegram } from "@/lib/telegram";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -152,13 +153,25 @@ export async function GET(request: NextRequest) {
     const [wallet] = await db.select().from(wallets).where(eq(wallets.id, pending.walletId)).limit(1);
 
     if (wallet) {
+      const amountLabel = rialToTomanNumber(amountRial).toLocaleString("fa-IR");
+
       await db.insert(notifications).values({
         userId: wallet.userId,
         type: "wallet",
         title: "شارژ کیف پول انجام شد",
-        message: `مبلغ ${rialToTomanNumber(amountRial).toLocaleString("fa-IR")} تومان به کیف پول شما اضافه شد. شماره پیگیری: ${verification.refId}`,
+        message: `مبلغ ${amountLabel} تومان به کیف پول شما اضافه شد. شماره پیگیری: ${verification.refId}`,
         link: "/wallet",
       });
+
+      // A deposit started in the bot ends on a web success page, so without
+      // this the user never gets confirmation where they actually are. Any
+      // linked account is notified; the helper no-ops when none exists.
+      // Never allowed to fail the request: the money is already credited.
+      notifyLinkedUserOnTelegram(
+        wallet.userId,
+        `✅ <b>شارژ کیف پول انجام شد</b>\n\nمبلغ: <b>${amountLabel} تومان</b>\nشماره پیگیری: <code>${verification.refId}</code>\n\nموجودی جدید در کیف پول قابل مشاهده است.`,
+        { inline_keyboard: [[{ text: "💳 مشاهده کیف پول", callback_data: "menu:wallet" }]] }
+      ).catch((error) => logger.warn({ error }, "Telegram deposit notification failed"));
     }
 
     logger.info(
