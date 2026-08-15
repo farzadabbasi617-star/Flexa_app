@@ -113,7 +113,9 @@ async function checkSecurityHeaders() {
   const response = await expectStatus(`/?smoke_headers=${requestNonce}`);
   const required = [
     ["strict-transport-security", /max-age=31536000/i],
-    ["content-security-policy-report-only", /default-src 'self'/i],
+    // Enforcing header, not Report-Only. Also assert unsafe-eval is absent,
+    // so a future change cannot quietly reintroduce it in production.
+    ["content-security-policy", /default-src 'self'/i],
     ["x-content-type-options", /^nosniff$/i],
     ["x-frame-options", /^(sameorigin|deny)$/i],
     ["referrer-policy", /strict-origin/i],
@@ -124,10 +126,20 @@ async function checkSecurityHeaders() {
     const value = response.headers.get(name) || "";
     assert(pattern.test(value), `/: missing or invalid ${name} header`);
   }
+
+  // A Report-Only header allows every violation, so shipping one alongside the
+  // enforcing header would silently undo the policy.
+  assert(
+    !response.headers.get("content-security-policy-report-only"),
+    "/: CSP is served as Report-Only, which enforces nothing"
+  );
+
+  const csp = response.headers.get("content-security-policy") || "";
+  assert(!/unsafe-eval/i.test(csp), "/: CSP allows unsafe-eval in production");
 }
 
 async function checkHealthAndRelease() {
-  const { body: health } = await expectJson(`/api/health?smoke=${requestNonce}`, {
+  const { body: health } = await expectJson(`/api/health?smoke=${requestNonce}`, [200], {
     headers: healthSecret ? { "x-health-secret": healthSecret } : {},
   });
   assert(health?.ok === true, "/api/health: application is not healthy");
