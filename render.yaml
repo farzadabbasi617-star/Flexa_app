@@ -25,8 +25,37 @@ services:
         sync: false
       - key: CLASH_ROYALE_API_BASE_URL
         value: https://proxy.royaleapi.dev/v1
+      # Email delivery.
+      # NOTE: when EMAIL_PROVIDER is set explicitly, email-service.ts does NOT fall back
+      # to another provider if that one is misconfigured -- it resolves to "none" and every
+      # OTP / verification / password-reset mail is silently dropped. Keep this value in
+      # sync with the credentials that are actually populated in the Render dashboard.
       - key: EMAIL_PROVIDER
-        value: google_apps_script
+        value: smtp
+      # Active provider: Gmail SMTP. Set SMTP_PASS to a Gmail App Password (not the
+      # account password) in the dashboard. Gmail free tier allows ~500 mails/day.
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: '465'
+      - key: SMTP_SECURE
+        value: 'true'
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: SMTP_FROM_EMAIL
+        sync: false
+      # Standby provider. To switch: verify the sending domain in Resend, set
+      # RESEND_FROM_EMAIL to an address on it, then flip EMAIL_PROVIDER to "resend".
+      # An unverified Resend account can only send from onboarding@resend.dev to the
+      # account owner's own address, which is not usable in production.
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
+        sync: false
+      # Legacy provider, currently unused. Both values must be present for
+      # EMAIL_PROVIDER=google_apps_script to work.
       - key: GOOGLE_APPS_SCRIPT_EMAIL_URL
         sync: false
       - key: GOOGLE_APPS_SCRIPT_EMAIL_SECRET
