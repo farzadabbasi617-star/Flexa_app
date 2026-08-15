@@ -104,7 +104,11 @@ export async function POST(request: NextRequest) {
       })
       .returning();
 
-    const callbackUrl = `${gateway.callbackBaseUrl}/api/wallet/deposit/zarinpal/callback?ref=${encodeURIComponent(reference)}`;
+    // Deliberately no query string. Some gateway configurations reject a
+    // callback_url that carries one, and we do not need it: ZarinPal always
+    // returns the Authority, and we store it on the pending row, so the
+    // callback can find the transaction by authority alone.
+    const callbackUrl = `${gateway.callbackBaseUrl}/api/wallet/deposit/zarinpal/callback`;
 
     const result = await requestPayment({
       amountRial,

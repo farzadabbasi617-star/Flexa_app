@@ -121,3 +121,27 @@ describe("zarinpalErrorMessage", () => {
     expect(zarinpalErrorMessage(undefined)).toContain("ارتباط با درگاه");
   });
 });
+
+describe("zarinpalErrorMessage with validation details", () => {
+  it("names the rejected field for a -9 validation error", () => {
+    const message = zarinpalErrorMessage(-9, {
+      validations: [{ "metadata.mobile": "The metadata.mobile format is invalid." }],
+    });
+    expect(message).toContain("metadata.mobile");
+  });
+
+  it("supports the {field, message} validation shape", () => {
+    const message = zarinpalErrorMessage(-9, {
+      validations: [{ field: "callback_url", message: "invalid" }],
+    });
+    expect(message).toContain("callback_url");
+  });
+
+  it("falls back to the generic -9 text when no validations are present", () => {
+    expect(zarinpalErrorMessage(-9, { validations: [] })).toContain("-9");
+  });
+
+  it("ignores malformed validation payloads", () => {
+    expect(zarinpalErrorMessage(-9, { validations: "nope" as unknown })).toContain("-9");
+  });
+});
