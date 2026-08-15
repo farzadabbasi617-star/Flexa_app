@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
   try {
     if (!getZarinpalConfiguration().live) {
       return NextResponse.json(
-        { error: "پرداخت آنلاین در حال حاضر فعال نیست. لطفاً از روش کارت‌به‌کارت استفاده کنید." },
+        { error: "شارژ کیف پول موقتاً در دسترس نیست. لطفاً کمی بعد دوباره تلاش کنید." },
         { status: 503 }
       );
     }
