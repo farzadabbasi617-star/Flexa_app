@@ -35,15 +35,34 @@ export async function checkChannelMembership(telegramId: string, forceRefresh = 
   });
 
   if (!result.ok) {
-    // Do not turn a Telegram/channel configuration failure into a false
-    // "you are not a member" response. It is a technical state and should be
-    // visible in logs/setup diagnostics while keeping the gate secure.
     logger.warn({
       telegramId,
       channelId,
       errorCode: result.error_code,
       description: result.description,
     }, "Telegram channel membership verification unavailable");
+
+    // Distinguish "we cannot ask" from "the answer was no".
+    //
+    // A 400 chat-not-found / 403 forbidden means the bot is not an admin of the
+    // channel, or the channel id is wrong. That is an operator misconfiguration,
+    // not a signal about this user, and it applies to *everyone*: failing closed
+    // locks the entire bot out, including members, with a message that tells them
+    // to retry something that cannot succeed until an admin intervenes.
+    //
+    // Losing a soft marketing gate for the duration of a misconfiguration is a
+    // far smaller cost than every user being unable to reach their wallet, so
+    // this case opens. Genuine per-user failures (network blip, rate limit) still
+    // fail closed, because those are transient and retrying does work.
+    const configurationBroken = result.error_code === 400 || result.error_code === 403;
+    if (configurationBroken) {
+      logger.error({
+        channelId,
+        description: result.description,
+      }, "Channel membership gate bypassed: bot cannot read the channel. Add the bot as a channel admin.");
+      return { member: true, state: "unavailable" };
+    }
+
     return { member: false, state: "unavailable" };
   }
 
