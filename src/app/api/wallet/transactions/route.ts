@@ -8,6 +8,7 @@ import { bigIntFromText, parseTomanToRial, rialToTomanNumber } from "@/lib/money
 import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
 import { isValidIranIban, sanitizeIban, sanitizeNationalId, sanitizeShortText, walletBreakdown } from "@/lib/wallet-accounting";
 import { rateLimit } from "@/lib/rate-limit";
+import { getZarinpalConfiguration } from "@/lib/zarinpal";
 import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
@@ -111,6 +112,9 @@ export async function GET(request: NextRequest) {
           amountToman: rialToTomanNumber(amountRial),
         };
       }),
+      // Lets the wallet UI show the online top-up button only when the gateway
+      // can actually take a payment, instead of failing after the user commits.
+      onlinePayment: { available: getZarinpalConfiguration().live, provider: "zarinpal" },
     });
   } catch (err) {
     logger.error({ err }, "Wallet transactions GET failed");
