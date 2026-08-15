@@ -18,6 +18,7 @@ interface WalletData {
     nonWithdrawableRial: string;
     currency: string;
   };
+  onlinePayment?: { available: boolean; provider: string };
   transactions: Array<{
     id: string;
     amountToman: number;
@@ -29,7 +30,10 @@ interface WalletData {
   }>;
 }
 
-const WALLET_TERMS =
+const WALLET_TERMS_ONLINE =
+  "شارژ کیف پول گیمنت از طریق درگاه پرداخت اینترنتی زرین‌پال انجام می‌شود و بلافاصله پس از تأیید بانک به موجودی شما اضافه می‌گردد. در صورت تمایل می‌توانید از روش کارت‌به‌کارت نیز استفاده کنید که پس از ارسال تصویر فیش، توسط مدیریت بررسی و تأیید می‌شود. مبالغ شارژ شده صرفاً برای خدمات داخل پلتفرم مثل ثبت‌نام تورنومنت قابل استفاده است و به‌صورت مستقیم قابل برداشت نیست. مبالغ قابل برداشت شامل جوایز، پاداش‌های رسمی و مبالغی است که طبق قوانین گیمنت قابل تسویه اعلام شده‌اند. درخواست‌های برداشت پس از ثبت اطلاعات بانکی معتبر و بررسی توسط تیم پشتیبانی، طی ۲۴ تا ۷۲ ساعت کاری پرداخت می‌شوند.";
+
+const WALLET_TERMS_MANUAL =
   "شارژ کیف پول گیمنت فعلاً فقط از طریق کارت‌به‌کارت انجام می‌شود. بعد از انتقال وجه، تصویر فیش و در صورت امکان شماره پیگیری را ارسال کنید تا مدیریت پرداخت را بررسی و موجودی قابل استفاده داخل سایت را تأیید کند. مبالغ شارژ شده صرفاً برای خدمات داخل پلتفرم مثل ثبت‌نام تورنومنت قابل استفاده است و به‌صورت مستقیم قابل برداشت نیست. مبالغ قابل برداشت شامل جوایز، پاداش‌های رسمی و مبالغی است که طبق قوانین گیمنت قابل تسویه اعلام شده‌اند. درخواست‌های برداشت پس از ثبت اطلاعات بانکی معتبر و بررسی توسط تیم پشتیبانی، طی ۲۴ تا ۷۲ ساعت کاری پرداخت می‌شوند.";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -94,7 +98,7 @@ export default function WalletPage() {
   const [nationalId, setNationalId] = useState("");
   const [iban, setIban] = useState("");
   const [withdrawNote, setWithdrawNote] = useState("");
-  const [submitting, setSubmitting] = useState<"deposit" | "withdrawal" | "">("");
+  const [submitting, setSubmitting] = useState<"deposit" | "withdrawal" | "online" | "">("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -130,6 +134,33 @@ export default function WalletPage() {
   const pendingDeposits = useMemo(() => data?.transactions.filter((tx) => tx.type === "deposit" && tx.status === "pending") || [], [data]);
   const pendingWithdrawals = useMemo(() => data?.transactions.filter((tx) => tx.type === "withdrawal" && tx.status === "pending") || [], [data]);
   const canContinueDeposit = acceptedTerms && Boolean(depositAmount);
+  const onlinePaymentAvailable = data?.onlinePayment?.available === true;
+
+  // Hands off to ZarinPal. The pending transaction and the credited amount are
+  // both decided server-side; this only forwards the user to the bank page.
+  async function startOnlineDeposit() {
+    setError("");
+    setMessage("");
+    setSubmitting("online");
+    try {
+      const res = await fetch("/api/wallet/deposit/zarinpal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+        credentials: "include",
+        body: JSON.stringify({ amountToman: depositAmount, acceptTerms: true }),
+      });
+      const payload = await res.json().catch(() => ({}));
+      if (!res.ok || !payload?.paymentUrl) {
+        setError(payload?.error || "شروع پرداخت اینترنتی با خطا مواجه شد.");
+        setSubmitting("");
+        return;
+      }
+      window.location.href = payload.paymentUrl;
+    } catch {
+      setError("ارتباط با درگاه پرداخت برقرار نشد.");
+      setSubmitting("");
+    }
+  }
 
   function openDeposit() {
     setError("");
@@ -428,10 +459,43 @@ export default function WalletPage() {
 
                 <label className="flex items-start gap-3 rounded-3xl bg-purple-500/10 border border-purple-300/20 p-4 cursor-pointer">
                   <input type="checkbox" checked={acceptedTerms} onChange={(e) => toggleTerms(e.target.checked)} className="mt-1 w-5 h-5 accent-purple-500" />
-                  <span className="text-sm font-black leading-7 text-purple-100">قوانین کیف پول و کارت‌به‌کارت را خوانده‌ام و قبول دارم.</span>
+                  <span className="text-sm font-black leading-7 text-purple-100">
+                    {onlinePaymentAvailable
+                      ? "قوانین کیف پول را خوانده‌ام و قبول دارم."
+                      : "قوانین کیف پول و کارت‌به‌کارت را خوانده‌ام و قبول دارم."}
+                  </span>
                 </label>
 
-                <button type="button" disabled={!canContinueDeposit} onClick={() => setDepositStep(2)} className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed">ادامه و دریافت شماره کارت</button>
+                {onlinePaymentAvailable && (
+                  <>
+                    <button
+                      type="button"
+                      disabled={!canContinueDeposit || submitting === "online"}
+                      onClick={startOnlineDeposit}
+                      className="gaming-btn w-full disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      {submitting === "online" ? "در حال انتقال به درگاه..." : "پرداخت اینترنتی (آنی)"}
+                    </button>
+                    <div className="flex items-center gap-3 text-[11px] font-black text-gray-500">
+                      <span className="h-px flex-1 bg-white/10" />
+                      یا
+                      <span className="h-px flex-1 bg-white/10" />
+                    </div>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  disabled={!canContinueDeposit}
+                  onClick={() => setDepositStep(2)}
+                  className={`w-full disabled:opacity-40 disabled:cursor-not-allowed ${
+                    onlinePaymentAvailable
+                      ? "px-4 py-3 rounded-2xl bg-white/5 border border-white/15 text-sm font-black text-gray-200 hover:border-purple-400/40"
+                      : "gaming-btn"
+                  }`}
+                >
+                  {onlinePaymentAvailable ? "کارت‌به‌کارت (بررسی دستی)" : "ادامه و دریافت شماره کارت"}
+                </button>
 
                 <div className="rounded-3xl bg-white/[.04] border border-white/10 overflow-hidden">
                   <button
@@ -444,7 +508,9 @@ export default function WalletPage() {
                   </button>
                   {depositTermsOpen && (
                     <div className="px-4 pb-4 animate-slide-up">
-                      <p className="text-xs leading-7 text-gray-400">{WALLET_TERMS}</p>
+                      <p className="text-xs leading-7 text-gray-400">
+                        {onlinePaymentAvailable ? WALLET_TERMS_ONLINE : WALLET_TERMS_MANUAL}
+                      </p>
                     </div>
                   )}
                 </div>

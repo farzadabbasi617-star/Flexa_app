@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { isLikelyPostgresUrl, normalizeDatabaseUrl } from "@/lib/database-url";
 import { sql } from "drizzle-orm";
 import { getEmailDeliveryConfiguration } from "@/lib/email-service";
+import { getZarinpalConfiguration } from "@/lib/zarinpal";
 import { getClashRoyaleApiConfiguration } from "@/lib/clash-royale-api";
 import { ensurePrivateTournamentAttendanceSchema } from "@/lib/private-tournament-attendance";
 import { ensureStoreOrderLifecycleSchema } from "@/lib/store-service";
@@ -32,6 +33,7 @@ function unhealthy(error: string) {
 export async function GET() {
   const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
   const email = getEmailDeliveryConfiguration();
+  const paymentGateway = getZarinpalConfiguration();
   const clashRoyaleApi = getClashRoyaleApiConfiguration();
 
   if (!databaseUrl) return unhealthy("DATABASE_URL_MISSING");
@@ -84,6 +86,14 @@ export async function GET() {
           from: email.from,
           smtpHost: email.smtpHost,
           appsScriptConfigured: email.appsScriptConfigured,
+        },
+        paymentGateway: {
+          provider: "zarinpal",
+          configured: paymentGateway.configured,
+          live: paymentGateway.live,
+          sandbox: paymentGateway.sandbox,
+          merchantIdValid: paymentGateway.merchantIdValid,
+          callbackConfigured: Boolean(paymentGateway.callbackBaseUrl),
         },
       },
       { headers: healthHeaders },

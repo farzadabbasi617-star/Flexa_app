@@ -114,3 +114,20 @@ services:
         sync: false
       - key: FARAZSMS_SENDER
         sync: false
+      # ZarinPal payment gateway.
+      # ZARINPAL_MERCHANT_ID is the 36-character UUID from the panel, not the
+      # ZP.xxxxxxx code shown on a ZarinLink page -- that is a personal payment
+      # page and cannot credit a wallet automatically.
+      # ZARINPAL_LIVE is a separate switch on purpose: a valid merchant id alone
+      # never starts charging cards, matching COD_ARENA_LIVE and
+      # AFFILIATE_PROGRAM_LIVE. Set it to 'true' only after a real end-to-end test.
+      - key: ZARINPAL_MERCHANT_ID
+        sync: false
+      - key: ZARINPAL_LIVE
+        value: 'false'
+      - key: ZARINPAL_SANDBOX
+        value: 'false'
+      # Must be the public https origin. The callback URL is built from it, and
+      # ZarinPal will not return the user to a mismatched or non-https host.
+      - key: PAYMENT_CALLBACK_BASE_URL
+        value: https://www.gament1.ir
