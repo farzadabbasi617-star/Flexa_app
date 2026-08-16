@@ -3567,7 +3567,13 @@ async function handleConversationMessage(message: TelegramMessage) {
       const gate = checkAgeGate({ birthDate: payer.birthDate, nationalId: payer.nationalId });
       if (!gate.ok) {
         await clearSession(telegramId);
-        await sendMessage(chatId, `${html(gate.message)}`, removeKeyboard());
+        // The gate message alone leaves the user stuck, since the identity
+        // fields can only be filled in on the web profile. Link straight to it.
+        await sendMessage(
+          chatId,
+          `🪪 ${html(gate.message)}\n\nکافی است یک‌بار کد ملی و تاریخ تولد را ثبت کنی؛ بعد از آن شارژ بدون محدودیت انجام می‌شود.`,
+          { inline_keyboard: [[{ text: "🪪 تکمیل اطلاعات هویتی", url: `${APP_URL}/profile/user` }]] }
+        );
         return;
       }
     }

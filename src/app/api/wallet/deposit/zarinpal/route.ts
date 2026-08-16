@@ -37,7 +37,13 @@ export async function POST(request: NextRequest) {
     // Deposits fund paid tournaments, so the same age gate as the manual flow applies.
     const gate = checkAgeGate({ birthDate: user.birthDate, nationalId: user.nationalId });
     if (!gate.ok) {
-      return NextResponse.json({ error: gate.message }, { status: 403 });
+      // Include a code and a destination so the caller can route the user to
+      // the fix instead of only showing text they cannot act on. The wallet UI
+      // checks this up front too; this covers a stale tab or a direct call.
+      return NextResponse.json(
+        { error: gate.message, code: gate.code, action: { label: "تکمیل اطلاعات هویتی", href: "/profile/user" } },
+        { status: 403 }
+      );
     }
 
     const limit = await rateLimit(`wallet:deposit:zarinpal:${user.id}`, 8, 10 * 60 * 1000);
