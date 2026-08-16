@@ -73,6 +73,24 @@ describe("call sites", () => {
     expect(offenders, "these still point at a channel that does not exist").toEqual([]);
   });
 
+  it("deployment config does not override the resolver with a dead channel", () => {
+    // The code was already correct, but render.yaml set TELEGRAM_CHANNEL_URL
+    // to the non-existent @Gament_games. Environment beats defaults, so the
+    // live bot still showed a dead link. Config needs the same guard as code.
+    const configs = ["render.yaml", ".env.example", "docs/RENDER_DEPLOY.md"];
+    const offenders = configs.filter((file) => {
+      const src = readFileSync(path.join(process.cwd(), file), "utf8")
+        // Strip comment lines: they document the old value on purpose.
+        .replace(/^\s*#.*$/gm, "");
+      return src.includes("Gament_games");
+    });
+
+    expect(
+      offenders,
+      "these set the bot's channel to one that does not exist",
+    ).toEqual([]);
+  });
+
   it("the contact page renders the channel from config, not a literal", () => {
     const src = readFileSync(path.join(process.cwd(), "src", "app/contact/page.tsx"), "utf8");
     expect(src).toContain("channelUrl(");

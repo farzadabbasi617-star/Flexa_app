@@ -55,8 +55,8 @@ GOOGLE_APPS_SCRIPT_EMAIL_SECRET=your_long_random_shared_secret
 BOT_TOKEN=telegram_bot_token_from_botfather
 TELEGRAM_WEBHOOK_SECRET=your_long_random_webhook_secret
 TELEGRAM_ADMIN_IDS=your_numeric_telegram_id
-TELEGRAM_CHANNEL_URL=https://t.me/Gament_games
-TELEGRAM_CHANNEL_ID=@Gament_games
+TELEGRAM_CHANNEL_URL=https://t.me/Flexa_games
+TELEGRAM_CHANNEL_ID=@Flexa_games
 TELEGRAM_CRON_SECRET=your_long_random_cron_secret
 TELEGRAM_SETUP_SECRET=your_different_long_random_setup_secret
 # Optional trusted public Telegram news channels:

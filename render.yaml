@@ -66,10 +66,12 @@ services:
         sync: false
       - key: TELEGRAM_ADMIN_IDS
         sync: false
+      # کانال واقعی @Flexa_games است (عنوانش «Gament» است — گمراه‌کننده).
+      # @Gament_games وجود خارجی ندارد؛ getChat می‌گوید chat not found.
       - key: TELEGRAM_CHANNEL_URL
-        value: https://t.me/Gament_games
+        value: https://t.me/Flexa_games
       - key: TELEGRAM_CHANNEL_ID
-        value: '@Gament_games'
+        value: '@Flexa_games'
       - key: TELEGRAM_BOT_USERNAME
         value: FlexaTournamentBot
       - key: TELEGRAM_CRON_SECRET

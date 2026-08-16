@@ -13,7 +13,7 @@ import {
 } from "./menu-model";
 
 const APP = "https://www.gament1.ir";
-const CHANNEL = "https://t.me/Gament_games";
+const CHANNEL = "https://t.me/Flexa_games";
 
 const flatten = (rows: MenuButton[][]) => rows.flat();
 const callbacks = (rows: MenuButton[][]) =>

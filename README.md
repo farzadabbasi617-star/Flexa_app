@@ -78,8 +78,8 @@ src/
 BOT_TOKEN="telegram_bot_token_from_botfather"
 TELEGRAM_WEBHOOK_SECRET="your_long_random_webhook_secret"
 TELEGRAM_ADMIN_IDS="your_numeric_telegram_id"
-TELEGRAM_CHANNEL_URL="https://t.me/Gament_games"
-TELEGRAM_CHANNEL_ID="@Gament_games"
+TELEGRAM_CHANNEL_URL="https://t.me/Flexa_games"
+TELEGRAM_CHANNEL_ID="@Flexa_games"
 ```
 
 Migrationهای لازم — همه با یک دستور:
@@ -125,7 +125,7 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://www.gament1.ir/ap
 - `/register` پیش‌ثبت‌نام مستقیم در پنل سایت
 - `/link` ساخت کد یک‌بارمصرف برای اتصال قطعی حساب تلگرام به حساب Gament
 - `/profile` نمایش پروفایل/وضعیت لینک حساب
-- `/channel` لینک کانال `Gament_games`
+- `/channel` لینک کانال `Flexa_games`
 - `/players` برای ادمین: آخرین پیش‌ثبت‌نام‌ها
 - `/announce` برای ادمین: ارسال اطلاعیه عمومی
 - `/announce_game` برای ادمین: ارسال اطلاعیه هدفمند بر اساس بازی
@@ -153,7 +153,7 @@ https://api.telegram.org/bot<BOT_TOKEN>/setWebhook?url=https://www.gament1.ir/ap
 - `/health` مانیتور سلامت برای ادمین
 - `/export_telegram` خروجی CSV تلگرام برای ادمین
 - `/poll` ارسال نظرسنجی در کانال
-- انتشار خودکار تورنومنت جدید در کانال `@Gament_games`
+- انتشار خودکار تورنومنت جدید در کانال `@Flexa_games`
 - یادآوری مسابقات، ارسال لابی و انتشار نتایج با Cron endpoint
 - اطلاع خودکار به ادمین‌ها هنگام پیش‌ثبت‌نام جدید
 

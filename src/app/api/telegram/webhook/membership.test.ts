@@ -5,12 +5,12 @@ const getSettingMock = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/telegram", () => ({
   telegramApi: telegramApiMock,
-  getTelegramChannelChatId: () => "@Gament_games",
+  getTelegramChannelChatId: () => "@Flexa_games",
 }));
 vi.mock("./settings", () => ({ getTelegramSetting: getSettingMock }));
 vi.mock("./transport", () => ({ sendMessage: vi.fn() }));
-vi.mock("./config", () => ({ CHANNEL_URL: "https://t.me/Gament_games" }));
-vi.mock("@/lib/telegram-channel", () => ({ channelUrl: () => "https://t.me/Gament_games" }));
+vi.mock("./config", () => ({ CHANNEL_URL: "https://t.me/Flexa_games" }));
+vi.mock("@/lib/telegram-channel", () => ({ channelUrl: () => "https://t.me/Flexa_games" }));
 vi.mock("@/lib/logger", () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 import { checkChannelMembership } from "./membership";
