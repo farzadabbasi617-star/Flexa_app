@@ -35,7 +35,8 @@ import type { SessionData, TelegramCallbackQuery, TelegramMessage, TelegramUpdat
 import { APP_URL, CANCEL_TEXT, CHANNEL_URL, DEFAULT_RULES, GAMENT_ID_REQUIRED, PLATFORM_OPTIONS, SKIP_TEXT } from "./config";
 import { validateWebhookSecret } from "./security";
 import { extractInviteReference, gameLabel, gamePrompt, generateLinkCode, html, isValidGamentId, linkCodeHash, normalizeGame, normalizeGamentId } from "./utils";
-import { confirmKeyboard, gameKeyboard, mainMenuKeyboard, platformKeyboard, removeKeyboard, replyKeyboard, roomsKeyboard } from "./keyboards";
+import { accountMenuKeyboard, confirmKeyboard, earnMenuKeyboard, gameHubKeyboard, gameKeyboard, helpMenuKeyboard, mainMenuKeyboard, platformKeyboard, removeKeyboard, replyKeyboard, roomsKeyboard } from "./keyboards";
+import { findGameHub, parseGameCallback, type GameHub } from "./menu-model";
 import { answerCallback, editMessage, sendDocument, sendMessage, sendPhoto } from "./transport";
 import { clearSession, getSession, registrationSummary, setSession } from "./sessions";
 import { ensureFeatureEnabled, telegramFeatureEnabled } from "./settings";
@@ -471,6 +472,43 @@ async function startCommand(chatId: number) {
   );
 }
 
+/** Hub screen for one game — its rooms, tournaments and own features. */
+async function gameHubCommand(chatId: number, hub: GameHub) {
+  await sendMessage(
+    chatId,
+    [
+      `${hub.emoji} <b>${html(hub.title)}</b>`,
+      "",
+      "از این بخش می‌تونی روم‌های فعال و تورنومنت‌های این بازی رو با ورودی و جایزه ببینی و ثبت‌نام کنی.",
+    ].join("\n"),
+    gameHubKeyboard(hub),
+  );
+}
+
+async function accountMenuCommand(chatId: number) {
+  await sendMessage(
+    chatId,
+    "👤 <b>حساب من</b>\n\nپروفایل، کیف پول، تورنومنت‌ها و مسابقات خودت رو از اینجا ببین.",
+    accountMenuKeyboard(),
+  );
+}
+
+async function earnMenuCommand(chatId: number) {
+  await sendMessage(
+    chatId,
+    "🎁 <b>کسب درآمد</b>\n\nمأموریت‌ها، کوییز روزانه، معرفی دوستان و همکاری رسانه‌ای.",
+    earnMenuKeyboard(),
+  );
+}
+
+async function helpMenuCommand(chatId: number) {
+  await sendMessage(
+    chatId,
+    "ℹ️ <b>راهنما و پشتیبانی</b>\n\nقوانین پلتفرم رو بخون یا با پشتیبانی در ارتباط باش.",
+    helpMenuKeyboard(),
+  );
+}
+
 async function linksCommand(chatId: number) {
   const rows: Array<Array<Record<string, string>>> = [
     [{ text: "⚡ وب‌اپ Gament", url: APP_URL }],
@@ -506,6 +544,25 @@ async function registerStart(chatId: number, telegramId: string) {
     chatId,
     "🎮 <b>پیش‌ثبت‌نام تلگرامی Gament</b>\n\nبازی موردنظر را انتخاب کن.\n\nبرای مسابقه <b>1V1 کلش رویال</b> ثبت‌نام و پرداخت واقعی مستقیم از همین بات انجام می‌شود؛ از دکمه ⚔️ 1V1 کلش رویال در منوی اصلی یا دستور /clash استفاده کن.",
     gameKeyboard()
+  );
+}
+
+/**
+ * Pre-registration started from inside a game hub.
+ *
+ * The user already picked the game by entering the hub, so skip the game
+ * picker and go straight to platform selection.
+ */
+async function registerStartForGame(chatId: number, telegramId: string, hub: GameHub) {
+  if (!(await isChannelMember(telegramId))) {
+    await promptChannelMembership(chatId);
+    return;
+  }
+  await setSession(telegramId, "idle", { game: hub.id });
+  await sendMessage(
+    chatId,
+    `🎮 <b>پیش‌ثبت‌نام ${html(hub.title)}</b>\n\nحالا پلتفرم را انتخاب کن:`,
+    platformKeyboard(),
   );
 }
 
@@ -555,6 +612,86 @@ async function roomsCommand(chatId: number, gameFilter?: string) {
   ].join("\n\n");
 
   await sendMessage(chatId, text, roomsKeyboard(visibleRows));
+}
+
+/**
+ * All tournaments for one game — open, running and recently finished —
+ * each with its entry fee and prize pool.
+ */
+async function gameTournamentsCommand(chatId: number, hub: GameHub) {
+  const rows = await db
+    .select({
+      id: tournaments.id,
+      name: tournaments.name,
+      game: tournaments.game,
+      gameMode: tournaments.gameMode,
+      maxPlayers: tournaments.maxPlayers,
+      prizePool: tournaments.prizePool,
+      entryFee: tournaments.entryFee,
+      status: tournaments.status,
+      categoryLabel: tournaments.categoryLabel,
+      registeredCount: count(registrations.id),
+    })
+    .from(tournaments)
+    .leftJoin(registrations, eq(registrations.tournamentId, tournaments.id))
+    .where(eq(tournaments.game, hub.id))
+    .groupBy(tournaments.id)
+    .orderBy(desc(tournaments.createdAt))
+    .limit(10);
+
+  const visibleRows = rows.filter((row) => row.categoryLabel !== CLASH_1V1_CONFIG.categoryLabel);
+
+  if (!visibleRows.length) {
+    await sendMessage(
+      chatId,
+      `${hub.emoji} فعلاً تورنومنتی برای <b>${html(hub.title)}</b> ثبت نشده.\n\nبه‌محض باز شدن روم جدید در کانال اطلاع‌رسانی می‌شود.`,
+      gameHubKeyboard(hub),
+    );
+    return;
+  }
+
+  const statusLabel: Record<string, string> = {
+    registration: "🟢 ثبت‌نام باز",
+    in_progress: "🔴 در حال برگزاری",
+    completed: "🏁 پایان‌یافته",
+    cancelled: "⛔ لغو شده",
+  };
+
+  const text = [
+    `${hub.emoji} <b>تورنومنت‌های ${html(hub.title)}</b>`,
+    "",
+    ...visibleRows.map((row, index) =>
+      [
+        `<b>${index + 1}. ${html(row.name || "تورنومنت Gament")}</b>`,
+        `${statusLabel[row.status] || row.status} | ${html(row.gameMode || "مود اعلام نشده")}`,
+        `👥 ظرفیت: <b>${row.registeredCount}/${row.maxPlayers}</b>`,
+        `💳 ورودی: <b>${html(row.entryFee || "رایگان")}</b>`,
+        `🏆 جایزه: <b>${html(row.prizePool || "اعلام نشده")}</b>`,
+      ].join("\n"),
+    ),
+  ].join("\n\n");
+
+  const keyboard: Array<Array<Record<string, string>>> = [];
+  for (const row of visibleRows.slice(0, 5)) {
+    const title = (row.name || "تورنومنت").slice(0, 28);
+    if (row.status === "registration") {
+      const isFull =
+        typeof row.registeredCount === "number" &&
+        typeof row.maxPlayers === "number" &&
+        row.registeredCount >= row.maxPlayers;
+      keyboard.push([
+        {
+          text: isFull ? `ظرفیت تکمیل: ${title}` : `✅ ثبت‌نام: ${title}`,
+          callback_data: `join:${row.id}`,
+        },
+      ]);
+    } else {
+      keyboard.push([{ text: `جزئیات: ${title}`, url: `${APP_URL}/tournaments/${row.id}` }]);
+    }
+  }
+  keyboard.push([{ text: `⬅️ بازگشت به ${hub.title}`, callback_data: `game:${hub.id}` }]);
+
+  await sendMessage(chatId, text, { inline_keyboard: keyboard });
 }
 
 async function clashPrivateTournamentsCommand(chatId: number, telegramId: string) {
@@ -4065,6 +4202,23 @@ async function handleCallback(callback: TelegramCallbackQuery) {
 
   if (data === "support:mine") return myTicketsCommand(chatId, telegramId);
   if (data === "menu:home") return startCommand(chatId);
+
+  // ── Game hubs: game:<id> and game:<id>:<action> ──────────────────────────
+  const gameRoute = parseGameCallback(data);
+  if (gameRoute) {
+    const hub = findGameHub(gameRoute.gameId);
+    if (hub) {
+      if (gameRoute.action === "hub") return gameHubCommand(chatId, hub);
+      if (gameRoute.action === "rooms") return roomsCommand(chatId, hub.id);
+      if (gameRoute.action === "tournaments") return gameTournamentsCommand(chatId, hub);
+      if (gameRoute.action === "register") return registerStartForGame(chatId, telegramId, hub);
+    }
+  }
+
+  // ── Sections ────────────────────────────────────────────────────────────
+  if (data === "menu:account") return accountMenuCommand(chatId);
+  if (data === "menu:earn") return earnMenuCommand(chatId);
+  if (data === "menu:help") return helpMenuCommand(chatId);
   if (data === "mission:invite") return inviteCommand(chatId, telegramId);
   if (data.startsWith("mission:claim:")) return claimMissionReward(chatId, telegramId, data.replace("mission:claim:", ""));
   if (data === "admin:wallets") return pendingWalletsCommand(chatId, telegramId);

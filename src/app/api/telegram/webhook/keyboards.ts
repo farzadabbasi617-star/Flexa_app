@@ -1,4 +1,12 @@
 import { APP_URL, CHANNEL_URL, GAME_OPTIONS, PLATFORM_OPTIONS } from "./config";
+import {
+  buildAccountMenu,
+  buildEarnMenu,
+  buildGameMenu,
+  buildHelpMenu,
+  buildHomeMenu,
+  type GameHub,
+} from "./menu-model";
 
 export function replyKeyboard(rows: string[][]) {
   return {
@@ -12,27 +20,35 @@ export function removeKeyboard() {
   return { remove_keyboard: true };
 }
 
+/**
+ * Home screen.
+ *
+ * Kept intentionally short: three games, then a handful of section entries.
+ * Everything that used to be crammed in here now lives one tap deeper — see
+ * `menu-model.ts` for the full information architecture and its tests.
+ */
 export function mainMenuKeyboard() {
-  const rows: Array<Array<Record<string, unknown>>> = [
-    [{ text: "⚔️ 1V1 کلش رویال — ورودی ۵۰K / جایزه ۸۰K", callback_data: "clash1v1:quick_register" }],
-    [
-      { text: "⚡ Open Gament Mini App", web_app: { url: APP_URL } },
-      { text: "🌐 وب‌اپ", url: APP_URL },
-    ],
-    ...(CHANNEL_URL ? [[{ text: "📣 کانال Gament Games", url: CHANNEL_URL }]] : []),
-    [{ text: "🏟 روم‌های فعال", callback_data: "menu:rooms" }, { text: "🎮 پیش‌ثبت‌نام", callback_data: "menu:register" }],
-    [{ text: "🎯 COD Arena — کاستوم‌روم کالاف", url: `${APP_URL}/cod-arena` }],
-    [{ text: "💳 کیف پول", callback_data: "menu:wallet" }, { text: "🏆 تورنومنت‌های من", callback_data: "menu:my_tournaments" }],
-    [{ text: "✅ چک‌این", callback_data: "menu:checkin" }, { text: "⚔️ مسابقات من", callback_data: "menu:matches" }],
-    [{ text: "🏅 کلش چندنفره", callback_data: "menu:clash_private" }, { text: "📦 وضعیت 1V1 من", callback_data: "clash1v1:status" }],
-    [{ text: "🎯 مأموریت‌ها", callback_data: "menu:missions" }, { text: "🧠 کوییز روزانه", callback_data: "menu:quiz" }],
-    [{ text: "🎁 درآمد از معرفی", callback_data: "mission:invite" }, { text: "📣 همکاری رسانه‌ای", callback_data: "menu:affiliate" }],
-    [{ text: "📜 قوانین", callback_data: "menu:rules" }, { text: "🎧 پشتیبانی", callback_data: "menu:support" }],
-    [{ text: "🔗 اتصال حساب", callback_data: "menu:link" }, { text: "👤 پروفایل", callback_data: "menu:profile" }],
-    [{ text: "👤 وضعیت من", callback_data: "menu:status" }],
-    [{ text: "🆕 ساخت حساب", url: `${APP_URL}/register` }, { text: "🌐 پروفایل وب", url: `${APP_URL}/profile` }],
-  ];
-  return { inline_keyboard: rows };
+  return { inline_keyboard: buildHomeMenu(APP_URL, CHANNEL_URL) };
+}
+
+/** Hub for a single game: its rooms, its tournaments, its own features. */
+export function gameHubKeyboard(hub: GameHub) {
+  return { inline_keyboard: buildGameMenu(hub, APP_URL) };
+}
+
+/** Everything tied to the signed-in user. */
+export function accountMenuKeyboard() {
+  return { inline_keyboard: buildAccountMenu(APP_URL) };
+}
+
+/** Missions, quiz, referral, media partnership. */
+export function earnMenuKeyboard() {
+  return { inline_keyboard: buildEarnMenu() };
+}
+
+/** Rules, support, channel. */
+export function helpMenuKeyboard() {
+  return { inline_keyboard: buildHelpMenu(CHANNEL_URL) };
 }
 
 export function gameKeyboard() {
