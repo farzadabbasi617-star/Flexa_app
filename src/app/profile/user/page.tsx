@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
+import { AVATAR_OPTIONS } from "@/lib/avatars";
 import { useAuth } from "@/contexts/AuthContext";
 import JalaliDatePicker from "@/components/JalaliDatePicker";
 
@@ -27,14 +28,6 @@ interface IdentityState {
   locked: { firstName: boolean; lastName: boolean; birthDate: boolean; nationalId: boolean };
 }
 
-const AVATAR_OPTIONS = [
-  { label: "لرد خون‌آشام", url: "/avatars/avatar_1.jpg" },
-  { label: "دراکولا جوان", url: "/avatars/avatar_2.jpg" },
-  { label: "ملکه رز سرخ", url: "/avatars/avatar_3.jpg" },
-  { label: "امپراتور طلایی", url: "/avatars/avatar_4.jpg" },
-  { label: "شوالیه پیش‌فرض", url: "/icons/profile_icon.png" },
-  { label: "نشان گیمنت", url: "/icons/gament-icon-192.png" },
-];
 
 export default function UserProfileSettingsPage() {
   const { user, loading, refreshUser } = useAuth();
@@ -278,12 +271,24 @@ export default function UserProfileSettingsPage() {
                 <label className="block text-[10px] font-black text-purple-300 tracking-wider">🌟 انتخاب آواتار انحصاری گیمنت</label>
                 <span className="text-[9px] text-gray-500">جهت اعمال کلیک کنید</span>
               </div>
-              <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+              <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-2">
                 {AVATAR_OPTIONS.map((avatar) => {
                   const active = selectedAvatar === avatar.url;
                   return (
-                    <button key={avatar.url} type="button" onClick={() => chooseAvatar(avatar.url)} disabled={saving} className={`rounded-2xl p-1 border transition-all aspect-square flex items-center justify-center relative ${active ? "border-yellow-500 bg-yellow-500/10 shadow-[0_0_16px_rgba(234,179,8,.2)]" : "border-white/10 bg-black/20 hover:border-purple-400/50"}`} title={avatar.label}>
-                      <img src={avatar.url} alt={avatar.label} className="w-full h-full rounded-xl object-cover" loading="lazy" decoding="async" />
+                    <button
+                      key={avatar.url}
+                      type="button"
+                      onClick={() => chooseAvatar(avatar.url)}
+                      disabled={saving}
+                      // title is a hover tooltip and never appears on touch, so
+                      // the name is also rendered below the image.
+                      title={avatar.label}
+                      aria-pressed={active}
+                      aria-label={avatar.label}
+                      className={`rounded-2xl p-1 border transition-all flex flex-col items-center gap-1 relative ${active ? "border-yellow-500 bg-yellow-500/10 shadow-[0_0_16px_rgba(234,179,8,.2)]" : "border-white/10 bg-black/20 hover:border-purple-400/50"}`}
+                    >
+                      <img src={avatar.url} alt="" className="w-full aspect-square rounded-xl object-cover" loading="lazy" decoding="async" />
+                      <span className="w-full truncate text-center text-[8px] leading-3 text-gray-400 px-0.5 pb-0.5">{avatar.label}</span>
                       {active && <span className="absolute -top-1 -right-1 text-[10px] bg-yellow-500 text-black rounded-full w-5 h-5 grid place-items-center font-black">✓</span>}
                     </button>
                   );

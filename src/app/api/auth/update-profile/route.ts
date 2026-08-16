@@ -7,18 +7,11 @@ import { ClashRoyaleApiError, createClashRoyaleApiClient, normalizeClashRoyaleTa
 import logger from "@/lib/logger";
 import { rateLimit } from "@/lib/rate-limit";
 import { notifyTelegramAdmins } from "@/lib/telegram";
+import { resolveAvatarUrl } from "@/lib/avatars";
 
 export const dynamic = "force-dynamic";
 
 // Strict list of allowed exclusive Gament avatars to protect exclusivity (and future purchases/sales)
-const ALLOWED_AVATARS = [
-  "/avatars/avatar_1.jpg",
-  "/avatars/avatar_2.jpg",
-  "/avatars/avatar_3.jpg",
-  "/avatars/avatar_4.jpg",
-  "/icons/profile_icon.png",
-  "/icons/gament-icon-192.png",
-];
 
 function html(value: unknown) {
   return String(value ?? "")
@@ -75,7 +68,7 @@ export async function PATCH(request: NextRequest) {
     // Strict backend enforcement of premium avatars
     if (avatarUrl !== undefined) {
       const url = String(avatarUrl || "").trim();
-      updateData.avatarUrl = ALLOWED_AVATARS.includes(url) ? url : "/icons/profile_icon.png";
+      updateData.avatarUrl = resolveAvatarUrl(url);
     }
     
     if (clashRoyaleId !== undefined) {

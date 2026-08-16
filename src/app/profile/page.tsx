@@ -48,15 +48,6 @@ interface DashboardData {
   recentActivity: Array<{ type: string; icon: string; title: string; description: string; link: string | null; time: string }>;
 }
 
-// Exclusive Gament premium avatars (uploaded directly by the platform owner)
-const AVATAR_OPTIONS = [
-  { label: "لرد خون‌آشام", url: "/avatars/avatar_1.jpg" },
-  { label: "دراکولا جوان", url: "/avatars/avatar_2.jpg" },
-  { label: "ملکه رز سرخ", url: "/avatars/avatar_3.jpg" },
-  { label: "امپراتور طلایی", url: "/avatars/avatar_4.jpg" },
-  { label: "شوالیه پیش‌فرض", url: "/icons/profile_icon.png" },
-  { label: "نشان گیمنت", url: "/icons/gament-icon-192.png" },
-];
 
 function statusFa(status: string | null | undefined) {
   const map: Record<string, string> = {
