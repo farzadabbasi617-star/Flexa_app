@@ -66,7 +66,6 @@ class Settings:
     app_url: str
     games: list[str]
     platforms: list[str]
-    db_path: Path
     rules_text: str
     payment_info: str
     gament_id_required: bool
@@ -91,7 +90,6 @@ settings = Settings(
         os.getenv("PLATFORMS"),
         ["Mobile", "PC", "Console", "PS5", "PS4", "Xbox", "Nintendo Switch", "Other"],
     ),
-    db_path=Path(os.getenv("DB_PATH", "gament_telegram_bot.db")).expanduser(),
     rules_text=(os.getenv("RULES_TEXT") or DEFAULT_RULES).strip(),
     payment_info=(os.getenv("PAYMENT_INFO") or "").strip(),
     gament_id_required=_bool(os.getenv("GAMENT_ID_REQUIRED"), default=False),

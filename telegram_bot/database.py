@@ -8,11 +8,23 @@ from typing import Any
 import os
 from config import settings
 
-# We use the same DATABASE_URL as the Next.js app
+# We use the same DATABASE_URL as the Next.js app.
+#
+# NOTE: this bot used to be SQLite-backed (DB_PATH) and was migrated to the
+# shared PostgreSQL database. If you find a DB_PATH setting anywhere, it is a
+# leftover from that migration and is no longer read.
 DATABASE_URL = os.getenv("DATABASE_URL")
+
 
 def get_conn():
     """Returns a connection to the PostgreSQL database."""
+    if not DATABASE_URL:
+        raise RuntimeError(
+            "DATABASE_URL تنظیم نشده است.\n"
+            "این ربات از همان دیتابیس PostgreSQL وب‌اپ Gament استفاده می‌کند.\n"
+            "مقدار آن را در محیط اجرا (Render → Environment) تعریف کنید.\n"
+            "توجه: DB_PATH قدیمی دیگر خوانده نمی‌شود."
+        )
     return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
 
 def utc_now() -> str:
