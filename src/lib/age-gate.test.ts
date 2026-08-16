@@ -119,3 +119,43 @@ describe("isEligibleForPaidActions", () => {
     expect(isEligibleForPaidActions({ birthDate: null, nationalId: null })).toBe(false);
   });
 });
+
+/**
+ * Regression guard for the deposit outage: accounts created before
+ * registration collected identity fields were blocked from the payment
+ * gateway, and the API returned only prose the client could not act on.
+ * These pin the machine-readable codes the UI routes on.
+ */
+describe("legacy accounts missing identity fields", () => {
+  it("blocks an account with neither field and says which is missing first", () => {
+    const result = checkAgeGate({ birthDate: null, nationalId: null });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("MISSING_NATIONAL_ID");
+  });
+
+  it("treats whitespace-only values as missing", () => {
+    const result = checkAgeGate({ birthDate: "   ", nationalId: "   " });
+    expect(result.ok).toBe(false);
+  });
+
+  it("still blocks when only the birth date is absent", () => {
+    const result = checkAgeGate({ birthDate: null, nationalId: "0012345678" });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.code).toBe("MISSING_BIRTH_DATE");
+  });
+
+  it("always exposes a code so the client can route to the fix", () => {
+    for (const user of [
+      { birthDate: null, nationalId: null },
+      { birthDate: null, nationalId: "0012345678" },
+      { birthDate: "not-a-date", nationalId: "0012345678" },
+    ]) {
+      const result = checkAgeGate(user);
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.code).toBeTruthy();
+        expect(result.message.trim()).not.toBe("");
+      }
+    }
+  });
+});

@@ -126,6 +126,15 @@ export default function WalletPage() {
   const canContinueDeposit = acceptedTerms && Boolean(depositAmount);
   const onlinePaymentAvailable = data?.onlinePayment?.available === true;
 
+  // Deposits are age-gated on national id + birth date. Accounts created
+  // before registration collected those fields fail that check server-side,
+  // which previously surfaced only as an error *after* the user entered an
+  // amount and pressed pay, with no way to act on it. Detect it up front and
+  // send them straight to the form instead.
+  const identityComplete = Boolean(
+    user?.nationalId && String(user.nationalId).trim() && user?.birthDate && String(user.birthDate).trim()
+  );
+
   // Hands off to ZarinPal. The pending transaction and the credited amount are
   // both decided server-side; this only forwards the user to the bank page.
   async function startOnlineDeposit() {
@@ -348,6 +357,24 @@ export default function WalletPage() {
                   </p>
                 </div>
                 <Link href="/support" className="gaming-btn w-full block text-center">تماس با پشتیبانی</Link>
+              </div>
+            ) : !identityComplete ? (
+              <div className="space-y-5">
+                <div className="rounded-[2rem] bg-amber-500/10 border border-amber-300/25 p-5 text-center">
+                  <div className="text-4xl mb-3">🪪</div>
+                  <div className="font-black text-amber-100 mb-2">ابتدا اطلاعات هویتی را کامل کنید</div>
+                  <p className="text-sm leading-7 text-amber-100/80">
+                    طبق قوانین، شارژ کیف پول و شرکت در مسابقات پولی فقط برای کاربران
+                    بالای ۱۸ سال با هویت ثبت‌شده امکان‌پذیر است.
+                  </p>
+                  <p className="text-xs leading-6 text-amber-100/60 mt-3">
+                    کافی است <b>کد ملی</b> و <b>تاریخ تولد</b> را یک‌بار ثبت کنید؛ بعد از آن
+                    شارژ بدون محدودیت انجام می‌شود.
+                  </p>
+                </div>
+                <Link href="/profile/user" className="gaming-btn w-full block text-center">
+                  تکمیل اطلاعات هویتی
+                </Link>
               </div>
             ) : (
               <div className="space-y-5">
