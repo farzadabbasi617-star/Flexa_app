@@ -13,6 +13,7 @@ import { initialPublicDisplayName } from "@/lib/public-profile-policy";
 import { bindWebAffiliateAttribution } from "@/lib/affiliate-service";
 import { REFERRAL_VISITOR_COOKIE } from "@/lib/referral-invite";
 import { registrationConflictMessage } from "@/lib/registration-conflict";
+import { withRequestLogging } from "@/lib/with-request-logging";
 
 export const dynamic = "force-dynamic";
 
@@ -31,7 +32,7 @@ async function generateUniqueGamentId() {
   return `FLX-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
 }
 
-export async function POST(request: NextRequest) {
+async function POSTHandler(request: NextRequest) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
 
@@ -231,3 +232,6 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+
+export const POST = withRequestLogging(POSTHandler);

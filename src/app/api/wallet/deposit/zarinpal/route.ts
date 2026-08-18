@@ -13,10 +13,11 @@ import { startZarinpalDeposit } from "@/lib/zarinpal-deposit";
 import { getZarinpalConfiguration } from "@/lib/zarinpal";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
+import { withRequestLogging } from "@/lib/with-request-logging";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+async function POSTHandler(request: NextRequest) {
   try {
     if (!getZarinpalConfiguration().live) {
       return NextResponse.json(
@@ -81,3 +82,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "شروع پرداخت با خطا مواجه شد." }, { status: 500 });
   }
 }
+
+
+export const POST = withRequestLogging(POSTHandler);

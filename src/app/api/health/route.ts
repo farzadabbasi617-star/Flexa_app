@@ -1,4 +1,5 @@
-import { db } from "@/db";
+import { db, pool, POOL_MAX } from "@/db";
+import { poolSnapshot } from "@/lib/pool-metrics";
 import { isLikelyPostgresUrl, normalizeDatabaseUrl } from "@/lib/database-url";
 import { sql } from "drizzle-orm";
 import { getEmailDeliveryConfiguration } from "@/lib/email-service";
@@ -64,8 +65,15 @@ export async function GET(request: Request) {
   try {
     await db.execute(sql`select 1`);
 
+    const dbPool = poolSnapshot(pool, POOL_MAX);
+
     if (!detailsAuthorised(request)) {
-      return Response.json({ ok: true, database: true, release }, { headers: healthHeaders });
+      // Uptime monitors need to distinguish "up" from "up but drowning", so the
+      // status word is public while the underlying counts are not.
+      return Response.json(
+        { ok: true, database: true, release, load: dbPool.status },
+        { headers: healthHeaders },
+      );
     }
 
     return Response.json(
@@ -107,6 +115,7 @@ export async function GET(request: Request) {
           smtpHost: email.smtpHost,
           appsScriptConfigured: email.appsScriptConfigured,
         },
+        dbPool,
         paymentGateway: {
           provider: "zarinpal",
           configured: paymentGateway.configured,
