@@ -6,10 +6,11 @@ import { verifyPassword, createSession, sessionCookieMaxAge } from "@/lib/auth";
 import { LoginSchema } from "@/lib/validations";
 import { rateLimit } from "@/lib/rate-limit";
 import logger from "@/lib/logger";
+import { withRequestLogging } from "@/lib/with-request-logging";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+async function POSTHandler(request: NextRequest) {
   try {
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
     const userAgent = request.headers.get("user-agent") || "unknown";
@@ -125,3 +126,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "ورود با خطا مواجه شد" }, { status: 500 });
   }
 }
+
+
+export const POST = withRequestLogging(POSTHandler);

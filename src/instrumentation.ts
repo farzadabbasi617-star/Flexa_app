@@ -15,6 +15,15 @@ export async function register() {
   // would fail to import pg.
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
 
+  // Start sampling pool saturation before the first request, so a spike during
+  // startup traffic is captured rather than missed.
+  const [{ pool, POOL_MAX }, { attachPoolMetrics }] = await Promise.all([
+    import("@/db"),
+    import("@/lib/pool-metrics"),
+  ]);
+  attachPoolMetrics(pool);
+  void POOL_MAX;
+
   const [
     { ensurePrivateTournamentAttendanceSchema },
     { ensureStoreOrderLifecycleSchema },
@@ -50,5 +59,36 @@ export async function register() {
         logger.error({ error, task: name }, "Startup schema reconciliation failed");
       }
     })
+  );
+}
+
+/**
+ * Next calls this for every unhandled error in a route, page or middleware.
+ *
+ * Previously such an error only surfaced as a stack trace on stdout with no
+ * indication of which request produced it. Routing it through the logger means
+ * it lands as structured JSON carrying the same requestId as that request's
+ * other lines, so the whole failure can be read as one story.
+ */
+export async function onRequestError(
+  error: unknown,
+  request: { path?: string; method?: string; headers?: Record<string, string | undefined> },
+  context: { routerKind?: string; routePath?: string; routeType?: string }
+) {
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+
+  const { default: logger } = await import("@/lib/logger");
+  const { REQUEST_ID_HEADER } = await import("@/lib/request-context");
+
+  logger.error(
+    {
+      error,
+      requestId: request.headers?.[REQUEST_ID_HEADER],
+      method: request.method,
+      path: request.path,
+      routePath: context.routePath,
+      routeType: context.routeType,
+    },
+    "Unhandled request error"
   );
 }

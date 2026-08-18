@@ -21,6 +21,7 @@ import { verifyPayment, getZarinpalConfiguration } from "@/lib/zarinpal";
 import { rialToTomanNumber } from "@/lib/money";
 import { notifyLinkedUserOnTelegram } from "@/lib/telegram";
 import logger from "@/lib/logger";
+import { withRequestLogging } from "@/lib/with-request-logging";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ function succeed(refId: string) {
   return NextResponse.redirect(siteUrl(`/payment/success?ref=${encodeURIComponent(refId)}`), 303);
 }
 
-export async function GET(request: NextRequest) {
+async function GETHandler(request: NextRequest) {
   const params = request.nextUrl.searchParams;
   const reference = params.get("ref") || "";
   const authority = params.get("Authority") || params.get("authority") || "";
@@ -185,3 +186,6 @@ export async function GET(request: NextRequest) {
     return fail("خطای غیرمنتظره در تأیید پرداخت.");
   }
 }
+
+
+export const GET = withRequestLogging(GETHandler);

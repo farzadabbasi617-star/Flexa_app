@@ -58,4 +58,25 @@ if (process.env.NODE_ENV !== "production") {
   globalForDb.__gamentPool = pool;
 }
 
+/**
+ * Exported so /api/health can report utilisation against the real ceiling
+ * instead of a hardcoded guess that drifts when DB_POOL_MAX changes.
+ */
+export const POOL_MAX = poolMax;
+
+/**
+ * A pool acquire timeout is the signature of saturation: every connection is
+ * checked out and the queue did not drain within connectionTimeoutMillis.
+ *
+ * pg surfaces it as a generic error from the query, which reads like a
+ * database fault. Counting it separately keeps "we are out of connections"
+ * distinguishable from "the database rejected this query".
+ */
+pool.on("error", (error) => {
+  const message = String((error as Error)?.message || "");
+  if (/timeout exceeded when trying to connect/i.test(message)) {
+    void import("@/lib/pool-metrics").then((m) => m.recordAcquireTimeout());
+  }
+});
+
 export const db = drizzle(pool);

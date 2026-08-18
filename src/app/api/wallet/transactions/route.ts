@@ -10,6 +10,7 @@ import { isValidIranIban, sanitizeIban, sanitizeNationalId, sanitizeShortText, w
 import { rateLimit } from "@/lib/rate-limit";
 import { getZarinpalConfiguration } from "@/lib/zarinpal";
 import logger from "@/lib/logger";
+import { withRequestLogging } from "@/lib/with-request-logging";
 
 export const dynamic = "force-dynamic";
 
@@ -76,7 +77,7 @@ function requireTermsAccepted(body: Record<string, unknown>) {
   return null;
 }
 
-export async function GET(request: NextRequest) {
+async function GETHandler(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
@@ -122,7 +123,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-export async function POST(request: NextRequest) {
+async function POSTHandler(request: NextRequest) {
   try {
     const token = request.cookies.get("session")?.value;
     const ip = request.headers.get("x-forwarded-for")?.split(",")[0] || "unknown";
@@ -258,3 +259,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "ثبت درخواست انجام نشد" }, { status: 500 });
   }
 }
+
+
+export const GET = withRequestLogging(GETHandler);
+
+
+export const POST = withRequestLogging(POSTHandler);
