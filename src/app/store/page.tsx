@@ -5,6 +5,7 @@ import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 import StoreIcon, { type StoreIconName } from "@/components/store/StoreIcon";
 import FeaturedCarousel from "@/components/store/FeaturedCarousel";
+import FeaturedHeroSlides from "@/components/store/FeaturedHeroSlides";
 
 type Kind = "currency" | "account" | "item" | "service";
 type Source = "official" | "user";
@@ -137,6 +138,8 @@ function ProductFallback({ listing }: { listing: Listing }) {
 
 export default function StorePage() {
   const [items, setItems] = useState<Listing[]>([]);
+  // >0 means promoted listings took over the hero, so the static pitch stands down.
+  const [heroSlides, setHeroSlides] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState(false);
   const [filter, setFilter] = useState<FilterId>("all");
@@ -436,6 +439,9 @@ export default function StorePage() {
             <div className="absolute -bottom-28 -left-16 h-80 w-80 rounded-full border border-cyan-300/10" />
             <div className="absolute -bottom-16 -left-4 h-56 w-56 rounded-full border border-violet-300/10" />
 
+            <FeaturedHeroSlides onLoaded={setHeroSlides} />
+
+            {heroSlides === 0 && (
             <div className="relative z-10 flex h-full max-w-2xl flex-col items-start justify-center md:max-w-[63%]">
               <span className="inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-500/10 px-3 py-1.5 text-[10px] font-black text-violet-200">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
@@ -459,7 +465,9 @@ export default function StorePage() {
                 </Link>
               </div>
             </div>
+            )}
 
+            {heroSlides === 0 && (
             <div className="pointer-events-none absolute bottom-5 left-4 hidden h-64 w-64 md:block lg:left-7 xl:h-72 xl:w-72">
               <div className="absolute left-1/2 top-1/2 h-44 w-44 -translate-x-1/2 -translate-y-1/2 rounded-full bg-violet-500/20 blur-3xl" />
               {[
@@ -476,6 +484,7 @@ export default function StorePage() {
                 <img src="/icons/gament-icon-192.png" alt="" className="h-14 w-14 object-contain" />
               </div>
             </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import KycReviewCard, { type KycReviewRow } from "@/components/admin/KycReviewCard";
 
-type Tab = "kyc" | "listings" | "orders" | "reports" | "rates";
+type Tab = "kyc" | "listings" | "orders" | "reports" | "rates" | "featured";
 
 interface ReportRow {
   id: string;
@@ -46,6 +46,29 @@ interface ListingRow {
   metadata?: any;
   deliveryNotes?: string | null;
 }
+interface FeaturedRow {
+  id: string;
+  title: string;
+  source: string;
+  sellerName: string | null;
+  status: string;
+  stock: number;
+  priceToman: number;
+  featuredStatus: "none" | "pending_review" | "approved" | "rejected";
+  featuredUntil: string | null;
+  featuredRank: number;
+  featuredRejectionReason: string | null;
+}
+interface PromotableRow {
+  id: string;
+  title: string;
+  source: string;
+  sellerName: string | null;
+  priceToman: number;
+  stock: number;
+  soldCount: number;
+}
+
 interface OrderRow {
   id: string;
   title: string | null;
@@ -69,6 +92,8 @@ export default function AdminStorePage() {
   const [rateFields, setRateFields] = useState<RateField[]>([]);
   const [savingRates, setSavingRates] = useState(false);
   const [reports, setReports] = useState<ReportRow[]>([]);
+  const [featured, setFeatured] = useState<FeaturedRow[]>([]);
+  const [promotable, setPromotable] = useState<PromotableRow[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -85,6 +110,11 @@ export default function AdminStorePage() {
       } else if (tab === "reports") {
         const r = await fetch("/api/admin/store/reports?status=open", { cache: "no-store", credentials: "include" });
         const d = await r.json(); setReports(Array.isArray(d.items) ? d.items : []);
+      } else if (tab === "featured") {
+        const r = await fetch("/api/admin/store/featured", { cache: "no-store", credentials: "include" });
+        const d = await r.json();
+        setFeatured(Array.isArray(d.items) ? d.items : []);
+        setPromotable(Array.isArray(d.promotable) ? d.promotable : []);
       } else if (tab === "rates") {
         const r = await fetch(`/api/admin/store/estimator-rates?game=${rateGame}`, { cache: "no-store", credentials: "include" });
         const d = await r.json(); setRateFields(Array.isArray(d.fields) ? d.fields : []);
@@ -155,11 +185,30 @@ export default function AdminStorePage() {
     setMsg(r.ok ? "انجام شد" : "خطا"); load();
   }
 
+  async function featuredAction(
+    listingId: string,
+    action: "approve" | "reject" | "clear",
+    extra?: { days?: number; rank?: number; reason?: string }
+  ) {
+    const r = await fetch("/api/admin/store/featured", {
+      method: "PATCH",
+      credentials: "include",
+      headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
+      body: JSON.stringify({ listingId, action, ...extra }),
+    });
+    const d = await r.json().catch(() => ({}));
+    // Surface the server's own message: approve refuses a non-active listing,
+    // and a clamped duration comes back as a warning worth reading.
+    setMsg(r.ok ? d.warning || "انجام شد" : d.error || "خطا");
+    load();
+  }
+
   const tabs: Array<{ id: Tab; label: string }> = [
     { id: "kyc", label: "احراز هویت" },
     { id: "listings", label: "آگهی‌های در انتظار" },
     { id: "orders", label: "اختلافات" },
     { id: "reports", label: "گزارش‌ها" },
+    { id: "featured", label: "محصولات ویژه" },
     { id: "rates", label: "نرخ تخمین قیمت" },
   ];
 
@@ -244,6 +293,124 @@ export default function AdminStorePage() {
                   </div>
                 </div>
               )))}
+
+              {tab === "featured" && (
+                <div className="space-y-6">
+                  {/* Live and pending placements. This is the review queue the
+                      paid flow will feed into once it exists. */}
+                  <div>
+                    <h2 className="mb-3 text-sm font-black text-amber-300">جایگاه‌های ویژه</h2>
+                    {featured.length === 0 ? (
+                      <div className="rounded-3xl border border-white/10 bg-white/[0.03] py-8 text-center text-sm text-gray-400">
+                        هنوز محصول ویژه‌ای ثبت نشده است.
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {featured.map((row) => {
+                          const expired = row.featuredUntil ? new Date(row.featuredUntil) <= new Date() : true;
+                          const live = row.featuredStatus === "approved" && !expired && row.status === "active" && row.stock > 0;
+                          return (
+                            <div key={row.id} className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
+                              <div className="flex flex-wrap items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="font-black">{row.title}</span>
+                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-black ${live ? "bg-emerald-500/15 text-emerald-300" : "bg-gray-500/15 text-gray-400"}`}>
+                                      {live ? "در حال نمایش" : expired && row.featuredStatus === "approved" ? "منقضی‌شده" : row.featuredStatus === "pending_review" ? "در انتظار تأیید" : row.featuredStatus === "rejected" ? "ردشده" : "غیرفعال"}
+                                    </span>
+                                    <span className="text-[10px] text-gray-500">رتبه {row.featuredRank.toLocaleString("fa-IR")}</span>
+                                  </div>
+                                  <div className="mt-1 text-[11px] text-gray-500">
+                                    {row.source === "user" ? row.sellerName || "فروشنده" : "عرضه گیمنت"} · {toman(row.priceToman)}
+                                    {row.featuredUntil && ` · تا ${new Date(row.featuredUntil).toLocaleDateString("fa-IR")}`}
+                                  </div>
+                                  {/* A promoted listing that went out of stock or was paused
+                                      stops showing publicly; say so instead of leaving the
+                                      admin wondering why it vanished. */}
+                                  {row.featuredStatus === "approved" && !expired && (row.status !== "active" || row.stock <= 0) && (
+                                    <p className="mt-1 text-[11px] text-amber-300">
+                                      نمایش داده نمی‌شود: {row.stock <= 0 ? "موجودی صفر است" : "محصول فعال نیست"}
+                                    </p>
+                                  )}
+                                  {row.featuredRejectionReason && (
+                                    <p className="mt-1 text-[11px] text-red-300">دلیل رد: {row.featuredRejectionReason}</p>
+                                  )}
+                                </div>
+                                <div className="flex shrink-0 flex-wrap gap-2">
+                                  {row.featuredStatus !== "approved" && (
+                                    <button
+                                      onClick={() => {
+                                        const days = Number(window.prompt("مدت نمایش (روز):", "7") || 0);
+                                        if (!days) return;
+                                        const rank = Number(window.prompt("رتبه (عدد بزرگ‌تر = بالاتر):", "0") || 0);
+                                        featuredAction(row.id, "approve", { days, rank });
+                                      }}
+                                      className="rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-black"
+                                    >
+                                      تأیید
+                                    </button>
+                                  )}
+                                  {row.featuredStatus === "pending_review" && (
+                                    <button
+                                      onClick={() => featuredAction(row.id, "reject", { reason: window.prompt("دلیل رد:") || undefined })}
+                                      className="rounded-xl bg-red-600/80 px-3 py-1.5 text-xs font-black"
+                                    >
+                                      رد
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => featuredAction(row.id, "clear")}
+                                    className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-black text-gray-300"
+                                  >
+                                    برداشتن
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Until sellers can buy a slot, this is how a placement starts. */}
+                  <div>
+                    <h2 className="mb-1 text-sm font-black text-gray-200">افزودن محصول به بخش ویژه</h2>
+                    <p className="mb-3 text-[11px] text-gray-500">
+                      فقط محصولات فعال و موجود قابل انتخاب‌اند. مدت نمایش حداکثر ۹۰ روز است.
+                    </p>
+                    {promotable.length === 0 ? (
+                      <div className="rounded-3xl border border-white/10 bg-white/[0.03] py-8 text-center text-sm text-gray-400">
+                        محصول فعالی برای ویژه‌کردن وجود ندارد.
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        {promotable.map((row) => (
+                          <div key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-3">
+                            <div className="min-w-0">
+                              <div className="truncate text-sm font-bold">{row.title}</div>
+                              <div className="text-[11px] text-gray-500">
+                                {row.source === "user" ? row.sellerName || "فروشنده" : "عرضه گیمنت"} · {toman(row.priceToman)} · موجودی {row.stock.toLocaleString("fa-IR")}
+                              </div>
+                            </div>
+                            <button
+                              onClick={() => {
+                                const days = Number(window.prompt("مدت نمایش (روز):", "7") || 0);
+                                if (!days) return;
+                                const rank = Number(window.prompt("رتبه (عدد بزرگ‌تر = بالاتر):", "0") || 0);
+                                featuredAction(row.id, "approve", { days, rank });
+                              }}
+                              className="shrink-0 rounded-xl bg-amber-500 px-3 py-1.5 text-xs font-black text-black"
+                            >
+                              ویژه کن
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {tab === "rates" && (
                 <div className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
