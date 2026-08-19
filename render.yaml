@@ -125,8 +125,13 @@ services:
       # AFFILIATE_PROGRAM_LIVE. Set it to 'true' only after a real end-to-end test.
       - key: ZARINPAL_MERCHANT_ID
         sync: false
+      # Deliberately sync:false rather than a literal. This file previously
+      # pinned 'false' while the dashboard had been switched to 'true' to take
+      # real payments, so every blueprint sync could silently disable the
+      # gateway -- deposits would start returning "درگاه غیرفعال" with nothing
+      # in the diff to explain why. The live switch belongs to the dashboard.
       - key: ZARINPAL_LIVE
-        value: 'false'
+        sync: false
       - key: ZARINPAL_SANDBOX
         value: 'false'
       # Must be the public https origin. The callback URL is built from it, and

@@ -15,10 +15,12 @@ import logger from "@/lib/logger";
 
 const REQUEST_URL = "https://payment.zarinpal.com/pg/v4/payment/request.json";
 const VERIFY_URL = "https://payment.zarinpal.com/pg/v4/payment/verify.json";
+const INQUIRY_URL = "https://payment.zarinpal.com/pg/v4/payment/inquiry.json";
 const STARTPAY_URL = "https://payment.zarinpal.com/pg/StartPay/";
 
 const SANDBOX_REQUEST_URL = "https://sandbox.zarinpal.com/pg/v4/payment/request.json";
 const SANDBOX_VERIFY_URL = "https://sandbox.zarinpal.com/pg/v4/payment/verify.json";
+const SANDBOX_INQUIRY_URL = "https://sandbox.zarinpal.com/pg/v4/payment/inquiry.json";
 const SANDBOX_STARTPAY_URL = "https://sandbox.zarinpal.com/pg/StartPay/";
 
 const TIMEOUT_MS = 20_000;
@@ -57,8 +59,8 @@ export function getZarinpalConfiguration(): ZarinpalConfig {
 function endpoints() {
   const { sandbox } = getZarinpalConfiguration();
   return sandbox
-    ? { request: SANDBOX_REQUEST_URL, verify: SANDBOX_VERIFY_URL, startpay: SANDBOX_STARTPAY_URL }
-    : { request: REQUEST_URL, verify: VERIFY_URL, startpay: STARTPAY_URL };
+    ? { request: SANDBOX_REQUEST_URL, verify: SANDBOX_VERIFY_URL, startpay: SANDBOX_STARTPAY_URL, inquiry: SANDBOX_INQUIRY_URL }
+    : { request: REQUEST_URL, verify: VERIFY_URL, startpay: STARTPAY_URL, inquiry: INQUIRY_URL };
 }
 
 export function startPayUrl(authority: string) {
@@ -268,5 +270,54 @@ export async function verifyPayment(input: { authority: string; amountRial: bigi
   } catch (error) {
     logger.error({ error }, "ZarinPal verification error");
     return { ok: false, error: "تأیید پرداخت با خطا مواجه شد." };
+  }
+}
+
+export type InquiryResult =
+  | { ok: true; status: string; paid: boolean; refId?: string }
+  | { ok: false; code?: number; error: string };
+
+/**
+ * Ask ZarinPal what actually happened to an authority.
+ *
+ * The callback is the happy path, but it only runs if the user's browser comes
+ * back. When they close the tab on the bank page the money can already be
+ * taken while our row sits "pending" forever. This is the out-of-band question
+ * that tells us which of those two it was, without moving any money itself.
+ */
+export async function inquirePayment(authority: string): Promise<InquiryResult> {
+  const merchantId = (process.env.ZARINPAL_MERCHANT_ID || "").trim();
+  const { configured } = getZarinpalConfiguration();
+  if (!configured) return { ok: false, error: "درگاه پرداخت پیکربندی نشده است." };
+
+  try {
+    const response = await fetch(endpoints().inquiry, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify({ merchant_id: merchantId, authority }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+
+    const payload = await response.json().catch(() => null);
+    const data = payload?.data;
+    const errors = payload?.errors;
+
+    if (data && data.code === 100) {
+      const status = String(data.status ?? "");
+      // "PAID" means the card was charged but we never verified it; "VERIFIED"
+      // means it is already settled. Anything else was never completed.
+      return {
+        ok: true,
+        status,
+        paid: status === "PAID" || status === "VERIFIED",
+        refId: data.ref_id ? String(data.ref_id) : undefined,
+      };
+    }
+
+    const code = typeof errors?.code === "number" ? errors.code : data?.code;
+    return { ok: false, code, error: zarinpalErrorMessage(code, errors) };
+  } catch (error) {
+    logger.error({ error }, "ZarinPal inquiry error");
+    return { ok: false, error: "استعلام وضعیت پرداخت با خطا مواجه شد." };
   }
 }

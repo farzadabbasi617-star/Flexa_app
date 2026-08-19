@@ -1,4 +1,5 @@
 import logger from "@/lib/logger";
+import { getTelegramAdminIdsFromEnv } from "@/lib/telegram-admin-ids";
 import { formatCodRoomChannelPost, type CodRoomChannelPost } from "./cod-channel-post";
 import { db } from "@/db";
 import { registrations, telegramAccounts } from "@/db/schema";
@@ -183,10 +184,7 @@ export async function publishCodRoomToTelegramChannel(room: CodRoomChannelPost &
 }
 
 export function getTelegramAdminIds() {
-  return (process.env.TELEGRAM_ADMIN_IDS || "")
-    .split(/[\s,;]+/)
-    .map((value) => value.trim())
-    .filter((value) => /^\d+$/.test(value));
+  return getTelegramAdminIdsFromEnv();
 }
 
 export async function notifyTelegramAdmins(text: string, replyMarkup?: Record<string, unknown>) {
