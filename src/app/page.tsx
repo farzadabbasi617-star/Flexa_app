@@ -251,7 +251,7 @@ export default async function LuxuryHomePage() {
                 فصل جدید رقابت‌ها فعال است
               </div>
               <h2 className="text-4xl sm:text-6xl lg:text-7xl font-black leading-[1.05] tracking-tight max-w-3xl animate-slide-up [animation-delay:80ms] [animation-fill-mode:backwards]">
-                آرنای حرفه‌ای<br />تورنومنت‌های موبایل
+                آرنای حرفه‌ای<br />برگزاری تورنومنت
               </h2>
               <p className="text-sm sm:text-base text-gray-300 leading-8 mt-5 max-w-2xl animate-slide-up [animation-delay:160ms] [animation-fill-mode:backwards]">
                 ثبت‌نام سریع، کیف پول امن، چک‌این، لابی اختصاصی، ثبت نتیجه، داوری قابل پیگیری و اخبار گیمینگ در یک پلتفرم فارسی.
