@@ -236,9 +236,9 @@ export default function Navbar() {
               const isActive = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
               
               const customIcons: Record<string, string> = {
-                "/tournaments": "/icons/honors_icon.png",
+                "/tournaments": "/icons/honors_icon.webp",
                 "/cod-arena": "/icons/icon-cod-arena.png",
-                "/leaderboard": "/icons/rankings_icon.png",
+                "/leaderboard": "/icons/rankings_icon.webp",
                 "/judging": "/icons/icon-judging.png", // Exclusive custom neon gavel/scale icon!
                 "/teams": "/icons/icon-teams.png",     // Exclusive custom neon guild shield icon!
                 "/admin": "/icons/profile_admin.png",

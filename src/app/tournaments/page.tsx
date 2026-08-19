@@ -212,7 +212,7 @@ export default function TournamentsPage() {
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6" dir="rtl">
           <div className="text-right">
             <h1 className="text-2xl sm:text-3xl font-black flex items-center gap-2.5 justify-start">
-              <img src="/icons/honors_icon.png" alt="Tournaments" className="w-8 h-8 object-contain drop-shadow-[0_0_8px_#bc00ff] shrink-0" loading="lazy" decoding="async" />
+              <img src="/icons/honors_icon.webp" alt="Tournaments" className="w-8 h-8 object-contain drop-shadow-[0_0_8px_#bc00ff] shrink-0" loading="lazy" decoding="async" />
               <span className="bg-gradient-to-l from-purple-400 to-cyan-300 bg-clip-text text-transparent">{L("تورنومنت‌ها", "Tournaments")}</span>
             </h1>
             <p className="text-gray-400 mt-1.5 text-xs">

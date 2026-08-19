@@ -258,7 +258,7 @@ export default function HonorsPage() {
                 <span className={`${styles.rune} right-[3%] top-[20%]`}><HonorsIcon name="crown" className="h-5 w-5" /></span>
                 <span className={`${styles.rune} bottom-[9%] right-[26%]`}><HonorsIcon name="sparkles" className="h-5 w-5" /></span>
                 <span className={`${styles.rune} left-[2%] top-[43%]`}><HonorsIcon name="trophy" className="h-5 w-5" /></span>
-                <AppImage src="/icons/honors_icon.png" alt="نشان تالار افتخارات گیمنت" width={330} height={330} priority className={styles.medallionIcon} />
+                <AppImage src="/icons/honors_icon.webp" alt="نشان تالار افتخارات گیمنت" width={330} height={330} priority className={styles.medallionIcon} />
               </div>
               <div className="absolute -bottom-8 left-1/2 w-64 -translate-x-1/2 rounded-2xl border border-white/[.08] bg-black/30 px-4 py-3 text-center backdrop-blur-xl">
                 <span className="text-[8px] font-black tracking-[.22em] text-amber-300">GAMENT HALL OF FAME</span>
