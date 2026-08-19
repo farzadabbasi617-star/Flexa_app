@@ -47,7 +47,6 @@ export async function GET(request: NextRequest) {
         xp: users.xp,
         level: users.level,
         rankPoints: users.rankPoints,
-        role: users.role,
         isVerified: users.isVerified,
         hasClashRoyale: sql<boolean>`${users.clashRoyaleId} IS NOT NULL`,
         hasCodMobile: sql<boolean>`${users.codMobileId} IS NOT NULL`,
@@ -62,6 +61,9 @@ export async function GET(request: NextRequest) {
       .limit(limit)
       .offset(offset);
 
+    // Staff roles are deliberately not selected above. Hiding the badge in the
+    // UI alone would still ship "role":"super_admin" in this public JSON, which
+    // hands anyone a list of which accounts to target.
     const publicPlayers = rows.map(({ ownerId, ...player }) => ({
       ...player,
       isOwner: Boolean(currentUser && ownerId === currentUser.id),

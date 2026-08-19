@@ -22,7 +22,6 @@ export async function GET(_request: NextRequest, { params }: { params: Promise<{
         gamentId: users.gamentId,
         level: users.level,
         rankPoints: users.rankPoints,
-        role: users.role,
         isVerified: users.isVerified,
         clashRoyaleUsername: users.clashRoyaleUsername,
         codMobileUsername: users.codMobileUsername,
