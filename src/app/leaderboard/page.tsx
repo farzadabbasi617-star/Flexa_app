@@ -16,7 +16,6 @@ interface Player {
   rankPoints?: number | null;
   gamentId?: string | null;
   isVerified?: boolean | null;
-  role?: string | null;
   avatarUrl?: string | null;
   hasClashRoyale?: boolean;
   hasCodMobile?: boolean;
@@ -70,13 +69,6 @@ function getRankTier(rating: number) {
   return { label: "برنزی", color: "text-amber-600 bg-amber-950/40 border-amber-800/50", icon: "🥉" };
 }
 
-function getRoleBadge(role?: string | null) {
-  if (role === "super_admin") return { label: "SUPER ADMIN", color: "text-red-400 bg-red-950/30 border-red-500/20" };
-  if (role === "admin") return { label: "ADMIN", color: "text-orange-400 bg-orange-950/30 border-orange-500/20" };
-  if (role === "judge") return { label: "JUDGE", color: "text-blue-400 bg-blue-950/30 border-blue-500/20" };
-  if (role === "moderator") return { label: "MOD", color: "text-green-400 bg-green-950/30 border-green-500/20" };
-  return null;
-}
 
 function medal(index: number) {
   if (index === 0) return "🥇";
@@ -312,7 +304,6 @@ export default function LeaderboardPage() {
                 const actualIndex = rankById.get(player.id) ?? 0;
                 const isTop3 = actualIndex < 3 && !searchQuery;
                 const tier = getRankTier(player.rating);
-                const roleBadge = getRoleBadge(player.role);
 
                 // Find In-Game Name for selected game
                 const ign = selectedGame === "clash_royale" ? player.clashRoyaleUsername : selectedGame === "cod_mobile" ? player.codMobileUsername : selectedGame === "fortnite" ? player.fortniteUsername : null;
@@ -352,11 +343,6 @@ export default function LeaderboardPage() {
                           <span className="font-black text-sm sm:text-base truncate max-w-[120px] sm:max-w-none">
                             {player.displayName}
                           </span>
-                          {roleBadge && (
-                            <span className={`px-1.5 py-0.5 rounded-md text-[8px] border font-black tracking-wider shrink-0 ${roleBadge.color}`}>
-                              {roleBadge.label}
-                            </span>
-                          )}
                           {ign && (
                             <span className="text-[9px] text-cyan-400 bg-cyan-950/20 px-1.5 py-0.5 rounded-md border border-cyan-500/10 num-en font-bold shrink-0">
                               🎮 {ign}

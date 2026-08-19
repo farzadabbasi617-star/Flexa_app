@@ -19,8 +19,7 @@ interface PlayerProfileData {
     gamentId: string | null;
     level: number | null;
     rankPoints: number | null;
-    role: string | null;
-    isVerified: boolean | null;
+      isVerified: boolean | null;
     clashRoyaleUsername: string | null;
     codMobileUsername: string | null;
     fortniteUsername: string | null;
@@ -75,7 +74,6 @@ export default function PlayerProfilePage({ params }: { params: Promise<{ id: st
               <div className="flex flex-wrap justify-center sm:justify-start items-center gap-2 mb-2">
                 <h1 className="text-3xl sm:text-4xl font-black">{p.displayName}</h1>
                 {p.isVerified && <span className="text-neon-green">✓</span>}
-                {p.role === "admin" || p.role === "super_admin" ? <span className="px-2 py-1 rounded-full bg-fuchsia-500/10 text-fuchsia-300 text-xs">ادمین</span> : null}
               </div>
               <p className="text-gray-500" dir="ltr">@{p.username} • {p.gamentId || "No Gament ID"}</p>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
