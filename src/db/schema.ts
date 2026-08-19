@@ -69,6 +69,13 @@ export const storeListingStatusEnum = pgEnum("store_listing_status", [
   "draft", "pending_review", "active", "paused", "sold_out", "rejected", "archived"
 ]);
 
+// Promotion state for the storefront hero carousel. Separate from
+// store_listing_status because a listing can be active (buyable) while its
+// promotion is still awaiting review, or rejected, or expired.
+export const storeFeaturedStatusEnum = pgEnum("store_featured_status", [
+  "none", "pending_review", "approved", "rejected"
+]);
+
 export const storeReportStatusEnum = pgEnum("store_report_status", [
   "open", "reviewing", "resolved", "dismissed"
 ]);
@@ -1442,6 +1449,15 @@ export const storeListings = pgTable("store_listings", {
   status: storeListingStatusEnum("status").notNull().default("pending_review"),
   rejectionReason: text("rejection_reason"),
   reviewedBy: uuid("reviewed_by").references(() => users.id),
+  // Promotion into the storefront hero carousel. Time-boxed via featuredUntil
+  // so expiry is data rather than something a cron has to enforce.
+  featuredStatus: storeFeaturedStatusEnum("featured_status").notNull().default("none"),
+  featuredUntil: timestamp("featured_until"),
+  featuredRank: integer("featured_rank").notNull().default(0),
+  featuredRequestedAt: timestamp("featured_requested_at"),
+  featuredReviewedAt: timestamp("featured_reviewed_at"),
+  featuredReviewedBy: uuid("featured_reviewed_by").references(() => users.id),
+  featuredRejectionReason: text("featured_rejection_reason"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
