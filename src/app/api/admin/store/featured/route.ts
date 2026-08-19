@@ -9,7 +9,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
 import { storeListings, users } from "@/db/schema";
-import { desc, eq, ne } from "drizzle-orm";
+import { and, desc, eq, ne, sql } from "drizzle-orm";
 import { requireAdminPermission } from "@/lib/admin-permissions";
 import { getClientIp, logAdminAction } from "@/lib/admin-audit";
 import { MAX_FEATURED_DAYS, resolveFeaturedUntil } from "@/lib/store-featured";
@@ -17,7 +17,16 @@ import logger from "@/lib/logger";
 
 export const dynamic = "force-dynamic";
 
-/** Every listing with a promotion attached, for the moderation queue. */
+/**
+ * Two lists in one response:
+ *
+ *   promotions  listings that already have a promotion, for the review queue
+ *   promotable  active, in-stock listings with no promotion yet
+ *
+ * The second exists because an admin has to be able to *start* a placement,
+ * not only approve one someone else requested. Until the paid flow lands
+ * nobody can request one, so without this the panel would always be empty.
+ */
 export async function GET(request: NextRequest) {
   const { user, error, status } = await requireAdminPermission(request, "store");
   if (!user) return NextResponse.json({ error }, { status });
@@ -44,8 +53,40 @@ export async function GET(request: NextRequest) {
       .orderBy(desc(storeListings.featuredRank), desc(storeListings.featuredRequestedAt))
       .limit(200);
 
+    // Candidates an admin can promote right now. Same conditions the public
+    // carousel enforces, so nothing offered here can be approved and then
+    // silently filtered out of the storefront.
+    const candidates = await db
+      .select({
+        id: storeListings.id,
+        title: storeListings.title,
+        source: storeListings.source,
+        sellerName: users.displayName,
+        status: storeListings.status,
+        stock: storeListings.stock,
+        priceRial: storeListings.priceRial,
+        soldCount: storeListings.soldCount,
+      })
+      .from(storeListings)
+      .leftJoin(users, eq(users.id, storeListings.sellerId))
+      .where(
+        and(
+          eq(storeListings.featuredStatus, "none"),
+          eq(storeListings.status, "active"),
+          sql`${storeListings.stock} > 0`
+        )
+      )
+      .orderBy(desc(storeListings.createdAt))
+      .limit(100);
+
+    const withToman = <T extends { priceRial: string }>(row: T) => ({
+      ...row,
+      priceToman: Number(BigInt(row.priceRial) / BigInt(10)),
+    });
+
     return NextResponse.json({
-      items: rows.map((row) => ({ ...row, priceToman: Number(BigInt(row.priceRial) / BigInt(10)) })),
+      items: rows.map(withToman),
+      promotable: candidates.map(withToman),
     });
   } catch (err) {
     logger.error({ error: err }, "Admin featured listing query failed");
