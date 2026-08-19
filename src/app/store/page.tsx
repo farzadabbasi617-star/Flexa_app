@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
 import StoreIcon, { type StoreIconName } from "@/components/store/StoreIcon";
+import FeaturedCarousel from "@/components/store/FeaturedCarousel";
 
 type Kind = "currency" | "account" | "item" | "service";
 type Source = "official" | "user";
@@ -498,6 +499,11 @@ export default function StorePage() {
             </Link>
           </div>
         </section>
+
+        {/* Promoted listings sit above the categories: the first thing after
+            the hero, which is what a seller is paying for. Renders nothing
+            when no placement is live, so the page is unchanged until then. */}
+        <FeaturedCarousel />
 
         <section className="mt-9 sm:mt-12" aria-labelledby="store-categories-title">
           <div className="mb-4 flex items-end justify-between gap-4">
