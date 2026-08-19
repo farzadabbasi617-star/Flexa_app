@@ -24,8 +24,14 @@ const navItems = [
   { id: "profile", label: "پروفایل", icon: "⚙️", path: "/profile" },
 ];
 
+// Bundled artwork wins over the CMS-managed /api/public/images entry, so the
+// bar renders its real icons on first paint instead of flashing the emoji
+// fallback while that request is in flight. Arena and Store were the only two
+// tabs without a bundled icon, so they alone kept showing an emoji.
 const customIcons: Record<string, string> = {
   rankings: "/icons/rankings_icon.png",
+  store: "/icons/store_icon.png",
+  arena: "/icons/arena_icon.png",
   honors: "/icons/honors_icon.png",
   profile: "/icons/settings_icon.png",
 };
