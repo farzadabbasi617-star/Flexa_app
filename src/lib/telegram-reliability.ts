@@ -172,12 +172,19 @@ export async function enqueueTelegramCall(
   if (typeof chatId !== "string" && typeof chatId !== "number") {
     throw new Error("TELEGRAM_OUTBOX_CHAT_ID_REQUIRED");
   }
+  // 0 is never a real chat and "" coerces to it, so a misparsed env var used to
+  // queue a row that could only ever fail "chat not found" -- five times, every
+  // night. Reject it at the door instead of paying for the retries.
+  const normalizedChatId = String(chatId).trim();
+  if (!normalizedChatId || normalizedChatId === "0") {
+    throw new Error("TELEGRAM_OUTBOX_CHAT_ID_REQUIRED");
+  }
 
   const [created] = await db
     .insert(telegramOutbox)
     .values({
       dedupeKey: options.dedupeKey,
-      chatId: String(chatId),
+      chatId: normalizedChatId,
       method,
       payload,
       priority: options.priority || 0,

@@ -22,6 +22,8 @@ import { notifyUsersInApp } from "@/lib/app-notifications";
 import { ensureAffiliateSchema, processAffiliateCommissions } from "@/lib/affiliate-service";
 import { ensureCodArenaSchema } from "@/lib/cod-room-service";
 import { advanceCodRoomLifecycle } from "@/lib/cod-room-lifecycle";
+import { reconcilePendingDeposits } from "@/lib/deposit-reconciliation";
+import { getTelegramAdminIdsFromEnv } from "@/lib/telegram-admin-ids";
 
 export const dynamic = "force-dynamic";
 
@@ -532,12 +534,7 @@ async function runHourlyClassifiedScrape() {
 }
 
 
-function telegramAdminIds() {
-  return (process.env.TELEGRAM_ADMIN_IDS || process.env.ADMIN_IDS || "")
-    .split(",")
-    .map((x) => x.trim())
-    .filter((id) => Number.isFinite(Number(id)));
-}
+const telegramAdminIds = getTelegramAdminIdsFromEnv;
 
 async function sendToAdmins(text: string, replyMarkup?: Record<string, unknown>) {
   let sent = 0;
@@ -645,7 +642,9 @@ async function sendDailyAdminReport() {
   const key = `daily-report:${today}`;
   if (await hasSent(key)) return 0;
 
-  const adminIds = (process.env.TELEGRAM_ADMIN_IDS || process.env.ADMIN_IDS || "").split(",").map((x) => x.trim()).filter(Boolean);
+  // Same parsing as every other admin broadcast; keeping a second inline copy
+  // is how the two drifted apart in the first place.
+  const adminIds = telegramAdminIds();
   if (!adminIds.length) return 0;
 
   const [preRegs] = await db.select({ value: count() }).from(telegramPreRegistrations);
@@ -656,13 +655,9 @@ async function sendDailyAdminReport() {
   const revenueToman = txRows.reduce((sum, row) => sum + Number((BigInt(row.amount || "0") / BigInt(10)).toString()), 0);
 
   const text = `📊 <b>گزارش روزانه Gament</b>\n\nپیش‌ثبت‌نام‌های تلگرام: <b>${preRegs.value}</b>\nتورنومنت‌های فعال: <b>${activeTournaments.value}</b>\nمسابقات تکمیل‌شده: <b>${completedMatches.value}</b>\nتیکت‌های باز: <b>${openTickets.value}</b>\nدرآمد ورودی‌ها: <b>${revenueToman.toLocaleString("fa-IR")} تومان</b>`;
-  let sent = 0;
-  for (const id of adminIds) {
-    const numericId = Number(id);
-    if (!Number.isFinite(numericId)) continue;
-    await sendTelegramMessage(numericId, text, { inline_keyboard: [[{ text: "پنل ادمین", url: `${process.env.APP_URL || "https://www.gament1.ir"}/admin` }]] });
-    sent += 1;
-  }
+  const sent = await sendToAdmins(text, {
+    inline_keyboard: [[{ text: "پنل ادمین", url: `${process.env.APP_URL || "https://www.gament1.ir"}/admin` }]],
+  });
   await markSent(key, "daily_report");
   return sent;
 }
@@ -850,6 +845,27 @@ async function publishCompletedResults() {
   return published;
 }
 
+/**
+ * Sweep deposits the gateway callback never closed out, and tell the admins
+ * when real money had to be recovered -- a nonzero count here means users were
+ * being charged without being credited.
+ */
+async function runDepositReconciliation() {
+  const summary = await reconcilePendingDeposits(25);
+
+  if (summary.recovered > 0) {
+    await sendToAdmins(
+      `\u26a0\ufe0f <b>پرداخت ناتمام بازیابی شد</b>\n\n` +
+        `تعداد: <b>${summary.recovered.toLocaleString("fa-IR")}</b>\n` +
+        `مجموع: <b>${summary.recoveredToman.toLocaleString("fa-IR")} تومان</b>\n\n` +
+        `این پرداخت‌ها انجام شده بودند ولی callback درگاه نرسیده بود.`,
+      { inline_keyboard: [[{ text: "پنل ادمین", url: `${process.env.APP_URL || "https://www.gament1.ir"}/admin` }]] }
+    );
+  }
+
+  return summary;
+}
+
 async function safeCronStep<T>(name: string, fn: () => Promise<T>): Promise<T | { error: string }> {
   try {
     return await fn();
@@ -887,6 +903,7 @@ export async function GET(request: NextRequest) {
   const storeOrderDeadlines = await safeCronStep("storeOrderDeadlines", () => processStoreOrderDeadlines(50));
   const codRoomLifecycle = await safeCronStep("codRoomLifecycle", () => advanceCodRoomLifecycle());
   const affiliateCommissions = await safeCronStep("affiliateCommissions", () => processAffiliateCommissions(100));
+  const depositReconciliation = await safeCronStep("depositReconciliation", runDepositReconciliation);
   const classifiedScrape = await safeCronStep("classifiedScrape", runHourlyClassifiedScrape);
   const classifiedCleanup = await safeCronStep("classifiedCleanup", cleanupClassifiedAds);
   const dailyReports = await safeCronStep("dailyReports", sendDailyAdminReport);
@@ -920,6 +937,7 @@ export async function GET(request: NextRequest) {
     storeOrderDeadlines,
     codRoomLifecycle,
     affiliateCommissions,
+    depositReconciliation,
     classifiedScrape,
     classifiedCleanup,
     dailyReports,

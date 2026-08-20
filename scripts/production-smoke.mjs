@@ -153,6 +153,23 @@ async function checkHealthAndRelease() {
     assert(health?.email?.configured === true, "/api/health: transactional email is not configured");
     assert(health?.clashRoyaleApi?.configured === true, "/api/health: Clash Royale API is not configured");
     assert(health?.telegramCron?.protected === true, "/api/health: Telegram cron is not protected by a secret");
+
+    // The gateway takes real money, and nothing else notices when it stops:
+    // deposits just start refusing. render.yaml used to pin ZARINPAL_LIVE to
+    // 'false' while the dashboard had it 'true', so a blueprint sync could
+    // disable payments with no failing check anywhere. Assert it out loud.
+    assert(
+      health?.paymentGateway?.configured === true,
+      "/api/health: payment gateway is not configured (check ZARINPAL_MERCHANT_ID and PAYMENT_CALLBACK_BASE_URL)",
+    );
+    assert(
+      health?.paymentGateway?.live === true,
+      "/api/health: payment gateway is NOT live - deposits are being refused (check ZARINPAL_LIVE)",
+    );
+    assert(
+      health?.paymentGateway?.sandbox === false,
+      "/api/health: payment gateway is in sandbox mode in production",
+    );
   }
 
   if (expectedRelease) {
