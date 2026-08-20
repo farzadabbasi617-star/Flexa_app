@@ -6,6 +6,7 @@ import Link from "next/link";
 import Navbar from "@/components/Navbar";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUnreadNotifications } from "@/contexts/UnreadNotificationsContext";
 
 interface Notification {
   id: string;
@@ -37,6 +38,7 @@ export default function NotificationsPage() {
   const { t, lang } = useLanguage();
   const { user, loading } = useAuth();
   const router = useRouter();
+  const { refresh: refreshBadge } = useUnreadNotifications();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loadingNotifs, setLoadingNotifs] = useState(true);
 
@@ -49,14 +51,34 @@ export default function NotificationsPage() {
   const fetchNotifications = useCallback(async () => {
     setLoadingNotifs(true);
     try {
-      const res = await fetch("/api/notifications");
+      const res = await fetch("/api/notifications", { credentials: "include" });
       const data = await res.json();
-      setNotifications(Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : []);
+      const rows: Notification[] = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
+
+      // Opening the page is what marks them read. This used to happen only if
+      // the user found the "mark all read" link, so in production all 124
+      // notifications were unread and the bell badge never cleared for anyone.
+      // Done here rather than in an effect so it cannot re-trigger on its own
+      // state update.
+      if (rows.some((n) => !n.isRead)) {
+        fetch("/api/notifications", {
+          method: "PATCH",
+          credentials: "include",
+          headers: { "X-Requested-With": "XMLHttpRequest" },
+        })
+          .then(() => refreshBadge())
+          .catch(() => {
+            // The list still renders; the next visit will try again.
+          });
+        setNotifications(rows.map((n) => ({ ...n, isRead: true })));
+      } else {
+        setNotifications(rows);
+      }
     } catch {
       setNotifications([]);
     }
     setLoadingNotifs(false);
-  }, []);
+  }, [refreshBadge]);
 
   useEffect(() => {
     if (user) {
@@ -64,14 +86,21 @@ export default function NotificationsPage() {
     }
   }, [user, fetchNotifications]);
 
-  async function markAllRead() {
+  const markAllRead = useCallback(async () => {
     try {
-      await fetch("/api/notifications", { method: "PATCH", headers: { "X-Requested-With": "XMLHttpRequest" } });
+      await fetch("/api/notifications", {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "X-Requested-With": "XMLHttpRequest" },
+      });
       setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      // Without this the bell keeps its count until the next 60s poll, which
+      // reads as "the button did nothing".
+      refreshBadge();
     } catch {
-      // handle error
+      // Leave the local state alone; the next load will show the truth.
     }
-  }
+  }, [refreshBadge]);
 
   if (loading || !user) {
     return (
