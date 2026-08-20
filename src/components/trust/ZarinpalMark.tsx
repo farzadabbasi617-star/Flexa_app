@@ -1,111 +1,176 @@
 "use client";
 
 /**
- * Animated 3D ZarinPal mark.
+ * ZarinPal brand mark, in 3D.
  *
- * Drawn as inline SVG rather than loaded as an image for three reasons:
- * it stays crisp at any size, it can be lit and layered for the 3D look, and
- * it costs no network request on a page that already carries the e-Namad seal.
+ * The real logo is a yellow parallelogram leaning right, with a blue circle
+ * overlapping its top-left corner. Where the two overlap the blue darkens
+ * (multiply), which is what makes the circle read as sitting *in front of* the
+ * slab. The first version of this file invented a rounded tile with a "7"
+ * glyph, which was simply the wrong logo.
  *
- * Deliberately NOT used for e-Namad: that seal must stay the real <img> served
- * from trustseal.enamad.ir with referrerPolicy="origin", because e-Namad checks
- * the Referer to verify the licence. A redrawn e-Namad badge would be both
- * broken and dishonest. Here there is nothing to verify — it is a payment
- * partner logo — so redrawing is safe.
+ * Geometry and colours were measured off the supplied artwork rather than
+ * eyeballed:
+ *   parallelogram  top edge y=36 x=168..275, bottom edge y=242 x=97..202
+ *                  both side edges slope -0.4 (dx/dy)
+ *   circle         centre (120.5, 96), r=61.5
+ *   yellow #FFD40C   blue #0A33FF   overlap #0727C7
+ * Drawn on the source's own 350x350 grid so those numbers stay checkable.
+ *
+ * Inline SVG rather than the JPEG: no network request, crisp at any size, and
+ * it can carry the lighting and the specular sweep. Redrawing is fine here --
+ * it is a payment partner's logo, unlike the e-Namad seal, which must stay the
+ * verifiable image served from their own domain.
  */
 
+/** Extrusion depth in source units; the body is stacked along this offset. */
+const DEPTH = 9;
+
 export default function ZarinpalMark({ className = "" }: { className?: string }) {
+  // Parallelogram geometry, measured off the artwork. Sides slope -0.4 in x
+  // per +1 y, and all four corners are rounded (~14 units), which is what
+  // makes the mark read as a soft slab rather than a sheared rectangle.
+  const TOP_Y = 36;
+  const BOT_Y = 242;
+  // Sharp (un-rounded) corners, from a least-squares fit of the two slanted
+  // edges: right x = -0.400y + 303.0, left x = -0.409y + 180.8. Reading the
+  // corners straight off the bitmap instead gives values pulled ~10 units
+  // inward by the corner radius, which made the slab too narrow.
+  const TL = 166;
+  const TR = 288.6;
+  const BL = 81.7;
+  const BR = 206.2;
+  const RAD = 14;
+
+  // Unit vectors along the top/bottom (horizontal) and along the slanted side.
+  const sx = -0.4; // dx per dy down the side
+  const sideLen = Math.hypot(sx, 1);
+  const ux = sx / sideLen;
+  const uy = 1 / sideLen;
+
+  // Rounded parallelogram: walk the four corners, cutting RAD off each side
+  // and joining with a quadratic through the true corner.
+  const slab = [
+    `M${TL + RAD} ${TOP_Y}`,
+    `L${TR - RAD} ${TOP_Y}`,
+    `Q${TR} ${TOP_Y} ${TR + ux * RAD} ${TOP_Y + uy * RAD}`,
+    `L${BR - ux * RAD} ${BOT_Y - uy * RAD}`,
+    `Q${BR} ${BOT_Y} ${BR - RAD} ${BOT_Y}`,
+    `L${BL + RAD} ${BOT_Y}`,
+    `Q${BL} ${BOT_Y} ${BL - ux * RAD} ${BOT_Y - uy * RAD}`,
+    `L${TL + ux * RAD} ${TOP_Y + uy * RAD}`,
+    `Q${TL} ${TOP_Y} ${TL + RAD} ${TOP_Y}`,
+    "Z",
+  ].join(" ");
+
+  const CX = 120.5;
+  const CY = 97;
+  const R = 61.5;
+
   return (
-    <svg
-      viewBox="0 0 120 120"
-      className={className}
-      role="img"
-      aria-label="درگاه پرداخت زرین‌پال"
-    >
+    <svg viewBox="0 0 350 350" className={className} role="img" aria-label="درگاه پرداخت زرین‌پال">
       <defs>
-        {/* Face lighting: brighter top-left, deeper bottom-right, so the tile
-            reads as a lit surface instead of a flat rectangle. */}
-        <linearGradient id="zp-face" x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor="#FFE066" />
-          <stop offset="45%" stopColor="#FFD400" />
-          <stop offset="100%" stopColor="#E8A800" />
+        {/* Face lighting: brighter toward the top-left so the slab reads as lit
+            from the same direction as the rest of the section. */}
+        <linearGradient id="zpx-yellow" x1="0" y1="0" x2="0.75" y2="1">
+          <stop offset="0%" stopColor="#FFE55C" />
+          <stop offset="42%" stopColor="#FFD40C" />
+          <stop offset="100%" stopColor="#E5A800" />
         </linearGradient>
 
-        {/* The extruded side wall, darker than any part of the face. */}
-        <linearGradient id="zp-edge" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#C98F00" />
-          <stop offset="100%" stopColor="#8A5F00" />
+        <linearGradient id="zpx-yellow-edge" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#C68F00" />
+          <stop offset="100%" stopColor="#8A6200" />
         </linearGradient>
 
-        <linearGradient id="zp-dot" x1="0.2" y1="0" x2="0.8" y2="1">
-          <stop offset="0%" stopColor="#3D6BFF" />
-          <stop offset="100%" stopColor="#1435C4" />
+        <linearGradient id="zpx-blue" x1="0.15" y1="0" x2="0.85" y2="1">
+          <stop offset="0%" stopColor="#3C63FF" />
+          <stop offset="45%" stopColor="#0A33FF" />
+          <stop offset="100%" stopColor="#0524B8" />
         </linearGradient>
 
-        {/* Sweeping specular band. Animated across the face on a long loop. */}
-        <linearGradient id="zp-shine" x1="0" y1="0" x2="1" y2="0">
+        <linearGradient id="zpx-blue-edge" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#0726A8" />
+          <stop offset="100%" stopColor="#03165E" />
+        </linearGradient>
+
+        {/* Overlap tint: the measured #0727C7, applied only where the circle
+            crosses the slab. */}
+        <linearGradient id="zpx-overlap" x1="0.15" y1="0" x2="0.85" y2="1">
+          <stop offset="0%" stopColor="#0A2ED6" />
+          <stop offset="100%" stopColor="#04198C" />
+        </linearGradient>
+
+        <linearGradient id="zpx-shine" x1="0" y1="0" x2="1" y2="0">
           <stop offset="0%" stopColor="#fff" stopOpacity="0" />
-          <stop offset="50%" stopColor="#fff" stopOpacity="0.55" />
+          <stop offset="50%" stopColor="#fff" stopOpacity="0.5" />
           <stop offset="100%" stopColor="#fff" stopOpacity="0" />
         </linearGradient>
 
-        <clipPath id="zp-clip">
-          <rect x="14" y="10" width="92" height="92" rx="22" />
+        {/* Clip the sweep to the two shapes so highlight never spills outside. */}
+        <clipPath id="zpx-clip">
+          <path d={slab} />
+          <circle cx={CX} cy={CY} r={R} />
         </clipPath>
 
-        <filter id="zp-soft" x="-40%" y="-40%" width="180%" height="180%">
-          <feGaussianBlur stdDeviation="3" />
+        {/* The circle's own area, used to tint the region it shares with the slab. */}
+        <clipPath id="zpx-circle-clip">
+          <circle cx={CX} cy={CY} r={R} />
+        </clipPath>
+
+        <filter id="zpx-shadow" x="-30%" y="-30%" width="160%" height="170%">
+          <feGaussianBlur stdDeviation="7" />
         </filter>
       </defs>
 
-      {/* Contact shadow on the ground plane. */}
-      <ellipse cx="60" cy="110" rx="34" ry="5" fill="#000" opacity="0.38" filter="url(#zp-soft)" />
+      {/* Ground contact shadow. */}
+      <ellipse cx="168" cy="262" rx="86" ry="13" fill="#000" opacity="0.34" filter="url(#zpx-shadow)" />
 
-      {/* Extruded body: stacked offsets fake the depth of the tile. */}
+      {/* --- extruded side walls, drawn before the faces --- */}
       <g>
-        <rect x="14" y="18" width="92" height="92" rx="22" fill="url(#zp-edge)" />
-        <rect x="14" y="15" width="92" height="92" rx="22" fill="url(#zp-edge)" opacity="0.85" />
-        <rect x="14" y="12.5" width="92" height="92" rx="22" fill="#B98400" />
+        <path d={slab} transform={`translate(0 ${DEPTH})`} fill="url(#zpx-yellow-edge)" />
+        <path d={slab} transform={`translate(0 ${DEPTH * 0.62})`} fill="url(#zpx-yellow-edge)" />
+        <path d={slab} transform={`translate(0 ${DEPTH * 0.3})`} fill="#B98400" />
+      </g>
+      <g>
+        <circle cx={CX} cy={CY + DEPTH} r={R} fill="url(#zpx-blue-edge)" />
+        <circle cx={CX} cy={CY + DEPTH * 0.62} r={R} fill="url(#zpx-blue-edge)" />
+        <circle cx={CX} cy={CY + DEPTH * 0.3} r={R} fill="#0722A0" />
       </g>
 
-      {/* Lit face. */}
-      <rect x="14" y="10" width="92" height="92" rx="22" fill="url(#zp-face)" />
+      {/* --- lit faces --- */}
+      <path d={slab} fill="url(#zpx-yellow)" />
 
-      {/* Inner top highlight — the glassy edge of a raised surface. */}
-      <rect
-        x="18"
-        y="14"
-        width="84"
-        height="84"
-        rx="19"
-        fill="none"
+      {/* Slab top highlight: a thin bright lip along the upper edge. */}
+      <path
+        d={`M${TL + RAD} ${TOP_Y + 2.5} L${TR - RAD} ${TOP_Y + 2.5}`}
         stroke="#fff"
         strokeOpacity="0.5"
-        strokeWidth="1.5"
+        strokeWidth="3"
+        strokeLinecap="round"
       />
 
-      {/* Brand glyph: the blue node and the descending ribbon. */}
-      <g>
-        <path
-          d="M45 34 h30 a6 6 0 0 1 5 9.3 L58 78 a6 6 0 0 1 -10.4 -6 L62 46 H45 a6 6 0 0 1 0 -12 z"
-          fill="#fff"
-          opacity="0.96"
-        />
-        <circle cx="47.5" cy="63" r="12.5" fill="url(#zp-dot)" />
-        <circle cx="43.5" cy="58.5" r="4" fill="#fff" opacity="0.4" />
+      <circle cx={CX} cy={CY} r={R} fill="url(#zpx-blue)" />
+
+      {/* Overlap region: circle ∩ slab, darker, exactly as in the artwork. */}
+      <g clipPath="url(#zpx-circle-clip)">
+        <path d={slab} fill="url(#zpx-overlap)" />
       </g>
 
-      {/* Specular sweep, clipped to the tile so it never spills. */}
-      <g clipPath="url(#zp-clip)">
-        <rect x="-70" y="0" width="46" height="120" fill="url(#zp-shine)" transform="skewX(-18)">
+      {/* Specular dot on the circle — sells the sphere. */}
+      <ellipse cx={CX - 21} cy={CY - 24} rx="17" ry="13" fill="#fff" opacity="0.22" transform={`rotate(-28 ${CX - 21} ${CY - 24})`} />
+
+      {/* Slow specular sweep across both shapes. */}
+      <g clipPath="url(#zpx-clip)">
+        <rect x="-140" y="0" width="80" height="350" fill="url(#zpx-shine)" transform="skewX(-22)">
           <animate
             attributeName="x"
-            values="-70;150"
-            dur="4.5s"
+            values="-140;420"
+            dur="4.8s"
             repeatCount="indefinite"
             calcMode="spline"
             keyTimes="0;1"
-            keySplines="0.4 0 0.2 1"
+            keySplines="0.42 0 0.25 1"
           />
         </rect>
       </g>
