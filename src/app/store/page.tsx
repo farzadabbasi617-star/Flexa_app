@@ -411,6 +411,10 @@ export default function StorePage() {
                 <StoreIcon name="box" className="h-5 w-5" />
                 <span className="hidden lg:inline">سفارش‌های من</span>
               </Link>
+              <Link href="/store/my-listings" className="inline-flex h-10 items-center gap-2 rounded-xl border border-white/10 bg-white/[.045] px-3 text-xs font-black text-gray-200 transition hover:border-violet-400/35 sm:h-11 sm:px-4" title="آگهی‌های من">
+                <StoreIcon name="store" className="h-5 w-5" />
+                <span className="hidden lg:inline">آگهی‌های من</span>
+              </Link>
               <Link href="/store/sell" className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-violet-600 px-3 text-xs font-black text-white shadow-[0_8px_24px_rgba(124,58,237,.28)] transition hover:bg-violet-500 sm:h-11 sm:px-4">
                 <StoreIcon name="plus" className="h-4 w-4" />
                 <span className="hidden min-[430px]:inline">ثبت آگهی</span>

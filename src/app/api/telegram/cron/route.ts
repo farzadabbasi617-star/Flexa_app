@@ -14,7 +14,7 @@ import { processClash1v1ReadyTimeouts, runClash1v1MatchmakingAndNotify } from ".
 import { CLASH_PRIVATE_DRAFT_CATEGORY } from "@/lib/clash-private-tournament";
 import { ensurePrivateTournamentAttendanceSchema, privateCheckInWindow } from "@/lib/private-tournament-attendance";
 import { decideClashVerdict } from "@/lib/clash-api-verdict";
-import { CLASH_1V1_CONFIG, expireClash1v1Challenges, finalizeMatchResult } from "@/lib/clash-1v1";
+import { CLASH_1V1_CONFIG, expireClash1v1Challenges, expireStaleClash1v1QueueEntries, finalizeMatchResult } from "@/lib/clash-1v1";
 import { clashBattleMatchesExpectedMode, isClashDuelGameMode } from "@/lib/clash-duel-policy";
 import { getClashRoyaleApiConfiguration, normalizeClashRoyaleTag, verifyClashRoyaleHeadToHead } from "@/lib/clash-royale-api";
 import { processStoreOrderDeadlines } from "@/lib/store-service";
@@ -895,6 +895,7 @@ export async function GET(request: NextRequest) {
   const clash1v1Matchmaking = await safeCronStep("clash1v1Matchmaking", runClash1v1MatchmakingAndNotify);
   const clash1v1ReadyTimeouts = await safeCronStep("clash1v1ReadyTimeouts", () => processClash1v1ReadyTimeouts(10));
   const clash1v1ExpiredChallenges = await safeCronStep("clash1v1ExpiredChallenges", expireClash1v1Challenges);
+  const clash1v1StaleQueue = await safeCronStep("clash1v1StaleQueue", () => expireStaleClash1v1QueueEntries());
   const clash1v1ApiVerification = await safeCronStep("clash1v1ApiVerification", verifyPendingClash1v1Results);
   const matchAssigned = await safeCronStep("matchAssigned", sendMatchAssignmentNotifications);
   const matchScheduled = await safeCronStep("matchScheduled", sendMatchScheduleNotifications);
@@ -929,6 +930,7 @@ export async function GET(request: NextRequest) {
     clash1v1Matchmaking,
     clash1v1ReadyTimeouts,
     clash1v1ExpiredChallenges,
+    clash1v1StaleQueue,
     clash1v1ApiVerification,
     matchAssigned,
     matchScheduled,
