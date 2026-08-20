@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Navbar from "@/components/Navbar";
 import KycReviewCard, { type KycReviewRow } from "@/components/admin/KycReviewCard";
+import OfficialListingForm from "@/components/admin/OfficialListingForm";
 
 type Tab = "kyc" | "listings" | "orders" | "reports" | "rates" | "featured";
 
@@ -235,7 +236,17 @@ export default function AdminStorePage() {
                 <KycReviewCard key={k.id} row={k} onReview={reviewKyc} />
               )))}
 
-              {tab === "listings" && (listings.length === 0 ? <Empty /> : listings.map((l) => (
+              {/* The pending queue only ever holds seller submissions, so without
+                  this the admin has no way to put a product in the store at all. */}
+              {tab === "listings" && (
+                <OfficialListingForm onCreated={(m) => { setMsg(m); load(); }} />
+              )}
+
+              {tab === "listings" && (listings.length === 0 ? (
+                <div className="rounded-3xl border border-white/10 bg-white/[0.03] py-8 text-center text-sm text-gray-400">
+                  آگهی در انتظار تأییدی وجود ندارد.
+                </div>
+              ) : listings.map((l) => (
                 <div key={l.id} className="rounded-3xl border border-white/10 bg-white/[0.04] p-4">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">

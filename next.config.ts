@@ -44,6 +44,17 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
 
+  // Emits .next/standalone: a self-contained server bundle with only the
+  // node_modules it actually imports, so the VPS can run `node server.js`
+  // without installing the full dependency tree (~1GB -> ~150MB) and without
+  // Render's build pipeline.
+  //
+  // Opt-in rather than always-on. Render currently starts the app with
+  // `next start`, which reads .next/ directly; flipping output globally is a
+  // change to how the live service boots, and this is not the deploy to find
+  // that out on. Set NEXT_OUTPUT_STANDALONE=true on the VPS build only.
+  ...(process.env.NEXT_OUTPUT_STANDALONE === "true" ? { output: "standalone" as const } : {}),
+
   // Heavy, Node-only image/QR libraries used exclusively by the Telegram
   // webhook (server-side). Marking them external keeps webpack from pulling
   // their large module graphs into the server bundle during `next build`,
