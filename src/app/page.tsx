@@ -6,6 +6,7 @@ import HeroScene from "@/components/fx/HeroScene";
 import TiltCard from "@/components/fx/TiltCard";
 import Reveal from "@/components/fx/Reveal";
 import MagneticButton from "@/components/fx/MagneticButton";
+import TrustBadges from "@/components/trust/TrustBadges";
 import { SITE_URL } from "@/lib/seo";
 import { db } from "@/db";
 import { siteImages, tournaments, registrations } from "@/db/schema";
@@ -460,6 +461,14 @@ export default async function LuxuryHomePage() {
             <DailyQuests />
           </Reveal>
         </section>
+
+        {/* Licence + payment gateway. Both existed already but were invisible:
+            a small footer seal, and no mention of ZarinPal anywhere. */}
+        <Reveal>
+          <section className="mb-10 sm:mb-14">
+            <TrustBadges />
+          </section>
+        </Reveal>
       </div>
 
       <BottomNav />
