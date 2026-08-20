@@ -935,32 +935,9 @@ function BracketMatch({
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [uploadingEvidence, setUploadingEvidence] = useState(false);
 
   const canSubmit = Boolean((ownedPlayerId || isAdmin) && match.player1Id && match.player2Id && match.status !== "completed");
   const canDispute = Boolean(ownedPlayerId && match.player1Id && match.player2Id && match.status !== "pending");
-
-  async function uploadEvidenceFile(file: File | null) {
-    if (!file) return;
-    setUploadingEvidence(true);
-    setError("");
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/uploads/evidence", {
-        method: "POST",
-        headers: { "X-Requested-With": "XMLHttpRequest" },
-        body: formData,
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "آپلود مدرک انجام نشد");
-      setEvidenceUrl(data.url);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "آپلود مدرک انجام نشد");
-    } finally {
-      setUploadingEvidence(false);
-    }
-  }
 
   async function submitResult() {
     setSubmitting(true);
@@ -1067,20 +1044,26 @@ function BracketMatch({
           </div>
           {!isAdmin && (
             <>
+              {/* Screenshots go through the bot: Telegram stores the file and we
+                  keep only its file_id, so the site never accepts an upload or
+                  carries the image bytes. */}
               <div className="rounded-xl bg-dark-800 border border-white/5 p-3">
-                <label className="block text-[11px] text-gray-400 mb-2">آپلود مدرک نتیجه</label>
-                <input
-                  type="file"
-                  accept="image/*,video/*"
-                  disabled={uploadingEvidence}
-                  onChange={(e) => uploadEvidenceFile(e.target.files?.[0] || null)}
-                  className="text-[11px] text-gray-400 file:me-2 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-purple-600 file:text-white file:font-bold disabled:opacity-50"
-                />
-                {uploadingEvidence && <p className="text-[10px] text-neon-blue mt-2">در حال آپلود...</p>}
+                <label className="block text-[11px] text-gray-400 mb-2">ارسال مدرک نتیجه</label>
+                <a
+                  href={botDeepLink(`ev_${match.id}`, process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 rounded-lg bg-[#229ED9] px-3 py-2 text-[11px] font-bold text-white transition hover:bg-[#1c8bc0]"
+                >
+                  📎 ارسال اسکرین‌شات در تلگرام
+                </a>
+                <p className="mt-2 text-[10px] leading-4 text-gray-500">
+                  ربات باز می‌شود و عکس را همان‌جا بفرست. مدرک داخل تلگرام می‌ماند و فقط داور می‌بیندش.
+                </p>
               </div>
               <input
                 className="gaming-input text-xs"
-                placeholder="یا لینک مستقیم مدرک نتیجه"
+                placeholder="یا لینک مستقیم مدرک نتیجه (اختیاری)"
                 value={evidenceUrl}
                 onChange={(e) => setEvidenceUrl(e.target.value)}
               />

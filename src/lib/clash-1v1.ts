@@ -120,6 +120,84 @@ export async function ensureClash1v1Schema(client: any = db) {
   return createClash1v1Schema(client);
 }
 
+/**
+ * How long a player may sit in the matchmaking queue before we give up.
+ *
+ * Production had two entries queued since 21 July -- a month -- because
+ * expireClash1v1Challenges only expires *challenges*, never queue *entries*.
+ * Those two happened to be free, so no money was trapped, but a paid entry in
+ * the same state would have held the player's 50,000 تومان indefinitely.
+ */
+const QUEUE_TIMEOUT_MS = 6 * 60 * 60 * 1000;
+
+/**
+ * Cancel queue entries nobody was ever matched with, refunding paid ones.
+ *
+ * The refund reuses the referenceId-keyed insert used by the admin refund path,
+ * so a retry of this sweep cannot pay a player twice.
+ */
+export async function expireStaleClash1v1QueueEntries(now = new Date()) {
+  await ensureClash1v1Schema();
+  const cutoff = new Date(now.getTime() - QUEUE_TIMEOUT_MS);
+
+  const stale = await db
+    .select()
+    .from(clash1v1Entries)
+    .where(and(
+      inArray(clash1v1Entries.status, ["waiting_qr", "queued"]),
+      lte(clash1v1Entries.createdAt, cutoff),
+    ))
+    .limit(50);
+
+  let cancelled = 0;
+  let refundedPlayers = 0;
+  let refundedRial = BigInt(0);
+
+  for (const entry of stale) {
+    await db.transaction(async (tx) => {
+      // Re-read under the transaction: matchmaking may have paired this entry
+      // between our scan and now, and cancelling a matched entry would strand
+      // the opponent.
+      const [fresh] = await tx.select().from(clash1v1Entries)
+        .where(eq(clash1v1Entries.id, entry.id)).limit(1);
+      if (!fresh || !["waiting_qr", "queued"].includes(fresh.status)) return;
+
+      const amount = BigInt(fresh.entryFeeRial || "0");
+      if (amount > BigInt(0)) {
+        const referenceId = `clash1v1-queue-timeout-${fresh.id}`;
+        const [existing] = await tx.select({ id: transactions.id }).from(transactions)
+          .where(eq(transactions.referenceId, referenceId)).limit(1);
+        if (!existing) {
+          let [wallet] = await tx.select().from(wallets).where(eq(wallets.userId, fresh.userId)).limit(1);
+          if (!wallet) [wallet] = await tx.insert(wallets)
+            .values({ userId: fresh.userId, balance: "0", currency: "RIAL" }).returning();
+          const [locked] = await tx.select().from(wallets).where(eq(wallets.id, wallet.id)).for("update").limit(1);
+          await tx.update(wallets)
+            .set({ balance: (BigInt(locked.balance || "0") + amount).toString(), updatedAt: new Date() })
+            .where(eq(wallets.id, wallet.id));
+          await tx.insert(transactions).values({
+            walletId: wallet.id,
+            amount: amount.toString(),
+            type: "refund",
+            status: "completed",
+            referenceId,
+            metadata: { kind: "clash_1v1_queue_timeout", entryId: fresh.id, userId: fresh.userId },
+          });
+          refundedPlayers += 1;
+          refundedRial += amount;
+        }
+      }
+
+      await tx.update(clash1v1Entries)
+        .set({ status: "cancelled", cancelledAt: new Date(), updatedAt: new Date() })
+        .where(and(eq(clash1v1Entries.id, fresh.id), eq(clash1v1Entries.status, fresh.status)));
+      cancelled += 1;
+    });
+  }
+
+  return { cancelled, refundedPlayers, refundedRial: refundedRial.toString() };
+}
+
 export async function expireClash1v1Challenges() {
   await ensureClash1v1Schema();
   const expired = await db

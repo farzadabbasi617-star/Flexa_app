@@ -387,6 +387,24 @@ async function handleStartPayload(chatId: number, telegramId: string, user: Tele
     return true;
   }
 
+  // Match-evidence deep link from the website. Screenshots live in Telegram's
+  // own file storage and we keep only the file_id, so the site never has to
+  // accept, store or serve an image upload for this.
+  const evidenceMatchId = payload.match(/^ev_([0-9a-f-]{36})$/i)?.[1];
+  if (evidenceMatchId) {
+    const linked = await getLinkedUserByTelegram(telegramId);
+    if (!linked?.userId) {
+      await sendMessage(
+        chatId,
+        "برای ارسال مدرک، اول باید حساب تلگرامت را به Gament وصل کنی.",
+        { inline_keyboard: [[{ text: "اتصال حساب", callback_data: "menu:link" }]] },
+      );
+      return true;
+    }
+    await startEvidenceUpload(chatId, telegramId, evidenceMatchId);
+    return true;
+  }
+
   const qrTournamentId = payload.match(/^qr_([0-9a-f-]{36})$/i)?.[1];
   if (qrTournamentId) {
     // Legacy deep-link path. The system 1V1 queue is a single global product,
