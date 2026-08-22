@@ -2,8 +2,20 @@ name: Telegram automation cron
 
 on:
   schedule:
-    # GitHub scheduled workflows have a five-minute minimum interval.
-    - cron: "*/5 * * * *"
+    # Every 30 minutes, NOT every 5.
+    #
+    # Neon suspends an idle compute after 5 minutes (scale to zero). A cron on
+    # a 5-minute interval lands exactly on that boundary, so the database was
+    # re-woken the moment before it could sleep and stayed up ~82% of the month
+    # (435 active hours out of 527 elapsed). That burned the free plan's
+    # 100 CU-hour allowance by 22 August and suspended the whole project:
+    # site down, no logins, no payments.
+    #
+    # At 30 minutes the compute genuinely sleeps between runs, which drops
+    # usage to roughly 25-35 hours a month. Nothing in this job needs
+    # 5-minute precision -- the tightest consumer is tournament reminders,
+    # which are hour-scale.
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 permissions:

@@ -80,6 +80,38 @@ async function cleanupClassifiedAds() {
   return cleanupOldClassifiedAds();
 }
 
+/**
+ * COD room reminder bucket. Same widening as the tournament one: the old
+ * windows were 10 and 20 minutes wide, which a 30-minute cron would step
+ * straight over.
+ */
+export function codRoomReminderBucket(minutes: number): 0 | 15 | 60 {
+  if (minutes <= 0) return 0;
+  if (minutes <= 30) return 15;
+  if (minutes <= 75) return 60;
+  return 0;
+}
+
+/**
+ * Which reminder a tournament is due for, given minutes until it starts.
+ *
+ * The buckets have to be at least as wide as the cron interval or they get
+ * skipped entirely: a run only sees one instant, so a 17-minute-wide window
+ * checked every 30 minutes is a coin flip. The old windows (0-16, 17-35)
+ * were sized for the 5-minute schedule and would have silently stopped
+ * firing the 15- and 30-minute reminders once the cron moved to 30 minutes.
+ *
+ * Dedupe is by bucket key, so overlapping windows still send each reminder
+ * exactly once -- widening them costs nothing.
+ */
+export function tournamentReminderBucket(minutes: number): 0 | 15 | 30 | 60 | 1440 {
+  if (minutes < 0) return 0;
+  if (minutes <= 30) return 15;
+  if (minutes <= 75) return 60;
+  if (minutes <= 24 * 60 + 35) return 1440;
+  return 0;
+}
+
 async function sendReminders() {
   const now = Date.now();
   const futureLimit = new Date(now + 24 * 60 * 60 * 1000 + 5 * 60 * 1000);
@@ -91,7 +123,7 @@ async function sendReminders() {
     const startTime = new Date(tournament.startDate).getTime();
     if (!Number.isFinite(startTime) || startTime < now || startTime > futureLimit.getTime()) continue;
     const minutes = Math.round((startTime - now) / 60000);
-    const bucket = minutes <= 16 ? 15 : minutes <= 35 ? 30 : minutes <= 65 ? 60 : minutes <= 24 * 60 + 5 ? 1440 : 0;
+    const bucket = tournamentReminderBucket(minutes);
     if (!bucket) continue;
 
     const recipients = await tournamentRecipients(tournament.id);
@@ -126,7 +158,7 @@ async function sendAppTournamentReminders() {
     const startTime = new Date(tournament.startDate).getTime();
     if (!Number.isFinite(startTime) || startTime < now || startTime > futureLimit.getTime()) continue;
     const minutes = Math.round((startTime - now) / 60000);
-    const bucket = minutes <= 16 ? 15 : minutes <= 35 ? 30 : minutes <= 65 ? 60 : minutes <= 24 * 60 + 5 ? 1440 : 0;
+    const bucket = tournamentReminderBucket(minutes);
     if (!bucket) continue;
 
     const recipients = await db.select({ userId: registrations.visibleUserId, checkedInAt: registrations.checkedInAt }).from(registrations).where(eq(registrations.tournamentId, tournament.id));
@@ -212,7 +244,7 @@ async function sendCodRoomNotices() {
       .innerJoin(telegramAccounts, eq(codRoomEntries.userId, telegramAccounts.userId))
       .where(eq(codRoomEntries.roomId, room.id));
     const minutes = Math.round((room.startsAt.getTime() - now) / 60_000);
-    const reminderBucket = minutes > 45 && minutes <= 65 ? 60 : minutes > 8 && minutes <= 18 ? 15 : 0;
+    const reminderBucket = codRoomReminderBucket(minutes);
     const revealReady = Boolean(room.credentialsRevealAt && room.credentialsRevealAt.getTime() <= now);
     for (const recipient of recipients) {
       if (reminderBucket) {
@@ -256,7 +288,7 @@ async function sendAppCodRoomReminders() {
   let sent = 0;
   for (const room of rooms) {
     const minutes = Math.round((room.startsAt.getTime() - now) / 60_000);
-    const reminderBucket = minutes > 45 && minutes <= 65 ? 60 : minutes > 8 && minutes <= 18 ? 15 : 0;
+    const reminderBucket = codRoomReminderBucket(minutes);
     if (!reminderBucket) continue;
     const recipients = await db.select({ userId: codRoomEntries.userId, checkedInAt: codRoomEntries.checkedInAt }).from(codRoomEntries).where(eq(codRoomEntries.roomId, room.id));
     for (const recipient of recipients) {
