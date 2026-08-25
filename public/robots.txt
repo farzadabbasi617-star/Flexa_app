@@ -1,9 +1,29 @@
 User-agent: *
 Allow: /
+
+# Internal APIs, administration, authentication and account-only screens
 Disallow: /api/
 Disallow: /admin/
+Disallow: /dashboard
+Disallow: /forgot-password
+Disallow: /login
+Disallow: /notifications
+Disallow: /payment/
+Disallow: /profile/
+Disallow: /referrals
+Disallow: /register
+Disallow: /settings
+Disallow: /wallet
 
-User-agent: Googlebot
-Allow: /
+# Private commerce and tournament operations
+Disallow: /store/my-listings
+Disallow: /store/orders
+Disallow: /tournaments/create
+Disallow: /tournaments/*/lobby
+
+# Never crawl URLs that may contain credentials or one-time secrets
+Disallow: /*?*token=
+Disallow: /*?*code=
+Disallow: /*?*password=
 
 Sitemap: https://www.gament1.ir/sitemap.xml

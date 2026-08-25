@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { createPageMetadata, SITE_URL } from "@/lib/seo";
+import { createPageMetadata, serializeJsonLd, SITE_URL } from "@/lib/seo";
 
 export const metadata = createPageMetadata({
   title: "سوالات متداول گیمنت",
@@ -45,7 +45,7 @@ export default function Layout({ children }: { children: ReactNode }) {
     <>
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }}
+        dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }}
       />
       {children}
     </>

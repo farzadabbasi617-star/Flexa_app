@@ -7,7 +7,7 @@ import { UnreadNotificationsProvider } from "@/contexts/UnreadNotificationsConte
 import { QueryProvider } from "@/components/QueryProvider";
 import { LayoutWrapper } from "@/components/LayoutWrapper";
 import BrandFooter from "@/components/BrandFooter";
-import { SITE_NAME, SITE_URL, absoluteUrl, SOCIAL_LINKS, CONTACT_EMAIL } from "@/lib/seo";
+import { SITE_NAME, SITE_URL, absoluteUrl, serializeJsonLd, SOCIAL_LINKS, CONTACT_EMAIL } from "@/lib/seo";
 import Script from "next/script";
 
 export const viewport: Viewport = {
@@ -171,7 +171,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <link rel="icon" href="/icons/gament-icon-192.png" />
         <script
           type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }}
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(structuredData) }}
         />
         {/* Load Telegram WebApp Javascript library securely */}
         <script src="https://telegram.org/js/telegram-web-app.js" async></script>

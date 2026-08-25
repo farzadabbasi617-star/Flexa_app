@@ -1,6 +1,6 @@
 import Link from "next/link";
 import BottomNav from "@/components/BottomNav";
-import { SITE_URL } from "@/lib/seo";
+import { serializeJsonLd, SITE_URL } from "@/lib/seo";
 
 // Real FAQ used both for the on-page accordion and the FAQPage rich-result schema.
 const faqs = [
@@ -78,8 +78,8 @@ export default function ProfileDescriptionsPage() {
 
   return (
     <div className="min-h-screen bg-[#050508] text-white relative overflow-x-hidden">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_-10%,_rgba(92,0,160,.68)_0%,_rgba(32,0,56,.42)_34%,_transparent_72%)]" />
         <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-purple-700/20 blur-[80px]" />

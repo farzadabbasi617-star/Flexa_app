@@ -3,8 +3,16 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
-import { createPageMetadata, SITE_URL } from "@/lib/seo";
+import { createPageMetadata, serializeJsonLd, SITE_URL } from "@/lib/seo";
 import { gameLandings, getGameLanding } from "@/lib/game-landing";
+import { PROGRAMMATIC_SEO_PAGES, programmaticPath } from "@/lib/programmatic-seo";
+
+const CLUSTER_LABELS = {
+  tournaments: "مسابقات و نتایج",
+  store: "فروشگاه",
+  guides: "راهنما",
+  leaderboards: "رتبه‌بندی",
+} as const;
 
 export function generateStaticParams() {
   return gameLandings.map((game) => ({ slug: game.slug }));
@@ -37,6 +45,7 @@ export default async function GameLandingPage({ params }: { params: Promise<{ sl
 
   if (!game) notFound();
 
+  const specialistPages = PROGRAMMATIC_SEO_PAGES.filter((page) => page.gameSlug === game.slug);
   const tournamentUrl = game.gameId === "cod_mobile" ? "/cod-arena" : `/tournaments?game=${game.gameId}`;
   const pageUrl = `${SITE_URL}/games/${game.slug}`;
   const faqJsonLd = {
@@ -60,8 +69,8 @@ export default async function GameLandingPage({ params }: { params: Promise<{ sl
 
   return (
     <div className="min-h-screen bg-[#050508] text-white overflow-x-hidden">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(faqJsonLd) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(faqJsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: serializeJsonLd(breadcrumbJsonLd) }} />
       <Navbar />
 
       <main className="pb-28">
@@ -133,6 +142,28 @@ export default async function GameLandingPage({ params }: { params: Promise<{ sl
               </div>
             </section>
           </div>
+
+          <section className="mt-12 text-right" aria-labelledby="specialist-pages-title">
+            <div className="mb-5">
+              <span className="text-[10px] font-black tracking-[.2em] text-purple-300">EXPLORE</span>
+              <h2 id="specialist-pages-title" className="mt-1 text-2xl font-black">مسیرهای تخصصی {game.title}</h2>
+              <p className="mt-2 text-sm leading-7 text-gray-400">
+                مسابقات و نتایج، محصولات فعال، راهنماهای عملی و رتبه‌بندی‌های داده‌محور این بازی را از یکجا دنبال کن.
+              </p>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {specialistPages.map((specialistPage) => (
+                <Link
+                  key={programmaticPath(specialistPage)}
+                  href={programmaticPath(specialistPage)}
+                  className="rounded-2xl border border-white/[.07] bg-white/[.025] p-4 transition hover:-translate-y-0.5 hover:border-purple-300/25 hover:bg-white/[.045]"
+                >
+                  <span className="text-[10px] font-black text-purple-300">{CLUSTER_LABELS[specialistPage.cluster]}</span>
+                  <h3 className="mt-2 text-sm font-black leading-7">{specialistPage.label}</h3>
+                </Link>
+              ))}
+            </div>
+          </section>
 
           <section className="mt-12 gaming-card rounded-3xl p-6 sm:p-8 text-right border border-purple-500/20">
             <h2 className="text-2xl font-black mb-3">برای رقابت آماده‌ای؟</h2>

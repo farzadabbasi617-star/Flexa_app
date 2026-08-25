@@ -33,8 +33,6 @@ interface HonorDetail {
   likedByMe?: boolean;
 }
 
-const SITE_URL = "https://www.gament1.ir";
-
 const GAME_LABELS: Record<string, string> = {
   clash_royale: "کلش رویال",
   cod_mobile: "کالاف موبایل",
@@ -46,59 +44,6 @@ const GAME_ICONS: Record<string, string> = {
   cod_mobile: "/icons/icon-cod_mobile.png",
   fortnite: "/icons/icon-fortnite.png",
 };
-
-
-function absoluteUrl(path?: string) {
-  if (!path) return SITE_URL;
-  if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
-}
-
-function newsArticleJsonLd(honor: HonorDetail) {
-  const description = (honor.summary || honor.description || "").replace(/\s+/g, " ").slice(0, 240);
-  return {
-    "@context": "https://schema.org",
-    "@type": honor.type === "news" ? "NewsArticle" : "Article",
-    headline: honor.title,
-    description,
-    image: honor.image ? [absoluteUrl(honor.image)] : undefined,
-    datePublished: honor.publishedAt || undefined,
-    dateModified: honor.publishedAt || undefined,
-    inLanguage: "fa-IR",
-    mainEntityOfPage: {
-      "@type": "WebPage",
-      "@id": absoluteUrl(`/honors/${honor.id}`),
-    },
-    author: {
-      "@type": "Organization",
-      name: "Gament",
-      url: SITE_URL,
-    },
-    publisher: {
-      "@type": "Organization",
-      name: "Gament",
-      url: SITE_URL,
-      logo: {
-        "@type": "ImageObject",
-        url: absoluteUrl("/icons/gament-icon-192.png"),
-      },
-    },
-    keywords: honor.seoKeywords?.join(", "),
-    articleSection: honor.game ? GAME_LABELS[honor.game] || honor.game : "گیمینگ",
-  };
-}
-
-function breadcrumbJsonLd(honor: HonorDetail) {
-  return {
-    "@context": "https://schema.org",
-    "@type": "BreadcrumbList",
-    itemListElement: [
-      { "@type": "ListItem", position: 1, name: "خانه", item: SITE_URL },
-      { "@type": "ListItem", position: 2, name: "تالار افتخارات", item: absoluteUrl("/honors") },
-      { "@type": "ListItem", position: 3, name: honor.title, item: absoluteUrl(`/honors/${honor.id}`) },
-    ],
-  };
-}
 
 function linkifyText(text: string) {
   const parts = text.split(/(https?:\/\/[^\s)]+|store\.supercell\.com[^\s)]*)/gi);
@@ -249,9 +194,6 @@ export default function HonorDetailPage({ params }: { params: Promise<{ id: stri
 
   return (
     <main className={`${styles.page} min-h-[100dvh] pb-28 text-white`} dir="rtl">
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(newsArticleJsonLd(honor)) }} />
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbJsonLd(honor)) }} />
-
       <header className="relative z-40 border-b border-white/[.07] bg-[#08090e]/82 backdrop-blur-2xl">
         <div className="mx-auto flex h-18 max-w-7xl items-center gap-3 px-4 sm:px-6">
           <Link href="/honors" className="flex items-center gap-2.5">

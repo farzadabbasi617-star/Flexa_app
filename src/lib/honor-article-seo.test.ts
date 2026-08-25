@@ -5,6 +5,9 @@ const BASE = "https://www.gament1.ir";
 
 const article: HonorArticleSeo = {
   id: "04e5bbdf-b2c7-4e38-a054-28600fd30882",
+  type: "news",
+  status: "approved",
+  source: "manual",
   title: "لیل تکا به عنوان آیکون فصل ۱۵ فورت نایت فستیوال معرفی شد",
   summary: "لیل تکا با صدای منحصربفردش به فورت نایت فستیوال می‌آید.",
   description: "پاراگراف اول خبر.\n\nپاراگراف دوم خبر.\n\nپاراگراف سوم.",
@@ -12,7 +15,10 @@ const article: HonorArticleSeo = {
   imageUrl: "https://cdn.example.com/a.jpg",
   imageAlt: "لیل تکا",
   publishedAt: new Date("2026-07-30T12:00:00.000Z"),
+  createdAt: new Date("2026-07-30T12:00:00.000Z"),
+  updatedAt: new Date("2026-07-30T12:00:00.000Z"),
   sources: [{ url: "https://www.epicgames.com/news/x" }],
+  seoKeywords: ["فورتنایت"],
   readTimeMinutes: 3,
 };
 

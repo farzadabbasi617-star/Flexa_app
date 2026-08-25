@@ -41,6 +41,25 @@ const securityHeaders = [
   },
 ];
 
+const privateNoIndexSources = [
+  "/api/:path*",
+  "/admin/:path*",
+  "/dashboard/:path*",
+  "/forgot-password/:path*",
+  "/login/:path*",
+  "/notifications/:path*",
+  "/payment/:path*",
+  "/profile/:path*",
+  "/referrals/:path*",
+  "/register/:path*",
+  "/settings/:path*",
+  "/wallet/:path*",
+  "/store/my-listings/:path*",
+  "/store/orders/:path*",
+  "/tournaments/create/:path*",
+  "/tournaments/:id/lobby/:path*",
+];
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
 
@@ -119,6 +138,10 @@ const nextConfig: NextConfig = {
         source: "/:path*",
         headers: securityHeaders,
       },
+      ...privateNoIndexSources.map((source) => ({
+        source,
+        headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow, noarchive" }],
+      })),
       // Next.js automatically serves hashed /_next/static assets as immutable;
       // overriding that Cache-Control header causes framework warnings and can
       // break development caching, so only the global security headers apply.

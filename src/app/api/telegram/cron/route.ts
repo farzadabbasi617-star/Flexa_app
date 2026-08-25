@@ -24,6 +24,7 @@ import { ensureCodArenaSchema } from "@/lib/cod-room-service";
 import { advanceCodRoomLifecycle } from "@/lib/cod-room-lifecycle";
 import { reconcilePendingDeposits } from "@/lib/deposit-reconciliation";
 import { getTelegramAdminIdsFromEnv } from "@/lib/telegram-admin-ids";
+import { codRoomReminderBucket, tournamentReminderBucket } from "@/lib/reminder-buckets";
 
 export const dynamic = "force-dynamic";
 
@@ -78,38 +79,6 @@ async function cleanupClassifiedAds() {
   if (maxAgeDays <= 0) return { deleted: 0, reason: "disabled" };
   const { cleanupOldClassifiedAds } = await import("@/lib/classified-scraper");
   return cleanupOldClassifiedAds();
-}
-
-/**
- * COD room reminder bucket. Same widening as the tournament one: the old
- * windows were 10 and 20 minutes wide, which a 30-minute cron would step
- * straight over.
- */
-export function codRoomReminderBucket(minutes: number): 0 | 15 | 60 {
-  if (minutes <= 0) return 0;
-  if (minutes <= 30) return 15;
-  if (minutes <= 75) return 60;
-  return 0;
-}
-
-/**
- * Which reminder a tournament is due for, given minutes until it starts.
- *
- * The buckets have to be at least as wide as the cron interval or they get
- * skipped entirely: a run only sees one instant, so a 17-minute-wide window
- * checked every 30 minutes is a coin flip. The old windows (0-16, 17-35)
- * were sized for the 5-minute schedule and would have silently stopped
- * firing the 15- and 30-minute reminders once the cron moved to 30 minutes.
- *
- * Dedupe is by bucket key, so overlapping windows still send each reminder
- * exactly once -- widening them costs nothing.
- */
-export function tournamentReminderBucket(minutes: number): 0 | 15 | 30 | 60 | 1440 {
-  if (minutes < 0) return 0;
-  if (minutes <= 30) return 15;
-  if (minutes <= 75) return 60;
-  if (minutes <= 24 * 60 + 35) return 1440;
-  return 0;
 }
 
 async function sendReminders() {

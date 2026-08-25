@@ -15,6 +15,13 @@ import { expect, test } from "@playwright/test";
 
 const NAV = ".site-bottom-nav";
 const PAGES = ["/", "/store", "/leaderboard", "/honors"];
+
+// This suite measures layout geometry, not the first-visit splash animation.
+// Mark the splash as seen before each navigation so elementsFromPoint probes the
+// actual page instead of seeing content stacked behind the temporary overlay.
+test.beforeEach(async ({ page }) => {
+  await page.addInitScript(() => sessionStorage.setItem("gament_splash_seen", "1"));
+});
 const WIDTHS = [
   { name: "desktop", width: 1920, height: 1080 },
   { name: "laptop", width: 1280, height: 800 },
@@ -62,9 +69,14 @@ for (const viewport of WIDTHS) {
         await page.goto(path);
         await page.locator(NAV).waitFor();
 
-        // Scroll to the very end — the worst case for a fixed bottom bar.
-        await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+        // Client-fetched cards can increase the document height just after the
+        // first paint. Let that settle, then scroll twice so the probe really
+        // runs at the final page end rather than at an obsolete scroll maximum.
         await page.waitForTimeout(600);
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+          await page.waitForTimeout(350);
+        }
 
         const covered = await page.evaluate((navSelector) => {
           const nav = document.querySelector(navSelector);

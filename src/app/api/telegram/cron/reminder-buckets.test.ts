@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { codRoomReminderBucket, tournamentReminderBucket } from "./route";
+import { codRoomReminderBucket, tournamentReminderBucket } from "@/lib/reminder-buckets";
 
 /**
  * The cron moved from every 5 minutes to every 30 (Neon's free compute

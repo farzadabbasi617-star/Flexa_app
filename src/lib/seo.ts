@@ -6,7 +6,7 @@ export const DEFAULT_OG_IMAGE = "/icons/gament-icon-192.png";
 
 const RAW_SOCIAL_LINKS: string[] = [];
 export const SOCIAL_LINKS: string[] = RAW_SOCIAL_LINKS.filter(
-  (u) => u && !u.includes("your_")
+  (url) => url && !url.includes("your_")
 );
 export const CONTACT_EMAIL = "support@gament1.ir";
 
@@ -15,41 +15,108 @@ export function absoluteUrl(path = "/") {
   return `${SITE_URL}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+/**
+ * Keywords are not a Google ranking lever, but Next still supports the metadata
+ * field and some secondary engines consume it. Keep it compact and relevant;
+ * injecting the old 50-keyword list into every URL made unrelated pages look
+ * identical and keyword-stuffed.
+ */
 export const GLOBAL_KEYWORDS = [
-  "گیمنت","gament","gament1","Gament","گیمنت اسپورت",
-  "تورنومنت","تورنومنت آنلاین","مسابقات بازی آنلاین","مسابقات گیمینگ","تورنومنت گیمینگ ایران",
-  "تورنومنت کالاف دیوتی موبایل","تورنومنت کالاف موبایل","مسابقات کالاف دیوتی موبایل","COD Mobile tournament",
-  "خرید CP کالاف موبایل","فروش CP کالاف موبایل","خرید سی پی","فروش سی پی",
-  "خرید اکانت کالاف دیوتی موبایل","فروش اکانت کالاف موبایل",
-  "تورنومنت فورتنایت","مسابقات فورتنایت","Fortnite tournament",
-  "خرید V-Bucks فورتنایت","فروش وی باک","خرید وی باک","vbucks ارزان",
-  "خرید اکانت فورتنایت","فروش اکانت فورتنایت","اکانت فول اسکین فورتنایت",
-  "تورنومنت کلش رویال","مسابقات کلش رویال","Clash Royale tournament",
-  "خرید جم کلش رویال","فروش جم کلش رویال","خرید جم","فروش جم",
-  "خرید اکانت کلش رویال","فروش اکانت کلش رویال","اکانت کلش رویال ماکس",
-  "خرید اکانت PS4","فروش اکانت PS4","خرید اکانت PS5","فروش اکانت PS5",
-  "اکانت پلی استیشن","خرید بازی PS4","خرید بازی PS5","فروش بازی پلی استیشن",
-  "خرید اکانت بازی","فروش اکانت بازی","فروشگاه اکانت بازی","خرید و فروش اکانت",
-  "خرید اسکین","فروش اسکین","خرید گان","ارز داخل بازی",
-  "داوری هوشمند بازی","لیگ گیمینگ ایران","گیمینگ ایران",
+  "گیمنت",
+  "Gament",
+  "تورنومنت گیمینگ",
+  "مسابقات بازی آنلاین",
+  "فروشگاه امن بازی",
 ];
 
+export function cleanSeoText(value: unknown, maxLength = 180) {
+  return String(value || "")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength);
+}
+
+export function uniqueKeywords(values: Array<string | null | undefined>, max = 14) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const cleaned = cleanSeoText(value, 70);
+    if (!cleaned) continue;
+    const key = cleaned.toLocaleLowerCase("fa-IR");
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(cleaned);
+    if (result.length >= max) break;
+  }
+  return result;
+}
+
+/** Escape characters that can terminate a JSON-LD script element. */
+export function serializeJsonLd(value: unknown) {
+  return JSON.stringify(value)
+    .replace(/</g, "\\u003c")
+    .replace(/>/g, "\\u003e")
+    .replace(/&/g, "\\u0026")
+    .replace(/\u2028/g, "\\u2028")
+    .replace(/\u2029/g, "\\u2029");
+}
+
 export function createPageMetadata({
-  title, description, path, keywords = [], image = DEFAULT_OG_IMAGE, noIndex = false,
+  title,
+  description,
+  path,
+  keywords = [],
+  image = DEFAULT_OG_IMAGE,
+  noIndex = false,
 }: {
-  title: string; description: string; path: string;
-  keywords?: string[]; image?: string; noIndex?: boolean;
+  title: string;
+  description: string;
+  path: string;
+  keywords?: string[];
+  image?: string;
+  noIndex?: boolean;
 }): Metadata {
   const url = absoluteUrl(path);
+  const safeTitle = cleanSeoText(title, 90);
+  const safeDescription = cleanSeoText(description, 190);
+  const safeImage = image.startsWith("http://") || image.startsWith("https://") || image.startsWith("/")
+    ? image
+    : DEFAULT_OG_IMAGE;
+
   return {
-    title, description,
-    keywords: [...new Set([...keywords, ...GLOBAL_KEYWORDS])].slice(0, 50),
+    title: safeTitle,
+    description: safeDescription,
+    keywords: uniqueKeywords([...keywords, ...GLOBAL_KEYWORDS]),
     alternates: { canonical: url },
     robots: noIndex
       ? { index: false, follow: false, nocache: true }
-      : { index: true, follow: true, googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1, "max-video-preview": -1 } },
-    openGraph: { title, description, url, siteName: SITE_NAME, images: [{ url: absoluteUrl(image), width: 512, height: 512, alt: title }], locale: "fa_IR", type: "website" },
-    twitter: { card: "summary_large_image", title, description, images: [absoluteUrl(image)] },
+      : {
+          index: true,
+          follow: true,
+          googleBot: {
+            index: true,
+            follow: true,
+            "max-image-preview": "large",
+            "max-snippet": -1,
+            "max-video-preview": -1,
+          },
+        },
+    openGraph: {
+      title: safeTitle,
+      description: safeDescription,
+      url,
+      siteName: SITE_NAME,
+      images: [{ url: absoluteUrl(safeImage), width: 512, height: 512, alt: safeTitle }],
+      locale: "fa_IR",
+      type: "website",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: safeTitle,
+      description: safeDescription,
+      images: [absoluteUrl(safeImage)],
+    },
   };
 }
 
