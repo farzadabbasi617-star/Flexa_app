@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { isLikelyPostgresUrl, normalizeDatabaseUrl } from "@/lib/database-url";
+import { shouldUseSsl } from "@/db/ssl-policy";
 
 const databaseUrl = normalizeDatabaseUrl(process.env.DATABASE_URL);
 
@@ -29,6 +30,8 @@ if (!databaseUrl) {
  */
 const noVerify = process.env.DB_SSL_NO_VERIFY === "true";
 
+const useSsl = shouldUseSsl(databaseUrl);
+
 const globalForDb = globalThis as typeof globalThis & {
   __gamentPool?: Pool;
 };
@@ -44,7 +47,7 @@ export const pool =
   globalForDb.__gamentPool ??
   new Pool({
     connectionString: databaseUrl,
-    ssl: { rejectUnauthorized: !noVerify },
+    ssl: useSsl ? { rejectUnauthorized: !noVerify } : false,
     max: poolMax,
     min: 0,
     idleTimeoutMillis: Number(process.env.DB_IDLE_TIMEOUT_MS || 30000),
