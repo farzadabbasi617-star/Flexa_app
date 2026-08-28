@@ -4,6 +4,7 @@ import { eq, or, desc } from 'drizzle-orm';
 import { SITE_URL } from '@/lib/seo';
 import { gameLandings } from '@/lib/game-landing';
 import { STATIC_HONORS } from '@/lib/static-honors';
+import { pseoBuyPages, pseoTournamentPages, pseoNewsPages } from '@/lib/pseo-content';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const baseUrl = SITE_URL;
@@ -43,6 +44,36 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: page.priority,
     });
   });
+
+  // ==================== صفحات Programmatic SEO (راهنمای خرید، هاب تورنومنت، هاب اخبار) ====================
+
+  pseoBuyPages.forEach(page => {
+    routes.push({
+      url: `${baseUrl}/buy/${page.slug}`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    });
+  });
+
+  pseoTournamentPages.forEach(page => {
+    routes.push({
+      url: `${baseUrl}/tournament/${page.slug}`,
+      lastModified: now,
+      changeFrequency: 'hourly',
+      priority: 0.85,
+    });
+  });
+
+  pseoNewsPages.forEach(page => {
+    routes.push({
+      url: `${baseUrl}/news/${page.slug}`,
+      lastModified: now,
+      changeFrequency: 'daily',
+      priority: 0.8,
+    });
+  });
+
 
   gameLandings.forEach(game => {
     routes.push({

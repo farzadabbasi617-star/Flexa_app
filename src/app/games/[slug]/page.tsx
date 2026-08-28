@@ -5,6 +5,7 @@ import Navbar from "@/components/Navbar";
 import BottomNav from "@/components/BottomNav";
 import { createPageMetadata, SITE_URL } from "@/lib/seo";
 import { gameLandings, getGameLanding } from "@/lib/game-landing";
+import { pseoLinksForGame } from "@/lib/pseo-content";
 
 export function generateStaticParams() {
   return gameLandings.map((game) => ({ slug: game.slug }));
@@ -147,6 +148,20 @@ export default async function GameLandingPage({ params }: { params: Promise<{ sl
                 دیدن رتبه‌بندی بازیکنان
               </Link>
             </div>
+
+            {/* حلقهٔ لینک‌سازی داخلی صفحات Programmatic SEO */}
+            <div className="flex flex-wrap gap-2 mt-5">
+              {pseoLinksForGame(game.gameId).map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="text-xs font-bold text-gray-300 bg-white/5 border border-white/10 rounded-full px-4 py-2 hover:bg-white/10 hover:text-white transition"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+
           </section>
         </section>
       </main>
