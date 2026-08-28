@@ -861,7 +861,9 @@ export async function publishReviewedNewsDraft(draft: {
 }
 
 export async function generateDailyGamingNews({ force = false } = {}) {
-  const cleanup = await cleanupOldNews(7);
+  // مدت ماندگاری خبر در تالار افتخارات — پیش‌فرض ۳۰ روز، با GAMING_NEWS_RETENTION_DAYS قابل تنظیم
+  const retentionDays = Math.max(1, Math.floor(Number(process.env.GAMING_NEWS_RETENTION_DAYS) || 30));
+  const cleanup = await cleanupOldNews(retentionDays);
   const collection = await collectGamingNewsItems();
   const items = collection.items
     .sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime());

@@ -73,12 +73,14 @@ export async function GET() {
         viewsCount: staticCounts.get(item.id)?.views || 0,
       }));
 
+      // مدت نمایش خبر در تالار افتخارات — پیش‌فرض ۳۰ روز، با GAMING_NEWS_RETENTION_DAYS قابل تنظیم
+      const newsRetentionDays = Math.max(1, Math.floor(Number(process.env.GAMING_NEWS_RETENTION_DAYS) || 30));
       const rows = await db
         .select()
         .from(honors)
         .where(and(
           eq(honors.status, "approved"),
-          sql`(${honors.source} <> 'ai_news' OR COALESCE(${honors.publishedAt}, ${honors.createdAt}) >= NOW() - INTERVAL '7 days')`,
+          sql`(${honors.source} <> 'ai_news' OR COALESCE(${honors.publishedAt}, ${honors.createdAt}) >= NOW() - (${newsRetentionDays}::int * INTERVAL '1 day'))`,
         ))
         .orderBy(desc(honors.publishedAt), desc(honors.createdAt))
         .limit(100);
