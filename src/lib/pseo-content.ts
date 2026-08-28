@@ -66,7 +66,7 @@ export const pseoBuyPages: PseoBuyPage[] = [
       game: "cod_mobile",
       currencyKind: "cp",
     },
-    metaTitle: "خرید CP کالاف دیوتی موبایل از گیمنت",
+    metaTitle: "خرید CP کالاف دیوتی موبایل",
     metaDescription: "راهنمای کامل خرید CP کالاف دیوتی موبایل. بررسی پکیج‌ها، نکات امنیتی شارژ روی اکانت شخصی و مراحل پرداخت سریع در گیمنت.",
     h1: "خرید CP کالاف دیوتی موبایل: راهنمای جامع",
     intro: [
@@ -120,7 +120,7 @@ export const pseoBuyPages: PseoBuyPage[] = [
       game: "clash_royale",
       currencyKind: "gem",
     },
-    metaTitle: "خرید جم کلش رویال | گیمنت",
+    metaTitle: "خرید جم کلش رویال",
     metaDescription: "خرید جم کلش رویال با تحویل فوری و امن در گیمنت. برای شروع سریع ساخت، خرید صندوق و پاس سیزن، جم را از فروشگاه گیمنت تهیه کن.",
     h1: "راهنمای کامل خرید جم کلش رویال",
     intro: [
@@ -174,7 +174,7 @@ export const pseoBuyPages: PseoBuyPage[] = [
       kind: "account",
       game: "cod_mobile",
     },
-    metaTitle: "خرید اکانت کالاف دیوتی موبایل | راهنمای گیمنت",
+    metaTitle: "خرید اکانت کالاف دیوتی موبایل | راهنمای",
     metaDescription: "راهنمای جامع خرید اکانت کالاف دیوتی موبایل. نکات مهم درباره سطح، اسکین‌ها و ریسک‌های خرید از افراد ناشناس را بخوانید و با اطمینان از گیمنت اکانت خود را تهیه کنید.",
     h1: "راهنمای خرید اکانت کالاف دیوتی موبایل",
     intro: [
@@ -267,7 +267,7 @@ export const pseoBuyPages: PseoBuyPage[] = [
       kind: "currency",
       currencyKind: "uc",
     },
-    metaTitle: "خرید UC پابجی موبایل در گیمنت",
+    metaTitle: "خرید UC پابجی موبایل",
     metaDescription: "راهنمای کامل خرید UC پابجی موبایل از گیمنت. آشنایی با پکیج‌ها، روش شارژ با آیدی و مراحل ساده و امن دریافت crédits برای خرید اسکین و Royale Pass.",
     h1: "راهنمای تخصصی خرید UC پابجی موبایل",
     intro: [
@@ -320,7 +320,7 @@ export const pseoBuyPages: PseoBuyPage[] = [
       kind: "account",
       game: "clash_royale",
     },
-    metaTitle: "خرید اکانت کلش رویال | راهنمای کامل گیمنت",
+    metaTitle: "خرید اکانت کلش رویال | راهنمای کامل",
     metaDescription: "اگر به دنبال خرید اکانت کلش رویال با کارت‌های ماکس و سطح بالا هستی، این راهنما معیارهای ارزیابی، ریسک‌ها و روش تحویل امن در گیمنت را توضیح می‌دهد.",
     h1: "خرید اکانت کلش رویال: راهنمای انتخاب و تحویل امن",
     intro: [
@@ -366,7 +366,7 @@ export const pseoBuyPages: PseoBuyPage[] = [
       kind: "account",
       game: "fortnite",
     },
-    metaTitle: "خرید اکانت فورتنایت | گیمنت",
+    metaTitle: "خرید اکانت فورتنایت",
     metaDescription: "خرید اکانت فورتنایت با اسکین‌های OG و ریِر، لِوِل فصل بالا و تحویل امن. با مشاورهٔ حرفه‌ای گیمنت، اکانت امن خودت را انتخاب کن.",
     h1: "راهنمای خرید اکانت فورتنایت در گیمنت",
     intro: [
@@ -465,7 +465,7 @@ export const pseoBuyPages: PseoBuyPage[] = [
       kind: "item",
       titleLike: "PS5",
     },
-    metaTitle: "خرید بازی PS5 | راهنمای جامع گیمنت",
+    metaTitle: "خرید بازی PS5 | راهنمای جامع",
     metaDescription: "راهنمای کامل خرید بازی PS5؛ مقایسه نسخه دیجیتال و دیسک، نکات ریجن و پیش‌خرید. با گیمنت خریدی امن و سریع داشته باش.",
     h1: "خرید بازی PS5؛ راهنمای انتخاب هوشمندانه",
     intro: [
@@ -520,7 +520,7 @@ export const pseoTournamentPages: PseoTournamentPage[] = [
     slug: "clash-royale",
     keyword: "تورنومنت کلش رویال",
     game: "clash_royale",
-    metaTitle: "تورنومنت کلش رویال | گیمنت",
+    metaTitle: "تورنومنت کلش رویال",
     metaDescription: "در تورنومنت‌های آنلاین کلش رویال گیمنت با فرمت‌های ۱v۱ و کلن‌وار شرکت کن. داوری هوشمند، جایزه‌های واقعی و ثبت‌نام سریع از طریق تلگرام.",
     h1: "تورنومنت کلش رویال در گیمنت",
     intro: [
@@ -569,7 +569,7 @@ export const pseoTournamentPages: PseoTournamentPage[] = [
     slug: "cod-mobile",
     keyword: "تورنومنت کالاف دیوتی موبایل",
     game: "cod_mobile",
-    metaTitle: "تورنومنت کالاف دیوتی موبایل | گیمنت",
+    metaTitle: "تورنومنت کالاف دیوتی موبایل",
     metaDescription: "در تورنومنت‌های کالاف دیوتی موبایل گیمنت شرکت کن. فرمت‌های بتل‌رویال و مولتی‌پلیر، داوری شفاف، جایزه نقدی و ثبت‌نام سریع با تلگرام.",
     h1: "تورنومنت کالاف دیوتی موبایل در گیمنت",
     intro: [
@@ -611,7 +611,7 @@ export const pseoTournamentPages: PseoTournamentPage[] = [
     slug: "fortnite",
     keyword: "تورنومنت فورتنایت",
     game: "fortnite",
-    metaTitle: "تورنومنت فورتنایت | گیمنت",
+    metaTitle: "تورنومنت فورتنایت",
     metaDescription: "در تورنومنت‌های تخصصی فورتنایت گیمنت با فرمت‌های سولو، دوئو و اسکواد شرکت کن. با داوری هوشمند و سیستم کراس‌پلی، جایزه بگیر و رتبه‌ات را بالا ببر.",
     h1: "تورنومنت فورتنایت در گیمنت",
     intro: [
@@ -653,7 +653,7 @@ export const pseoTournamentPages: PseoTournamentPage[] = [
     slug: "free",
     keyword: "تورنومنت رایگان با جایزه",
     game: undefined,
-    metaTitle: "تورنومنت رایگان با جایزه | گیمنت",
+    metaTitle: "تورنومنت رایگان با جایزه",
     metaDescription: "در گیمنت تورنومنت رایگان با جایزه شرکت کن. بدون ریسک مالی، با داوری شفاف و سیستم کیف پول داخلی، مهارتت رو بسنج و جایزه بگیر.",
     h1: "شروع رقابت با تورنومنت رایگان با جایزه در گیمنت",
     intro: [
@@ -743,7 +743,7 @@ export const pseoNewsPages: PseoNewsPage[] = [
     slug: "cod-mobile",
     keyword: "اخبار کالاف دیوتی موبایل",
     game: "cod_mobile",
-    metaTitle: "اخبار کالاف دیوتی موبایل | هاب خبری گیمنت",
+    metaTitle: "اخبار کالاف دیوتی موبایل | هاب خبری",
     metaDescription: "از سیزن‌های جدید تا بالانس سلاح‌ها، همه چیز درباره کالاف دیوتی موبایل را اینجا بخوان. با ایندنبال‌کردن اخبار، استراتژی خودت را برای رنک‌گرفتن به‌روز نگه دار.",
     h1: "هاب اخبار کالاف دیوتی موبایل",
     intro: [
