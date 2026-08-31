@@ -8,17 +8,17 @@ export interface ParsedTrustedArticle {
 }
 
 const TRUSTED_ARTICLE_HOSTS: Record<GamingNewsGame, string[]> = {
-  clash_royale: ["supercell.com", "clashroyale.com", "royaleapi.com"],
-  cod_mobile: ["callofduty.com", "activision.com"],
-  fortnite: ["fortnite.com", "epicgames.com"],
+  clash_royale: ["supercell.com", "clashroyale.com", "royaleapi.com", "clash.com", "deckshop.pro"],
+  cod_mobile: ["callofduty.com", "activision.com", "leakersonduty.com", "codm.gg"],
+  fortnite: ["fortnite.com", "epicgames.com", "fortnite.gg", "fortniteinsider.com"],
 };
 
 // Official publishers commonly serve article artwork from these first-party
 // CDNs rather than from the exact article hostname.
 const TRUSTED_IMAGE_HOSTS: Record<GamingNewsGame, string[]> = {
-  clash_royale: ["supercell.com", "clashroyale.com", "royaleapi.com", "inbox.supercell.com"],
-  cod_mobile: ["callofduty.com", "activision.com"],
-  fortnite: ["fortnite.com", "epicgames.com", "unrealengine.com"],
+  clash_royale: ["supercell.com", "clashroyale.com", "royaleapi.com", "inbox.supercell.com", "clash.com", "deckshop.pro"],
+  cod_mobile: ["callofduty.com", "activision.com", "leakersonduty.com", "codm.gg"],
+  fortnite: ["fortnite.com", "epicgames.com", "unrealengine.com", "fortnite.gg", "fortniteinsider.com"],
 };
 
 function hostMatches(host: string, allowed: string[]) {

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { honorContentLikes, honorContentViews, honorLikes, honorViews, honors, telegramSentNotifications } from "@/db/schema";
 import { fetchAIResponse, isUsableAISecret, normalizeAIEnvValue } from "@/lib/ai-provider-manager";
 import { notifyAllUsersInApp } from "@/lib/app-notifications";
+import { publishHonorToTelegramTargets } from "@/lib/telegram";
 import { gamentSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import {
@@ -40,13 +41,20 @@ type GeneratedNews = {
 
 const NEWS_QUERIES: Array<{ game: NewsItem["game"]; query: string }> = [
   { game: "clash_royale", query: "site:supercell.com/en/games/clashroyale/blog Clash Royale when:4d" },
+  { game: "clash_royale", query: "site:royaleapi.com Clash Royale balance changes OR meta OR deck when:7d" },
+  { game: "clash_royale", query: "Clash Royale new season OR update OR card OR event when:7d" },
   { game: "cod_mobile", query: "site:callofduty.com/blog Call of Duty Mobile when:4d" },
+  { game: "cod_mobile", query: "Call of Duty Mobile new season OR update OR weapon OR event when:7d" },
+  { game: "cod_mobile", query: "site:leakersonduty.com Call of Duty Mobile when:7d" },
   { game: "fortnite", query: "site:fortnite.com/news Fortnite when:4d" },
+  { game: "fortnite", query: "Fortnite new season OR item shop OR update OR event when:7d" },
 ];
 
 const OFFICIAL_NEWS_INDEXES: Array<{ game: GamingNewsGame; url: string; source: string }> = [
   { game: "clash_royale", url: "https://supercell.com/en/games/clashroyale/blog/", source: "Supercell / Clash Royale" },
+  { game: "clash_royale", url: "https://royaleapi.com/blog/", source: "RoyaleAPI / Clash Royale" },
   { game: "cod_mobile", url: "https://www.callofduty.com/blog/mobile", source: "Call of Duty Mobile" },
+  { game: "cod_mobile", url: "https://leakersonduty.com/", source: "Leakers On Duty / COD Mobile" },
   { game: "fortnite", url: "https://www.fortnite.com/news", source: "Fortnite / Epic Games" },
 ];
 
@@ -727,7 +735,21 @@ ${sourcesText}
     link: `/honors/${created.id}`,
     dedupeKey: `app-news:${created.id}`,
   }).catch((err) => logger.warn({ err, honorId: created.id }, "Failed to create app notifications for generated news"));
-  logger.info({ honorId: created.id, title, game, sources: items.length }, "Generated daily game news");
+  // انتشار خودکار خبر به تلگرام (کانال اصلی + مقصدهای پیکربندی‌شده، با تصویر اصلی).
+  // خطا در ارسال تلگرام نباید تولید خبر را متوقف کند؛ در لاگ ثبت می‌شود.
+  const tg = await publishHonorToTelegramTargets({
+    id: created.id,
+    title,
+    description,
+    type: "news",
+    game,
+    imageUrl,
+    highlight: false,
+  }).catch((err) => {
+    logger.warn({ err, honorId: created.id }, "Failed to publish generated news to Telegram targets");
+    return { sent: 0, failed: 1 };
+  });
+  logger.info({ honorId: created.id, title, game, sources: items.length, tg }, "Generated daily game news");
   return { generated: true as const, honorId: created.id, title, game, sources: items.length, provider: ai.provider };
 }
 

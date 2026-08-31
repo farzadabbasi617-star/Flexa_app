@@ -263,6 +263,108 @@ export async function publishHonorToTelegramChannel(honor: {
   });
 }
 
+/**
+ * A list of extra Telegram destinations (channel and/or group chat ids) that a
+ * news/announcement should also be published to. Comma-separated in env:
+ *   GAMING_NEWS_TELEGRAM_TARGETS=-10012345, -10067890, @mygroup
+ * Each is normalized the same way as a channel id. Empty/absent -> only the
+ * primary channel ("getTelegramChannelChatId") is used, preserving past behavior.
+ */
+export function getTelegramNewsTargets(): string[] {
+  const raw = (process.env.GAMING_NEWS_TELEGRAM_TARGETS || "").split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+  const parsed = raw
+    .map(normalizeTelegramChannelChatId)
+    .filter((value): value is string => Boolean(value));
+  return parsed;
+}
+
+/**
+ * Publishes an honour/news post to the primary channel AND any configured
+ * extra targets (groups/channels) with the source image, exactly like the
+ * primary channel. Every missing image falls back to a text message.
+ *
+ * Returns the number of successful sends. A failure on one destination does
+ * not stop the others (so a bad group id never blocks the main channel).
+ */
+export async function publishHonorToTelegramTargets(honor: {
+  id: string;
+  title: string;
+  description: string;
+  type?: string | null;
+  game?: string | null;
+  imageUrl?: string | null;
+  highlight?: boolean | null;
+}): Promise<{ sent: number; failed: number }> {
+  const primary = getTelegramChannelChatId();
+  const targets = [primary, ...getTelegramNewsTargets()].filter(Boolean);
+  const unique = [...new Set(targets)];
+
+  let sent = 0;
+  let failed = 0;
+  for (const chatId of unique) {
+    try {
+      const result = await _publishHonorToChat(chatId, honor);
+      if (result) sent += 1;
+      else failed += 1;
+    } catch (err) {
+      logger.warn({ err, chatId, honorId: honor.id }, "Failed to publish honor to a news target");
+      failed += 1;
+    }
+  }
+  return { sent, failed };
+}
+
+async function _publishHonorToChat(chatId: string, honor: {
+  id: string;
+  title: string;
+  description: string;
+  type?: string | null;
+  game?: string | null;
+  imageUrl?: string | null;
+  highlight?: boolean | null;
+}): Promise<boolean> {
+  const url = `${appUrl()}/honors/${honor.id}`;
+  const label = honor.type === "news" ? "خبر جدید" : "افتخار جدید";
+  const game = honor.game ? `\n🎮 بازی: <b>${html(honor.game)}</b>` : "";
+  const text = [
+    `🏛 <b>${label} در تالار افتخارات Gament</b>`,
+    "",
+    `🔥 <b>${html(honor.title)}</b>`,
+    game,
+    "",
+    html((honor.description || "").slice(0, 650)),
+    "",
+    "برای دیدن جزئیات، لایک و سین خبر وارد Gament شو 👇",
+  ].filter(Boolean).join("\n");
+  const replyMarkup = {
+    inline_keyboard: [[
+      { text: "مشاهده در تالار افتخارات", url },
+      { text: "باز کردن Gament", web_app: { url: appUrl() } },
+    ]],
+  };
+
+  if (honor.imageUrl) {
+    const photo = await telegramApi("sendPhoto", {
+      chat_id: chatId,
+      photo: honor.imageUrl,
+      caption: text,
+      parse_mode: "HTML",
+      reply_markup: replyMarkup,
+    });
+    if (photo.ok) return true;
+  }
+  const msg = await telegramApi("sendMessage", {
+    chat_id: chatId,
+    text,
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+    reply_markup: replyMarkup,
+  });
+  return Boolean(msg.ok);
+}
+
 
 export async function notifyTournamentParticipantsOnTelegram(tournamentId: string, text: string, replyMarkup?: Record<string, unknown>) {
   try {
