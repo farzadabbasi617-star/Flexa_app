@@ -7,7 +7,6 @@ import {
   getTelegramChannelChatId,
   getTelegramNewsTargets,
 } from "@/lib/telegram";
-import { telegramApi } from "@/lib/telegram-api";
 
 /**
  * Review-then-publish for generated gaming news.
@@ -61,6 +60,31 @@ export function ensureNewsReviewSchema(client: any = db) {
 
 // --- helpers -----------------------------------------------------------------
 const APP_URL = (process.env.APP_URL || "https://www.gament1.ir").replace(/\/$/, "");
+
+/**
+ * The review/publish channel lives on the *Add_members* bot
+ * (GAMING_NEWS_REVIEW_BOT_TOKEN = @NewAdd_members_bot), because that bot — not
+ * the site's FlexaTournamentBot — is the administrator of @Flexa_games and is
+ * the bot the owner actually uses. All review + channel sends go through it.
+ */
+function reviewBotToken(): string {
+  return (process.env.GAMING_NEWS_REVIEW_BOT_TOKEN || process.env.BOT_TOKEN || "").trim();
+}
+
+async function reviewBotApi<T = { message_id?: number }>(
+  method: string,
+  payload: Record<string, unknown>,
+): Promise<{ ok: boolean; result?: T; description?: string }> {
+  const token = reviewBotToken();
+  if (!token) return { ok: false, description: "GAMING_NEWS_REVIEW_BOT_TOKEN missing" };
+  const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  const json = (await response.json().catch(() => ({}))) as { ok?: boolean; result?: T; description?: string };
+  return { ok: Boolean(json.ok), result: json.result, description: json.description };
+}
 
 function html(value: unknown) {
   return String(value ?? "")
@@ -151,7 +175,7 @@ export async function sendNewsForApproval(honor: NewsReviewHonor): Promise<{ sen
       let messageId: number | undefined;
       let hasPhoto = false;
       if (honor.imageUrl) {
-        const photo = await telegramApi("sendPhoto", {
+        const photo = await reviewBotApi("sendPhoto", {
           chat_id: chatId,
           photo: honor.imageUrl,
           caption,
@@ -165,7 +189,7 @@ export async function sendNewsForApproval(honor: NewsReviewHonor): Promise<{ sen
         }
       }
       if (!messageId) {
-        const msg = await telegramApi("sendMessage", {
+        const msg = await reviewBotApi("sendMessage", {
           chat_id: chatId,
           text: caption,
           parse_mode: "HTML",
@@ -264,6 +288,15 @@ export async function saveCorrectedCaption(chatId: number, messageId: number, co
     .where(and(eq(newsReviews.reviewerChatId, chatId), eq(newsReviews.reviewerMessageId, messageId)));
 }
 
+/** Apply a corrected caption to every review row for a honour (used by the Add_members bot). */
+export async function saveCorrectedCaptionForHonor(honorId: string, correctedCaption: string) {
+  await ensureNewsReviewSchema();
+  await db
+    .update(newsReviews)
+    .set({ correctedCaption: correctedCaption.trim().slice(0, 1024), status: "pending", updatedAt: new Date() })
+    .where(eq(newsReviews.honorId, honorId));
+}
+
 export async function markReviewStatus(honorId: string, status: "approved" | "rejected" | "dismissed") {
   await ensureNewsReviewSchema();
   await db
@@ -296,7 +329,7 @@ export async function publishNewsToChannelTargets(
   for (const chatId of targets) {
     try {
       if (honor.imageUrl) {
-        const photo = await telegramApi("sendPhoto", {
+        const photo = await reviewBotApi("sendPhoto", {
           chat_id: chatId,
           photo: honor.imageUrl,
           caption,
@@ -308,7 +341,7 @@ export async function publishNewsToChannelTargets(
           continue;
         }
       }
-      const msg = await telegramApi("sendMessage", {
+      const msg = await reviewBotApi("sendMessage", {
         chat_id: chatId,
         text: caption,
         parse_mode: "HTML",
