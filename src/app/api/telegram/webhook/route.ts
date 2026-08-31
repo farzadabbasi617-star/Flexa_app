@@ -77,6 +77,7 @@ import {
 import { getAdminIds, hasAdminAccess } from "./admin-access";
 import { downloadTelegramPhotoAsDataUrl, downloadTelegramQrPhoto } from "./files";
 import { parseTelegramCommand } from "./command-router";
+import { handleNewsReviewCallback, handleNewsReviewReply } from "./news-review-callback";
 import {
   claimTelegramUpdate,
   completeTelegramUpdate,
@@ -4195,6 +4196,14 @@ async function handleCallback(callback: TelegramCallbackQuery) {
   const telegramId = String(callback.from.id);
   const data = callback.data || "";
 
+  // News review buttons (approve / edit / reject) are handled entirely here;
+  // they acknowledge their own callback. This is also what powers the reply to
+  // a review message (handleNewsReviewReply) with a corrected caption.
+  if (data.startsWith("news:")) {
+    await handleNewsReviewCallback(callback);
+    return;
+  }
+
   // A stale/expired Telegram callback acknowledgement must not prevent the
   // underlying action (notably the 1V1 button) from running.
   await answerCallback(callback.id).catch((err) => {
@@ -4511,6 +4520,11 @@ async function handleUpdate(update: TelegramUpdate) {
   const message = update.message;
   if (!message?.from) return;
   const text = message.text || "";
+
+  // A Reply to a news review message, carrying a corrected caption, is captured
+  // here before anything else (even in maintenance mode) so the owner can always
+  // fix and then publish a pending news item.
+  if (await handleNewsReviewReply(message)) return;
 
   if (!(await telegramFeatureEnabled("telegram_bot_enabled", true)) && !text.trim().startsWith("/admin")) {
     await sendMessage(message.chat.id, "ربات Gament فعلاً در حالت تعمیرات است. لطفاً کمی بعد دوباره تلاش کن.");

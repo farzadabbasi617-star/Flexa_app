@@ -62,6 +62,16 @@ export async function editMessage(chatId: number, messageId: number, text: strin
   });
 }
 
+export async function editMessageCaption(chatId: number, messageId: number, caption: string, replyMarkup?: Record<string, unknown>) {
+  return telegramApi("editMessageCaption", {
+    chat_id: chatId,
+    message_id: messageId,
+    caption,
+    parse_mode: "HTML",
+    reply_markup: replyMarkup,
+  });
+}
+
 export async function answerCallback(callbackQueryId: string, text?: string, showAlert = false) {
   return telegramApi("answerCallbackQuery", {
     callback_query_id: callbackQueryId,

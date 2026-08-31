@@ -11,6 +11,7 @@ import {
   index,
   uniqueIndex,
   numeric,
+  bigint,
 } from "drizzle-orm/pg-core";
 
 // --- ENUMS ---
@@ -422,6 +423,27 @@ export const honorContentLikes = pgTable("honor_content_likes", {
 }, (table) => ({
   contentIdx: index("honor_content_likes_content_id_idx").on(table.contentId),
   uniqueLikeIdx: uniqueIndex("honor_content_likes_content_visitor_unique").on(table.contentId, table.visitorKey),
+}));
+
+// News review queue: one or more rows per generated news honour, recording where
+// the owner's Telegram review message was delivered so an approve/reply/reject
+// can be resolved later. The physical table is created at runtime by
+// ensureNewsReviewSchema (src/lib/news-review.ts) to survive missing migrations;
+// this definition only gives the ORM a type-safe query builder.
+export const newsReviews = pgTable("news_reviews", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  honorId: uuid("honor_id").notNull().references(() => honors.id),
+  reviewerChatId: bigint("reviewer_chat_id", { mode: "number" }).notNull(),
+  reviewerMessageId: bigint("reviewer_message_id", { mode: "number" }),
+  reviewerTelegramId: varchar("reviewer_telegram_id", { length: 32 }),
+  hasPhoto: boolean("has_photo").notNull().default(false),
+  correctedCaption: text("corrected_caption"),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  honorIdx: index("news_reviews_honor_idx").on(table.honorId),
+  replyIdx: index("news_reviews_reply_idx").on(table.reviewerChatId, table.reviewerMessageId),
 }));
 
 // Players

@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { honorContentLikes, honorContentViews, honorLikes, honorViews, honors, telegramSentNotifications } from "@/db/schema";
 import { fetchAIResponse, isUsableAISecret, normalizeAIEnvValue } from "@/lib/ai-provider-manager";
 import { notifyAllUsersInApp } from "@/lib/app-notifications";
-import { publishHonorToTelegramTargets } from "@/lib/telegram";
+import { sendNewsForApproval } from "@/lib/news-review";
 import { gamentSystemPrompt } from "@/lib/ai-prompts";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import {
@@ -735,21 +735,20 @@ ${sourcesText}
     link: `/honors/${created.id}`,
     dedupeKey: `app-news:${created.id}`,
   }).catch((err) => logger.warn({ err, honorId: created.id }, "Failed to create app notifications for generated news"));
-  // انتشار خودکار خبر به تلگرام (کانال اصلی + مقصدهای پیکربندی‌شده، با تصویر اصلی).
-  // خطا در ارسال تلگرام نباید تولید خبر را متوقف کند؛ در لاگ ثبت می‌شود.
-  const tg = await publishHonorToTelegramTargets({
+  // خبر دیگر مستقیم در کانال انتشار نمی‌شود؛ برای تأیید مالک به ربات فرستاده
+  // می‌شود (با تصویر اصلی). تأیید مالک آن را در کانال منتشر می‌کند. خطا در ارسال
+  // برای تأیید نباید تولید خبر را متوقف کند؛ در لاگ ثبت می‌شود.
+  const review = await sendNewsForApproval({
     id: created.id,
     title,
     description,
-    type: "news",
     game,
     imageUrl,
-    highlight: false,
   }).catch((err) => {
-    logger.warn({ err, honorId: created.id }, "Failed to publish generated news to Telegram targets");
-    return { sent: 0, failed: 1 };
+    logger.warn({ err, honorId: created.id }, "Failed to send generated news for approval");
+    return { sent: 0, reviewers: 0 };
   });
-  logger.info({ honorId: created.id, title, game, sources: items.length, tg }, "Generated daily game news");
+  logger.info({ honorId: created.id, title, game, sources: items.length, review }, "Generated daily game news (awaiting owner review)");
   return { generated: true as const, honorId: created.id, title, game, sources: items.length, provider: ai.provider };
 }
 
