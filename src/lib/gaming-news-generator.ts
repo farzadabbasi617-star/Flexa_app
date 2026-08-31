@@ -904,8 +904,14 @@ export async function generateDailyGamingNews({ force = false } = {}) {
 
   // Publish every new trusted item, not one item per game/day. A small per-run
   // batch protects provider/runtime limits; later cron runs drain the rest.
-  const configuredBatch = Number(process.env.GAMING_NEWS_MAX_PER_RUN || "4");
-  const maxPerRun = Math.min(10, Math.max(1, Number.isFinite(configuredBatch) ? Math.floor(configuredBatch) : 4));
+  // GAMING_NEWS_MAX_PER_RUN: a positive number caps how many are processed per run.
+  // Use -1 (or 0 / empty) to process every new trusted item found, i.e. "no limit".
+  // The channel/group publishers already de-dupe, so repeating runs are safe.
+  const requested = Number(process.env.GAMING_NEWS_MAX_PER_RUN ?? "--");
+  const unlimited = !Number.isFinite(requested) || requested <= 0;
+  const maxPerRun = unlimited
+    ? Number.MAX_SAFE_INTEGER
+    : Math.min(60, Math.max(1, Math.floor(requested)));
   const candidates: NewsItem[] = [];
   for (const item of items) {
     if (candidates.length >= maxPerRun) break;
@@ -916,8 +922,9 @@ export async function generateDailyGamingNews({ force = false } = {}) {
     return { generated: false, generatedCount: 0, reason: "no_new_trusted_sources", diagnostics, cleanup };
   }
 
-  // Two translations at a time avoids provider bursts while keeping the
-  // endpoint comfortably inside the scheduled workflow timeout.
+  // Translate a few at a time to avoid provider bursts while keeping the
+  // endpoint comfortably inside the scheduled workflow timeout. With an
+  // unlimited batch the loop drains in bounded chunks.
   const results: Awaited<ReturnType<typeof generateNewsFromItem>>[] = [];
   for (let index = 0; index < candidates.length; index += 2) {
     results.push(...await Promise.all(candidates.slice(index, index + 2).map((item) => generateNewsFromItem(item, force))));
