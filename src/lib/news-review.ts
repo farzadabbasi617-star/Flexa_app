@@ -143,10 +143,13 @@ function reviewKeyboard(honorId: string) {
 }
 
 function channelKeyboard(honorId: string) {
+  // Channel posts only support `url` buttons — `web_app` buttons are not allowed
+  // in channels and return BUTTON_TYPE_INVALID, which previously made every
+  // channel publish fail.
   return {
     inline_keyboard: [[
       { text: "مشاهده در تالار افتخارات", url: `${APP_URL}/honors/${honorId}` },
-      { text: "باز کردن Gament", web_app: { url: APP_URL } },
+      { text: "ورود به Gament", url: APP_URL },
     ]],
   };
 }
