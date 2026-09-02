@@ -123,7 +123,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
 
   const fetchPlayers = useCallback(async () => {
     try {
-      const res = await fetch("/api/players");
+      const res = await fetch("/api/players?mine=1");
       const data = await res.json();
       setAllPlayers(Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : []);
     } catch {
@@ -322,7 +322,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     ? tournament.registrations.find((r) => r.registration.isOwner || r.player?.isOwner) || null
     : null;
   const isRegistered = Boolean(myRegistration);
-  const availablePlayers = allPlayers.filter((p) => !registeredIds.has(p.id) && (isAdmin || p.isOwner));
+  const availablePlayers = allPlayers.filter((p) => !registeredIds.has(p.id) && p.isOwner);
 
   // اگر فقط یک پروفایل بازیکن دارد (حالت عادی)، همان خودکار معتبر است —
   // بدون useEffect (هوک بعد از return زودهنگام = React #310).

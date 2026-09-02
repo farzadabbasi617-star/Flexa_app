@@ -27,6 +27,31 @@ export async function GET(request: NextRequest) {
           request
         )
       : null;
+    // mine=1: فقط پروفایل(های) بازیکنِ خود کاربرِ لاگین — برای انتخاب در
+    // ثبت‌نام تورنومنت بدون افشا شدن پروفایل‌های بقیه.
+    if (searchParams.get("mine") === "1") {
+      if (!currentUser) {
+        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      }
+      const ownRows = await db
+        .select({
+          id: players.id,
+          username: players.username,
+          displayName: players.displayName,
+          avatarUrl: users.avatarUrl,
+          rating: players.rating,
+          wins: players.wins,
+          losses: players.losses,
+          createdAt: players.createdAt,
+          gamentId: users.gamentId,
+        })
+        .from(players)
+        .leftJoin(users, eq(players.visibleUserId, users.id))
+        .where(eq(players.visibleUserId, currentUser.id))
+        .orderBy(desc(players.rating));
+      return NextResponse.json({ data: ownRows.map((p) => ({ ...p, isOwner: true })) });
+    }
+
     const [totalResult] = await db
       .select({ value: count() })
       .from(players);
