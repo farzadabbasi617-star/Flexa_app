@@ -1,16 +1,19 @@
-// gament-v5: forces every client to drop any previously cached knight/arena
-// icon (icons/manifest are fetched network-first anyway, but bumping the
-// cache name also forces old cached HTML/asset entries out immediately).
-const CACHE_NAME = 'gament-v5';
+// gament-v6: robust offline fallback.
+// v5 bug: on a flaky connection the HTML navigation fallback could resolve to
+// undefined (nothing cached) → respondWith(undefined) → net::ERR_FAILED →
+// Chrome shows its dead-end "This page couldn't load" page. v6 always has a
+// real response to hand back: the precached /offline.html.
+const CACHE_NAME = 'gament-v6';
 
 const PRECACHE = [
   '/icons/gament-icon-192.png',
   '/icons/gament-icon-512.png',
   '/icons/gament-logo-square.png',
   '/manifest.json',
+  '/offline.html',
 ];
 
-// Install — precache gament icons only
+// Install — precache gament icons + offline fallback page
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE))
@@ -18,7 +21,7 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate — delete ALL old caches (gament-v1/v2/v3 and old arena caches)
+// Activate — delete ALL old caches (gament-v1..v5 and old arena caches)
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
@@ -27,6 +30,16 @@ self.addEventListener('activate', (event) => {
   );
   self.clients.claim();
 });
+
+// Never hand undefined to respondWith — Chrome turns that into a hard
+// navigation error. If everything else fails, serve the offline page.
+const OFFLINE_FALLBACK = () =>
+  caches
+    .match('/offline.html')
+    .then((c) => c || new Response('<!doctype html><meta charset="utf-8"><body style="background:#0d0b16;color:#fff;font-family:sans-serif;text-align:center;padding-top:40vh">اتصال برقرار نیست — دوباره تلاش کن</body>', {
+      status: 503,
+      headers: { 'Content-Type': 'text/html; charset=utf-8' },
+    }));
 
 // Fetch strategy
 self.addEventListener('fetch', (event) => {
@@ -45,17 +58,21 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((c) => c.put(event.request, clone));
           return res;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() =>
+          caches.match(event.request).then((c) => c || Response.error())
+        )
     );
     return;
   }
 
-  // HTML pages: network-first (keep content fresh)
+  // HTML pages: network-first; offline → cached copy or /offline.html
   if (event.request.headers.get('accept')?.includes('text/html')) {
     event.respondWith(
-      fetch(event.request)
-        .then((res) => res)
-        .catch(() => caches.match(event.request).then((c) => c || caches.match('/')))
+      fetch(event.request).catch(() =>
+        caches
+          .match(event.request)
+          .then((c) => c || OFFLINE_FALLBACK())
+      )
     );
     return;
   }
@@ -75,8 +92,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Default: network-first
+  // Default: network-first → cached → offline page
   event.respondWith(
-    fetch(event.request).catch(() => caches.match(event.request))
+    fetch(event.request).catch(() =>
+      caches
+        .match(event.request)
+        .then((c) => c || (event.request.headers.get('accept')?.includes('text/html') ? OFFLINE_FALLBACK() : Response.error()))
+    )
   );
 });
