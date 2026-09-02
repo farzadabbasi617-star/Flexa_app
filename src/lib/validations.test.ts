@@ -93,11 +93,18 @@ describe("RegisterSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("rejects registration when nationalId is missing", () => {
+  it("accepts registration when nationalId is missing (deferred to first money flow)", () => {
     const { nationalId, ...withoutNid } = validBase;
     void nationalId;
     const result = RegisterSchema.safeParse(withoutNid);
-    expect(result.success).toBe(false);
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.nationalId ?? null).toBeNull();
+  });
+
+  it("accepts registration when nationalId is an empty string", () => {
+    const result = RegisterSchema.safeParse({ ...validBase, nationalId: "" });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.nationalId ?? null).toBeNull();
   });
 
   it("rejects registration with an invalid nationalId checksum", () => {

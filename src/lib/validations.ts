@@ -94,7 +94,13 @@ export const RegisterSchema = z.object({
   // Age-gate fields (see src/lib/age-gate.ts). Collected at signup so we
   // never have to interrupt a user mid-payment to ask for them.
   birthDate: registerBirthDateSchema,
-  nationalId: nationalIdSchema,
+  // کد ملی دیگر هنگام ثبت‌نام گرفته نمی‌شود — در اولین تراکنش مالی (شارژ
+  // کیف‌پول/برداشت) از طریق /api/profile/identity گرفته و قفل می‌شود.
+  // خالی یا ناموجود = null؛ اگر هم داده شود باید معتبر باشد.
+  nationalId: z.preprocess(
+    (v) => (typeof v === "string" && v.replace(/\D/g, "") === "" ? null : v),
+    nationalIdSchema.nullable().optional()
+  ),
   termsAccepted: z.boolean().refine((value) => value === true, "پذیرش قوانین و مقررات گیمنت الزامی است"),
   riskAndAgeAccepted: z.boolean().refine((value) => value === true, "تأیید هشدارها، محدودیت‌ها و اعلام مسئولیت سنی الزامی است"),
 });

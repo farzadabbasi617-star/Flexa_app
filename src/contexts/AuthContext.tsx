@@ -48,7 +48,6 @@ interface AuthContextType {
     firstName: string,
     lastName: string,
     birthDate: string,
-    nationalId: string,
     termsAccepted: boolean,
     riskAndAgeAccepted: boolean
   ) => Promise<{ success: boolean; pendingVerification?: boolean; email?: string; error?: string }>;
@@ -155,7 +154,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     firstName: string,
     lastName: string,
     birthDate: string,
-    nationalId: string,
     termsAccepted: boolean,
     riskAndAgeAccepted: boolean
   ) {
@@ -164,7 +162,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         method: "POST",
         headers: { "Content-Type": "application/json", ...csrfHeaders },
         credentials: "include",
-        body: JSON.stringify({ phoneNumber, email, username, password, firstName, lastName, birthDate, nationalId, termsAccepted, riskAndAgeAccepted }),
+        body: JSON.stringify({ phoneNumber, email, username, password, firstName, lastName, birthDate, termsAccepted, riskAndAgeAccepted }),
       });
 
       const data = await res.json();

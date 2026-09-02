@@ -73,11 +73,20 @@ async function POSTHandler(request: NextRequest) {
       .from(users)
       .where(or(ilike(users.email, email), ilike(users.username, username), eq(users.phoneNumber, phoneNumber)));
 
-    const [existingByNationalId] = await db
-      .select({ id: users.id, email: users.email })
-      .from(users)
-      .where(eq(users.nationalId, nationalId))
-      .limit(1);
+    // کد ملی اختیاری است (به اولین تراکنش مالی موکول شده) — فقط اگر داده
+    // شده باشد یکتایی چک می‌شود.
+    const nationalIdValue =
+      typeof nationalId === "string" && nationalId.replace(/\D/g, "") !== ""
+        ? nationalId.replace(/\D/g, "")
+        : null;
+
+    const [existingByNationalId] = nationalIdValue
+      ? await db
+          .select({ id: users.id, email: users.email })
+          .from(users)
+          .where(eq(users.nationalId, nationalIdValue))
+          .limit(1)
+      : [undefined];
 
     const existingByEmail = existing.find((u) => u.email?.toLowerCase() === email.toLowerCase());
     const reclaimingStaleAccount = Boolean(existingByEmail && !existingByEmail.emailVerifiedAt);
@@ -91,7 +100,7 @@ async function POSTHandler(request: NextRequest) {
       phoneTaken: existing.some((u) => u.phoneNumber === phoneNumber && u.id !== existingByEmail?.id),
       // National id must be unique site-wide, except on the abandoned
       // unverified row we are about to reclaim (same email).
-      nationalIdTaken: Boolean(existingByNationalId && existingByNationalId.id !== existingByEmail?.id),
+      nationalIdTaken: Boolean(nationalIdValue && existingByNationalId && existingByNationalId.id !== existingByEmail?.id),
     });
 
     if (conflict) {
@@ -132,7 +141,7 @@ async function POSTHandler(request: NextRequest) {
             displayName,
             email,
             birthDate,
-            nationalId,
+            nationalId: nationalIdValue,
             phoneVerifiedAt: null,
             emailVerifiedAt: null,
             isVerified: false,
@@ -165,7 +174,7 @@ async function POSTHandler(request: NextRequest) {
             displayName,
             email,
             birthDate,
-            nationalId,
+            nationalId: nationalIdValue,
             phoneVerifiedAt: null,
             emailVerifiedAt: null,
             isVerified: false,

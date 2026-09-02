@@ -15,7 +15,6 @@ import { isPasswordStrong } from "@/lib/password-strength";
 import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 import OtpCodeInput from "@/components/OtpCodeInput";
 import JalaliDatePicker from "@/components/JalaliDatePicker";
-import { isValidIranianNationalId } from "@/lib/validations";
 import { calculateAgeYears, MIN_ADULT_AGE, parseBirthDate } from "@/lib/age-gate";
 import { REFERRAL_CODE_COOKIE, normalizeInviteCode } from "@/lib/referral-invite";
 
@@ -30,7 +29,6 @@ export default function RegisterPage() {
     firstName: "",
     lastName: "",
     birthDate: "",
-    nationalId: "",
     password: "",
     confirmPassword: "",
     termsAccepted: false,
@@ -99,11 +97,6 @@ export default function RegisterPage() {
       );
       return;
     }
-    if (!isValidIranianNationalId(form.nationalId)) {
-      setError(lang === "fa" ? "کد ملی وارد شده معتبر نیست" : "National ID is not valid");
-      return;
-    }
-
     if (form.password !== form.confirmPassword) {
       setError(lang === "fa" ? "رمز عبور و تکرار آن یکسان نیستند" : "Passwords do not match");
       return;
@@ -138,7 +131,6 @@ export default function RegisterPage() {
       form.firstName.trim(),
       form.lastName.trim(),
       form.birthDate.trim(),
-      form.nationalId.replace(/\D/g, ""),
       form.termsAccepted,
       form.riskAndAgeAccepted
     );
@@ -433,27 +425,11 @@ export default function RegisterPage() {
                 })()}
               </div>
 
-              <div>
-                <label className="block text-sm text-gray-400 mb-2">
-                  {lang === "fa" ? "کد ملی" : "National ID (کد ملی)"} *
-                </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  required
-                  dir="ltr"
-                  maxLength={10}
-                  className="gaming-input text-left"
-                  placeholder="0012345678"
-                  value={form.nationalId}
-                  onChange={(e) =>
-                    setForm({ ...form, nationalId: e.target.value.replace(/\D/g, "").slice(0, 10) })
-                  }
-                />
-                <p className="text-[11px] text-gray-500 mt-1.5 leading-5">
+              <div className="rounded-xl bg-white/5 border border-white/10 p-3">
+                <p className="text-[11px] leading-5 text-gray-500">
                   {lang === "fa"
-                    ? "برای احراز هویت مالی الزامی است. با شخص دیگری قابل اشتراک‌گذاری نیست."
-                    : "Required for financial identity verification. Cannot be shared with anyone else."}
+                    ? "🪪 کد ملی لازم نیست — فقط هنگام اولین تراکنش مالی (شارژ کیف پول یا برداشت) برای احراز هویت از شما پرسیده می‌شود."
+                    : "🪪 No national ID needed now — we only ask for it during your first financial transaction (deposit or withdrawal)."}
                 </p>
               </div>
             </div>
