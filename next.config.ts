@@ -16,7 +16,6 @@ const scriptSrc = [
 
 const securityHeaders = [
   { key: "X-DNS-Prefetch-Control", value: "on" },
-  { key: "X-Frame-Options", value: "SAMEORIGIN" },
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), payment=(), clipboard-write=(self)" },
@@ -30,7 +29,7 @@ const securityHeaders = [
       "base-uri 'self'",
       "object-src 'none'",
       "form-action 'self'",
-      "frame-ancestors 'self'",
+      "frame-ancestors 'self' https://web.telegram.org https://telegram.org;",
       "upgrade-insecure-requests",
       `script-src ${scriptSrc}`,
       "style-src 'self' 'unsafe-inline'",
