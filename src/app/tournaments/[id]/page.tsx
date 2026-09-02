@@ -168,7 +168,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   }, [fetchTickets]);
 
   async function registerPlayer() {
-    if (!selectedPlayer) return;
+    if (!effectivePlayerId) return;
     if (isPrivateClashDraft && !privatePolicyAccepted) {
       setRegistrationError("قبل از ثبت‌نام باید قانون No-show و عدم بازگشت وجه را بپذیری.");
       return;
@@ -179,7 +179,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       const res = await fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-        body: JSON.stringify({ tournamentId: id, playerId: selectedPlayer, policyAccepted: privatePolicyAccepted, ticketId: useTicket ? applicableTicket?.id : undefined }),
+        body: JSON.stringify({ tournamentId: id, playerId: effectivePlayerId, policyAccepted: privatePolicyAccepted, ticketId: useTicket ? applicableTicket?.id : undefined }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "ثبت‌نام انجام نشد");
@@ -324,13 +324,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const isRegistered = Boolean(myRegistration);
   const availablePlayers = allPlayers.filter((p) => !registeredIds.has(p.id) && (isAdmin || p.isOwner));
 
-  // اگر کاربر فقط یک پروفایل بازیکن دارد (حالت عادی)، خودکار انتخاب شود —
-  // دیگر نیازی به دیالوگ «انتخاب بازیکن» نیست.
-  useEffect(() => {
-    if (!selectedPlayer && availablePlayers.length === 1) {
-      setSelectedPlayer(availablePlayers[0].id);
-    }
-  }, [availablePlayers, selectedPlayer]);
+  // اگر فقط یک پروفایل بازیکن دارد (حالت عادی)، همان خودکار معتبر است —
+  // بدون useEffect (هوک بعد از return زودهنگام = React #310).
+  const effectivePlayerId = selectedPlayer || (availablePlayers.length === 1 ? availablePlayers[0].id : "");
   const spotsLeft = Math.max(0, tournament.maxPlayers - tournament.registrations.length);
   const entryFee = tournament.entryFee || "رایگان";
   const entryFeeRial = parseTomanToRial(entryFee);
@@ -644,7 +640,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                       ) : (
                         <button
                           onClick={registerPlayer}
-                          disabled={!selectedPlayer || registering || (isPrivateClashDraft && !privatePolicyAccepted)}
+                          disabled={!effectivePlayerId || registering || (isPrivateClashDraft && !privatePolicyAccepted)}
                           className="gaming-btn disabled:opacity-50 text-sm"
                         >
                           {registering ? "..." : payWithTicket ? "ثبت‌نام رایگان با بلیت 🎟" : isPaidTournament ? "ثبت‌نام و کسر ورودی" : t.tournamentDetail.register}
