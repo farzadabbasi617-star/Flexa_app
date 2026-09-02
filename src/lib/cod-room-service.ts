@@ -48,7 +48,6 @@ import {
   type CodRegion,
   type CodRoomStatus,
 } from "@/lib/cod-room-policy";
-import { checkAgeGate } from "@/lib/age-gate";
 import { fetchAIResponse } from "@/lib/ai-provider-manager";
 import { safeParseAIJson } from "@/lib/ai-utils";
 import { affiliateAccrualLiveForUsers, ensureAffiliateSchema, AFFILIATE_HOLD_HOURS } from "@/lib/affiliate-service";
@@ -557,15 +556,11 @@ export async function joinCodRoom(input: { roomId: string; userId: string; rules
     // the seat away: flipping COD_ARENA_LIVE off must not turn paid rooms into
     // free ones.
     if (!live && entryFee > BigInt(0)) throw new Error("COD_PAID_ROOM_NOT_LIVE");
-    // A free room that still pays cash prizes has the same integrity
-    // requirements as a paid one: a minor must not win money, and an
-    // unverified game ID cannot be matched against the scoreboard at
-    // settlement. Gating on `entryFee > 0` alone let a free prize room admit
-    // both.
+    // A free room that still pays cash prizes keeps one integrity
+    // requirement: an unverified game ID cannot be matched against the
+    // scoreboard at settlement.
     const paysPrizes = bigIntFromText(room.prizeBudgetRial) > BigInt(0);
     if (entryFee > BigInt(0) || paysPrizes) {
-      const gate = checkAgeGate({ birthDate: account.birthDate, nationalId: account.nationalId });
-      if (!gate.ok) throw new Error("COD_AGE_GATE_BLOCKED");
       if (profile[roomGameConfig.profileFields.status] !== "verified") throw new Error("COD_PROFILE_NOT_VERIFIED");
     }
 

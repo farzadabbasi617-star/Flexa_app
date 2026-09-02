@@ -11,7 +11,6 @@ import { getEntryFeeRial } from "@/lib/tournament-finance";
 import { createWalletReference, sanitizeWalletNote, validateDepositAmountRial } from "@/lib/wallet-security";
 import { getZarinpalConfiguration } from "@/lib/zarinpal";
 import { startZarinpalDeposit } from "@/lib/zarinpal-deposit";
-import { checkAgeGate } from "@/lib/age-gate";
 import { evaluateUserAchievements, achievementProgressForUser } from "@/lib/achievement-service";
 import { LevelingService } from "@/lib/leveling-service";
 import { CLASH_1V1_CONFIG, ensureClash1v1Schema, finalizeMatchResult, refundClash1v1Match, suspendClash1v1Telegram } from "@/lib/clash-1v1";
@@ -3711,28 +3710,6 @@ async function handleConversationMessage(message: TelegramMessage) {
       return;
     }
 
-    // Paid tournaments are age-gated, and a deposit funds them, so the bot
-    // applies the same gate the web wallet does rather than routing around it.
-    const [payer] = await db
-      .select({ birthDate: users.birthDate, nationalId: users.nationalId, phoneNumber: users.phoneNumber, email: users.email })
-      .from(users)
-      .where(eq(users.id, linked.userId))
-      .limit(1);
-
-    if (payer) {
-      const gate = checkAgeGate({ birthDate: payer.birthDate, nationalId: payer.nationalId });
-      if (!gate.ok) {
-        await clearSession(telegramId);
-        // The gate message alone leaves the user stuck, since the identity
-        // fields can only be filled in on the web profile. Link straight to it.
-        await sendMessage(
-          chatId,
-          `🪪 ${html(gate.message)}\n\nکافی است یک‌بار کد ملی و تاریخ تولد را ثبت کنی؛ بعد از آن شارژ بدون محدودیت انجام می‌شود.`,
-          { inline_keyboard: [[{ text: "🪪 تکمیل اطلاعات هویتی", url: `${APP_URL}/profile/user` }]] }
-        );
-        return;
-      }
-    }
 
     const limit = await rateLimit(`wallet:deposit:zarinpal:${linked.userId}`, 8, 10 * 60 * 1000);
     if (!limit.success) {

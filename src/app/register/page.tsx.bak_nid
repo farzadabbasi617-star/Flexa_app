@@ -15,7 +15,8 @@ import { isPasswordStrong } from "@/lib/password-strength";
 import PasswordStrengthMeter from "@/components/PasswordStrengthMeter";
 import OtpCodeInput from "@/components/OtpCodeInput";
 import JalaliDatePicker from "@/components/JalaliDatePicker";
-import { calculateAgeYears, parseBirthDate } from "@/lib/age-gate";
+import { isValidIranianNationalId } from "@/lib/validations";
+import { calculateAgeYears, MIN_ADULT_AGE, parseBirthDate } from "@/lib/age-gate";
 import { REFERRAL_CODE_COOKIE, normalizeInviteCode } from "@/lib/referral-invite";
 
 export default function RegisterPage() {
@@ -29,6 +30,7 @@ export default function RegisterPage() {
     firstName: "",
     lastName: "",
     birthDate: "",
+    nationalId: "",
     password: "",
     confirmPassword: "",
     termsAccepted: false,
@@ -97,6 +99,11 @@ export default function RegisterPage() {
       );
       return;
     }
+    if (!isValidIranianNationalId(form.nationalId)) {
+      setError(lang === "fa" ? "کد ملی وارد شده معتبر نیست" : "National ID is not valid");
+      return;
+    }
+
     if (form.password !== form.confirmPassword) {
       setError(lang === "fa" ? "رمز عبور و تکرار آن یکسان نیستند" : "Passwords do not match");
       return;
@@ -117,7 +124,7 @@ export default function RegisterPage() {
     }
 
     if (!form.riskAndAgeAccepted) {
-      setError("برای ثبت‌نام، مطالعه و تأیید اخطارها و پذیرش مسئولیت الزامی است.");
+      setError("برای ثبت‌نام، مطالعه و تأیید اخطارها، محدودیت‌ها و اعلام مسئولیت سنی الزامی است.");
       return;
     }
 
@@ -131,6 +138,7 @@ export default function RegisterPage() {
       form.firstName.trim(),
       form.lastName.trim(),
       form.birthDate.trim(),
+      form.nationalId.replace(/\D/g, ""),
       form.termsAccepted,
       form.riskAndAgeAccepted
     );
@@ -425,11 +433,27 @@ export default function RegisterPage() {
                 })()}
               </div>
 
-              <div className="rounded-xl bg-white/5 border border-white/10 p-3">
-                <p className="text-[11px] leading-5 text-gray-500">
+              <div>
+                <label className="block text-sm text-gray-400 mb-2">
+                  {lang === "fa" ? "کد ملی" : "National ID (کد ملی)"} *
+                </label>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  required
+                  dir="ltr"
+                  maxLength={10}
+                  className="gaming-input text-left"
+                  placeholder="0012345678"
+                  value={form.nationalId}
+                  onChange={(e) =>
+                    setForm({ ...form, nationalId: e.target.value.replace(/\D/g, "").slice(0, 10) })
+                  }
+                />
+                <p className="text-[11px] text-gray-500 mt-1.5 leading-5">
                   {lang === "fa"
-                    ? "🪪 کد ملی لازم نیست — فقط هنگام اولین تراکنش مالی (شارژ کیف پول یا برداشت) برای احراز هویت از شما پرسیده می‌شود."
-                    : "🪪 No national ID needed now — we only ask for it during your first financial transaction (deposit or withdrawal)."}
+                    ? "برای احراز هویت مالی الزامی است. با شخص دیگری قابل اشتراک‌گذاری نیست."
+                    : "Required for financial identity verification. Cannot be shared with anyone else."}
                 </p>
               </div>
             </div>
@@ -477,6 +501,7 @@ export default function RegisterPage() {
                 <li>پرداخت ورودی، شارژ کیف پول و دریافت جایزه باید مطابق قوانین، توضیحات هر روم و وضعیت کیف پول انجام شود.</li>
                 <li>در صورت تقلب، تیم‌آپ، ورود با اکانت غیرمجاز، نداشتن مدرک یا نقض قوانین، امکان جریمه، بن یا ابطال نتیجه وجود دارد.</li>
                 <li>مسئولیت صحت اطلاعات هویتی، UID بازی، شماره تماس، ایمیل و دسترسی به حساب با کاربر است.</li>
+                <li>با تأیید این بخش اعلام می‌کنید که حداقل {MIN_ADULT_AGE} سال دارید یا مسئولیت قانونی استفاده از سرویس را می‌پذیرید.</li>
               </ul>
               <label className="mt-4 flex cursor-pointer select-none items-start gap-3 rounded-xl border border-amber-400/30 bg-black/20 p-3">
                 <input
@@ -485,7 +510,7 @@ export default function RegisterPage() {
                   checked={form.riskAndAgeAccepted}
                   onChange={(e) => setForm({ ...form, riskAndAgeAccepted: e.target.checked })}
                 />
-                <span>همه اخطارها و قوانین را خوانده‌ام و مسئولیت استفاده از سرویس را می‌پذیرم.</span>
+                <span>همه اخطارها و محدودیت‌ها را خوانده‌ام و تأیید می‌کنم که بالای {MIN_ADULT_AGE} سال هستم / مسئولیت اعلام سن و استفاده از سرویس را می‌پذیرم.</span>
               </label>
             </div>
 

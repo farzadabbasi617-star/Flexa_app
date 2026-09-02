@@ -7,7 +7,6 @@
  */
 import { NextRequest, NextResponse } from "next/server";
 import { validateSession } from "@/lib/auth";
-import { checkAgeGate } from "@/lib/age-gate";
 import { parseTomanToRial } from "@/lib/money";
 import { startZarinpalDeposit } from "@/lib/zarinpal-deposit";
 import { getZarinpalConfiguration } from "@/lib/zarinpal";
@@ -35,17 +34,6 @@ async function POSTHandler(request: NextRequest) {
       return NextResponse.json({ error: "برای شارژ کیف پول ابتدا وارد شوید." }, { status: 401 });
     }
 
-    // Deposits fund paid tournaments, so the same age gate as the manual flow applies.
-    const gate = checkAgeGate({ birthDate: user.birthDate, nationalId: user.nationalId });
-    if (!gate.ok) {
-      // Include a code and a destination so the caller can route the user to
-      // the fix instead of only showing text they cannot act on. The wallet UI
-      // checks this up front too; this covers a stale tab or a direct call.
-      return NextResponse.json(
-        { error: gate.message, code: gate.code, action: { label: "تکمیل اطلاعات هویتی", href: "/profile/user" } },
-        { status: 403 }
-      );
-    }
 
     const limit = await rateLimit(`wallet:deposit:zarinpal:${user.id}`, 8, 10 * 60 * 1000);
     if (!limit.success) {
