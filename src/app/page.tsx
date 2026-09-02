@@ -7,6 +7,7 @@ import TiltCard from "@/components/fx/TiltCard";
 import Reveal from "@/components/fx/Reveal";
 import MagneticButton from "@/components/fx/MagneticButton";
 import TrustBadges from "@/components/trust/TrustBadges";
+import TournamentCountdown from "@/components/TournamentCountdown";
 import { SITE_URL } from "@/lib/seo";
 import { db } from "@/db";
 import { siteImages, tournaments, registrations } from "@/db/schema";
@@ -296,32 +297,90 @@ export default async function LuxuryHomePage() {
             <TiltCard maxTilt={7} liftZ={12} className="rounded-[30px]">
               <Link
                 href={featuredTournament ? `/tournaments/${featuredTournament.id}` : "/tournaments"}
-                className="relative block overflow-hidden rounded-[30px] border border-cyan-300/15 bg-gradient-to-br from-cyan-950/30 to-[#0d0b16] p-5 min-h-[205px] group active:scale-[.99] transition"
+                className="relative block overflow-hidden rounded-[30px] border border-amber-300/25 bg-gradient-to-br from-amber-950/40 via-[#160f0d]/70 to-[#0d0b16] min-h-[205px] group active:scale-[.99] transition shadow-[0_0_45px_-12px_rgba(251,146,60,.45)]"
               >
-                <div className="absolute -top-14 -left-14 w-44 h-44 rounded-full bg-cyan-400/15 blur-3xl" />
+                {featuredTournament?.bannerUrl && (
+                  <>
+                    <AppImage
+                      src={featuredTournament.bannerUrl}
+                      alt={featuredTournament.name}
+                      fill
+                      priority
+                      sizes="(max-width: 1024px) 100vw, 45vw"
+                      className="absolute inset-0 w-full h-full object-cover opacity-85 group-hover:scale-[1.06] transition duration-700"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#0d0b16] via-[#0d0b16]/70 to-[#0d0b16]/10" />
+                  </>
+                )}
+                {!featuredTournament?.bannerUrl && (
+                  <div className="absolute -top-14 -left-14 w-44 h-44 rounded-full bg-amber-400/15 blur-3xl" />
+                )}
+
+                {/* هاله نورانی متحرک */}
+                <div
+                  className="pointer-events-none absolute -top-16 -right-10 w-44 h-44 rounded-full blur-3xl animate-pulse"
+                  style={{ background: "radial-gradient(circle, rgba(251,146,60,.35), transparent 65%)" }}
+                />
+                {/* نوار درخشش که از روی کارت می‌گذرد */}
+                <div className="pointer-events-none absolute inset-0 overflow-hidden">
+                  <div
+                    className="absolute inset-y-0 w-1/3 bg-gradient-to-r from-transparent via-white/10 to-transparent"
+                    style={{ animation: "gnt-shine 3.6s ease-in-out infinite" }}
+                  />
+                </div>
+
                 <div className="relative" style={{ transform: "translateZ(24px)" }}>
-                  <div className="text-[10px] font-black tracking-[0.24em] text-cyan-300 mb-3">
-                    NEXT TOURNAMENT
-                  </div>
-                  <h3 className="text-xl font-black leading-8 line-clamp-2">
-                    {featuredTournament?.name || "تورنومنت‌های فعال گیمنت"}
-                  </h3>
-                  <p className="text-xs text-gray-400 mt-3 leading-6">
-                    {featuredTournament
-                      ? `${gameLabel(featuredTournament.game)} • شروع: ${formatDate(featuredTournament.startDate)}`
-                      : "روم‌های فعال را ببین و وارد رقابت شو."}
-                  </p>
-                  {featuredTournament && (
-                    <div className="mt-5 grid grid-cols-2 gap-2 text-xs">
-                      <span className="rounded-xl bg-white/5 border border-white/10 px-3 py-2">
-                        {(featuredTournament.registeredCount || 0).toLocaleString("fa-IR")}/
-                        {(featuredTournament.maxPlayers || 0).toLocaleString("fa-IR")} نفر
-                      </span>
-                      <span className="rounded-xl bg-white/5 border border-white/10 px-3 py-2">
-                        {featuredTournament.entryFee || "رایگان"}
-                      </span>
+                  <div className="p-5">
+                    <div className="flex items-center justify-between gap-2 mb-3">
+                      <div className="text-[10px] font-black tracking-[0.24em] text-amber-300 drop-shadow-[0_0_10px_rgba(251,191,36,.65)]">
+                        NEXT TOURNAMENT
+                      </div>
+                      {featuredTournament && (
+                        <span className="shrink-0 inline-flex items-center gap-1.5 rounded-full border border-red-400/40 bg-red-500/15 px-2 py-0.5 text-[9px] font-black text-red-200">
+                          <span className="relative flex h-1.5 w-1.5">
+                            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                            <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-red-500" />
+                          </span>
+                          ثبت‌نام باز
+                        </span>
+                      )}
                     </div>
-                  )}
+                    <h3 className="text-xl font-black leading-8 line-clamp-2 drop-shadow-[0_2px_10px_rgba(0,0,0,.85)]">
+                      {featuredTournament?.name || "تورنومنت‌های فعال گیمنت"}
+                    </h3>
+                    <p className="text-[11px] text-gray-300 mt-1.5 leading-5">
+                      {featuredTournament
+                        ? `${gameLabel(featuredTournament.game)} • ${formatDate(featuredTournament.startDate)}`
+                        : "روم‌های فعال را ببین و وارد رقابت شو."}
+                    </p>
+
+                    {featuredTournament && (
+                      <TournamentCountdown target={featuredTournament.startDate} />
+                    )}
+
+                    {featuredTournament && (
+                      <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300/35 bg-amber-400/10 px-2 py-1 font-black text-amber-200 shadow-[0_0_14px_rgba(251,191,36,.18)]">
+                          🥇 {featuredTournament.prizePool || "۱۰۰٬۰۰۰ تومان نقدی"}
+                        </span>
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-fuchsia-300/30 bg-fuchsia-400/10 px-2 py-1 font-black text-fuchsia-200">
+                          🥈🥉 بلیت رایگان 🎟
+                        </span>
+                      </div>
+                    )}
+
+                    {featuredTournament && (
+                      <div className="mt-2.5 grid grid-cols-2 gap-2 text-xs">
+                        <span className="rounded-xl bg-black/45 border border-white/10 px-3 py-2 backdrop-blur-sm">
+                          {(featuredTournament.registeredCount || 0).toLocaleString("fa-IR")}/
+                          {(featuredTournament.maxPlayers || 0).toLocaleString("fa-IR")} نفر
+                        </span>
+                        <span className="rounded-xl bg-black/45 border border-white/10 px-3 py-2 backdrop-blur-sm">
+                          {featuredTournament.entryFee || "رایگان"}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </Link>
             </TiltCard>

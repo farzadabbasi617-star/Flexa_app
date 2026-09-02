@@ -698,3 +698,9 @@ body:has(.site-bottom-nav) {
 @media (prefers-reduced-motion: reduce) {
   .animate-\[trust-spin_9s_linear_infinite\] { animation: none; }
 }
+
+/* گیمنت — نوار درخشش کارت تورنومنت */
+@keyframes gnt-shine {
+  0% { transform: translateX(-180%) skewX(-18deg); }
+  55%, 100% { transform: translateX(380%) skewX(-18deg); }
+}
