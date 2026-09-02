@@ -489,6 +489,30 @@ export const registrations = pgTable("registrations", {
   tournamentUserUnique: uniqueIndex("registrations_tournament_user_unique").on(table.tournamentId, table.visibleUserId),
 }));
 
+// Admin-issued free-entry tickets for paid tournaments (0048).
+// A ticket belongs to one user; tournament_id NULL means it can be spent on
+// any paid tournament. It fully covers the entry fee of one registration.
+export const tournamentTickets = pgTable("tournament_tickets", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: varchar("code", { length: 20 }).notNull().unique(),
+  userId: uuid("user_id").notNull().references(() => users.id),
+  tournamentId: uuid("tournament_id").references(() => tournaments.id),
+  maxUses: integer("max_uses").notNull().default(1),
+  usedCount: integer("used_count").notNull().default(0),
+  status: varchar("status", { length: 20 }).notNull().default("active"),
+  note: text("note"),
+  issuedById: uuid("issued_by_id").references(() => users.id),
+  expiresAt: timestamp("expires_at"),
+  usedAt: timestamp("used_at"),
+  usedTournamentId: uuid("used_tournament_id").references(() => tournaments.id),
+  usedRegistrationId: uuid("used_registration_id").references(() => registrations.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  ticketUserIdx: index("tournament_tickets_user_idx").on(table.userId),
+  ticketStatusIdx: index("tournament_tickets_status_idx").on(table.status),
+  ticketTournamentIdx: index("tournament_tickets_tournament_idx").on(table.tournamentId),
+}));
+
 // Standalone Clash Royale 1V1 paid queue entries.
 // This is intentionally separate from tournament registrations: a 1V1 queue is
 // not a room/bracket signup and the same player may buy a new entry for a new

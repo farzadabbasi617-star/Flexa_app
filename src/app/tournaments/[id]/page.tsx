@@ -104,6 +104,8 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const [registrationError, setRegistrationError] = useState("");
   const [privatePolicyAccepted, setPrivatePolicyAccepted] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [myTickets, setMyTickets] = useState<Array<{ id: string; code: string; tournamentId: string | null; tournamentName: string | null; expiresAt: string | null }>>([]);
+  const [useTicket, setUseTicket] = useState(false);
   const isAdmin = user?.role === "admin" || user?.role === "super_admin";
   const countdown = useCountdown(tournament?.startDate);
 
@@ -152,6 +154,19 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
     fetchWalletBalance();
   }, [fetchWalletBalance]);
 
+  const fetchTickets = useCallback(async () => {
+    if (!user) { setMyTickets([]); return; }
+    try {
+      const res = await fetch("/api/tickets", { cache: "no-store" });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) setMyTickets(Array.isArray(data.active) ? data.active : []);
+    } catch { setMyTickets([]); }
+  }, [user]);
+
+  useEffect(() => {
+    fetchTickets();
+  }, [fetchTickets]);
+
   async function registerPlayer() {
     if (!selectedPlayer) return;
     if (isPrivateClashDraft && !privatePolicyAccepted) {
@@ -164,14 +179,16 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
       const res = await fetch("/api/registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json", "X-Requested-With": "XMLHttpRequest" },
-        body: JSON.stringify({ tournamentId: id, playerId: selectedPlayer, policyAccepted: privatePolicyAccepted }),
+        body: JSON.stringify({ tournamentId: id, playerId: selectedPlayer, policyAccepted: privatePolicyAccepted, ticketId: useTicket ? applicableTicket?.id : undefined }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "ثبت‌نام انجام نشد");
       await fetchTournament();
       await fetchWalletBalance();
+      await fetchTickets();
       setSelectedPlayer("");
       setPrivatePolicyAccepted(false);
+      setUseTicket(false);
     } catch (err) {
       setRegistrationError(err instanceof Error ? err.message : "ثبت‌نام انجام نشد");
     }
@@ -312,6 +329,9 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
   const entryFeeToman = rialToTomanNumber(entryFeeRial);
   const isPaidTournament = entryFeeRial > BigInt(0);
   const hasEnoughWallet = walletBalance !== null && walletBalance >= entryFeeToman;
+  // بلیت‌های قابل استفاده در این تورنومنت: بلیت سراسری (بدون تورنومنت مشخص) یا مخصوص همین تورنومنت
+  const applicableTicket = myTickets.find((t) => !t.tournamentId || t.tournamentId === id) || null;
+  const payWithTicket = isPaidTournament && !!applicableTicket && useTicket;
   const checkedInCount = tournament.registrations.filter((r) => r.registration.checkedInAt).length;
   const fillPercent = Math.min((tournament.registrations.length / Math.max(tournament.maxPlayers, 1)) * 100, 100);
   const completedMatches = tournament.matches.filter((m) => m.status === "completed").length;
@@ -534,7 +554,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-dark-700 rounded-2xl p-3 text-center">
                       <div className="text-xs text-gray-500 mb-1">ورودی</div>
-                      <div className={isPaidTournament ? "text-yellow-300 font-black" : "text-green-300 font-black"}>{entryFee}</div>
+                      <div className={isPaidTournament && !payWithTicket ? "text-yellow-300 font-black" : "text-green-300 font-black"}>{payWithTicket ? "رایگان 🎟" : entryFee}</div>
                     </div>
                     <div className="bg-dark-700 rounded-2xl p-3 text-center">
                       <div className="text-xs text-gray-500 mb-1">موجودی شما</div>
@@ -542,6 +562,21 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                     </div>
                   </div>
 
+                  {isPaidTournament && applicableTicket && (
+                    <label className="flex items-center gap-2 bg-green-500/10 border border-green-500/25 text-green-300 rounded-2xl p-3 text-sm cursor-pointer select-none">
+                      <input
+                        type="checkbox"
+                        checked={useTicket}
+                        onChange={(e) => setUseTicket(e.target.checked)}
+                        className="w-4 h-4 accent-green-500"
+                      />
+                      <span>
+                        🎟 استفاده از بلیت رایگان <b>{applicableTicket.code}</b>
+                        {applicableTicket.tournamentName ? ` (مخصوص: ${applicableTicket.tournamentName})` : " (قابل استفاده در هر تورنومنت پولی)"}
+                        {" "}— ورودی رایگان می‌شود
+                      </span>
+                    </label>
+                  )}
                   {isPaidTournament && walletBalance !== null && !hasEnoughWallet && (
                     <div className="bg-red-500/10 border border-red-500/20 text-red-300 rounded-2xl p-3 text-xs leading-6">
                       موجودی کیف پول برای ثبت‌نام کافی نیست. مبلغ لازم: {entryFeeToman.toLocaleString("fa-IR")} تومان.
@@ -598,7 +633,7 @@ export default function TournamentDetailPage({ params }: { params: Promise<{ id:
                           disabled={!selectedPlayer || registering || (isPrivateClashDraft && !privatePolicyAccepted)}
                           className="gaming-btn disabled:opacity-50 text-sm"
                         >
-                          {registering ? "..." : isPaidTournament ? "ثبت‌نام و کسر ورودی" : t.tournamentDetail.register}
+                          {registering ? "..." : payWithTicket ? "ثبت‌نام رایگان با بلیت 🎟" : isPaidTournament ? "ثبت‌نام و کسر ورودی" : t.tournamentDetail.register}
                         </button>
                       )}
                     </div>

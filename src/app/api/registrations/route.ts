@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/db";
-import { registrations, players, tournaments, transactions, wallets } from "@/db/schema";
+import { registrations, players, tournaments, transactions, wallets, tournamentTickets } from "@/db/schema";
 import { and, eq, count, sql } from "drizzle-orm";
 import { validateSession } from "@/lib/auth";
 import { checkAgeGate } from "@/lib/age-gate";
@@ -21,6 +21,8 @@ const registrationSchema = z.object({
   tournamentId: z.string().uuid(),
   playerId: z.string().uuid(),
   policyAccepted: z.boolean().optional().default(false),
+  // بلیت رایگان (اختیاری): اگر فرستده شود و معتبر باشد، ورودی کامل پوشش داده می‌شود.
+  ticketId: z.string().uuid().optional(),
 });
 
 function isPgUniqueViolation(error: unknown) {
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest) {
     if (!validation.success) {
       return NextResponse.json({ error: "ورودی‌های ارسالی نامعتبر هستند.", details: validation.error.format() }, { status: 400 });
     }
-    const { tournamentId, playerId, policyAccepted } = validation.data;
+    const { tournamentId, playerId, policyAccepted, ticketId } = validation.data;
 
     const isAdmin = user.role === "admin" || user.role === "super_admin";
     await ensurePrivateTournamentAttendanceSchema();
@@ -117,7 +119,39 @@ export async function POST(request: NextRequest) {
       const entryFeeRial = getEntryFeeRial(tournament.entryFee);
       let paymentTransactionId: string | null = null;
 
-      if (!isAdmin && entryFeeRial > BigInt(0)) {
+      // 🎟 بلیت رایگان: اگر ticketId معتبر باشد، ورودی کامل پوشش داده می‌شود
+      // و از کیف پول کسر نمی‌شود. مصرف بلیت اتمی است (قفل ردیف + شرط used<max).
+      let usedTicket: { id: string; code: string } | null = null;
+      if (ticketId && entryFeeRial > BigInt(0)) {
+        const [tk] = await tx
+          .select()
+          .from(tournamentTickets)
+          .where(eq(tournamentTickets.id, ticketId))
+          .for("update")
+          .limit(1);
+        if (!tk || tk.userId !== ownerId) throw new Error("TICKET_NOT_FOUND");
+        if (tk.status !== "active") throw new Error("TICKET_INACTIVE");
+        if (tk.usedCount >= tk.maxUses) throw new Error("TICKET_ALREADY_USED");
+        if (tk.expiresAt && tk.expiresAt.getTime() < Date.now()) throw new Error("TICKET_EXPIRED");
+        if (tk.tournamentId && tk.tournamentId !== tournamentId) throw new Error("TICKET_WRONG_TOURNAMENT");
+        const [ticketMarked] = await tx
+          .update(tournamentTickets)
+          .set({
+            usedCount: sql`${tournamentTickets.usedCount} + 1`,
+            usedAt: new Date(),
+            usedTournamentId: tournamentId,
+          })
+          .where(and(
+            eq(tournamentTickets.id, tk.id),
+            sql`${tournamentTickets.usedCount} < ${tournamentTickets.maxUses}`,
+            eq(tournamentTickets.status, "active")
+          ))
+          .returning({ id: tournamentTickets.id, code: tournamentTickets.code });
+        if (!ticketMarked) throw new Error("TICKET_ALREADY_USED");
+        usedTicket = ticketMarked;
+      }
+
+      if (!isAdmin && entryFeeRial > BigInt(0) && !usedTicket) {
         // Age-gate: paid tournaments are for adults only, and require a
         // registered national ID. Free tournaments are NOT affected by this
         // block — under-18s can still enjoy the free side of the app.
@@ -183,7 +217,14 @@ export async function POST(request: NextRequest) {
         })
         .returning();
 
-      return { registration: reg, entryFeeRial: entryFeeRial.toString(), paymentTransactionId, tournamentName: tournament.name, tournamentGame: tournament.game, tournamentCategory: tournament.categoryLabel, playerName: player.displayName };
+      if (usedTicket) {
+        await tx
+          .update(tournamentTickets)
+          .set({ usedRegistrationId: reg.id })
+          .where(eq(tournamentTickets.id, usedTicket.id));
+      }
+
+      return { registration: reg, entryFeeRial: entryFeeRial.toString(), paymentTransactionId, tournamentName: tournament.name, tournamentGame: tournament.game, tournamentCategory: tournament.categoryLabel, playerName: player.displayName, paidWithTicket: usedTicket ? usedTicket.code : null };
     });
 
     await evaluateUserAchievements(result.registration.visibleUserId).catch(() => undefined);
@@ -204,7 +245,7 @@ export async function POST(request: NextRequest) {
 
 🏆 ${result.tournamentName}
 👤 بازیکن: <b>${result.playerName}</b>
-💳 ورودی: <b>${formatTomanFromRial(bigIntFromText(result.entryFeeRial))}</b>${qrLine}
+💳 ورودی: <b>${result.paidWithTicket ? "رایگان (بلیت " + result.paidWithTicket + ")" : formatTomanFromRial(bigIntFromText(result.entryFeeRial))}</b>${qrLine}
 
 زمان چک‌این، لابی و نتیجه‌ها از همین ربات هم اطلاع‌رسانی می‌شود.`,
       replyKeyboard
@@ -224,6 +265,11 @@ export async function POST(request: NextRequest) {
       CLASH_TAG_NOT_VERIFIED: { text: "برای ثبت‌نام، ابتدا Player Tag کلش رویال را در پروفایل با Supercell API تأیید کن.", status: 409 },
       PRIVATE_POLICY_REQUIRED: { text: "برای ثبت‌نام باید قانون No-show و عدم بازگشت وجه را بپذیری.", status: 409 },
       CLASH_1V1_TELEGRAM_ONLY: { text: "ثبت‌نام 1V1 کلش فقط از بات انجام می‌شود تا پرداخت و QR امن ثبت شود.", status: 409 },
+      TICKET_NOT_FOUND: { text: "بلیت رایگان پیدا نشد یا متعلق به شما نیست.", status: 403 },
+      TICKET_INACTIVE: { text: "این بلیت لغو شده است.", status: 409 },
+      TICKET_ALREADY_USED: { text: "این بلیت قبلاً مصرف شده است.", status: 409 },
+      TICKET_EXPIRED: { text: "اعتبار این بلیت تمام شده است.", status: 409 },
+      TICKET_WRONG_TOURNAMENT: { text: "این بلیت مخصوص تورنومنت دیگری است.", status: 409 },
     };
 
     if (message === "INSUFFICIENT_BALANCE") {
