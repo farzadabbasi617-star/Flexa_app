@@ -8,6 +8,10 @@ import Link from "next/link";
  * می‌خورد و تلگرام قبل از کامل شدن، صفحه «Failed to load» نشان می‌دهد.
  * این صفحه عمداً بدون هیچ عکسی است (فقط متن + Tailwind) تا در <۱ ثانیه
  * بالا بیاید و تلگرام را نگه دارد؛ بقیه مسیرها از اینجا لینک می‌شوند.
+ *
+ * چالش JS کلادفلر هم بعضی وقت‌ها لحظه‌ی event load را دیر می‌کند؛
+ * MiniReloadGuard پایین صفحه اگر تا ۲.۵ ثانیه load کامل نشده بود یک بار
+ * reload می‌زند (بار دوم cf_clearance ست شده و سریع بالا می‌آید).
  */
 export const metadata: Metadata = {
   title: "گیمنت | منوی سریع",
@@ -22,12 +26,28 @@ const ITEMS = [
   { href: "/support", emoji: "🎧", title: "پشتیبانی", desc: "تیکت و ارتباط با ما" },
 ] as const;
 
+const RELOAD_GUARD = `(function(){
+  var done = false;
+  function ok(){ done = true; }
+  if (document.readyState === "complete") ok();
+  else window.addEventListener("load", ok);
+  setTimeout(function(){
+    if (!done) {
+      try { sessionStorage.setItem("gmini-retry", "1"); } catch (e) {}
+      location.reload();
+    }
+  }, 2500);
+})();`;
+
 export default function MiniMenuPage() {
   return (
     <main
       dir="rtl"
       className="min-h-screen bg-[#050508] text-white flex flex-col items-center justify-center px-5 py-8"
     >
+      {/* نگهبان reload — قبل از هر چیز لود شود */}
+      <script dangerouslySetInnerHTML={{ __html: RELOAD_GUARD }} />
+
       <div className="w-full max-w-md">
         <header className="text-center mb-7">
           <div className="text-3xl font-black tracking-tight">
