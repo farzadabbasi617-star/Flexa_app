@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>گیمنت | منوی سریع</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{min-height:100vh;display:flex;align-items:center;justify-content:center;background:#050508;color:#fff;
+       font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;padding:20px}
+  .wrap{width:100%;max-width:420px}
+  header{text-align:center;margin-bottom:22px}
+  .logo{font-size:30px;font-weight:900;background:linear-gradient(90deg,#c084fc,#60a5fa);
+        -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{font-size:11px;color:#6b7280;margin-top:6px}
+  a.item{display:flex;align-items:center;gap:14px;text-decoration:none;color:#fff;
+         border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);
+         border-radius:18px;padding:16px;margin-bottom:10px;transition:transform .08s}
+  a.item:active{transform:scale(.98);background:rgba(255,255,255,.08)}
+  .em{font-size:24px}
+  .t{font-weight:900;font-size:15px}
+  .d{font-size:11px;color:#9ca3af;margin-top:2px}
+  .arrow{color:#6b7280;font-size:18px}
+  .foot{text-align:center;margin-top:18px}
+  .foot a{color:#6b7280;font-size:11px;text-decoration:underline;text-underline-offset:4px}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="logo">گیمنت</div>
+      <div class="sub">ورود خودکار با تلگرام فعال است — یک بخش را انتخاب کن</div>
+    </header>
+    <a class="item" href="/tournaments"><span class="em">🏆</span><span style="flex:1"><span class="t">تورنومنت‌ها</span><span class="d" style="display:block">روم‌های باز و ثبت‌نام</span></span><span class="arrow">←</span></a>
+    <a class="item" href="/wallet"><span class="em">💰</span><span style="flex:1"><span class="t">کیف پول</span><span class="d" style="display:block">موجودی، شارژ و برداشت</span></span><span class="arrow">←</span></a>
+    <a class="item" href="/leaderboard"><span class="em">📊</span><span style="flex:1"><span class="t">جدول رتبه‌بندی</span><span class="d" style="display:block">برترین بازیکنان</span></span><span class="arrow">←</span></a>
+    <a class="item" href="/profile"><span class="em">👤</span><span style="flex:1"><span class="t">پروفایل من</span><span class="d" style="display:block">حساب و پروفایل بازیکن</span></span><span class="arrow">←</span></a>
+    <a class="item" href="/support"><span class="em">🎧</span><span style="flex:1"><span class="t">پشتیبانی</span><span class="d" style="display:block">تیکت و ارتباط با ما</span></span><span class="arrow">←</span></a>
+    <div class="foot"><a href="/">رفتن به صفحه کامل سایت</a></div>
+  </div>
+  <script>
+    // سرویس‌ورکرهای قدیمی/خراب پروفایل WebView تلگرام را خنثی کن —
+    // این صفحه هیچ SW لازم ندارد و نباید هیچ درخواستی ربوده شود.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (rs) {
+        rs.forEach(function (r) { r.unregister(); });
+      }).catch(function () {});
+    }
+    if (window.caches && caches.keys) {
+      caches.keys().then(function (ks) {
+        ks.forEach(function (k) { caches.delete(k); });
+      }).catch(function () {});
+    }
+  </script>
+</body>
+</html>
