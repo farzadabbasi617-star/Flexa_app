@@ -15,11 +15,24 @@ export default function PWAInstall() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [showIOSGuide, setShowIOSGuide] = useState(false);
   const [dismissed, setDismissed] = useState(false);
+  const [inAppBrowser, setInAppBrowser] = useState(false);
+  const [webAppUrl, setWebAppUrl] = useState("/");
 
   const isIOS = useCallback(() => {
     if (typeof window === "undefined") return false;
     return /iPad|iPhone|iPod/.test(navigator.userAgent) ||
       (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+  }, []);
+
+  // Google/Instagram/Telegram in-app WebViews cannot install PWAs — the
+  // banner must send the user to the real browser instead.
+  const detectInApp = useCallback(() => {
+    if (typeof window === "undefined") return false;
+    const ua = navigator.userAgent;
+    const inApp = /\bFB_IAB\b|FBAV|Instagram|Line\/|\bTGWebApp|Telegram-Android|Telegram-iOS|\/WebView\b|; wv\)/.test(ua);
+    setInAppBrowser(inApp);
+    if (inApp) setWebAppUrl(window.location.href);
+    return inApp;
   }, []);
 
   const isStandalone = useCallback(() => {
@@ -40,8 +53,8 @@ export default function PWAInstall() {
     const wasDismissed = localStorage.getItem("gament-pwa-dismissed");
     if (wasDismissed) {
       const dismissTime = parseInt(wasDismissed);
-      // Show again after 3 days
-      if (Date.now() - dismissTime < 3 * 24 * 60 * 60 * 1000) {
+      // Show again after 1 day (was 3 — install prompt is easy to miss)
+      if (Date.now() - dismissTime < 1 * 24 * 60 * 60 * 1000) {
         setDismissed(true);
       }
     }
@@ -50,6 +63,17 @@ export default function PWAInstall() {
     if (isStandalone()) {
       setIsInstalled(true);
       return;
+    }
+
+    const inApp = detectInApp();
+
+    // Inside Telegram/Instagram WebView: no install API exists — show the
+    // banner with an "open in browser" action right away.
+    if (inApp) {
+      const timer2 = setTimeout(() => {
+        if (!dismissed) setShowBanner(true);
+      }, 2500);
+      return () => clearTimeout(timer2);
     }
 
     // Listen for beforeinstallprompt (Android/Chrome)
@@ -80,7 +104,7 @@ export default function PWAInstall() {
       window.removeEventListener("beforeinstallprompt", handler);
       clearTimeout(timer);
     };
-  }, [dismissed, isIOS, isStandalone]);
+  }, [dismissed, detectInApp, isIOS, isStandalone]);
 
   async function handleInstall() {
     if (deferredPrompt) {
@@ -169,6 +193,25 @@ export default function PWAInstall() {
                       </span>
                     </div>
                   </div>
+                ) : inAppBrowser ? (
+                  <>
+                    <button
+                      onClick={() => {
+                        // خارج شدن از WebView به مرورگر واقعی — آنجا دکمه نصب خودکار می‌آید
+                        window.open(webAppUrl, "_blank");
+                        handleDismiss();
+                      }}
+                      className="flex-1 gaming-btn py-3 text-sm font-bold"
+                    >
+                      🌐 {lang === "fa" ? "باز کردن در کروم و نصب" : "Open in browser"}
+                    </button>
+                    <button
+                      onClick={handleDismiss}
+                      className="px-4 py-3 rounded-xl text-gray-500 text-sm hover:text-white transition-colors"
+                    >
+                      {lang === "fa" ? "بعداً" : "Later"}
+                    </button>
+                  </>
                 ) : (
                   <>
                     <button
